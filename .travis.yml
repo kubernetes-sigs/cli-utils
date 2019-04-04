@@ -1,0 +1,26 @@
+language: go
+
+os:
+- linux
+- osx
+
+env:
+- GO111MODULE=on 
+
+go:
+- "1.12"
+
+git:
+  depth: 1
+
+go_import_path: sigs.k8s.io/cli-experimental
+
+install:
+  - go get -u gopkg.in/alecthomas/gometalinter.v2 && gometalinter.v2 --install
+
+script:
+  - TRACE=1 ./scripts/check-everything.sh
+
+# TBD. Suppressing for now.
+notifications:
+  email: false
