@@ -1,0 +1,10 @@
+# go build binaries
+main
+cli-experimental
+
+#intellij
+.idea/
+*.iml
+
+# scripts/verify.sh creates a vendor for metalinter
+vendor/
