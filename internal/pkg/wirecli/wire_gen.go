@@ -10,21 +10,24 @@ import (
 	"sigs.k8s.io/cli-experimental/internal/pkg/apply"
 	"sigs.k8s.io/cli-experimental/internal/pkg/clik8s"
 	"sigs.k8s.io/cli-experimental/internal/pkg/status"
+	"sigs.k8s.io/cli-experimental/internal/pkg/util"
 	"sigs.k8s.io/cli-experimental/internal/pkg/wirecli/wiregit"
 	"sigs.k8s.io/cli-experimental/internal/pkg/wirecli/wirek8s"
 )
 
 // Injectors from wire.go:
 
-func InitializeStatus(resourceConfigPath clik8s.ResourceConfigPath, writer io.Writer) (*status.Status, error) {
+func InitializeStatus(resourceConfigPath clik8s.ResourceConfigPath, writer io.Writer, args util.Args) (*status.Status, error) {
 	fileSystem := wirek8s.NewFileSystem()
 	resourceConfigs, err := wirek8s.NewResourceConfig(resourceConfigPath, fileSystem)
 	if err != nil {
 		return nil, err
 	}
-	masterURL := wirek8s.NewMasterFlag()
-	kubeConfigPath := wirek8s.NewKubeConfigPathFlag()
-	config, err := wirek8s.NewRestConfig(masterURL, kubeConfigPath)
+	configFlags, err := wirek8s.NewConfigFlags(args)
+	if err != nil {
+		return nil, err
+	}
+	config, err := wirek8s.NewRestConfig(configFlags)
 	if err != nil {
 		return nil, err
 	}
@@ -44,10 +47,12 @@ func InitializeStatus(resourceConfigPath clik8s.ResourceConfigPath, writer io.Wr
 	return statusStatus, nil
 }
 
-func InitializeApply(resourceConfigPath clik8s.ResourceConfigPath, writer io.Writer) (*apply.Apply, error) {
-	masterURL := wirek8s.NewMasterFlag()
-	kubeConfigPath := wirek8s.NewKubeConfigPathFlag()
-	config, err := wirek8s.NewRestConfig(masterURL, kubeConfigPath)
+func InitializeApply(resourceConfigPath clik8s.ResourceConfigPath, writer io.Writer, args util.Args) (*apply.Apply, error) {
+	configFlags, err := wirek8s.NewConfigFlags(args)
+	if err != nil {
+		return nil, err
+	}
+	config, err := wirek8s.NewRestConfig(configFlags)
 	if err != nil {
 		return nil, err
 	}
@@ -72,15 +77,17 @@ func InitializeApply(resourceConfigPath clik8s.ResourceConfigPath, writer io.Wri
 	return applyApply, nil
 }
 
-func DoStatus(resourceConfigPath clik8s.ResourceConfigPath, writer io.Writer) (status.Result, error) {
+func DoStatus(resourceConfigPath clik8s.ResourceConfigPath, writer io.Writer, args util.Args) (status.Result, error) {
 	fileSystem := wirek8s.NewFileSystem()
 	resourceConfigs, err := wirek8s.NewResourceConfig(resourceConfigPath, fileSystem)
 	if err != nil {
 		return status.Result{}, err
 	}
-	masterURL := wirek8s.NewMasterFlag()
-	kubeConfigPath := wirek8s.NewKubeConfigPathFlag()
-	config, err := wirek8s.NewRestConfig(masterURL, kubeConfigPath)
+	configFlags, err := wirek8s.NewConfigFlags(args)
+	if err != nil {
+		return status.Result{}, err
+	}
+	config, err := wirek8s.NewRestConfig(configFlags)
 	if err != nil {
 		return status.Result{}, err
 	}
@@ -104,10 +111,12 @@ func DoStatus(resourceConfigPath clik8s.ResourceConfigPath, writer io.Writer) (s
 	return result, nil
 }
 
-func DoApply(resourceConfigPath clik8s.ResourceConfigPath, writer io.Writer) (apply.Result, error) {
-	masterURL := wirek8s.NewMasterFlag()
-	kubeConfigPath := wirek8s.NewKubeConfigPathFlag()
-	config, err := wirek8s.NewRestConfig(masterURL, kubeConfigPath)
+func DoApply(resourceConfigPath clik8s.ResourceConfigPath, writer io.Writer, args util.Args) (apply.Result, error) {
+	configFlags, err := wirek8s.NewConfigFlags(args)
+	if err != nil {
+		return apply.Result{}, err
+	}
+	config, err := wirek8s.NewRestConfig(configFlags)
 	if err != nil {
 		return apply.Result{}, err
 	}

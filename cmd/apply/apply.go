@@ -16,16 +16,17 @@ package apply
 import (
 	"fmt"
 
+	"sigs.k8s.io/cli-experimental/internal/pkg/util"
+
 	"sigs.k8s.io/cli-experimental/internal/pkg/clik8s"
 
 	"github.com/spf13/cobra"
 	"sigs.k8s.io/cli-experimental/cmd/apply/status"
 	"sigs.k8s.io/cli-experimental/internal/pkg/wirecli"
-	"sigs.k8s.io/cli-experimental/internal/pkg/wirecli/wirek8s"
 )
 
 // GetApplyCommand returns the `apply` cobra Command
-func GetApplyCommand() *cobra.Command {
+func GetApplyCommand(a util.Args) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "apply",
 		Short: ".",
@@ -35,7 +36,7 @@ func GetApplyCommand() *cobra.Command {
 
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
 		for i := range args {
-			r, err := wirecli.DoApply(clik8s.ResourceConfigPath(args[i]), cmd.OutOrStdout())
+			r, err := wirecli.DoApply(clik8s.ResourceConfigPath(args[i]), cmd.OutOrStdout(), a)
 			if err != nil {
 				return err
 			}
@@ -44,10 +45,7 @@ func GetApplyCommand() *cobra.Command {
 		return nil
 	}
 
-	// Add Flags
-	wirek8s.Flags(cmd)
-
 	// Add Commands
-	cmd.AddCommand(status.GetApplyStatusCommand())
+	cmd.AddCommand(status.GetApplyStatusCommand(a))
 	return cmd
 }

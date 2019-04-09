@@ -1,6 +1,7 @@
 # go build binaries
 main
 cli-experimental
+dyctl
 
 #intellij
 .idea/
@@ -8,3 +9,6 @@ cli-experimental
 
 # scripts/verify.sh creates a vendor for metalinter
 vendor/
+
+# go artifacts
+cover.out

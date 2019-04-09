@@ -1,3 +1,5 @@
+//+build wireinject
+
 /*
 Copyright 2019 The Kubernetes Authors.
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -11,37 +13,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package status
+package dy
 
 import (
-	"fmt"
+	"io"
 
+	"github.com/google/wire"
 	"sigs.k8s.io/cli-experimental/internal/pkg/util"
-
-	"github.com/spf13/cobra"
-	"sigs.k8s.io/cli-experimental/internal/pkg/clik8s"
 	"sigs.k8s.io/cli-experimental/internal/pkg/wirecli"
 )
 
-// GetApplyStatusCommand returns a new `apply status` command
-func GetApplyStatusCommand(a util.Args) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "status",
-		Short: ".",
-		Long:  ``,
-		Args:  cobra.MinimumNArgs(1),
-	}
-
-	cmd.RunE = func(cmd *cobra.Command, args []string) error {
-		for i := range args {
-			r, err := wirecli.DoStatus(clik8s.ResourceConfigPath(args[i]), cmd.OutOrStdout(), a)
-			if err != nil {
-				return err
-			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Resources: %v\n", len(r.Resources))
-		}
-		return nil
-	}
-
-	return cmd
+// InitializeCommandLister creates a new *CommandLister object
+func InitializeCommandBuilder(io.Writer, util.Args) (*CommandBuilder, error) {
+	panic(wire.Build(ProviderSet, wirecli.ProviderSet))
 }

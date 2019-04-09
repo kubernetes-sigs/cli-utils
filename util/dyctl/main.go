@@ -13,16 +13,8 @@ limitations under the License.
 
 package main
 
-import (
-	"fmt"
-	"os"
-
-	"sigs.k8s.io/cli-experimental/cmd"
-)
+import "sigs.k8s.io/cli-experimental/util/dyctl/cmd"
 
 func main() {
-	if err := cmd.Execute(os.Args, nil); err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
-		os.Exit(1)
-	}
+	cmd.Execute()
 }

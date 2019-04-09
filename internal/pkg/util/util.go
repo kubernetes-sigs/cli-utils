@@ -24,3 +24,6 @@ func HomeDir() string {
 	}
 	return os.Getenv("USERPROFILE") // windows
 }
+
+// Args are command line arguments
+type Args []string

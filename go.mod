@@ -14,7 +14,7 @@ require (
 	github.com/gogo/protobuf v1.2.1 // indirect
 	github.com/golang/mock v1.2.0 // indirect
 	github.com/google/btree v1.0.0 // indirect
-	github.com/google/go-github v17.0.0+incompatible
+	github.com/google/go-github v17.0.0+incompatible // indirect
 	github.com/google/go-querystring v1.0.0 // indirect
 	github.com/google/gofuzz v0.0.0-20170612174753-24818f796faf // indirect
 	github.com/google/wire v0.2.1
@@ -30,6 +30,7 @@ require (
 	github.com/modern-go/reflect2 v1.0.1 // indirect
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
 	github.com/spf13/cobra v0.0.3
+	github.com/spf13/pflag v1.0.3
 	github.com/spf13/viper v1.3.2 // indirect
 	github.com/stretchr/testify v1.2.2
 	go.opencensus.io v0.19.2 // indirect
@@ -37,12 +38,12 @@ require (
 	go.uber.org/multierr v1.1.0 // indirect
 	go.uber.org/zap v1.9.1 // indirect
 	golang.org/x/net v0.0.0-20190328230028-74de082e2cca // indirect
-	golang.org/x/oauth2 v0.0.0-20190319182350-c85d3e98c914
+	golang.org/x/oauth2 v0.0.0-20190319182350-c85d3e98c914 // indirect
 	golang.org/x/time v0.0.0-20190308202827-9d24e82272b4 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/src-d/go-git.v4 v4.10.0
-	k8s.io/api v0.0.0-20190327184913-92d2ee7fc726 // indirect
-	k8s.io/apiextensions-apiserver v0.0.0-20190328030136-8ada4fd07db4 // indirect
+	k8s.io/api v0.0.0-20190327184913-92d2ee7fc726
+	k8s.io/apiextensions-apiserver v0.0.0-20190328030136-8ada4fd07db4
 	k8s.io/apimachinery v0.0.0-20190326224424-4ceb6b6c5db5
 	k8s.io/cli-runtime v0.0.0-20190313123343-44a48934c135
 	k8s.io/client-go v2.0.0-alpha.0.0.20190313235726-6ee68ca5fd83+incompatible

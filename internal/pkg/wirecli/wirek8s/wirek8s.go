@@ -22,12 +22,14 @@ import (
 	"strings"
 
 	"github.com/google/wire"
-	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
+	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/kustomize"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/cli-experimental/internal/pkg/clik8s"
 	"sigs.k8s.io/cli-experimental/internal/pkg/util"
 	"sigs.k8s.io/kustomize/pkg/fs"
@@ -38,44 +40,94 @@ import (
 )
 
 // ProviderSet defines dependencies for initializing Kubernetes objects
-var ProviderSet = wire.NewSet(NewKubernetesClientSet, NewKubeConfigPathFlag, NewRestConfig,
-	NewMasterFlag, NewResourceConfig, NewFileSystem)
-var kubeConfigPathFlag string
-var master string
+var ProviderSet = wire.NewSet(NewKubernetesClientSet, NewExtensionsClientSet, NewConfigFlags, NewRestConfig,
+	NewResourceConfig, NewFileSystem, NewDynamicClient)
 
 // Flags registers flags for talkig to a Kubernetes cluster
-func Flags(command *cobra.Command) {
-	var path string
-	if len(util.HomeDir()) > 0 {
-		path = filepath.Join(util.HomeDir(), ".kube", "config")
-	} else {
-		path = ""
-		command.MarkFlagRequired("kubeconfig")
+func Flags(fs *pflag.FlagSet) {
+	kubeConfigFlags := genericclioptions.NewConfigFlags(false)
+	kubeConfigFlags.AddFlags(fs)
+}
+
+// HelpFlags is a list of flags to strips
+var HelpFlags = []string{"-h", "--help"}
+
+// WordSepNormalizeFunc normalizes flags
+func WordSepNormalizeFunc(f *pflag.FlagSet, name string) pflag.NormalizedName {
+	if strings.Contains(name, "_") {
+		return pflag.NormalizedName(strings.Replace(name, "_", "-", -1))
 	}
-	command.Flags().StringVar(&kubeConfigPathFlag,
-		"kubeconfig", path, "absolute path to the kubeconfig file")
-	command.Flags().StringVar(&master,
-		"master", "", "address of master")
+	return pflag.NormalizedName(name)
 }
 
-// NewKubeConfigPathFlag provides the path to the kubeconfig file
-func NewKubeConfigPathFlag() clik8s.KubeConfigPath {
-	return clik8s.KubeConfigPath(kubeConfigPathFlag)
+// NewConfigFlags parses flags used to generate the *rest.Config
+func NewConfigFlags(ar util.Args) (*genericclioptions.ConfigFlags, error) {
+	a := CopyStrSlice([]string(ar))
+
+	// IMPORTANT: If there is an error parsing flags--continue.
+	kubeConfigFlagSet := pflag.NewFlagSet("dispatcher-kube-config", pflag.ContinueOnError)
+	kubeConfigFlagSet.ParseErrorsWhitelist.UnknownFlags = true
+	kubeConfigFlagSet.SetNormalizeFunc(WordSepNormalizeFunc)
+	kubeConfigFlagSet.Set("namespace", "default")
+
+	unusedParameter := true // Could be either true or false
+	kubeConfigFlags := genericclioptions.NewConfigFlags(unusedParameter)
+	kubeConfigFlags.AddFlags(kubeConfigFlagSet)
+
+	// Remove help flags, since these are special-cased in pflag.Parse,
+	args := FilterList(a, HelpFlags)
+	if err := kubeConfigFlagSet.Parse(args); err != nil {
+		return nil, err
+	}
+
+	return kubeConfigFlags, nil
 }
 
-// NewMasterFlag returns the MasterURL parsed from the `--master` flag
-func NewMasterFlag() clik8s.MasterURL {
-	return clik8s.MasterURL(master)
+// FilterList returns a copy of "l" with elements from "toRemove" filtered out.
+func FilterList(l []string, rl []string) []string {
+	c := CopyStrSlice(l)
+	for _, r := range rl {
+		c = RemoveAllElements(c, r)
+	}
+	return c
+}
+
+// RemoveAllElements removes all elements from "s" which match the string "r".
+func RemoveAllElements(s []string, r string) []string {
+	for i, rlen := 0, len(s); i < rlen; i++ {
+		j := i - (rlen - len(s))
+		if s[j] == r {
+			s = append(s[:j], s[j+1:]...)
+		}
+	}
+	return s
+}
+
+// CopyStrSlice returns a copy of the slice of strings.
+func CopyStrSlice(s []string) []string {
+	c := make([]string, len(s))
+	copy(c, s)
+	return c
 }
 
 // NewRestConfig returns a new rest.Config parsed from --kubeconfig and --master
-func NewRestConfig(master clik8s.MasterURL, path clik8s.KubeConfigPath) (*rest.Config, error) {
-	return clientcmd.BuildConfigFromFlags(string(master), string(path))
+func NewRestConfig(f *genericclioptions.ConfigFlags) (*rest.Config, error) {
+	return f.ToRESTConfig()
 }
 
 // NewKubernetesClientSet provides a clientset for talking to k8s clusters
 func NewKubernetesClientSet(c *rest.Config) (*kubernetes.Clientset, error) {
 	return kubernetes.NewForConfig(c)
+}
+
+// NewExtensionsClientSet provides an apiextensions ClientSet
+func NewExtensionsClientSet(c *rest.Config) (*clientset.Clientset, error) {
+	return clientset.NewForConfig(c)
+}
+
+// NewDynamicClient provides a dynamic.Interface
+func NewDynamicClient(c *rest.Config) (dynamic.Interface, error) {
+	return dynamic.NewForConfig(c)
 }
 
 // NewFileSystem provides a real FileSystem

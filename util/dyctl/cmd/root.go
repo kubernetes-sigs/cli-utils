@@ -11,18 +11,27 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package cmd
 
 import (
 	"fmt"
 	"os"
 
-	"sigs.k8s.io/cli-experimental/cmd"
+	"github.com/spf13/cobra"
 )
 
-func main() {
-	if err := cmd.Execute(os.Args, nil); err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
+// rootCmd represents the base command when called without any subcommands
+var rootCmd = &cobra.Command{
+	Use:   "dy",
+	Short: "Utilities for publishing dynamic Commands to CRDs.",
+	Long:  `Utilities for publishing dynamic Commands to CRDs.`,
+}
+
+// Execute adds all child commands to the root command and sets flags appropriately.
+// This is called by main.main(). It only needs to happen once to the rootCmd.
+func Execute() {
+	if err := rootCmd.Execute(); err != nil {
+		fmt.Println(err)
 		os.Exit(1)
 	}
 }

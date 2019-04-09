@@ -22,6 +22,9 @@ import (
 	"gopkg.in/src-d/go-git.v4/plumbing/object"
 	"sigs.k8s.io/cli-experimental/internal/pkg/apply"
 	"sigs.k8s.io/cli-experimental/internal/pkg/clik8s"
+	"sigs.k8s.io/cli-experimental/internal/pkg/dy"
+	"sigs.k8s.io/cli-experimental/internal/pkg/dy/dispatch"
+	"sigs.k8s.io/cli-experimental/internal/pkg/dy/list"
 	"sigs.k8s.io/cli-experimental/internal/pkg/status"
 )
 
@@ -30,5 +33,17 @@ func InitializeStatus(clik8s.ResourceConfigs, *object.Commit, io.Writer) (*statu
 }
 
 func InitializeApply(clik8s.ResourceConfigs, *object.Commit, io.Writer) (*apply.Apply, func(), error) {
+	panic(wire.Build(ProviderSet))
+}
+
+func InitializeCommandBuilder(io.Writer) (*dy.CommandBuilder, func(), error) {
+	panic(wire.Build(ProviderSet))
+}
+
+func InitializeDispatcher(io.Writer) (*dispatch.Dispatcher, func(), error) {
+	panic(wire.Build(ProviderSet))
+}
+
+func InitializeLister(io.Writer) (*list.CommandLister, func(), error) {
 	panic(wire.Build(ProviderSet))
 }

@@ -23,10 +23,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"sigs.k8s.io/cli-experimental/cmd/apply"
+	"sigs.k8s.io/cli-experimental/internal/pkg/wirecli/wirek8s"
 	"sigs.k8s.io/cli-experimental/internal/pkg/wirecli/wiretest"
 )
 
-var h string
+var host string
 
 func TestMain(m *testing.M) {
 	c, stop, err := wiretest.NewRestConfig()
@@ -34,7 +35,7 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 	defer stop()
-	h = c.Host
+	host = c.Host
 	os.Exit(m.Run())
 }
 
@@ -51,12 +52,13 @@ configMapGenerator:
 }
 
 func TestApply(t *testing.T) {
-	f := setupKustomize(t)
 	buf := new(bytes.Buffer)
 
-	cmd := apply.GetApplyCommand()
+	args := []string{fmt.Sprintf("--server=%s", host), "--namespace=default", setupKustomize(t)}
+	cmd := apply.GetApplyCommand(args)
 	cmd.SetOutput(buf)
-	cmd.SetArgs([]string{fmt.Sprintf("--master=%s", h), f})
+	cmd.SetArgs(args)
+	wirek8s.Flags(cmd.PersistentFlags())
 
 	assert.NoError(t, cmd.Execute())
 	assert.Equal(t, "Doing `cli-experimental apply`\nResources: 1\n", buf.String())

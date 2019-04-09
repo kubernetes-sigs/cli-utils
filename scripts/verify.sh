@@ -20,7 +20,7 @@ source $(dirname ${BASH_SOURCE})/common.sh
 
 header_text "running go vet"
 
-go vet ./internal/... ./pkg/... ./cmd/...
+go vet ./internal/... ./pkg/... ./cmd/... ./util/...
 
 header_text "populating vendor for gometalinter.v2"
 
@@ -39,7 +39,7 @@ gometalinter.v2 -e $(go env GOROOT) -e vendor/ -e _gen.go --disable-all \
     --enable=goconst \
     --enable=goimports \
     --enable=gocyclo \
-    --cyclo-over=7 \
+    --cyclo-over=20 \
     --line-length=120 \
     --enable=lll \
     --enable=nakedret \
@@ -49,5 +49,4 @@ gometalinter.v2 -e $(go env GOROOT) -e vendor/ -e _gen.go --disable-all \
     --dupl-threshold=400 \
     --enable=dupl \
     --enable=misspell \
-    ./pkg/... ./internal/... ./cmd/...
-
+    ./pkg/... ./internal/... ./cmd/... ./util/...

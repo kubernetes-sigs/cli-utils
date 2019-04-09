@@ -1,0 +1,47 @@
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    cli-experimental.sigs.k8s.io/ResourceCommandList: '{"items":[{"command":{"aliases":["deploy","deployments"],"example":"#
+      Create a new deployment named my-dep that runs the busybox image.\nkubectl create
+      deployment --name my-dep --image=busybox\n","flags":[{"description":"deployment
+      name","name":"name","type":"String"},{"description":"Image name to run.","name":"image","type":"String"},{"description":"Image
+      name to run.","intValue":2,"name":"replicas","type":"Int"}],"long":"Create a
+      deployment with the specified name.","path":["create"],"short":"Create a deployment
+      with the specified name.","use":"deployment"},"output":"deployment.apps/{{index
+      .Responses.Strings \"responsename\"}} created\n","requests":[{"bodyTemplate":"apiVersion:
+      apps/v1\nkind: Deployment\nmetadata:\n  name: {{index .Flags.Strings \"name\"}}\n  namespace:
+      {{index .Flags.Strings \"namespace\"}}\n  labels:\n    app: nginx\nspec:\n  replicas:
+      {{index .Flags.Ints \"replicas\"}}\n  selector:\n    matchLabels:\n      app:
+      {{index .Flags.Strings \"name\"}}\n  template:\n    metadata:\n      labels:\n        app:
+      {{index .Flags.Strings \"name\"}}\n    spec:\n      containers:\n      - name:
+      {{index .Flags.Strings \"name\"}}\n        image: {{index .Flags.Strings \"image\"}}\n","group":"apps","operation":"Create","resource":"deployments","saveResponseValues":[{"jsonPath":"{.metadata.name}","name":"responsename"}],"version":"v1"}]}]}'
+  labels:
+    cli-experimental.sigs.k8s.io/ResourceCommandList: ""
+  name: clitestresources.test.cli.sigs.k8s.io
+spec:
+  group: test.cli.sigs.k8s.io
+  names:
+    kind: CLITestResource
+    plural: clitestresources
+  scope: Namespaced
+  validation:
+    openAPIV3Schema:
+      properties:
+        apiVersion:
+          type: string
+        kind:
+          type: string
+        metadata:
+          type: object
+        spec:
+          properties:
+            image:
+              type: string
+            replicas:
+              format: int32
+              type: integer
+          type: object
+        status:
+          type: object
+  version: v1alpha1

@@ -1,0 +1,59 @@
+# Run
+---
+items:
+- command:
+    path:
+    - "create" # Command is a subcommand of this path
+    use: "deployment" # Command use
+    aliases: # Command alias'
+    - "deploy"
+    - "deployments"
+    short: Create a deployment with the specified name.
+    long: Create a deployment with the specified name.
+    example: |
+        # Create a new deployment named my-dep that runs the busybox image.
+        kubectl create deployment --name my-dep --image=busybox
+    flags:
+    - name: name
+      type: String
+      stringValue: ""
+      description: deployment name
+    - name: image
+      type: String
+      stringValue: ""
+      description: Image name to run.
+    - name: replicas
+      type: Int
+      intValue: 2
+      description: Image name to run.
+  requests:
+  - group: apps
+    version: v1
+    resource: deployments
+    operation: Create
+    bodyTemplate: |
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: {{index .Flags.Strings "name"}}
+        namespace: {{index .Flags.Strings "namespace"}}
+        labels:
+          app: {{index .Flags.Strings "name"}}
+      spec:
+        replicas: {{index .Flags.Ints "replicas"}}
+        selector:
+          matchLabels:
+            app: {{index .Flags.Strings "name"}}
+        template:
+          metadata:
+            labels:
+              app: {{index .Flags.Strings "name"}}
+          spec:
+            containers:
+            - name: {{index .Flags.Strings "name"}}
+              image: {{index .Flags.Strings "image"}}
+    saveResponseValues:
+    - name: responsename
+      jsonPath: "{.metadata.name}"
+  output: |
+    deployment.apps/{{index .Responses.Strings "responsename"}} created
