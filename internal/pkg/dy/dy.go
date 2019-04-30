@@ -29,9 +29,11 @@ import (
 )
 
 // ProviderSet provides wiring for initializing types.
-var ProviderSet = wire.NewSet(
-	output.CommandOutputWriter{}, list.CommandLister{}, parse.CommandParser{}, dispatch.Dispatcher{},
-	CommandBuilder{})
+var ProviderSet = wire.NewSet(wire.Struct(new(output.CommandOutputWriter), "*"),
+	wire.Struct(new(list.CommandLister), "*"),
+	wire.Struct(new(parse.CommandParser), "*"),
+	wire.Struct(new(dispatch.Dispatcher), "*"),
+	wire.Struct(new(CommandBuilder), "*"))
 
 // CommandBuilder creates dynamically generated commands from annotations on CRDs.
 type CommandBuilder struct {

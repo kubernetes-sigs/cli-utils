@@ -18,13 +18,12 @@ set -e
 
 source $(dirname ${BASH_SOURCE})/common.sh
 
+header_text "populating vendor for gometalinter.v2"
+go mod vendor
+
 header_text "running go vet"
 
 go vet ./internal/... ./pkg/... ./cmd/... ./util/...
-
-header_text "populating vendor for gometalinter.v2"
-
-go mod vendor
 
 header_text "running gometalinter.v2"
 

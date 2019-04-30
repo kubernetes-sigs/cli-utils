@@ -26,7 +26,7 @@ import (
 // ProviderSet defines dependencies for initializing objects
 var ProviderSet = wire.NewSet(
 	dy.ProviderSet, wirek8s.NewKubernetesClientSet, wirek8s.NewExtensionsClientSet, wirek8s.NewDynamicClient,
-	NewRestConfig, status.Status{}, apply.Apply{})
+	NewRestConfig, wire.Struct(new(status.Status), "*"), wire.Struct(new(apply.Apply), "*"))
 
 // NewRestConfig provides a rest.Config for a testing environment
 func NewRestConfig() (*rest.Config, func(), error) {

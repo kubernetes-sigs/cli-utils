@@ -25,7 +25,7 @@ import (
 
 // ProviderSet defines dependencies for initializing objects
 var ProviderSet = wire.NewSet(wirek8s.ProviderSet, wiregit.OptionalProviderSet,
-	status.Status{}, apply.Apply{}, NewStatusCommandResult, NewApplyCommandResult)
+	wire.Struct(new(status.Status), "*"), wire.Struct(new(apply.Apply), "*"), NewStatusCommandResult, NewApplyCommandResult)
 
 // NewStatusCommandResult returns a new status.Result
 func NewStatusCommandResult(s *status.Status, out io.Writer) (status.Result, error) {

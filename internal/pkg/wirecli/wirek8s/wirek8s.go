@@ -24,14 +24,17 @@ import (
 	"github.com/google/wire"
 	"github.com/spf13/pflag"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/kustomize"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"sigs.k8s.io/cli-experimental/internal/pkg/client"
 	"sigs.k8s.io/cli-experimental/internal/pkg/clik8s"
 	"sigs.k8s.io/cli-experimental/internal/pkg/util"
+	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/kustomize/pkg/fs"
 	"sigs.k8s.io/yaml"
 
@@ -40,8 +43,8 @@ import (
 )
 
 // ProviderSet defines dependencies for initializing Kubernetes objects
-var ProviderSet = wire.NewSet(NewKubernetesClientSet, NewExtensionsClientSet, NewConfigFlags, NewRestConfig,
-	NewResourceConfig, NewFileSystem, NewDynamicClient)
+var ProviderSet = wire.NewSet(NewKubernetesClientSet, NewExtensionsClientSet, NewConfigFlags, NewRestConfig, NewDynamicClient, NewRestMapper,
+	NewResourceConfig, NewFileSystem, NewClient)
 
 // Flags registers flags for talkig to a Kubernetes cluster
 func Flags(fs *pflag.FlagSet) {
@@ -128,6 +131,16 @@ func NewExtensionsClientSet(c *rest.Config) (*clientset.Clientset, error) {
 // NewDynamicClient provides a dynamic.Interface
 func NewDynamicClient(c *rest.Config) (dynamic.Interface, error) {
 	return dynamic.NewForConfig(c)
+}
+
+// NewRestMapper provides a dynamic.Interface
+func NewRestMapper(c *rest.Config) (meta.RESTMapper, error) {
+	return apiutil.NewDiscoveryRESTMapper(c)
+}
+
+// NewClient provides a dynamic.Interface
+func NewClient(d dynamic.Interface, m meta.RESTMapper) (client.Client, error) {
+	return client.NewForConfig(d, m)
 }
 
 // NewFileSystem provides a real FileSystem

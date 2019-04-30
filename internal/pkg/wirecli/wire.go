@@ -26,7 +26,7 @@ import (
 	"sigs.k8s.io/cli-experimental/internal/pkg/status"
 )
 
-// InitializeApplyStatus creates a new *status.Status object
+// InitializeStatus creates a new *status.Status object
 func InitializeStatus(clik8s.ResourceConfigPath, io.Writer, util.Args) (*status.Status, error) {
 	panic(wire.Build(ProviderSet))
 }
