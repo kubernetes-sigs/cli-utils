@@ -7,7 +7,7 @@ require (
 	github.com/Azure/go-autorest v11.7.0+incompatible // indirect
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible // indirect
 	github.com/emicklei/go-restful v2.9.3+incompatible // indirect
-	github.com/evanphx/json-patch v4.1.0+incompatible // indirect
+	github.com/evanphx/json-patch v4.1.0+incompatible
 	github.com/go-logr/logr v0.1.0 // indirect
 	github.com/go-logr/zapr v0.1.1 // indirect
 	github.com/go-openapi/spec v0.19.0 // indirect

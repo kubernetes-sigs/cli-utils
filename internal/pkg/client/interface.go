@@ -21,14 +21,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-// Patch is a patch that can be applied to a Kubernetes object.
-type Patch interface {
-	// Type is the PatchType of the patch.
-	Type() types.PatchType
-	// Data is the raw data representing the patch.
-	Data(obj runtime.Object) ([]byte, error)
-}
-
 // Reader knows how to read and list Kubernetes objects.
 type Reader interface {
 	// Get retrieves an obj for the given object key from the Kubernetes Cluster.
@@ -56,7 +48,7 @@ type Writer interface {
 
 	// Patch patches the given obj in the Kubernetes cluster. obj must be a
 	// struct pointer so that obj can be updated with the content returned by the Server.
-	Patch(ctx context.Context, obj runtime.Object, patch Patch, options metav1.PatchOptions) error
+	Patch(ctx context.Context, obj runtime.Object, patch Patch, options *metav1.PatchOptions) error
 }
 
 // StatusWriter knows how to update status subresource of a Kubernetes object.
