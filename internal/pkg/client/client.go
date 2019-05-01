@@ -57,11 +57,7 @@ type client struct {
 
 // Create implements client.Client
 func (uc *client) Create(_ context.Context, obj runtime.Object, options metav1.CreateOptions) error {
-	u, ok := obj.(*unstructured.Unstructured)
-	if !ok {
-		return fmt.Errorf("unstructured client did not understand object: %T", obj)
-	}
-	r, err := uc.getResourceInterface(u.GroupVersionKind(), u.GetNamespace())
+	u, r, err := uc.getUnstructuredResource(obj, "")
 	if err != nil {
 		return err
 	}
@@ -75,11 +71,7 @@ func (uc *client) Create(_ context.Context, obj runtime.Object, options metav1.C
 
 // Update implements client.Client
 func (uc *client) Update(_ context.Context, obj runtime.Object, options metav1.UpdateOptions) error {
-	u, ok := obj.(*unstructured.Unstructured)
-	if !ok {
-		return fmt.Errorf("unstructured client did not understand object: %T", obj)
-	}
-	r, err := uc.getResourceInterface(u.GroupVersionKind(), u.GetNamespace())
+	u, r, err := uc.getUnstructuredResource(obj, "")
 	if err != nil {
 		return err
 	}
@@ -93,11 +85,7 @@ func (uc *client) Update(_ context.Context, obj runtime.Object, options metav1.U
 
 // Delete implements client.Client
 func (uc *client) Delete(_ context.Context, obj runtime.Object, options *metav1.DeleteOptions) error {
-	u, ok := obj.(*unstructured.Unstructured)
-	if !ok {
-		return fmt.Errorf("unstructured client did not understand object: %T", obj)
-	}
-	r, err := uc.getResourceInterface(u.GroupVersionKind(), u.GetNamespace())
+	u, r, err := uc.getUnstructuredResource(obj, "")
 	if err != nil {
 		return err
 	}
@@ -107,11 +95,7 @@ func (uc *client) Delete(_ context.Context, obj runtime.Object, options *metav1.
 
 // Patch implements client.Client
 func (uc *client) Patch(_ context.Context, obj runtime.Object, patch Patch, options metav1.PatchOptions) error {
-	u, ok := obj.(*unstructured.Unstructured)
-	if !ok {
-		return fmt.Errorf("unstructured client did not understand object: %T", obj)
-	}
-	r, err := uc.getResourceInterface(u.GroupVersionKind(), u.GetNamespace())
+	u, r, err := uc.getUnstructuredResource(obj, "")
 	if err != nil {
 		return err
 	}
@@ -131,11 +115,7 @@ func (uc *client) Patch(_ context.Context, obj runtime.Object, patch Patch, opti
 
 // Get implements client.Client
 func (uc *client) Get(_ context.Context, key types.NamespacedName, obj runtime.Object) error {
-	u, ok := obj.(*unstructured.Unstructured)
-	if !ok {
-		return fmt.Errorf("unstructured client did not understand object: %T", obj)
-	}
-	r, err := uc.getResourceInterface(u.GroupVersionKind(), key.Namespace)
+	u, r, err := uc.getUnstructuredResource(obj, key.Namespace)
 	if err != nil {
 		return err
 	}
@@ -172,11 +152,7 @@ func (uc *client) List(_ context.Context, obj runtime.Object, namespace string, 
 }
 
 func (uc *client) UpdateStatus(_ context.Context, obj runtime.Object) error {
-	u, ok := obj.(*unstructured.Unstructured)
-	if !ok {
-		return fmt.Errorf("unstructured client did not understand object: %T", obj)
-	}
-	r, err := uc.getResourceInterface(u.GroupVersionKind(), u.GetNamespace())
+	u, r, err := uc.getUnstructuredResource(obj, "")
 	if err != nil {
 		return err
 	}
@@ -197,4 +173,20 @@ func (uc *client) getResourceInterface(gvk schema.GroupVersionKind, ns string) (
 		return uc.client.Resource(mapping.Resource), nil
 	}
 	return uc.client.Resource(mapping.Resource).Namespace(ns), nil
+}
+
+func (uc *client) getUnstructuredResource(obj runtime.Object, namespace string) (*unstructured.Unstructured, dynamic.ResourceInterface, error) {
+	u, ok := obj.(*unstructured.Unstructured)
+	if !ok {
+		return nil, nil, fmt.Errorf("unstructured client did not understand object: %T", obj)
+	}
+	if namespace == "" {
+		namespace = u.GetNamespace()
+	}
+	r, err := uc.getResourceInterface(u.GroupVersionKind(), namespace)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return u, r, nil
 }
