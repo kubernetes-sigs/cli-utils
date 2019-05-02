@@ -19,6 +19,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/cli-experimental/internal/pkg/client/patch"
 )
 
 // Reader knows how to read and list Kubernetes objects.
@@ -31,24 +32,29 @@ type Reader interface {
 	// List retrieves list of objects for a given namespace and list options. On a
 	// successful call, Items field in the list will be populated with the
 	// result returned from the server.
-	List(ctx context.Context, list runtime.Object, namespace string, options metav1.ListOptions) error
+	List(ctx context.Context, list runtime.Object, namespace string, options *metav1.ListOptions) error
 }
 
 // Writer knows how to create, delete, and update Kubernetes objects.
 type Writer interface {
 	// Create saves the object obj in the Kubernetes cluster.
-	Create(ctx context.Context, obj runtime.Object, options metav1.CreateOptions) error
+	Create(ctx context.Context, obj runtime.Object, options *metav1.CreateOptions) error
 
 	// Delete deletes the given obj from Kubernetes cluster.
 	Delete(ctx context.Context, obj runtime.Object, options *metav1.DeleteOptions) error
 
 	// Update updates the given obj in the Kubernetes cluster. obj must be a
 	// struct pointer so that obj can be updated with the content returned by the Server.
-	Update(ctx context.Context, obj runtime.Object, options metav1.UpdateOptions) error
+	Update(ctx context.Context, obj runtime.Object, options *metav1.UpdateOptions) error
+
+	// Apply generates a merge patch and patches the object.
+	// TODO - annotate the object with patch
+	// If not found the object is created
+	Apply(ctx context.Context, obj runtime.Object) error
 
 	// Patch patches the given obj in the Kubernetes cluster. obj must be a
 	// struct pointer so that obj can be updated with the content returned by the Server.
-	Patch(ctx context.Context, obj runtime.Object, patch Patch, options *metav1.PatchOptions) error
+	Patch(ctx context.Context, obj runtime.Object, patch patch.Patch, options *metav1.PatchOptions) error
 }
 
 // StatusWriter knows how to update status subresource of a Kubernetes object.

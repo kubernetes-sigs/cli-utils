@@ -133,7 +133,7 @@ func NewDynamicClient(c *rest.Config) (dynamic.Interface, error) {
 	return dynamic.NewForConfig(c)
 }
 
-// NewRestMapper provides a dynamic.Interface
+// NewRestMapper provides a Discovery rest mapper
 func NewRestMapper(c *rest.Config) (meta.RESTMapper, error) {
 	return apiutil.NewDiscoveryRESTMapper(c)
 }

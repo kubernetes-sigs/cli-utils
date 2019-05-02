@@ -47,9 +47,5 @@ func Execute(args []string, fn func(*cobra.Command)) error {
 	}
 
 	// Run the Command
-	if err := rootCmd.Execute(); err != nil {
-		return err
-	}
-
-	return nil
+	return rootCmd.Execute()
 }

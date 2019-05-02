@@ -86,11 +86,8 @@ func (d *Dispatcher) do(req v1alpha1.ResourceRequest, name string, values *parse
 	}
 
 	// Save the response values so they can be used when writing the output
-	if err := doResponse(req, resp, values); err != nil {
-		return err
-	}
+	return doResponse(req, resp, values)
 
-	return nil
 }
 
 // doRequest makes a request to the apiserver with the object (request body), operation (request http operation),

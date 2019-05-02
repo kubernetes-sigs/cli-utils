@@ -18,15 +18,15 @@ import (
 	"fmt"
 	"strings"
 
-	jsonpatch "github.com/evanphx/json-patch"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/client-go/dynamic"
+	"sigs.k8s.io/cli-experimental/internal/pkg/client/patch"
 )
 
 // NewForConfig returns a new Client using the provided config and Options.
@@ -57,19 +57,26 @@ type client struct {
 	restMapper meta.RESTMapper
 }
 
-// Patch object
-type Patch struct {
-	Type types.PatchType
-	Data []byte
+// Create Creates an object using dynamic client
+func (uc *client) Create(ctx context.Context, obj runtime.Object, options *metav1.CreateOptions) error {
+	return uc.create(ctx, obj, false, options)
 }
 
-// Create Creates an object using dynamic client
-func (uc *client) Create(_ context.Context, obj runtime.Object, options metav1.CreateOptions) error {
-	u, r, err := uc.getUnstructuredResource(obj, "")
+// create Creates an object using dynamic client
+func (uc *client) create(_ context.Context, obj runtime.Object, recordPatch bool, options *metav1.CreateOptions) error {
+	if recordPatch {
+		patch.SetLastApplied(obj)
+	}
+	u, r, err := uc.resourceInterface(obj, "")
 	if err != nil {
 		return err
 	}
-	i, err := r.Create(u, options)
+
+	if options == nil {
+		options = &metav1.CreateOptions{}
+	}
+
+	i, err := r.Create(u, *options)
 	if err != nil {
 		return err
 	}
@@ -78,12 +85,15 @@ func (uc *client) Create(_ context.Context, obj runtime.Object, options metav1.C
 }
 
 // Update updates an object using dynamic client
-func (uc *client) Update(_ context.Context, obj runtime.Object, options metav1.UpdateOptions) error {
-	u, r, err := uc.getUnstructuredResource(obj, "")
+func (uc *client) Update(_ context.Context, obj runtime.Object, options *metav1.UpdateOptions) error {
+	u, r, err := uc.resourceInterface(obj, "")
 	if err != nil {
 		return err
 	}
-	i, err := r.Update(u, options)
+	if options == nil {
+		options = &metav1.UpdateOptions{}
+	}
+	i, err := r.Update(u, *options)
 	if err != nil {
 		return err
 	}
@@ -93,21 +103,27 @@ func (uc *client) Update(_ context.Context, obj runtime.Object, options metav1.U
 
 // Delete calls the delete of an object using dynamic client
 func (uc *client) Delete(_ context.Context, obj runtime.Object, options *metav1.DeleteOptions) error {
-	u, r, err := uc.getUnstructuredResource(obj, "")
+	u, r, err := uc.resourceInterface(obj, "")
 	if err != nil {
 		return err
+	}
+	if options == nil {
+		options = &metav1.DeleteOptions{}
 	}
 	err = r.Delete(u.GetName(), options)
 	return err
 }
 
 // Patch implements patching of an object
-func (uc *client) Patch(_ context.Context, obj runtime.Object, patch Patch, options *metav1.PatchOptions) error {
-	u, r, err := uc.getUnstructuredResource(obj, "")
+func (uc *client) Patch(_ context.Context, obj runtime.Object, patch patch.Patch, options *metav1.PatchOptions) error {
+	u, r, err := uc.resourceInterface(obj, "")
 	if err != nil {
 		return err
 	}
 
+	if options == nil {
+		options = &metav1.PatchOptions{}
+	}
 	i, err := r.Patch(u.GetName(), patch.Type, patch.Data, *options)
 	if err != nil {
 		return err
@@ -118,7 +134,7 @@ func (uc *client) Patch(_ context.Context, obj runtime.Object, patch Patch, opti
 
 // Get fetches the requested object into the input obj using dynamic client
 func (uc *client) Get(_ context.Context, key types.NamespacedName, obj runtime.Object) error {
-	u, r, err := uc.getUnstructuredResource(obj, key.Namespace)
+	u, r, err := uc.resourceInterface(obj, key.Namespace)
 	if err != nil {
 		return err
 	}
@@ -131,7 +147,7 @@ func (uc *client) Get(_ context.Context, key types.NamespacedName, obj runtime.O
 }
 
 // List fetches the list of objects into the input obj using dynamic client
-func (uc *client) List(_ context.Context, obj runtime.Object, namespace string, options metav1.ListOptions) error {
+func (uc *client) List(_ context.Context, obj runtime.Object, namespace string, options *metav1.ListOptions) error {
 	u, ok := obj.(*unstructured.UnstructuredList)
 	if !ok {
 		return fmt.Errorf("unstructured client did not understand object: %T", obj)
@@ -140,12 +156,15 @@ func (uc *client) List(_ context.Context, obj runtime.Object, namespace string, 
 	if strings.HasSuffix(gvk.Kind, "List") {
 		gvk.Kind = gvk.Kind[:len(gvk.Kind)-4]
 	}
-	r, err := uc.getResourceInterface(gvk, namespace)
+	r, err := uc.resourceInterfaceFromGVK(gvk, namespace)
 	if err != nil {
 		return err
 	}
 
-	i, err := r.List(options)
+	if options == nil {
+		options = &metav1.ListOptions{}
+	}
+	i, err := r.List(*options)
 	if err != nil {
 		return err
 	}
@@ -156,7 +175,7 @@ func (uc *client) List(_ context.Context, obj runtime.Object, namespace string, 
 
 // UpdateStatus updates the status subresource using dynamic client
 func (uc *client) UpdateStatus(_ context.Context, obj runtime.Object) error {
-	u, r, err := uc.getUnstructuredResource(obj, "")
+	u, r, err := uc.resourceInterface(obj, "")
 	if err != nil {
 		return err
 	}
@@ -169,26 +188,47 @@ func (uc *client) UpdateStatus(_ context.Context, obj runtime.Object) error {
 }
 
 // Apply - use merge patch to apply an object
-func (uc *client) Apply(c context.Context, obj runtime.Object) error {
+func (uc *client) Apply(c context.Context, desired runtime.Object) error {
 
-	u, r, err := uc.getUnstructuredResource(obj, "")
+	u, r, err := uc.resourceInterface(desired, "")
 	if err != nil {
 		return err
 	}
-	i, err := r.Get(u.GetName(), metav1.GetOptions{})
-	if err != nil {
+	current, err := r.Get(u.GetName(), metav1.GetOptions{})
+
+	if err != nil && !errors.IsNotFound(err) {
 		return err
 	}
 
-	patch, err := MergePatch(i, obj)
+	if errors.IsNotFound(err) {
+		return uc.create(c, desired, true, nil)
+	}
+
+	// TODO - parameterize or separate API to support these strategies:
+	// 1. ServerSideApply
+	// 2. ClientSideApply - 3 way
+	// 3. SimpleMerge  - useful for controllers more than cli
+	// Ideally for 1,2 we should query server side capability to decide what to use automatically.
+	// Currently we will only support client side apply (2)
+
+	// SimpleMerge - 2 way merge
+	//patch, err := GetMergePatch(current, desired)
+
+	// ClientSideApply - 3 way merge/strategicmerge
+	patch, err := patch.GetClientSideApplyPatch(current, desired)
+
 	if err != nil {
 		return err
 	}
+	if string(patch.Data) == "{}" {
+		// Avoid doing a noop patch.
+		return nil
+	}
 
-	return uc.Patch(c, obj, patch, nil)
+	return uc.Patch(c, current, patch, nil)
 }
 
-func (uc *client) getResourceInterface(gvk schema.GroupVersionKind, ns string) (dynamic.ResourceInterface, error) {
+func (uc *client) resourceInterfaceFromGVK(gvk schema.GroupVersionKind, ns string) (dynamic.ResourceInterface, error) {
 	mapping, err := uc.restMapper.RESTMapping(gvk.GroupKind(), gvk.Version)
 	if err != nil {
 		return nil, err
@@ -199,7 +239,7 @@ func (uc *client) getResourceInterface(gvk schema.GroupVersionKind, ns string) (
 	return uc.client.Resource(mapping.Resource).Namespace(ns), nil
 }
 
-func (uc *client) getUnstructuredResource(obj runtime.Object, namespace string) (*unstructured.Unstructured, dynamic.ResourceInterface, error) {
+func (uc *client) resourceInterface(obj runtime.Object, namespace string) (*unstructured.Unstructured, dynamic.ResourceInterface, error) {
 	u, ok := obj.(*unstructured.Unstructured)
 	if !ok {
 		return nil, nil, fmt.Errorf("unstructured client did not understand object: %T", obj)
@@ -207,29 +247,10 @@ func (uc *client) getUnstructuredResource(obj runtime.Object, namespace string) 
 	if namespace == "" {
 		namespace = u.GetNamespace()
 	}
-	r, err := uc.getResourceInterface(u.GroupVersionKind(), namespace)
+	r, err := uc.resourceInterfaceFromGVK(u.GroupVersionKind(), namespace)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	return u, r, nil
-}
-
-// MergePatch - generate merge patch from original and modified objects
-func MergePatch(original, modified runtime.Object) (Patch, error) {
-	originalJSON, err := json.Marshal(original)
-	if err != nil {
-		return Patch{}, err
-	}
-
-	modifiedJSON, err := json.Marshal(modified)
-	if err != nil {
-		return Patch{}, err
-	}
-
-	patch, err := jsonpatch.CreateMergePatch(originalJSON, modifiedJSON)
-	if err != nil {
-		return Patch{}, err
-	}
-	return Patch{types.MergePatchType, patch}, nil
 }
