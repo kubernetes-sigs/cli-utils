@@ -17,7 +17,9 @@ import (
 	"github.com/google/wire"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/cli-experimental/internal/pkg/apply"
+	"sigs.k8s.io/cli-experimental/internal/pkg/delete"
 	"sigs.k8s.io/cli-experimental/internal/pkg/dy"
+	"sigs.k8s.io/cli-experimental/internal/pkg/prune"
 	"sigs.k8s.io/cli-experimental/internal/pkg/status"
 	"sigs.k8s.io/cli-experimental/internal/pkg/wirecli/wirek8s"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
@@ -26,7 +28,9 @@ import (
 // ProviderSet defines dependencies for initializing objects
 var ProviderSet = wire.NewSet(
 	dy.ProviderSet, wirek8s.NewKubernetesClientSet, wirek8s.NewExtensionsClientSet, wirek8s.NewDynamicClient,
-	NewRestConfig, wire.Struct(new(status.Status), "*"), wire.Struct(new(apply.Apply), "*"))
+	NewRestConfig, wirek8s.NewClient, wirek8s.NewRestMapper,
+	wire.Struct(new(status.Status), "*"), wire.Struct(new(apply.Apply), "*"),
+	wire.Struct(new(delete.Delete), "*"), wire.Struct(new(prune.Prune), "*"))
 
 // NewRestConfig provides a rest.Config for a testing environment
 func NewRestConfig() (*rest.Config, func(), error) {

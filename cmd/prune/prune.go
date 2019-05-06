@@ -11,32 +11,32 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package apply
+package prune
 
 import (
 	"fmt"
 
-	"sigs.k8s.io/cli-experimental/internal/pkg/util"
-
-	"sigs.k8s.io/cli-experimental/internal/pkg/clik8s"
-
 	"github.com/spf13/cobra"
-	"sigs.k8s.io/cli-experimental/cmd/apply/status"
+	"sigs.k8s.io/cli-experimental/internal/pkg/clik8s"
+	"sigs.k8s.io/cli-experimental/internal/pkg/util"
 	"sigs.k8s.io/cli-experimental/internal/pkg/wirecli"
 )
 
-// GetApplyCommand returns the `apply` cobra Command
-func GetApplyCommand(a util.Args) *cobra.Command {
+// GetPruneCommand returns the `prune` cobra Command
+func GetPruneCommand(a util.Args) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "apply",
-		Short: "Apply resource configurations.",
-		Long:  `Apply resource configurations to k8s cluster.`,
-		Args:  cobra.MinimumNArgs(1),
+		Use:   "prune",
+		Short: "Prune obsolete resources.",
+		Long: `Prune obsolete resources.
+		It is based on checking the inventory annotation that
+		is stored in the resource configuration that is passed
+		to prune command.`,
+		Args: cobra.MinimumNArgs(1),
 	}
 
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
 		for i := range args {
-			r, err := wirecli.DoApply(clik8s.ResourceConfigPath(args[i]), cmd.OutOrStdout(), a)
+			r, err := wirecli.DoPrune(clik8s.ResourceConfigPath(args[i]), cmd.OutOrStdout(), a)
 			if err != nil {
 				return err
 			}
@@ -45,7 +45,5 @@ func GetApplyCommand(a util.Args) *cobra.Command {
 		return nil
 	}
 
-	// Add Commands
-	cmd.AddCommand(status.GetApplyStatusCommand(a))
 	return cmd
 }

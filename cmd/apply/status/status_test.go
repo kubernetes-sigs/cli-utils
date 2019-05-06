@@ -16,15 +16,12 @@ package status_test
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"os"
-	"path/filepath"
 	"testing"
-
-	"sigs.k8s.io/cli-experimental/internal/pkg/wirecli/wirek8s"
 
 	"github.com/stretchr/testify/assert"
 	"sigs.k8s.io/cli-experimental/cmd/apply/status"
+	"sigs.k8s.io/cli-experimental/internal/pkg/wirecli/wirek8s"
 	"sigs.k8s.io/cli-experimental/internal/pkg/wirecli/wiretest"
 )
 
@@ -40,27 +37,19 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-func setupKustomize(t *testing.T) string {
-	f, err := ioutil.TempDir("/tmp", "TestApplyStatus")
-	assert.NoError(t, err)
-	err = ioutil.WriteFile(filepath.Join(f, "kustomization.yaml"), []byte(`apiVersion: kustomize.config.k8s.io/v1beta1
-kind: Kustomization
-configMapGenerator:
-- name: testMap
-`), 0644)
-	assert.NoError(t, err)
-	return f
-}
-
 func TestStatus(t *testing.T) {
 	buf := new(bytes.Buffer)
+	fs, cleanup, err := wiretest.InitializeKustomization()
+	defer cleanup()
+	assert.NoError(t, err)
+	assert.NotEmpty(t, fs)
 
-	args := []string{fmt.Sprintf("--server=%s", host), "--namespace=default", setupKustomize(t)}
+	args := []string{fmt.Sprintf("--server=%s", host), "--namespace=default", fs[0]}
 	cmd := status.GetApplyStatusCommand(args)
 	cmd.SetOutput(buf)
 	cmd.SetArgs(args)
 	wirek8s.Flags(cmd.PersistentFlags())
 
 	assert.NoError(t, cmd.Execute())
-	assert.Equal(t, "Doing `cli-experimental apply status`\nResources: 1\n", buf.String())
+	assert.Equal(t, "Doing `cli-experimental apply status`\nResources: 2\n", buf.String())
 }

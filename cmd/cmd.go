@@ -18,6 +18,8 @@ import (
 
 	"github.com/spf13/cobra"
 	"sigs.k8s.io/cli-experimental/cmd/apply"
+	"sigs.k8s.io/cli-experimental/cmd/delete"
+	"sigs.k8s.io/cli-experimental/cmd/prune"
 	"sigs.k8s.io/cli-experimental/internal/pkg/dy"
 	"sigs.k8s.io/cli-experimental/internal/pkg/wirecli/wirek8s"
 )
@@ -26,14 +28,16 @@ import (
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute(args []string, fn func(*cobra.Command)) error {
 	rootCmd := &cobra.Command{
-		Use:   "cli-experimental",
-		Short: "",
-		Long:  ``,
+		Use:   "k2",
+		Short: "kubectl version 2",
+		Long:  `kubectl version 2`,
 	}
 	if fn != nil {
 		fn(rootCmd)
 	}
 	rootCmd.AddCommand(apply.GetApplyCommand(os.Args))
+	rootCmd.AddCommand(prune.GetPruneCommand(os.Args))
+	rootCmd.AddCommand(delete.GetDeleteCommand(os.Args))
 	wirek8s.Flags(rootCmd.PersistentFlags())
 	rootCmd.PersistentFlags().Set("namespace", "default")
 

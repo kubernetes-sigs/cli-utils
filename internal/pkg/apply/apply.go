@@ -14,21 +14,27 @@ limitations under the License.
 package apply
 
 import (
+	"context"
 	"fmt"
 	"io"
+	"os"
+
+	"k8s.io/apimachinery/pkg/api/errors"
 
 	"gopkg.in/src-d/go-git.v4/plumbing/object"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/cli-experimental/internal/pkg/client"
 	"sigs.k8s.io/cli-experimental/internal/pkg/clik8s"
+	"sigs.k8s.io/kustomize/pkg/inventory"
 )
 
 // Apply applies directories
 type Apply struct {
-	Clientset *kubernetes.Clientset
-	Out       io.Writer
-	Resources clik8s.ResourceConfigs
-	Commit    *object.Commit
+	DynamicClient client.Client
+	Out           io.Writer
+	Resources     clik8s.ResourceConfigs
+	Commit        *object.Commit
 }
 
 // Result contains the Apply Result
@@ -39,13 +45,89 @@ type Result struct {
 // Do executes the apply
 func (a *Apply) Do() (Result, error) {
 	fmt.Fprintf(a.Out, "Doing `cli-experimental apply`\n")
-	pods, err := a.Clientset.CoreV1().Pods("default").List(metav1.ListOptions{})
-	if err != nil {
-		return Result{}, err
+
+	// TODO(Liuijngfang1): add a dry-run for all objects
+	// When the dry-run passes, proceed to the actual apply
+
+	for _, u := range adjustOrder(a.Resources) {
+		annotation := u.GetAnnotations()
+		_, ok := annotation[inventory.InventoryAnnotation]
+
+		if ok {
+			var err error
+			u, err = a.updateInventoryObject(u)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "failed to update inventory object %v\n", err)
+			}
+		}
+
+		err := a.DynamicClient.Apply(context.Background(), u)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "failed to apply the object: %s: %v\n", u.GetName(), err)
+			continue
+		}
+		fmt.Fprintf(a.Out, "applied %s/%s\n", u.GetKind(), u.GetName())
 	}
-	for _, p := range pods.Items {
-		fmt.Fprintf(a.Out, "Pod %s\n", p.Name)
+	return Result{Resources: a.Resources}, nil
+}
+
+func (a Apply) updateInventoryObject(u *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+	obj := u.DeepCopy()
+	err := a.DynamicClient.Get(context.Background(),
+		types.NamespacedName{Namespace: u.GetNamespace(), Name: u.GetName()}, obj)
+	if err != nil && !errors.IsNotFound(err) {
+		return nil, err
+	}
+	if errors.IsNotFound(err) {
+		return u, nil
 	}
 
-	return Result{Resources: a.Resources}, nil
+	oldAnnotation := obj.GetAnnotations()
+	newAnnotation := u.GetAnnotations()
+	oldhash, okold := oldAnnotation[inventory.InventoryHashAnnotation]
+	newhash, oknew := newAnnotation[inventory.InventoryHashAnnotation]
+	if okold && oknew && oldhash == newhash {
+		return obj, nil
+	}
+
+	return mergeInventoryAnnotation(u, obj)
+}
+
+func mergeInventoryAnnotation(newObj, oldObj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+	newInv := inventory.NewInventory()
+	err := newInv.LoadFromAnnotation(newObj.GetAnnotations())
+	if err != nil {
+		return nil, err
+	}
+	oldInv := inventory.NewInventory()
+	err = oldInv.LoadFromAnnotation(oldObj.GetAnnotations())
+	if err != nil {
+		return nil, err
+	}
+	newInv.Previous.Merge(oldInv.Previous)
+	newInv.Previous.Merge(oldInv.Current)
+
+	annotations := newObj.GetAnnotations()
+	newInv.UpdateAnnotations(annotations)
+	newObj.SetAnnotations(annotations)
+	return newObj, nil
+}
+
+// adjustOrder moves the inventory object to be the first resource
+func adjustOrder(resources clik8s.ResourceConfigs) []*unstructured.Unstructured {
+	var results []*unstructured.Unstructured
+	index := -1
+	for i, u := range resources {
+		annotation := u.GetAnnotations()
+		_, ok := annotation[inventory.InventoryAnnotation]
+		if ok {
+			index = i
+		} else {
+			results = append(results, u)
+		}
+	}
+	if index >= 0 {
+		return append([]*unstructured.Unstructured{resources[index]}, results...)
+	}
+	return results
 }

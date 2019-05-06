@@ -11,7 +11,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package apply_test
+package prune_test
 
 import (
 	"bytes"
@@ -19,43 +19,49 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/src-d/go-git.v4/plumbing/object"
-	"sigs.k8s.io/cli-experimental/internal/pkg/apply"
 	"sigs.k8s.io/cli-experimental/internal/pkg/clik8s"
+	"sigs.k8s.io/cli-experimental/internal/pkg/prune"
 	"sigs.k8s.io/cli-experimental/internal/pkg/wirecli/wiretest"
 )
 
-func TestApplyEmpty(t *testing.T) {
+func TestPruneEmpty(t *testing.T) {
 	buf := new(bytes.Buffer)
-	a, done, err := wiretest.InitializeApply(clik8s.ResourceConfigs(nil), &object.Commit{}, buf)
+	p, done, err := wiretest.InitializePrune(clik8s.ResourcePruneConfigs(nil), &object.Commit{}, buf)
 	defer done()
 	assert.NoError(t, err)
-	r, err := a.Do()
+	r, err := p.Do()
 	assert.NoError(t, err)
-	assert.Equal(t, apply.Result{}, r)
+	assert.Equal(t, prune.Result{}, r)
 }
 
-func TestApply(t *testing.T) {
+func TestPrune(t *testing.T) {
 	buf := new(bytes.Buffer)
 	kp := wiretest.InitializConfigProvider()
 	fs, cleanup, err := wiretest.InitializeKustomization()
+	assert.NoError(t, err)
 	defer cleanup()
 	assert.NoError(t, err)
 	assert.Equal(t, len(fs), 2)
 
 	objects, err := kp.GetConfig(fs[0])
 	assert.NoError(t, err)
+	a, donea, err := wiretest.InitializeApply(objects, &object.Commit{}, buf)
+	assert.NoError(t, err)
+	defer donea()
+	_, err = a.Do()
+	assert.NoError(t, err)
+	a.Resources, err = kp.GetConfig(fs[1])
+	assert.NoError(t, err)
+	_, err = a.Do()
+	assert.NoError(t, err)
 
-	a, done, err := wiretest.InitializeApply(objects, &object.Commit{}, buf)
-	defer done()
+	pruneObject, err := kp.GetPruneConfig(fs[1])
 	assert.NoError(t, err)
-	r, err := a.Do()
+	p, donep, err := wiretest.InitializePrune(pruneObject, &object.Commit{}, buf)
+	defer donep()
 	assert.NoError(t, err)
-	assert.Equal(t, apply.Result{objects}, r)
-
-	updatedObjects, err := kp.GetConfig(fs[1])
-	a.Resources = updatedObjects
+	p.DynamicClient = a.DynamicClient
+	pr, err := p.Do()
 	assert.NoError(t, err)
-	r, err = a.Do()
-	assert.NoError(t, err)
-	assert.Equal(t, apply.Result{updatedObjects}, r)
+	assert.Equal(t, len(pr.Resources), 1)
 }

@@ -23,6 +23,8 @@ import (
 	"github.com/google/wire"
 	"sigs.k8s.io/cli-experimental/internal/pkg/apply"
 	"sigs.k8s.io/cli-experimental/internal/pkg/clik8s"
+	"sigs.k8s.io/cli-experimental/internal/pkg/delete"
+	"sigs.k8s.io/cli-experimental/internal/pkg/prune"
 	"sigs.k8s.io/cli-experimental/internal/pkg/status"
 )
 
@@ -43,5 +45,15 @@ func DoStatus(clik8s.ResourceConfigPath, io.Writer, util.Args) (status.Result, e
 
 // DoApply creates a new Apply object and runs it
 func DoApply(clik8s.ResourceConfigPath, io.Writer, util.Args) (apply.Result, error) {
+	panic(wire.Build(ProviderSet))
+}
+
+// DoPrune creates a new Prune object and runs it
+func DoPrune(clik8s.ResourceConfigPath, io.Writer, util.Args) (prune.Result, error) {
+	panic(wire.Build(ProviderSet))
+}
+
+// DoDelete creates a new Delete object and runs it
+func DoDelete(clik8s.ResourceConfigPath, io.Writer, util.Args) (delete.Result, error) {
 	panic(wire.Build(ProviderSet))
 }

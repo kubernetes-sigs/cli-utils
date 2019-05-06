@@ -9,8 +9,11 @@ import (
 	"io"
 	"sigs.k8s.io/cli-experimental/internal/pkg/apply"
 	"sigs.k8s.io/cli-experimental/internal/pkg/clik8s"
+	delete2 "sigs.k8s.io/cli-experimental/internal/pkg/delete"
+	"sigs.k8s.io/cli-experimental/internal/pkg/prune"
 	"sigs.k8s.io/cli-experimental/internal/pkg/status"
 	"sigs.k8s.io/cli-experimental/internal/pkg/util"
+	"sigs.k8s.io/cli-experimental/internal/pkg/wirecli/wireconfig"
 	"sigs.k8s.io/cli-experimental/internal/pkg/wirecli/wiregit"
 	"sigs.k8s.io/cli-experimental/internal/pkg/wirecli/wirek8s"
 )
@@ -18,8 +21,12 @@ import (
 // Injectors from wire.go:
 
 func InitializeStatus(resourceConfigPath clik8s.ResourceConfigPath, writer io.Writer, args util.Args) (*status.Status, error) {
-	fileSystem := wirek8s.NewFileSystem()
-	resourceConfigs, err := wirek8s.NewResourceConfig(resourceConfigPath, fileSystem)
+	pluginConfig := wireconfig.NewPluginConfig()
+	factory := wireconfig.NewResMapFactory(pluginConfig)
+	fileSystem := wireconfig.NewFileSystem()
+	transformerFactory := wireconfig.NewTransformerFactory()
+	kustomizeProvider := wireconfig.NewKustomizeProvider(factory, fileSystem, transformerFactory, pluginConfig)
+	resourceConfigs, err := wireconfig.NewResourceConfig(resourceConfigPath, kustomizeProvider)
 	if err != nil {
 		return nil, err
 	}
@@ -56,12 +63,24 @@ func InitializeApply(resourceConfigPath clik8s.ResourceConfigPath, writer io.Wri
 	if err != nil {
 		return nil, err
 	}
-	clientset, err := wirek8s.NewKubernetesClientSet(config)
+	dynamicInterface, err := wirek8s.NewDynamicClient(config)
 	if err != nil {
 		return nil, err
 	}
-	fileSystem := wirek8s.NewFileSystem()
-	resourceConfigs, err := wirek8s.NewResourceConfig(resourceConfigPath, fileSystem)
+	restMapper, err := wirek8s.NewRestMapper(config)
+	if err != nil {
+		return nil, err
+	}
+	client, err := wirek8s.NewClient(dynamicInterface, restMapper)
+	if err != nil {
+		return nil, err
+	}
+	pluginConfig := wireconfig.NewPluginConfig()
+	factory := wireconfig.NewResMapFactory(pluginConfig)
+	fileSystem := wireconfig.NewFileSystem()
+	transformerFactory := wireconfig.NewTransformerFactory()
+	kustomizeProvider := wireconfig.NewKustomizeProvider(factory, fileSystem, transformerFactory, pluginConfig)
+	resourceConfigs, err := wireconfig.NewResourceConfig(resourceConfigPath, kustomizeProvider)
 	if err != nil {
 		return nil, err
 	}
@@ -69,17 +88,21 @@ func InitializeApply(resourceConfigPath clik8s.ResourceConfigPath, writer io.Wri
 	commitIter := wiregit.NewOptionalCommitIter(repository)
 	commit := wiregit.NewOptionalCommit(commitIter)
 	applyApply := &apply.Apply{
-		Clientset: clientset,
-		Out:       writer,
-		Resources: resourceConfigs,
-		Commit:    commit,
+		DynamicClient: client,
+		Out:           writer,
+		Resources:     resourceConfigs,
+		Commit:        commit,
 	}
 	return applyApply, nil
 }
 
 func DoStatus(resourceConfigPath clik8s.ResourceConfigPath, writer io.Writer, args util.Args) (status.Result, error) {
-	fileSystem := wirek8s.NewFileSystem()
-	resourceConfigs, err := wirek8s.NewResourceConfig(resourceConfigPath, fileSystem)
+	pluginConfig := wireconfig.NewPluginConfig()
+	factory := wireconfig.NewResMapFactory(pluginConfig)
+	fileSystem := wireconfig.NewFileSystem()
+	transformerFactory := wireconfig.NewTransformerFactory()
+	kustomizeProvider := wireconfig.NewKustomizeProvider(factory, fileSystem, transformerFactory, pluginConfig)
+	resourceConfigs, err := wireconfig.NewResourceConfig(resourceConfigPath, kustomizeProvider)
 	if err != nil {
 		return status.Result{}, err
 	}
@@ -120,12 +143,24 @@ func DoApply(resourceConfigPath clik8s.ResourceConfigPath, writer io.Writer, arg
 	if err != nil {
 		return apply.Result{}, err
 	}
-	clientset, err := wirek8s.NewKubernetesClientSet(config)
+	dynamicInterface, err := wirek8s.NewDynamicClient(config)
 	if err != nil {
 		return apply.Result{}, err
 	}
-	fileSystem := wirek8s.NewFileSystem()
-	resourceConfigs, err := wirek8s.NewResourceConfig(resourceConfigPath, fileSystem)
+	restMapper, err := wirek8s.NewRestMapper(config)
+	if err != nil {
+		return apply.Result{}, err
+	}
+	client, err := wirek8s.NewClient(dynamicInterface, restMapper)
+	if err != nil {
+		return apply.Result{}, err
+	}
+	pluginConfig := wireconfig.NewPluginConfig()
+	factory := wireconfig.NewResMapFactory(pluginConfig)
+	fileSystem := wireconfig.NewFileSystem()
+	transformerFactory := wireconfig.NewTransformerFactory()
+	kustomizeProvider := wireconfig.NewKustomizeProvider(factory, fileSystem, transformerFactory, pluginConfig)
+	resourceConfigs, err := wireconfig.NewResourceConfig(resourceConfigPath, kustomizeProvider)
 	if err != nil {
 		return apply.Result{}, err
 	}
@@ -133,14 +168,106 @@ func DoApply(resourceConfigPath clik8s.ResourceConfigPath, writer io.Writer, arg
 	commitIter := wiregit.NewOptionalCommitIter(repository)
 	commit := wiregit.NewOptionalCommit(commitIter)
 	applyApply := &apply.Apply{
-		Clientset: clientset,
-		Out:       writer,
-		Resources: resourceConfigs,
-		Commit:    commit,
+		DynamicClient: client,
+		Out:           writer,
+		Resources:     resourceConfigs,
+		Commit:        commit,
 	}
 	result, err := NewApplyCommandResult(applyApply, writer)
 	if err != nil {
 		return apply.Result{}, err
+	}
+	return result, nil
+}
+
+func DoPrune(resourceConfigPath clik8s.ResourceConfigPath, writer io.Writer, args util.Args) (prune.Result, error) {
+	configFlags, err := wirek8s.NewConfigFlags(args)
+	if err != nil {
+		return prune.Result{}, err
+	}
+	config, err := wirek8s.NewRestConfig(configFlags)
+	if err != nil {
+		return prune.Result{}, err
+	}
+	dynamicInterface, err := wirek8s.NewDynamicClient(config)
+	if err != nil {
+		return prune.Result{}, err
+	}
+	restMapper, err := wirek8s.NewRestMapper(config)
+	if err != nil {
+		return prune.Result{}, err
+	}
+	client, err := wirek8s.NewClient(dynamicInterface, restMapper)
+	if err != nil {
+		return prune.Result{}, err
+	}
+	pluginConfig := wireconfig.NewPluginConfig()
+	factory := wireconfig.NewResMapFactory(pluginConfig)
+	fileSystem := wireconfig.NewFileSystem()
+	transformerFactory := wireconfig.NewTransformerFactory()
+	kustomizeProvider := wireconfig.NewKustomizeProvider(factory, fileSystem, transformerFactory, pluginConfig)
+	resourcePruneConfigs, err := wireconfig.NewResourcePruneConfig(resourceConfigPath, kustomizeProvider)
+	if err != nil {
+		return prune.Result{}, err
+	}
+	repository := wiregit.NewOptionalRepository(resourceConfigPath)
+	commitIter := wiregit.NewOptionalCommitIter(repository)
+	commit := wiregit.NewOptionalCommit(commitIter)
+	prunePrune := &prune.Prune{
+		DynamicClient: client,
+		Out:           writer,
+		Resources:     resourcePruneConfigs,
+		Commit:        commit,
+	}
+	result, err := NewPruneCommandResult(prunePrune, writer)
+	if err != nil {
+		return prune.Result{}, err
+	}
+	return result, nil
+}
+
+func DoDelete(resourceConfigPath clik8s.ResourceConfigPath, writer io.Writer, args util.Args) (delete2.Result, error) {
+	configFlags, err := wirek8s.NewConfigFlags(args)
+	if err != nil {
+		return delete2.Result{}, err
+	}
+	config, err := wirek8s.NewRestConfig(configFlags)
+	if err != nil {
+		return delete2.Result{}, err
+	}
+	dynamicInterface, err := wirek8s.NewDynamicClient(config)
+	if err != nil {
+		return delete2.Result{}, err
+	}
+	restMapper, err := wirek8s.NewRestMapper(config)
+	if err != nil {
+		return delete2.Result{}, err
+	}
+	client, err := wirek8s.NewClient(dynamicInterface, restMapper)
+	if err != nil {
+		return delete2.Result{}, err
+	}
+	pluginConfig := wireconfig.NewPluginConfig()
+	factory := wireconfig.NewResMapFactory(pluginConfig)
+	fileSystem := wireconfig.NewFileSystem()
+	transformerFactory := wireconfig.NewTransformerFactory()
+	kustomizeProvider := wireconfig.NewKustomizeProvider(factory, fileSystem, transformerFactory, pluginConfig)
+	resourceConfigs, err := wireconfig.NewResourceConfig(resourceConfigPath, kustomizeProvider)
+	if err != nil {
+		return delete2.Result{}, err
+	}
+	repository := wiregit.NewOptionalRepository(resourceConfigPath)
+	commitIter := wiregit.NewOptionalCommitIter(repository)
+	commit := wiregit.NewOptionalCommit(commitIter)
+	deleteDelete := &delete2.Delete{
+		DynamicClient: client,
+		Out:           writer,
+		Resources:     resourceConfigs,
+		Commit:        commit,
+	}
+	result, err := NewDeleteCommandResult(deleteDelete, writer)
+	if err != nil {
+		return delete2.Result{}, err
 	}
 	return result, nil
 }

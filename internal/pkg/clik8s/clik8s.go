@@ -14,7 +14,7 @@ limitations under the License.
 package clik8s
 
 import (
-	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 // ResourceConfigPath is a path containing Kubernetes Resource Config.
@@ -32,4 +32,7 @@ type KubeConfigPath string
 type MasterURL string
 
 // ResourceConfigs is a collection of Resource Config read from Files.
-type ResourceConfigs []runtime.Object
+type ResourceConfigs []*unstructured.Unstructured
+
+// ResourcePruneConfigs is a collection of Resource Config used for pruning
+type ResourcePruneConfigs *unstructured.Unstructured

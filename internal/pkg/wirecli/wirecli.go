@@ -18,14 +18,28 @@ import (
 
 	"github.com/google/wire"
 	"sigs.k8s.io/cli-experimental/internal/pkg/apply"
+	"sigs.k8s.io/cli-experimental/internal/pkg/delete"
+	"sigs.k8s.io/cli-experimental/internal/pkg/prune"
 	"sigs.k8s.io/cli-experimental/internal/pkg/status"
+	"sigs.k8s.io/cli-experimental/internal/pkg/wirecli/wireconfig"
 	"sigs.k8s.io/cli-experimental/internal/pkg/wirecli/wiregit"
 	"sigs.k8s.io/cli-experimental/internal/pkg/wirecli/wirek8s"
 )
 
 // ProviderSet defines dependencies for initializing objects
-var ProviderSet = wire.NewSet(wirek8s.ProviderSet, wiregit.OptionalProviderSet,
-	wire.Struct(new(status.Status), "*"), wire.Struct(new(apply.Apply), "*"), NewStatusCommandResult, NewApplyCommandResult)
+var ProviderSet = wire.NewSet(
+	wirek8s.ProviderSet,
+	wiregit.OptionalProviderSet,
+	wire.Struct(new(status.Status), "*"),
+	wire.Struct(new(apply.Apply), "*"),
+	wire.Struct(new(prune.Prune), "*"),
+	wire.Struct(new(delete.Delete), "*"),
+	NewStatusCommandResult,
+	NewApplyCommandResult,
+	NewDeleteCommandResult,
+	NewPruneCommandResult,
+	wireconfig.ConfigProviderSet,
+)
 
 // NewStatusCommandResult returns a new status.Result
 func NewStatusCommandResult(s *status.Status, out io.Writer) (status.Result, error) {
@@ -33,6 +47,16 @@ func NewStatusCommandResult(s *status.Status, out io.Writer) (status.Result, err
 }
 
 // NewApplyCommandResult returns a new apply.Result
-func NewApplyCommandResult(s *apply.Apply, out io.Writer) (apply.Result, error) {
-	return s.Do()
+func NewApplyCommandResult(a *apply.Apply, out io.Writer) (apply.Result, error) {
+	return a.Do()
+}
+
+// NewPruneCommandResult returns a new prune.Result
+func NewPruneCommandResult(p *prune.Prune, out io.Writer) (prune.Result, error) {
+	return p.Do()
+}
+
+// NewDeleteCommandResult returns a new delete.Result
+func NewDeleteCommandResult(d *delete.Delete, out io.Writer) (delete.Result, error) {
+	return d.Do()
 }

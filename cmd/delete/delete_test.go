@@ -11,7 +11,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package apply_test
+package delete_test
 
 import (
 	"bytes"
@@ -21,6 +21,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"sigs.k8s.io/cli-experimental/cmd/apply"
+	"sigs.k8s.io/cli-experimental/cmd/delete"
 	"sigs.k8s.io/cli-experimental/internal/pkg/wirecli/wirek8s"
 	"sigs.k8s.io/cli-experimental/internal/pkg/wirecli/wiretest"
 )
@@ -37,7 +38,7 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-func TestApply(t *testing.T) {
+func TestDelete(t *testing.T) {
 	buf := new(bytes.Buffer)
 	fs, cleanup, err := wiretest.InitializeKustomization()
 	defer cleanup()
@@ -52,4 +53,13 @@ func TestApply(t *testing.T) {
 
 	assert.NoError(t, cmd.Execute())
 	assert.Equal(t, "Doing `cli-experimental apply`\napplied ConfigMap/inventory\napplied ConfigMap/test-map-k6tb869f64\nResources: 2\n", buf.String()) // nolint
+
+	cmd = delete.GetDeleteCommand(args)
+	buf.Reset()
+	cmd.SetOutput(buf)
+	cmd.SetArgs(args)
+	wirek8s.Flags(cmd.PersistentFlags())
+
+	assert.NoError(t, cmd.Execute())
+	assert.Equal(t, "Doing `cli-experimental delete`\nResources: 2\n", buf.String())
 }
