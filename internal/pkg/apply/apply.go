@@ -31,10 +31,18 @@ import (
 
 // Apply applies directories
 type Apply struct {
+	// DynamicClient is the client used to talk
+	// with the cluster
 	DynamicClient client.Client
-	Out           io.Writer
-	Resources     clik8s.ResourceConfigs
-	Commit        *object.Commit
+
+	// Out stores the output
+	Out io.Writer
+
+	// Resources is a list of resource configurations
+	Resources clik8s.ResourceConfigs
+
+	// Commit is a git commit object
+	Commit *object.Commit
 }
 
 // Result contains the Apply Result
@@ -49,7 +57,7 @@ func (a *Apply) Do() (Result, error) {
 	// TODO(Liuijngfang1): add a dry-run for all objects
 	// When the dry-run passes, proceed to the actual apply
 
-	for _, u := range adjustOrder(a.Resources) {
+	for _, u := range normalizeResourceOrdering(a.Resources) {
 		annotation := u.GetAnnotations()
 		_, ok := annotation[inventory.InventoryAnnotation]
 
@@ -113,8 +121,8 @@ func mergeInventoryAnnotation(newObj, oldObj *unstructured.Unstructured) (*unstr
 	return newObj, nil
 }
 
-// adjustOrder moves the inventory object to be the first resource
-func adjustOrder(resources clik8s.ResourceConfigs) []*unstructured.Unstructured {
+// normalizeResourceOrdering moves the inventory object to be the first resource
+func normalizeResourceOrdering(resources clik8s.ResourceConfigs) []*unstructured.Unstructured {
 	var results []*unstructured.Unstructured
 	index := -1
 	for i, u := range resources {

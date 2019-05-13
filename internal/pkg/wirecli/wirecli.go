@@ -26,6 +26,8 @@ import (
 	"sigs.k8s.io/cli-experimental/internal/pkg/wirecli/wirek8s"
 )
 
+// TODO(Liujingfang1): split into per command wire
+
 // ProviderSet defines dependencies for initializing objects
 var ProviderSet = wire.NewSet(
 	wirek8s.ProviderSet,

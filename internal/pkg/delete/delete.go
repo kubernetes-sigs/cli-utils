@@ -31,10 +31,18 @@ import (
 
 // Delete applies directories
 type Delete struct {
+	// DynamicClient is the client used to talk
+	// with the cluster
 	DynamicClient client.Client
-	Out           io.Writer
-	Resources     clik8s.ResourceConfigs
-	Commit        *object.Commit
+
+	// Out stores the output
+	Out io.Writer
+
+	// Resources is a list of resource configurations
+	Resources clik8s.ResourceConfigs
+
+	// Commit is a git commit object
+	Commit *object.Commit
 }
 
 // Result contains the Apply Result
@@ -45,18 +53,19 @@ type Result struct {
 // Do executes the delete
 func (a *Delete) Do() (Result, error) {
 	fmt.Fprintf(a.Out, "Doing `cli-experimental delete`\n")
-	for _, u := range adjustOrder(a.Resources) {
+	ctx := context.Background()
+	for _, u := range normalizeResourceOrdering(a.Resources) {
 		annotations := u.GetAnnotations()
 		_, ok := annotations[inventory.InventoryAnnotation]
 		if ok {
-			err := a.deleteLeftOvers(annotations)
+			err := a.handleInventroy(ctx, annotations)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "failed to delete leftovers for inventory %v\n", err)
 				continue
 			}
 		}
 
-		err := a.deleteObject(u.GroupVersionKind(), u.GetNamespace(), u.GetName())
+		err := a.deleteObject(ctx, u.GroupVersionKind(), u.GetNamespace(), u.GetName())
 		if err != nil {
 			fmt.Fprint(os.Stderr, err)
 		}
@@ -65,7 +74,12 @@ func (a *Delete) Do() (Result, error) {
 	return Result{Resources: a.Resources}, nil
 }
 
-func (a *Delete) deleteLeftOvers(annotations map[string]string) error {
+// handleInventory reads the inventory annotation
+// and delete any object recorded in it that hasn't been deleted.
+// When there is an inventory object in the resource configurations, the inventory
+// object may record some objects that are applied previously and never been pruned.
+// By delete command, those objects are supposed to be cleaned up as well.
+func (a *Delete) handleInventroy(ctx context.Context, annotations map[string]string) error {
 	inv := inventory.NewInventory()
 	err := inv.LoadFromAnnotation(annotations)
 	if err != nil {
@@ -80,7 +94,7 @@ func (a *Delete) deleteLeftOvers(annotations map[string]string) error {
 			Version: id.Version,
 			Kind:    id.Kind,
 		}
-		err = a.deleteObject(gvk, id.Namespace, id.Name)
+		err = a.deleteObject(ctx, gvk, id.Namespace, id.Name)
 		if err != nil {
 			fmt.Fprint(os.Stderr, err)
 		}
@@ -88,13 +102,13 @@ func (a *Delete) deleteLeftOvers(annotations map[string]string) error {
 	return nil
 }
 
-func (a *Delete) deleteObject(gvk schema.GroupVersionKind, ns, nm string) error {
+func (a *Delete) deleteObject(ctx context.Context, gvk schema.GroupVersionKind, ns, nm string) error {
 	obj := &unstructured.Unstructured{}
 	obj.SetGroupVersionKind(gvk)
 	obj.SetNamespace(ns)
 	obj.SetName(nm)
 
-	err := a.DynamicClient.Delete(context.Background(), obj, &metav1.DeleteOptions{})
+	err := a.DynamicClient.Delete(ctx, obj, &metav1.DeleteOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return nil
@@ -104,8 +118,9 @@ func (a *Delete) deleteObject(gvk schema.GroupVersionKind, ns, nm string) error 
 	return nil
 }
 
-// adjustOrder move the inventory object to be the last resource
-func adjustOrder(resources clik8s.ResourceConfigs) []*unstructured.Unstructured {
+// normalizeResourceOrdering move the inventory object to be the last resource
+// This is to make sure the inventory object is the last object to be deleted.
+func normalizeResourceOrdering(resources clik8s.ResourceConfigs) []*unstructured.Unstructured {
 	var results []*unstructured.Unstructured
 	index := -1
 	for i, u := range resources {

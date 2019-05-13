@@ -28,9 +28,11 @@ import (
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute(args []string, fn func(*cobra.Command)) error {
 	rootCmd := &cobra.Command{
-		Use:   "k2",
+		// TODO(Liujingfang1): change this binary to a better name
+		Use:   "cli-experimental",
 		Short: "kubectl version 2",
-		Long:  `kubectl version 2`,
+		Long: `kubectl version 2
+with commands apply, prune, delete and dynamic commands`,
 	}
 	if fn != nil {
 		fn(rootCmd)

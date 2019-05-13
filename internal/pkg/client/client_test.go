@@ -334,7 +334,10 @@ var _ = Describe("Client", func() {
 				By("encoding the deployment as unstructured")
 				u := &unstructured.Unstructured{}
 				scheme.Convert(dep, u, nil)
-				annotation, err := patch.GetModifiedConfiguration(u, true)
+				data, err := patch.SerializeLastApplied(u, true)
+				Expect(err).NotTo(HaveOccurred())
+				expected := u.DeepCopy()
+				err = runtime.DecodeInto(unstructured.UnstructuredJSONScheme, data, expected)
 				Expect(err).NotTo(HaveOccurred())
 				u.SetGroupVersionKind(schema.GroupVersionKind{
 					Group:   "apps",
@@ -349,7 +352,8 @@ var _ = Describe("Client", func() {
 				actual, err := clientset.AppsV1().Deployments(ns).Get(dep.Name, metav1.GetOptions{})
 				Expect(err).NotTo(HaveOccurred())
 				Expect(actual).NotTo(BeNil())
-				Expect(actual.Annotations[v1.LastAppliedConfigAnnotation]).To(Equal(string(annotation)))
+
+				Expect(actual.Annotations[v1.LastAppliedConfigAnnotation]).To(Equal(expected.GetAnnotations()[v1.LastAppliedConfigAnnotation]))
 				close(done)
 			})
 
@@ -379,7 +383,7 @@ var _ = Describe("Client", func() {
 					Version: "v1",
 				})
 				u.SetAnnotations(map[string]string{"foo": "bar"})
-				annotation, err := patch.GetModifiedConfiguration(u, false)
+				annotation, err := patch.SerializeLastApplied(u, false)
 				Expect(err).NotTo(HaveOccurred())
 				err = cl.Apply(context.TODO(), u)
 				Expect(err).NotTo(HaveOccurred())

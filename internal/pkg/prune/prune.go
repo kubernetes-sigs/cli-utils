@@ -31,12 +31,22 @@ import (
 	"sigs.k8s.io/kustomize/pkg/inventory"
 )
 
-// Prune prunes directories
+// Prune prunes obsolete resources from a kustomization directory
+// that are applied in previous applies but not show up in the
+// latest apply.
 type Prune struct {
+	// DynamicClient is the client used to talk
+	// with the cluster
 	DynamicClient client.Client
-	Out           io.Writer
-	Resources     clik8s.ResourcePruneConfigs
-	Commit        *object.Commit
+
+	// Out stores the output
+	Out io.Writer
+
+	// Resources is the resource used for pruning
+	Resources clik8s.ResourcePruneConfigs
+
+	// Commit is a git commit object
+	Commit *object.Commit
 }
 
 // Result contains the Prune Result
@@ -50,6 +60,7 @@ func (o *Prune) Do() (Result, error) {
 		return Result{}, nil
 	}
 	fmt.Fprintf(o.Out, "Doing `cli-experimental prune`\n")
+	ctx := context.Background()
 
 	u := (*unstructured.Unstructured)(o.Resources)
 	annotation := u.GetAnnotations()
@@ -59,7 +70,7 @@ func (o *Prune) Do() (Result, error) {
 	}
 
 	obj := u.DeepCopy()
-	err := o.DynamicClient.Get(context.Background(),
+	err := o.DynamicClient.Get(ctx,
 		types.NamespacedName{Namespace: u.GetNamespace(), Name: u.GetName()}, obj)
 
 	if err != nil {
@@ -70,7 +81,7 @@ func (o *Prune) Do() (Result, error) {
 		fmt.Fprintf(os.Stderr, "retrieving current configuration of %s from server for %v", u.GetName(), err)
 		return Result{}, err
 	}
-	obj, results, err := o.runPrune(obj)
+	obj, results, err := o.runPrune(ctx, obj)
 	if err != nil {
 		return Result{}, err
 	}
@@ -90,7 +101,7 @@ func (o *Prune) Do() (Result, error) {
 //     https://github.com/kubernetes-sigs/kustomize/tree/master/pkg/inventory
 // This is based on the KEP
 //     https://github.com/kubernetes/enhancements/pull/810
-func (o *Prune) runPrune(obj *unstructured.Unstructured) (
+func (o *Prune) runPrune(ctx context.Context, obj *unstructured.Unstructured) (
 	*unstructured.Unstructured, []*unstructured.Unstructured, error) {
 	var results []*unstructured.Unstructured
 	annotations := obj.GetAnnotations()
@@ -103,7 +114,7 @@ func (o *Prune) runPrune(obj *unstructured.Unstructured) (
 			Version: item.Version,
 			Kind:    item.Kind,
 		}
-		u, err := o.deleteObject(gvk, item.Namespace, item.Name)
+		u, err := o.deleteObject(ctx, gvk, item.Namespace, item.Name)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -116,7 +127,8 @@ func (o *Prune) runPrune(obj *unstructured.Unstructured) (
 	return obj, results, nil
 }
 
-func (o *Prune) deleteObject(gvk schema.GroupVersionKind, ns, nm string) (*unstructured.Unstructured, error) {
+func (o *Prune) deleteObject(ctx context.Context, gvk schema.GroupVersionKind,
+	ns, nm string) (*unstructured.Unstructured, error) {
 	obj := &unstructured.Unstructured{}
 	obj.SetGroupVersionKind(gvk)
 	obj.SetNamespace(ns)

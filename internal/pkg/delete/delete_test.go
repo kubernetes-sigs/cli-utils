@@ -18,12 +18,10 @@ import (
 	"context"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/src-d/go-git.v4/plumbing/object"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/cli-experimental/internal/pkg/clik8s"
 	"sigs.k8s.io/cli-experimental/internal/pkg/delete"
 	"sigs.k8s.io/cli-experimental/internal/pkg/wirecli/wiretest"
@@ -39,7 +37,7 @@ func TestDeleteEmpty(t *testing.T) {
 	assert.Equal(t, delete.Result{}, r)
 }
 
-func TestPrune(t *testing.T) {
+func TestDelete(t *testing.T) {
 	buf := new(bytes.Buffer)
 	kp := wiretest.InitializConfigProvider()
 	fs, cleanup, err := wiretest.InitializeKustomization()
@@ -65,7 +63,7 @@ func TestPrune(t *testing.T) {
 		Kind:    "ConfigMapList",
 		Version: "v1",
 	})
-	err = a.DynamicClient.List(context.Background(), cmList, "default", metav1.ListOptions{})
+	err = a.DynamicClient.List(context.Background(), cmList, "default", nil)
 	assert.NoError(t, err)
 	assert.Equal(t, len(cmList.Items), 3)
 
@@ -76,7 +74,7 @@ func TestPrune(t *testing.T) {
 	_, err = d.Do()
 	assert.NoError(t, err)
 
-	err = d.DynamicClient.List(context.Background(), cmList, "default", metav1.ListOptions{})
+	err = d.DynamicClient.List(context.Background(), cmList, "default", nil)
 	assert.NoError(t, err)
 	assert.Equal(t, len(cmList.Items), 0)
 }

@@ -26,9 +26,16 @@ import (
 func GetDeleteCommand(a util.Args) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "delete",
-		Short: "Delete resources from a K8s cluster.",
-		Long:  `Delete resources from a K8s cluster.`,
-		Args:  cobra.MinimumNArgs(1),
+		Short: "Delete resources from a Kubernetes cluster.",
+		Long: `Delete resources from a Kubernetes cluster.
+The resource configurations can be from a Kustomization directory.
+The path of the resource configurations should be passed to delete
+as an argument.
+
+	# Delete the configurations from a directory containing kustomization.yaml - e.g. dir/kustomization.yaml
+	k2 delete dir
+`,
+		Args: cobra.MinimumNArgs(1),
 	}
 
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {

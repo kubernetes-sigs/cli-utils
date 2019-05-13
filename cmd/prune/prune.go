@@ -28,9 +28,49 @@ func GetPruneCommand(a util.Args) *cobra.Command {
 		Use:   "prune",
 		Short: "Prune obsolete resources.",
 		Long: `Prune obsolete resources.
-		It is based on checking the inventory annotation that
-		is stored in the resource configuration that is passed
-		to prune command.`,
+		# Prune the configurations from a directory containing kustomization.yaml -e.g. dir/kustomization.yaml
+		k2 prune dir
+
+The pruning is done based on checking the inventory annotation that
+is stored in the resource configuration that is passed to prune command.
+The inventory annotation kustomize.k8s.io/Inventory has following format:
+{
+  "current":
+    {
+      "apps_v1_Deployment|default|mysql":null,
+      "~G_v1_Secret|default|pass-dfg7h97cf6":
+        [
+          {
+            "group":"apps",
+            "version":"v1",
+            "kind":"Deployment",
+            "name":"mysql",
+            "namespace":"default",
+          }
+        ],
+      "~G_v1_Service|default|mysql":null
+    }
+  }
+  "previous:
+      {
+      "apps_v1_Deployment|default|mysql":null,
+      "~G_v1_Secret|default|pass-dfg7h97cf6":
+        [
+          {
+            "group":"apps",
+            "version":"v1",
+            "kind":"Deployment",
+            "name":"mysql",
+            "namespace":"default",
+          }
+        ],
+      "~G_v1_Service|default|mysql":null
+    }
+  }
+}
+Any objects in the previous part that don't show up in the current part will be pruned.
+For more information, see https://github.com/kubernetes-sigs/kustomize/blob/master/docs/inventory_object.md.
+`,
 		Args: cobra.MinimumNArgs(1),
 	}
 

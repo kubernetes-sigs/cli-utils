@@ -30,8 +30,18 @@ func GetApplyCommand(a util.Args) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "apply",
 		Short: "Apply resource configurations.",
-		Long:  `Apply resource configurations to k8s cluster.`,
-		Args:  cobra.MinimumNArgs(1),
+		Long: `Apply resource configurations to k8s cluster. 
+The resource configurations can be from a Kustomization directory.
+The path of the resource configurations should be passed to apply
+as an argument.
+
+	# Apply the configurations from a directory containing kustomization.yaml - e.g. dir/kustomization.yaml
+	k2 apply dir
+
+When server-side apply is available on the cluster, it is used; otherwise, client-side apply
+is used.
+`,
+		Args: cobra.MinimumNArgs(1),
 	}
 
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
