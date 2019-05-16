@@ -11,10 +11,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package wirecli
+package wireprune
 
 import (
+	"io"
+
 	"github.com/google/wire"
+	"sigs.k8s.io/cli-experimental/internal/pkg/prune"
 	"sigs.k8s.io/cli-experimental/internal/pkg/wirecli/wireconfig"
 	"sigs.k8s.io/cli-experimental/internal/pkg/wirecli/wiregit"
 	"sigs.k8s.io/cli-experimental/internal/pkg/wirecli/wirek8s"
@@ -24,5 +27,12 @@ import (
 var ProviderSet = wire.NewSet(
 	wirek8s.ProviderSet,
 	wiregit.OptionalProviderSet,
+	wire.Struct(new(prune.Prune), "*"),
+	NewPruneCommandResult,
 	wireconfig.ConfigProviderSet,
 )
+
+// NewPruneCommandResult returns a new prune.Result
+func NewPruneCommandResult(p *prune.Prune, out io.Writer) (prune.Result, error) {
+	return p.Do()
+}

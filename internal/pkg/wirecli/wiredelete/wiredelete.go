@@ -11,10 +11,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package wirecli
+package wiredelete
 
 import (
+	"io"
+
 	"github.com/google/wire"
+	"sigs.k8s.io/cli-experimental/internal/pkg/delete"
 	"sigs.k8s.io/cli-experimental/internal/pkg/wirecli/wireconfig"
 	"sigs.k8s.io/cli-experimental/internal/pkg/wirecli/wiregit"
 	"sigs.k8s.io/cli-experimental/internal/pkg/wirecli/wirek8s"
@@ -24,5 +27,12 @@ import (
 var ProviderSet = wire.NewSet(
 	wirek8s.ProviderSet,
 	wiregit.OptionalProviderSet,
+	wire.Struct(new(delete.Delete), "*"),
+	NewDeleteCommandResult,
 	wireconfig.ConfigProviderSet,
 )
+
+// NewDeleteCommandResult returns a new delete.Result
+func NewDeleteCommandResult(d *delete.Delete, out io.Writer) (delete.Result, error) {
+	return d.Do()
+}

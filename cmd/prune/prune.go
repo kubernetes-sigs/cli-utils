@@ -19,7 +19,7 @@ import (
 	"github.com/spf13/cobra"
 	"sigs.k8s.io/cli-experimental/internal/pkg/clik8s"
 	"sigs.k8s.io/cli-experimental/internal/pkg/util"
-	"sigs.k8s.io/cli-experimental/internal/pkg/wirecli"
+	"sigs.k8s.io/cli-experimental/internal/pkg/wirecli/wireprune"
 )
 
 // GetPruneCommand returns the `prune` cobra Command
@@ -76,7 +76,7 @@ For more information, see https://github.com/kubernetes-sigs/kustomize/blob/mast
 
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
 		for i := range args {
-			r, err := wirecli.DoPrune(clik8s.ResourceConfigPath(args[i]), cmd.OutOrStdout(), a)
+			r, err := wireprune.DoPrune(clik8s.ResourceConfigPath(args[i]), cmd.OutOrStdout(), a)
 			if err != nil {
 				return err
 			}

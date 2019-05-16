@@ -11,10 +11,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package wirecli
+package wirestatus
 
 import (
+	"io"
+
 	"github.com/google/wire"
+	"sigs.k8s.io/cli-experimental/internal/pkg/status"
 	"sigs.k8s.io/cli-experimental/internal/pkg/wirecli/wireconfig"
 	"sigs.k8s.io/cli-experimental/internal/pkg/wirecli/wiregit"
 	"sigs.k8s.io/cli-experimental/internal/pkg/wirecli/wirek8s"
@@ -24,5 +27,12 @@ import (
 var ProviderSet = wire.NewSet(
 	wirek8s.ProviderSet,
 	wiregit.OptionalProviderSet,
+	wire.Struct(new(status.Status), "*"),
+	NewStatusCommandResult,
 	wireconfig.ConfigProviderSet,
 )
+
+// NewStatusCommandResult returns a new status.Result
+func NewStatusCommandResult(s *status.Status, out io.Writer) (status.Result, error) {
+	return s.Do()
+}

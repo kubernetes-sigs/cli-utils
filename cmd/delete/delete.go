@@ -19,7 +19,7 @@ import (
 	"github.com/spf13/cobra"
 	"sigs.k8s.io/cli-experimental/internal/pkg/clik8s"
 	"sigs.k8s.io/cli-experimental/internal/pkg/util"
-	"sigs.k8s.io/cli-experimental/internal/pkg/wirecli"
+	"sigs.k8s.io/cli-experimental/internal/pkg/wirecli/wiredelete"
 )
 
 // GetDeleteCommand returns the `prune` cobra Command
@@ -40,7 +40,7 @@ as an argument.
 
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
 		for i := range args {
-			r, err := wirecli.DoDelete(clik8s.ResourceConfigPath(args[i]), cmd.OutOrStdout(), a)
+			r, err := wiredelete.DoDelete(clik8s.ResourceConfigPath(args[i]), cmd.OutOrStdout(), a)
 			if err != nil {
 				return err
 			}

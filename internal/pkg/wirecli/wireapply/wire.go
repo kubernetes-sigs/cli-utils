@@ -13,47 +13,23 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package wirecli
+package wireapply
 
 import (
 	"io"
 
-	"sigs.k8s.io/cli-experimental/internal/pkg/util"
-
 	"github.com/google/wire"
+	"sigs.k8s.io/cli-experimental/internal/pkg/util"
 	"sigs.k8s.io/cli-experimental/internal/pkg/apply"
 	"sigs.k8s.io/cli-experimental/internal/pkg/clik8s"
-	"sigs.k8s.io/cli-experimental/internal/pkg/delete"
-	"sigs.k8s.io/cli-experimental/internal/pkg/prune"
-	"sigs.k8s.io/cli-experimental/internal/pkg/status"
 )
-
-// InitializeStatus creates a new *status.Status object
-func InitializeStatus(clik8s.ResourceConfigPath, io.Writer, util.Args) (*status.Status, error) {
-	panic(wire.Build(ProviderSet))
-}
 
 // InitializeApply creates a new *apply.Apply object
 func InitializeApply(clik8s.ResourceConfigPath, io.Writer, util.Args) (*apply.Apply, error) {
 	panic(wire.Build(ProviderSet))
 }
 
-// DoStatus creates a new Status object and runs it
-func DoStatus(clik8s.ResourceConfigPath, io.Writer, util.Args) (status.Result, error) {
-	panic(wire.Build(ProviderSet))
-}
-
 // DoApply creates a new Apply object and runs it
 func DoApply(clik8s.ResourceConfigPath, io.Writer, util.Args) (apply.Result, error) {
-	panic(wire.Build(ProviderSet))
-}
-
-// DoPrune creates a new Prune object and runs it
-func DoPrune(clik8s.ResourceConfigPath, io.Writer, util.Args) (prune.Result, error) {
-	panic(wire.Build(ProviderSet))
-}
-
-// DoDelete creates a new Delete object and runs it
-func DoDelete(clik8s.ResourceConfigPath, io.Writer, util.Args) (delete.Result, error) {
 	panic(wire.Build(ProviderSet))
 }

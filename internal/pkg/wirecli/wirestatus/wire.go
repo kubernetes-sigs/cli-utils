@@ -1,3 +1,5 @@
+//+build wireinject
+
 /*
 Copyright 2019 The Kubernetes Authors.
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -11,18 +13,23 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package wirecli
+package wirestatus
 
 import (
+	"io"
+
 	"github.com/google/wire"
-	"sigs.k8s.io/cli-experimental/internal/pkg/wirecli/wireconfig"
-	"sigs.k8s.io/cli-experimental/internal/pkg/wirecli/wiregit"
-	"sigs.k8s.io/cli-experimental/internal/pkg/wirecli/wirek8s"
+	"sigs.k8s.io/cli-experimental/internal/pkg/clik8s"
+	"sigs.k8s.io/cli-experimental/internal/pkg/status"
+	"sigs.k8s.io/cli-experimental/internal/pkg/util"
 )
 
-// ProviderSet defines dependencies for initializing objects
-var ProviderSet = wire.NewSet(
-	wirek8s.ProviderSet,
-	wiregit.OptionalProviderSet,
-	wireconfig.ConfigProviderSet,
-)
+// InitializeStatus creates a new *status.Status object
+func InitializeStatus(clik8s.ResourceConfigPath, io.Writer, util.Args) (*status.Status, error) {
+	panic(wire.Build(ProviderSet))
+}
+
+// DoStatus creates a new Status object and runs it
+func DoStatus(clik8s.ResourceConfigPath, io.Writer, util.Args) (status.Result, error) {
+	panic(wire.Build(ProviderSet))
+}
