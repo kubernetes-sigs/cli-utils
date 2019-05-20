@@ -248,6 +248,11 @@ func InitializConfigProvider() resourceconfig.ConfigProvider {
 	return kustomizeProvider
 }
 
+func InitializeRawConfigProvider() resourceconfig.ConfigProvider {
+	rawConfigFileProvider := &resourceconfig.RawConfigFileProvider{}
+	return rawConfigFileProvider
+}
+
 // wire.go:
 
 func InitializeKustomization() ([]string, func(), error) {

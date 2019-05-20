@@ -18,21 +18,20 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"sigs.k8s.io/kustomize/pkg/inventory"
 	"strings"
-
-	"sigs.k8s.io/kustomize/pkg/ifc"
-	"sigs.k8s.io/yaml"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/cli-experimental/internal/pkg/clik8s"
 	"sigs.k8s.io/kustomize/pkg/fs"
+	"sigs.k8s.io/kustomize/pkg/ifc"
 	"sigs.k8s.io/kustomize/pkg/ifc/transformer"
+	"sigs.k8s.io/kustomize/pkg/inventory"
 	"sigs.k8s.io/kustomize/pkg/loader"
 	"sigs.k8s.io/kustomize/pkg/plugins"
 	"sigs.k8s.io/kustomize/pkg/resmap"
 	"sigs.k8s.io/kustomize/pkg/target"
 	"sigs.k8s.io/kustomize/pkg/types"
+	"sigs.k8s.io/yaml"
 )
 
 // ConfigProvider provides runtime.Objects for a path
@@ -135,29 +134,51 @@ func (p *RawConfigFileProvider) IsSupported(path string) bool {
 }
 
 // GetConfig returns the resource configs
-func (p *RawConfigFileProvider) GetConfig(path string) ([]*unstructured.Unstructured, error) {
+// from a directory or a file containing raw Kubernetes resource configurations
+func (p *RawConfigFileProvider) GetConfig(root string) ([]*unstructured.Unstructured, error) {
 	var values clik8s.ResourceConfigs
 
-	b, err := ioutil.ReadFile(path)
+	err := filepath.Walk(root, func(path string, fi os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if fi.IsDir() {
+			return nil
+		}
+
+		b, err := ioutil.ReadFile(path)
+
+		if err != nil {
+			return err
+		}
+		objs := strings.Split(string(b), "---")
+		for _, o := range objs {
+			body := map[string]interface{}{}
+
+			if err := yaml.Unmarshal([]byte(o), &body); err != nil {
+				return err
+			}
+			values = append(values, &unstructured.Unstructured{Object: body})
+		}
+		return nil
+	})
+
 	if err != nil {
 		return nil, err
 	}
-	objs := strings.Split(string(b), "---")
-	for _, o := range objs {
-		body := map[string]interface{}{}
-
-		if err := yaml.Unmarshal([]byte(o), &body); err != nil {
-			return nil, err
-		}
-		values = append(values, &unstructured.Unstructured{Object: body})
-	}
-
 	return values, nil
 }
 
 // GetPruneConfig returns the resource configs
+// from a directory or a file containing raw Kubernetes resource configurations
+// The resource used for prune is get by checking the presence of the inventory annotation
 func (p *RawConfigFileProvider) GetPruneConfig(path string) (*unstructured.Unstructured, error) {
-	return nil, nil
+	resources, err := p.GetConfig(path)
+	if err != nil {
+		return nil, err
+	}
+	return GetPruneResources(resources)
 }
 
 // RawConfigHTTPProvider provides configs from HTTP urls

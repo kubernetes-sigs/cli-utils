@@ -43,6 +43,12 @@ var ConfigProviderSet = wire.NewSet(
 	NewResourcePruneConfig,
 )
 
+// RawConfigProviderSet defines dependencies for initializing a RawConfigFileProvider
+var RawConfigProviderSet = wire.NewSet(
+	wire.Struct(new(resourceconfig.RawConfigFileProvider), "*"),
+	wire.Bind(new(resourceconfig.ConfigProvider), new(*resourceconfig.RawConfigFileProvider)),
+)
+
 // NewPluginConfig returns a new PluginConfig
 func NewPluginConfig() *types.PluginConfig {
 	pc := plugin.DefaultPluginConfig()

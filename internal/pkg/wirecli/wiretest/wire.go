@@ -67,6 +67,10 @@ func InitializConfigProvider() resourceconfig.ConfigProvider {
 	panic(wire.Build(wireconfig.ConfigProviderSet))
 }
 
+func InitializeRawConfigProvider() resourceconfig.ConfigProvider {
+	panic(wire.Build(wireconfig.RawConfigProviderSet))
+}
+
 func InitializeKustomization() ([]string, func(), error) {
 	f1, err := ioutil.TempDir("/tmp", "TestApply")
 	if err != nil {
