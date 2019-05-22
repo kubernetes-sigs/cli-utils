@@ -18,6 +18,7 @@ import (
 	"sigs.k8s.io/cli-experimental/internal/pkg/apply"
 	"sigs.k8s.io/cli-experimental/internal/pkg/delete"
 	"sigs.k8s.io/cli-experimental/internal/pkg/prune"
+	"sigs.k8s.io/cli-experimental/internal/pkg/resourceconfig"
 )
 
 // Cmd is a wrapper for different structs:
@@ -38,9 +39,9 @@ func (a *Cmd) Apply(resources []*unstructured.Unstructured) error {
 
 // Prune prunes resources given the input as a slice of unstructured resources
 func (a *Cmd) Prune(resources []*unstructured.Unstructured) error {
-	pruneResource, err := prune.GetPruneResources(resources)
+	pruneResource, err := resourceconfig.GetPruneResources(resources)
 	if err != nil {
-		return nil
+		return err
 	}
 	a.Pruner.Resources = pruneResource
 	_, err = a.Pruner.Do()

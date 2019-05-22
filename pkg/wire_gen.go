@@ -37,21 +37,22 @@ func InitializeCmd(writer io.Writer, args util.Args) (*Cmd, error) {
 	if err != nil {
 		return nil, err
 	}
-	applyApply := apply.Apply{
+	applyApply := &apply.Apply{
 		DynamicClient: client,
 		Out:           writer,
 	}
-	prunePrune := prune.Prune{
+	prunePrune := &prune.Prune{
 		DynamicClient: client,
 		Out:           writer,
 	}
-	deleteDelete := delete2.Delete{
+	deleteDelete := &delete2.Delete{
 		DynamicClient: client,
 		Out:           writer,
 	}
-	cmd, err := NewCmd(applyApply, prunePrune, deleteDelete, client)
-	if err != nil {
-		return nil, err
+	cmd := &Cmd{
+		Applier: applyApply,
+		Pruner:  prunePrune,
+		Deleter: deleteDelete,
 	}
 	return cmd, nil
 }

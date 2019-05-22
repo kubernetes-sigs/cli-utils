@@ -24,7 +24,27 @@ import (
 	"sigs.k8s.io/kustomize/pkg/inventory"
 )
 
-func setupResources() []*unstructured.Unstructured {
+func TestCmdWithEmptyInput(t *testing.T) {
+	buf := new(bytes.Buffer)
+	cmd, err := InitializeCmd(buf, nil)
+	assert.NoError(t, err)
+	assert.NotNil(t, cmd)
+
+	err = cmd.Apply(nil)
+	assert.NoError(t, err)
+
+	err = cmd.Prune(nil)
+	assert.NoError(t, err)
+
+	err = cmd.Delete(nil)
+	assert.NoError(t, err)
+}
+
+// setupResourcesV1 create a slice of unstructured
+// with two ConfigMaps
+// 	one with the inventory annotation
+// 	one without the inventory annotation
+func setupResourcesV1() []*unstructured.Unstructured {
 	r1 := &unstructured.Unstructured{}
 	r1.SetGroupVersionKind(schema.GroupVersionKind{
 		Version: "v1",
@@ -37,15 +57,61 @@ func setupResources() []*unstructured.Unstructured {
 		Version: "v1",
 		Kind:    "ConfigMap",
 	})
-	r2.SetName("cm2")
+	r2.SetName("inventory")
 	r2.SetNamespace("default")
 	r2.SetAnnotations(map[string]string{
-		inventory.InventoryAnnotation:     "{}",
+		inventory.InventoryAnnotation:
+		"{\"current\":{\"~G_v1_ConfigMap|default|cm1\":null}}",
 		inventory.InventoryHashAnnotation: "1234567",
 	})
 	return []*unstructured.Unstructured{r1, r2}
 }
 
+// setupResourcesV2 create a slice of unstructured
+// with two ConfigMaps
+// 	one with the inventory annotation
+// 	one without the inventory annotation
+func setupResourcesV2() []*unstructured.Unstructured {
+	r1 := &unstructured.Unstructured{}
+	r1.SetGroupVersionKind(schema.GroupVersionKind{
+		Version: "v1",
+		Kind:    "ConfigMap",
+	})
+	r1.SetName("cm2")
+	r1.SetNamespace("default")
+	r2 := &unstructured.Unstructured{}
+	r2.SetGroupVersionKind(schema.GroupVersionKind{
+		Version: "v1",
+		Kind:    "ConfigMap",
+	})
+	r2.SetName("inventory")
+	r2.SetNamespace("default")
+	r2.SetAnnotations(map[string]string{
+		inventory.InventoryAnnotation:
+		"{\"current\":{\"~G_v1_ConfigMap|default|cm2\":null}}",
+		inventory.InventoryHashAnnotation: "7654321",
+	})
+	return []*unstructured.Unstructured{r1, r2}
+}
+
+/* TestCmd tests Apply/Prune/Delete functions by
+taking the following steps:
+	1. Initialize a Cmd object
+	2. Create the Resources v1
+	3. Check that there no existing ConfigMap.
+
+	Call apply and prune for the first version of Configs
+	4. Apply the resources and confirm that there are 2 ConfigMaps
+	5. Prune the resources and confirm that there are 2 ConfigMaps
+
+	Call apply and prune for the second version of Configs
+	6. Create the Resources v2
+	7. Apply the resources and confirm that there are 3 ConfigMaps
+	8. Prune the resources and confirm that there are 2 ConfigMaps
+
+	Cleanup
+	9. Delete the resources and confirm that there is no ConfigMap
+*/
 func TestCmd(t *testing.T) {
 	buf := new(bytes.Buffer)
 	cmd, err := InitializeCmd(buf, nil)
@@ -63,12 +129,25 @@ func TestCmd(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, len(cmList.Items), 0)
 
-	resources := setupResources()
+	resources := setupResourcesV1()
 	err = cmd.Apply(resources)
 	assert.NoError(t, err)
 	err = c.List(context.Background(), cmList, "default", nil)
 	assert.NoError(t, err)
 	assert.Equal(t, len(cmList.Items), 2)
+
+	err = cmd.Prune(resources)
+	assert.NoError(t, err)
+	err = c.List(context.Background(), cmList, "default", nil)
+	assert.NoError(t, err)
+	assert.Equal(t, len(cmList.Items), 2)
+
+	resources = setupResourcesV2()
+	err = cmd.Apply(resources)
+	assert.NoError(t, err)
+	err = c.List(context.Background(), cmList, "default", nil)
+	assert.NoError(t, err)
+	assert.Equal(t, len(cmList.Items), 3)
 
 	err = cmd.Prune(resources)
 	assert.NoError(t, err)

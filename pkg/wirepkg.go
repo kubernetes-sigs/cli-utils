@@ -16,7 +16,6 @@ package pkg
 import (
 	"github.com/google/wire"
 	"sigs.k8s.io/cli-experimental/internal/pkg/apply"
-	"sigs.k8s.io/cli-experimental/internal/pkg/client"
 	"sigs.k8s.io/cli-experimental/internal/pkg/delete"
 	"sigs.k8s.io/cli-experimental/internal/pkg/prune"
 	"sigs.k8s.io/cli-experimental/internal/pkg/wirecli/wirek8s"
@@ -27,18 +26,6 @@ var ProviderSet = wire.NewSet(
 	wire.Struct(new(apply.Apply), "DynamicClient", "Out"),
 	wire.Struct(new(prune.Prune), "DynamicClient", "Out"),
 	wire.Struct(new(delete.Delete), "DynamicClient", "Out"),
+	wire.Struct(new(Cmd), "*"),
 	wirek8s.ProviderSet,
-	NewCmd,
 )
-
-// NewCmd returns a new Cmd object
-func NewCmd(a apply.Apply, p prune.Prune, d delete.Delete, c client.Client) (*Cmd, error) {
-	a.DynamicClient = c
-	p.DynamicClient = c
-	d.DynamicClient = c
-	return &Cmd{
-		Applier: &a,
-		Pruner:  &p,
-		Deleter: &d,
-	}, nil
-}

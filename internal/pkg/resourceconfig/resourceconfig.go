@@ -18,6 +18,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"sigs.k8s.io/kustomize/pkg/inventory"
 	"strings"
 
 	"sigs.k8s.io/kustomize/pkg/ifc"
@@ -176,4 +177,28 @@ func (p *RawConfigHTTPProvider) GetConfig(path string) ([]*unstructured.Unstruct
 // GetPruneConfig returns the resource configs
 func (p *RawConfigHTTPProvider) GetPruneConfig(path string) (*unstructured.Unstructured, error) {
 	return nil, nil
+}
+
+// GetPruneResources finds the resource used for pruning from a slice of resources
+// by looking for a special annotation in the resource
+// inventory.InventoryAnnotation
+func GetPruneResources(resources []*unstructured.Unstructured) (*unstructured.Unstructured, error) {
+	count := 0
+	var result *unstructured.Unstructured
+
+	for _, res := range resources {
+		annotations := res.GetAnnotations()
+		if _, ok := annotations[inventory.InventoryAnnotation]; ok {
+			count++
+			result = res
+		}
+	}
+
+	if count == 0 {
+		return nil, nil
+	}
+	if count > 1 {
+		return nil, fmt.Errorf("found multiple resources with inventory annotations")
+	}
+	return result, nil
 }

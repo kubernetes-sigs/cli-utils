@@ -143,28 +143,3 @@ func (o *Prune) deleteObject(ctx context.Context, gvk schema.GroupVersionKind,
 	}
 	return obj, nil
 }
-
-// GetPruneResources finds the resource used for pruning from a slice of resources
-// by looking for a special annotation in the resource
-// inventory.InventoryAnnotation
-func GetPruneResources(resources []*unstructured.Unstructured) (*unstructured.Unstructured, error) {
-	count := 0
-	var result *unstructured.Unstructured
-
-	for _, res := range resources {
-		annotations := res.GetAnnotations()
-		if _, ok := annotations[inventory.InventoryAnnotation]; ok {
-			count++
-			result = res
-		}
-	}
-
-	switch count {
-	case 0:
-		return nil, nil
-	case 1:
-		return result, nil
-	default:
-		return nil, fmt.Errorf("found multiple resources with inventory annotations")
-	}
-}
