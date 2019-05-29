@@ -26,7 +26,8 @@ import (
 
 func TestCmdWithEmptyInput(t *testing.T) {
 	buf := new(bytes.Buffer)
-	cmd, err := InitializeCmd(buf, nil)
+	cmd, done, err := InitializeFakeCmd(buf, nil)
+	defer done()
 	assert.NoError(t, err)
 	assert.NotNil(t, cmd)
 
@@ -114,7 +115,8 @@ taking the following steps:
 */
 func TestCmd(t *testing.T) {
 	buf := new(bytes.Buffer)
-	cmd, err := InitializeCmd(buf, nil)
+	cmd, done, err := InitializeFakeCmd(buf, nil)
+	defer done()
 	assert.NoError(t, err)
 	assert.NotNil(t, cmd)
 

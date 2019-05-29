@@ -26,3 +26,8 @@ import (
 func InitializeCmd(io.Writer, util.Args) (*Cmd, error) {
 	panic(wire.Build(ProviderSet))
 }
+
+// InitializeFakeCmd creates a new Cmd object used for testing
+func InitializeFakeCmd(io.Writer, util.Args) (*Cmd, func(), error) {
+	panic(wire.Build(ProviderSetForTesting))
+}
