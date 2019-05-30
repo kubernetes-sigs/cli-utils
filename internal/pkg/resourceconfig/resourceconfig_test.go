@@ -24,6 +24,7 @@ import (
 	"sigs.k8s.io/cli-experimental/internal/pkg/resourceconfig"
 	"sigs.k8s.io/cli-experimental/internal/pkg/wirecli/wiretest"
 	"sigs.k8s.io/kustomize/pkg/inventory"
+	"sigs.k8s.io/yaml"
 )
 
 func TestKustomizeProvider(t *testing.T) {
@@ -67,23 +68,8 @@ func TestKustomizeProvider2(t *testing.T) {
 	assert.Equal(t, len(inv.Current), 1)
 }
 
-/*
-setupRawConfigFiles provides a directory with Kubernetes resources
-that can be used as input to test RawConfigFileProvider.
-The directory created is
-
-f
-├── service.yaml
-├── subdir1
-│   └── service.yaml
-└── subdir2
-    └── service.yaml
-
- */
-func setupRawConfigFiles(t *testing.T) (string, string) {
-	f, err := ioutil.TempDir("/tmp", "TestConfigProvider")
-	assert.NoError(t, err)
-	err = ioutil.WriteFile(filepath.Join(f, "service.yaml"), []byte(`
+var (
+	serviceA = `
 apiVersion: v1
 kind: Service
 metadata:
@@ -95,13 +81,8 @@ spec:
   - protocol: TCP
     port: 80
     targetPort: 9376
-`), 0644)
-	assert.NoError(t, err)
-	subdir1, err := ioutil.TempDir(f, "subdir")
-	assert.NoError(t, err)
-	subdir2, err := ioutil.TempDir(f, "subdir")
-	assert.NoError(t, err)
-	err = ioutil.WriteFile(filepath.Join(subdir1, "service.yaml"), []byte(`
+`
+	serviceB = `
 apiVersion: v1
 kind: Service
 metadata:
@@ -116,14 +97,8 @@ spec:
   - protocol: TCP
     port: 80
     targetPort: 9376
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
- name: cm
-`), 0644)
-	assert.NoError(t, err)
-	err = ioutil.WriteFile(filepath.Join(subdir2, "service.yaml"), []byte(`
+`
+	serviceC = `
 apiVersion: v1
 kind: Service
 metadata:
@@ -135,27 +110,90 @@ spec:
   - protocol: TCP
     port: 80
     targetPort: 9376
+`
+	cm = `
+apiVersion: v1
+kind: ConfigMap
+metadata:
+ name: cm
+`
+)
+
+/*
+setupRawConfigFiles provides a directory with Kubernetes resources
+that can be used as input to test RawConfigFileProvider.
+The directory created is
+
+f
+├── README.md
+├── nonk8s.yaml
+├── service.yaml
+├── subdir1
+│   └── service.yaml
+└── subdir2
+    └── service.yaml
+
+ */
+func setupRawConfigFiles(t *testing.T) (string, string) {
+	f, err := ioutil.TempDir("/tmp", "TestConfigProvider")
+	assert.NoError(t, err)
+	err = ioutil.WriteFile(filepath.Join(f, "README.md"), []byte(`
+readme
 `), 0644)
 	assert.NoError(t, err)
+	err = ioutil.WriteFile(filepath.Join(f, "nonk8s.yaml"), []byte(`
+key: value
+`), 0644)
+	assert.NoError(t, err)
+	err = ioutil.WriteFile(filepath.Join(f, "service.yaml"), []byte(serviceA), 0644)
+	assert.NoError(t, err)
+	subdir1, err := ioutil.TempDir(f, "subdir")
+	assert.NoError(t, err)
+	subdir2, err := ioutil.TempDir(f, "subdir")
+	assert.NoError(t, err)
+	err = ioutil.WriteFile(filepath.Join(subdir1, "service.yaml"), []byte(
+		serviceB + "\n---\n" + cm), 0644)
+	assert.NoError(t, err)
+	err = ioutil.WriteFile(filepath.Join(subdir2, "service.yaml"), []byte(
+		serviceC), 0644)
+	assert.NoError(t, err)
 	return f, subdir1
+}
+
+func setupExpected(t *testing.T) []*unstructured.Unstructured {
+	var results []*unstructured.Unstructured
+	inputs := []string{serviceA, serviceB, cm, serviceC}
+	for _, input := range inputs {
+		body := map[string]interface{}{}
+		err := yaml.Unmarshal([]byte(input), &body)
+		assert.NoError(t, err)
+		results = append(results, &unstructured.Unstructured{Object: body})
+	}
+	return results
 }
 
 func TestRawConfigFileProvider(t *testing.T) {
 	f, subdir := setupRawConfigFiles(t)
 	defer os.RemoveAll(f)
+	expected := setupExpected(t)
+
+
 	cp := wiretest.InitializeRawConfigProvider()
 	b := cp.IsSupported(f)
 	assert.Equal(t, b, true)
 	resources, err := cp.GetConfig(f)
 	assert.NoError(t, err)
 	assert.Equal(t, len(resources), 4)
+	assert.Equal(t, expected, resources)
 	resources, err = cp.GetConfig(filepath.Join(f, "service.yaml"))
 	assert.NoError(t, err)
 	assert.Equal(t, len(resources), 1)
+	assert.Equal(t, expected[0], resources[0])
 
 	resource, err := cp.GetPruneConfig(f)
 	assert.NoError(t, err)
 	assert.NotNil(t, resource)
+	assert.Equal(t, expected[1], resource)
 	resource, err = cp.GetPruneConfig(filepath.Join(f, "service.yaml"))
 	assert.NoError(t, err)
 	assert.Nil(t, resource)
@@ -164,16 +202,20 @@ func TestRawConfigFileProvider(t *testing.T) {
 	resources, err = cp.GetConfig(subdir)
 	assert.NoError(t, err)
 	assert.Equal(t, len(resources), 2)
+	assert.Equal(t, expected[1:3], resources)
 	resources, err = cp.GetConfig(filepath.Join(subdir, "service.yaml"))
 	assert.NoError(t, err)
 	assert.Equal(t, len(resources), 2)
+	assert.Equal(t, expected[1:3], resources)
 
 	resource, err = cp.GetPruneConfig(subdir)
 	assert.NoError(t, err)
 	assert.NotNil(t, resource)
+	assert.Equal(t, expected[1], resource)
 	resource, err = cp.GetPruneConfig(filepath.Join(subdir, "service.yaml"))
 	assert.NoError(t, err)
 	assert.NotNil(t, resource)
+	assert.Equal(t, expected[1], resource)
 }
 
 func setupKustomizeWithoutInventory(t *testing.T) string {

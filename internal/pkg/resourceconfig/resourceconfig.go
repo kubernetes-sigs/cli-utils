@@ -14,6 +14,7 @@ limitations under the License.
 package resourceconfig
 
 import (
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -133,6 +134,26 @@ func (p *RawConfigFileProvider) IsSupported(path string) bool {
 	return false
 }
 
+// isYamlFile checks if the input file path has
+// either .yaml or .yml extension
+func isYamlFile(path string) bool {
+	ext := filepath.Ext(path)
+	if ext == ".yaml" || ext == ".yml" {
+		return true
+	}
+	return false
+}
+
+// hasAPIVersionKind checks that the input bytes
+// contains both apiVersion and kind
+func hasApiVersionKind(content []byte) bool {
+	if bytes.Contains(content, []byte("apiVersion:")) &&
+		bytes.Contains(content, []byte("kind:")) {
+		return true
+	}
+	return false
+}
+
 // GetConfig returns the resource configs
 // from a directory or a file containing raw Kubernetes resource configurations
 func (p *RawConfigFileProvider) GetConfig(root string) ([]*unstructured.Unstructured, error) {
@@ -147,11 +168,18 @@ func (p *RawConfigFileProvider) GetConfig(root string) ([]*unstructured.Unstruct
 			return nil
 		}
 
+		if !isYamlFile(path) {
+			return nil
+		}
 		b, err := ioutil.ReadFile(path)
-
 		if err != nil {
 			return err
 		}
+
+		if !hasApiVersionKind(b) {
+			return nil
+		}
+
 		objs := strings.Split(string(b), "---")
 		for _, o := range objs {
 			body := map[string]interface{}{}
