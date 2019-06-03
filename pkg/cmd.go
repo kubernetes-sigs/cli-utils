@@ -19,15 +19,17 @@ import (
 	"sigs.k8s.io/cli-experimental/internal/pkg/delete"
 	"sigs.k8s.io/cli-experimental/internal/pkg/prune"
 	"sigs.k8s.io/cli-experimental/internal/pkg/resourceconfig"
+	"sigs.k8s.io/cli-experimental/internal/pkg/status"
 )
 
 // Cmd is a wrapper for different structs:
 //   apply, prune and delete
 // These structs share the same client
 type Cmd struct {
-	Applier *apply.Apply
-	Pruner  *prune.Prune
-	Deleter *delete.Delete
+	Applier      *apply.Apply
+	Pruner       *prune.Prune
+	Deleter      *delete.Delete
+	StatusGetter *status.Status
 }
 
 // Apply applies resources given the input as a slice of unstructured resources
@@ -52,5 +54,12 @@ func (a *Cmd) Prune(resources []*unstructured.Unstructured) error {
 func (a *Cmd) Delete(resources []*unstructured.Unstructured) error {
 	a.Deleter.Resources = resources
 	_, err := a.Deleter.Do()
+	return err
+}
+
+// Status returns the status given the input as a slice of unstructured resources
+func (a *Cmd) Status(resources []*unstructured.Unstructured) error {
+	a.StatusGetter.Resources = resources
+	_, err := a.StatusGetter.Do()
 	return err
 }

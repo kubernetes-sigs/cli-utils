@@ -61,8 +61,7 @@ func setupResourcesV1() []*unstructured.Unstructured {
 	r2.SetName("inventory")
 	r2.SetNamespace("default")
 	r2.SetAnnotations(map[string]string{
-		inventory.InventoryAnnotation:
-		"{\"current\":{\"~G_v1_ConfigMap|default|cm1\":null}}",
+		inventory.InventoryAnnotation:     "{\"current\":{\"~G_v1_ConfigMap|default|cm1\":null}}",
 		inventory.InventoryHashAnnotation: "1234567",
 	})
 	return []*unstructured.Unstructured{r1, r2}
@@ -88,8 +87,7 @@ func setupResourcesV2() []*unstructured.Unstructured {
 	r2.SetName("inventory")
 	r2.SetNamespace("default")
 	r2.SetAnnotations(map[string]string{
-		inventory.InventoryAnnotation:
-		"{\"current\":{\"~G_v1_ConfigMap|default|cm2\":null}}",
+		inventory.InventoryAnnotation:     "{\"current\":{\"~G_v1_ConfigMap|default|cm2\":null}}",
 		inventory.InventoryHashAnnotation: "7654321",
 	})
 	return []*unstructured.Unstructured{r1, r2}
@@ -152,6 +150,12 @@ func TestCmd(t *testing.T) {
 	assert.Equal(t, len(cmList.Items), 3)
 
 	err = cmd.Prune(resources)
+	assert.NoError(t, err)
+	err = c.List(context.Background(), cmList, "default", nil)
+	assert.NoError(t, err)
+	assert.Equal(t, len(cmList.Items), 2)
+
+	err = cmd.Status(resources)
 	assert.NoError(t, err)
 	err = c.List(context.Background(), cmList, "default", nil)
 	assert.NoError(t, err)

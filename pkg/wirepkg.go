@@ -18,6 +18,7 @@ import (
 	"sigs.k8s.io/cli-experimental/internal/pkg/apply"
 	"sigs.k8s.io/cli-experimental/internal/pkg/delete"
 	"sigs.k8s.io/cli-experimental/internal/pkg/prune"
+	"sigs.k8s.io/cli-experimental/internal/pkg/status"
 	"sigs.k8s.io/cli-experimental/internal/pkg/wirecli/wirek8s"
 	"sigs.k8s.io/cli-experimental/internal/pkg/wirecli/wiretest"
 )
@@ -27,6 +28,7 @@ var ProviderSet = wire.NewSet(
 	wire.Struct(new(apply.Apply), "DynamicClient", "Out"),
 	wire.Struct(new(prune.Prune), "DynamicClient", "Out"),
 	wire.Struct(new(delete.Delete), "DynamicClient", "Out"),
+	wire.Struct(new(status.Status), "DynamicClient", "Out"),
 	wire.Struct(new(Cmd), "*"),
 	wirek8s.ProviderSet,
 )
@@ -36,6 +38,7 @@ var ProviderSetForTesting = wire.NewSet(
 	wiretest.NewRestConfig, wirek8s.NewClient, wirek8s.NewRestMapper,
 	wire.Struct(new(apply.Apply), "DynamicClient", "Out"),
 	wire.Struct(new(prune.Prune), "DynamicClient", "Out"),
+	wire.Struct(new(status.Status), "DynamicClient", "Out"),
 	wire.Struct(new(delete.Delete), "DynamicClient", "Out"),
 	wire.Struct(new(Cmd), "*"),
 )

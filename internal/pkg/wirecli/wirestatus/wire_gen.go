@@ -18,6 +18,26 @@ import (
 // Injectors from wire.go:
 
 func InitializeStatus(resourceConfigPath clik8s.ResourceConfigPath, writer io.Writer, args util.Args) (*status.Status, error) {
+	configFlags, err := wirek8s.NewConfigFlags(args)
+	if err != nil {
+		return nil, err
+	}
+	config, err := wirek8s.NewRestConfig(configFlags)
+	if err != nil {
+		return nil, err
+	}
+	dynamicInterface, err := wirek8s.NewDynamicClient(config)
+	if err != nil {
+		return nil, err
+	}
+	restMapper, err := wirek8s.NewRestMapper(config)
+	if err != nil {
+		return nil, err
+	}
+	client, err := wirek8s.NewClient(dynamicInterface, restMapper)
+	if err != nil {
+		return nil, err
+	}
 	pluginConfig := wireconfig.NewPluginConfig()
 	factory := wireconfig.NewResMapFactory(pluginConfig)
 	fileSystem := wireconfig.NewFileSystem()
@@ -27,31 +47,39 @@ func InitializeStatus(resourceConfigPath clik8s.ResourceConfigPath, writer io.Wr
 	if err != nil {
 		return nil, err
 	}
-	configFlags, err := wirek8s.NewConfigFlags(args)
-	if err != nil {
-		return nil, err
-	}
-	config, err := wirek8s.NewRestConfig(configFlags)
-	if err != nil {
-		return nil, err
-	}
-	clientset, err := wirek8s.NewKubernetesClientSet(config)
-	if err != nil {
-		return nil, err
-	}
 	repository := wiregit.NewOptionalRepository(resourceConfigPath)
 	commitIter := wiregit.NewOptionalCommitIter(repository)
 	commit := wiregit.NewOptionalCommit(commitIter)
 	statusStatus := &status.Status{
-		Resources: resourceConfigs,
-		Out:       writer,
-		Clientset: clientset,
-		Commit:    commit,
+		DynamicClient: client,
+		Out:           writer,
+		Resources:     resourceConfigs,
+		Commit:        commit,
 	}
 	return statusStatus, nil
 }
 
 func DoStatus(resourceConfigPath clik8s.ResourceConfigPath, writer io.Writer, args util.Args) (status.Result, error) {
+	configFlags, err := wirek8s.NewConfigFlags(args)
+	if err != nil {
+		return status.Result{}, err
+	}
+	config, err := wirek8s.NewRestConfig(configFlags)
+	if err != nil {
+		return status.Result{}, err
+	}
+	dynamicInterface, err := wirek8s.NewDynamicClient(config)
+	if err != nil {
+		return status.Result{}, err
+	}
+	restMapper, err := wirek8s.NewRestMapper(config)
+	if err != nil {
+		return status.Result{}, err
+	}
+	client, err := wirek8s.NewClient(dynamicInterface, restMapper)
+	if err != nil {
+		return status.Result{}, err
+	}
 	pluginConfig := wireconfig.NewPluginConfig()
 	factory := wireconfig.NewResMapFactory(pluginConfig)
 	fileSystem := wireconfig.NewFileSystem()
@@ -61,26 +89,14 @@ func DoStatus(resourceConfigPath clik8s.ResourceConfigPath, writer io.Writer, ar
 	if err != nil {
 		return status.Result{}, err
 	}
-	configFlags, err := wirek8s.NewConfigFlags(args)
-	if err != nil {
-		return status.Result{}, err
-	}
-	config, err := wirek8s.NewRestConfig(configFlags)
-	if err != nil {
-		return status.Result{}, err
-	}
-	clientset, err := wirek8s.NewKubernetesClientSet(config)
-	if err != nil {
-		return status.Result{}, err
-	}
 	repository := wiregit.NewOptionalRepository(resourceConfigPath)
 	commitIter := wiregit.NewOptionalCommitIter(repository)
 	commit := wiregit.NewOptionalCommit(commitIter)
 	statusStatus := &status.Status{
-		Resources: resourceConfigs,
-		Out:       writer,
-		Clientset: clientset,
-		Commit:    commit,
+		DynamicClient: client,
+		Out:           writer,
+		Resources:     resourceConfigs,
+		Commit:        commit,
 	}
 	result, err := NewStatusCommandResult(statusStatus, writer)
 	if err != nil {

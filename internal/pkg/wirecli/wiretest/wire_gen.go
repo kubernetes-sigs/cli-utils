@@ -33,16 +33,26 @@ func InitializeStatus(resourceConfigs clik8s.ResourceConfigs, commit *object.Com
 	if err != nil {
 		return nil, nil, err
 	}
-	clientset, err := wirek8s.NewKubernetesClientSet(config)
+	dynamicInterface, err := wirek8s.NewDynamicClient(config)
+	if err != nil {
+		cleanup()
+		return nil, nil, err
+	}
+	restMapper, err := wirek8s.NewRestMapper(config)
+	if err != nil {
+		cleanup()
+		return nil, nil, err
+	}
+	client, err := wirek8s.NewClient(dynamicInterface, restMapper)
 	if err != nil {
 		cleanup()
 		return nil, nil, err
 	}
 	statusStatus := &status.Status{
-		Resources: resourceConfigs,
-		Out:       writer,
-		Clientset: clientset,
-		Commit:    commit,
+		DynamicClient: client,
+		Out:           writer,
+		Resources:     resourceConfigs,
+		Commit:        commit,
 	}
 	return statusStatus, func() {
 		cleanup()

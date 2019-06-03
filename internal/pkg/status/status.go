@@ -14,41 +14,92 @@ limitations under the License.
 package status
 
 import (
+	"context"
 	"fmt"
 	"io"
 
 	"gopkg.in/src-d/go-git.v4/plumbing/object"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/errors"
+	"sigs.k8s.io/cli-experimental/internal/pkg/client"
 	"sigs.k8s.io/cli-experimental/internal/pkg/clik8s"
 )
 
 // Status returns the status for rollouts
 type Status struct {
+	// DynamicClient is the client used to talk
+	// with the cluster
+	DynamicClient client.Client
+	// Out stores the output
+	Out io.Writer
+	// Resources is a list of resource configurations
 	Resources clik8s.ResourceConfigs
-	Out       io.Writer
-	Clientset *kubernetes.Clientset
-	Commit    *object.Commit
+	// Commit is a git commit object
+	Commit *object.Commit
+}
+
+// ResourceStatus - resource status
+type ResourceStatus struct {
+	Resource *unstructured.Unstructured
+	Status   string
+	Error    error
 }
 
 // Result contains the Status Result
 type Result struct {
-	Resources clik8s.ResourceConfigs
+	Ready     bool
+	Resources []ResourceStatus
 }
 
-// Do executes the apply
-func (s *Status) Do() (Result, error) {
-	fmt.Fprintf(s.Out, "Doing `cli-experimental apply status`\n")
-	if s.Commit != nil {
-		fmt.Fprintf(s.Out, "Commit %s\n", s.Commit.Hash.String())
-	}
-	pods, err := s.Clientset.CoreV1().Pods("default").List(metav1.ListOptions{})
-	if err != nil {
-		return Result{}, err
-	}
-	for _, p := range pods.Items {
-		fmt.Fprintf(s.Out, "Pod %s\n", p.Name)
+// Do executes the status
+func (a *Status) Do() (Result, error) {
+	ready := true
+	var errs []error
+	var rs = []ResourceStatus{}
+
+	fmt.Fprintf(a.Out, "Doing `cli-experimental apply status`\n")
+	ctx := context.Background()
+	for _, u := range a.Resources {
+		err := a.DynamicClient.Get(ctx,
+			types.NamespacedName{Namespace: u.GetNamespace(), Name: u.GetName()}, u)
+		if err != nil {
+			rs = append(rs, ResourceStatus{Resource: u, Status: "GET_ERROR", Error: err})
+			errs = append(errs, err)
+			continue
+		}
+
+		// Ready indicator is a simple ANDing of all the individual resource readiness
+		uReady, err := IsReady(u)
+		if err != nil {
+			rs = append(rs, ResourceStatus{Resource: u, Status: "ERROR", Error: err})
+			errs = append(errs, err)
+			continue
+		}
+		status := "Ready"
+		if !ready {
+			status = "InProgress"
+		}
+		rs = append(rs, ResourceStatus{Resource: u, Status: status, Error: nil})
+		ready = ready && uReady
 	}
 
-	return Result{Resources: s.Resources}, nil
+	if len(errs) != 0 {
+		return Result{Ready: ready, Resources: rs}, errors.NewAggregate(errs)
+	}
+	return Result{Ready: ready, Resources: rs}, nil
+}
+
+// IsReady - return true if object is ready
+func IsReady(u *unstructured.Unstructured) (bool, error) {
+	fn := GetLegacyReadyFn(u)
+	if fn == nil {
+		fn = GetGenericReadyFn(u)
+	}
+
+	if fn != nil {
+		return fn(u)
+	}
+
+	return true, nil
 }

@@ -10,6 +10,7 @@ import (
 	"sigs.k8s.io/cli-experimental/internal/pkg/apply"
 	delete2 "sigs.k8s.io/cli-experimental/internal/pkg/delete"
 	"sigs.k8s.io/cli-experimental/internal/pkg/prune"
+	"sigs.k8s.io/cli-experimental/internal/pkg/status"
 	"sigs.k8s.io/cli-experimental/internal/pkg/util"
 	"sigs.k8s.io/cli-experimental/internal/pkg/wirecli/wirek8s"
 	"sigs.k8s.io/cli-experimental/internal/pkg/wirecli/wiretest"
@@ -50,10 +51,15 @@ func InitializeCmd(writer io.Writer, args util.Args) (*Cmd, error) {
 		DynamicClient: client,
 		Out:           writer,
 	}
+	statusStatus := &status.Status{
+		DynamicClient: client,
+		Out:           writer,
+	}
 	cmd := &Cmd{
-		Applier: applyApply,
-		Pruner:  prunePrune,
-		Deleter: deleteDelete,
+		Applier:      applyApply,
+		Pruner:       prunePrune,
+		Deleter:      deleteDelete,
+		StatusGetter: statusStatus,
 	}
 	return cmd, nil
 }
@@ -90,10 +96,15 @@ func InitializeFakeCmd(writer io.Writer, args util.Args) (*Cmd, func(), error) {
 		DynamicClient: client,
 		Out:           writer,
 	}
+	statusStatus := &status.Status{
+		DynamicClient: client,
+		Out:           writer,
+	}
 	cmd := &Cmd{
-		Applier: applyApply,
-		Pruner:  prunePrune,
-		Deleter: deleteDelete,
+		Applier:      applyApply,
+		Pruner:       prunePrune,
+		Deleter:      deleteDelete,
+		StatusGetter: statusStatus,
 	}
 	return cmd, func() {
 		cleanup()
