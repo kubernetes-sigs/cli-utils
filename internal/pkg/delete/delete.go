@@ -18,10 +18,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sigs.k8s.io/cli-experimental/internal/pkg/util"
 
 	"gopkg.in/src-d/go-git.v4/plumbing/object"
-	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/cli-experimental/internal/pkg/client"
@@ -65,7 +64,7 @@ func (a *Delete) Do() (Result, error) {
 			}
 		}
 
-		err := a.deleteObject(ctx, u.GroupVersionKind(), u.GetNamespace(), u.GetName())
+		_, err := util.DeleteObject(a.DynamicClient, ctx, u.GroupVersionKind(), u.GetNamespace(), u.GetName())
 		if err != nil {
 			fmt.Fprint(os.Stderr, err)
 		}
@@ -94,26 +93,10 @@ func (a *Delete) handleInventroy(ctx context.Context, annotations map[string]str
 			Version: id.Version,
 			Kind:    id.Kind,
 		}
-		err = a.deleteObject(ctx, gvk, id.Namespace, id.Name)
+		_, err = util.DeleteObject(a.DynamicClient, ctx, gvk, id.Namespace, id.Name)
 		if err != nil {
 			fmt.Fprint(os.Stderr, err)
 		}
-	}
-	return nil
-}
-
-func (a *Delete) deleteObject(ctx context.Context, gvk schema.GroupVersionKind, ns, nm string) error {
-	obj := &unstructured.Unstructured{}
-	obj.SetGroupVersionKind(gvk)
-	obj.SetNamespace(ns)
-	obj.SetName(nm)
-
-	err := a.DynamicClient.Delete(ctx, obj, &metav1.DeleteOptions{})
-	if err != nil {
-		if errors.IsNotFound(err) {
-			return nil
-		}
-		return fmt.Errorf("failed to delete %s/%s: %v", gvk.Kind, nm, err)
 	}
 	return nil
 }

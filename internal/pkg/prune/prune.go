@@ -18,12 +18,12 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sigs.k8s.io/cli-experimental/internal/pkg/util"
 
 	"k8s.io/apimachinery/pkg/types"
 
 	"gopkg.in/src-d/go-git.v4/plumbing/object"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/cli-experimental/internal/pkg/client"
@@ -114,7 +114,7 @@ func (o *Prune) runPrune(ctx context.Context, obj *unstructured.Unstructured) (
 			Version: item.Version,
 			Kind:    item.Kind,
 		}
-		u, err := o.deleteObject(ctx, gvk, item.Namespace, item.Name)
+		u, err := util.DeleteObject(o.DynamicClient, ctx, gvk, item.Namespace, item.Name)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -127,19 +127,3 @@ func (o *Prune) runPrune(ctx context.Context, obj *unstructured.Unstructured) (
 	return obj, results, nil
 }
 
-func (o *Prune) deleteObject(ctx context.Context, gvk schema.GroupVersionKind,
-	ns, nm string) (*unstructured.Unstructured, error) {
-	obj := &unstructured.Unstructured{}
-	obj.SetGroupVersionKind(gvk)
-	obj.SetNamespace(ns)
-	obj.SetName(nm)
-
-	err := o.DynamicClient.Delete(context.Background(), obj, &metav1.DeleteOptions{})
-	if err != nil {
-		if errors.IsNotFound(err) {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("failed to delete %s/%s: %v", gvk.Kind, nm, err)
-	}
-	return obj, nil
-}

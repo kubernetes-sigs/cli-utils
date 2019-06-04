@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/cli-experimental/internal/pkg/client"
 	"sigs.k8s.io/cli-experimental/internal/pkg/clik8s"
+	"sigs.k8s.io/cli-experimental/internal/pkg/constants"
 	"sigs.k8s.io/kustomize/pkg/inventory"
 )
 
@@ -67,7 +68,12 @@ func (a *Apply) Do() (Result, error) {
 				fmt.Fprintf(a.Out, "failed to update inventory object %v\n", err)
 			}
 		}
-
+		if presence, ok := annotation[constants.Presence]; ok {
+			if presence == constants.EnsureNoExist {
+				// not applying the resource
+				continue
+			}
+		}
 		err := a.DynamicClient.Apply(context.Background(), u)
 		if err != nil {
 			fmt.Fprintf(a.Out, "failed to apply the object: %s/%s: %v\n", u.GetKind(), u.GetName(), err)
