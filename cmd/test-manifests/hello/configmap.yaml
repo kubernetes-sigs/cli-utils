@@ -1,0 +1,10 @@
+kind: ConfigMap 
+apiVersion: v1 
+metadata:
+  name: example-cfgmap
+data:
+  database: mysql
+  database_uri: mysql://localhost:27017
+  keys: | 
+    db.key=222 
+    db.mem=111 

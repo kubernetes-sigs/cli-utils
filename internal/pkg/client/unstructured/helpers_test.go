@@ -23,22 +23,19 @@ import (
 var emptyObj = map[string]interface{}{}
 var testObj = map[string]interface{}{
 	"f1": map[string]interface{}{
-		"f1f2": map[string]interface{}{
-			"f1f2i32":   int32(32),
-			"f1f2i64":   int64(64),
-			"f1f2float": 64.02,
-			"f1f2ms": []interface{}{
+		"f2": map[string]interface{}{
+			"i32":   int32(32),
+			"i64":   int64(64),
+			"float": 64.02,
+			"ms": []interface{}{
 				map[string]interface{}{"f1f2ms0f1": 22},
 				map[string]interface{}{"f1f2ms1f1": "index1"},
 			},
-			"f1f2msbad": []interface{}{
+			"msbad": []interface{}{
 				map[string]interface{}{"f1f2ms0f1": 22},
 				32,
 			},
 		},
-	},
-	"f2": map[string]interface{}{
-		"f2f2": map[string]interface{}{},
 	},
 
 	"ride": "dragon",
@@ -51,68 +48,24 @@ var testObj = map[string]interface{}{
 	},
 }
 
-func TestNestedInt(t *testing.T) {
-	v, found, err := helperu.NestedInt(testObj, "f1", "f1f2", "f1f2i32")
-	assert.NoError(t, err)
-	assert.Equal(t, found, true)
+func TestGetIntField(t *testing.T) {
+	v := helperu.GetIntField(testObj, ".f1.f2.i32", -1)
 	assert.Equal(t, int(32), v)
 
-	v, found, err = helperu.NestedInt(testObj, "f1", "f1f2", "wrongname")
-	assert.NoError(t, err)
-	assert.Equal(t, found, false)
-	assert.Equal(t, int(0), v)
+	v = helperu.GetIntField(testObj, ".f1.f2.wrongname", -1)
+	assert.Equal(t, int(-1), v)
 
-	v, found, err = helperu.NestedInt(testObj, "f1", "f1f2", "f1f2i64")
-	assert.NoError(t, err)
-	assert.Equal(t, found, true)
+	v = helperu.GetIntField(testObj, ".f1.f2.i64", -1)
 	assert.Equal(t, int(64), v)
 
-	v, found, err = helperu.NestedInt(testObj, "f1", "f1f2", "f1f2float")
-	assert.Error(t, err)
-	assert.Equal(t, found, true)
-	assert.Equal(t, int(0), v)
+	v = helperu.GetIntField(testObj, ".f1.f2.float", -1)
+	assert.Equal(t, int(-1), v)
 }
 
 func TestGetStringField(t *testing.T) {
-	v := helperu.GetStringField(testObj, "ride", "horse")
+	v := helperu.GetStringField(testObj, ".ride", "horse")
 	assert.Equal(t, v, "dragon")
 
-	v = helperu.GetStringField(testObj, "destination", "north")
+	v = helperu.GetStringField(testObj, ".destination", "north")
 	assert.Equal(t, v, "north")
-}
-
-func TestNestedMapSlice(t *testing.T) {
-	v, found, err := helperu.NestedMapSlice(testObj, "f1", "f1f2", "f1f2ms")
-	assert.NoError(t, err)
-	assert.Equal(t, found, true)
-	assert.Equal(t, []map[string]interface{}{
-		map[string]interface{}{"f1f2ms0f1": 22},
-		map[string]interface{}{"f1f2ms1f1": "index1"},
-	}, v)
-
-	v, found, err = helperu.NestedMapSlice(testObj, "f1", "f1f2", "f1f2msbad")
-	assert.Error(t, err)
-	assert.Equal(t, found, true)
-	assert.Equal(t, []map[string]interface{}(nil), v)
-
-	v, found, err = helperu.NestedMapSlice(testObj, "f1", "f1f2", "wrongname")
-	assert.NoError(t, err)
-	assert.Equal(t, found, false)
-	assert.Equal(t, []map[string]interface{}(nil), v)
-
-	v, found, err = helperu.NestedMapSlice(testObj, "f1", "f1f2", "f1f2i64")
-	assert.Error(t, err)
-	assert.Equal(t, found, true)
-	assert.Equal(t, []map[string]interface{}(nil), v)
-}
-
-func TestGetConditions(t *testing.T) {
-	v := helperu.GetConditions(emptyObj)
-	assert.Equal(t, []map[string]interface{}{}, v)
-
-	v = helperu.GetConditions(testObj)
-	assert.Equal(t, []map[string]interface{}{
-		map[string]interface{}{"f1f2ms0f1": 22},
-		map[string]interface{}{"f1f2ms1f1": "index1"},
-	}, v)
 }

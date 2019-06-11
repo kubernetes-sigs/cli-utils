@@ -22,6 +22,13 @@ import (
 	"sigs.k8s.io/cli-experimental/internal/pkg/status"
 )
 
+// TODO
+// Standardize these APIs so that this library could be used by others
+// ideally we would need something like this:
+// cmd := NewCommand(client, ...)
+// result := cmd.Apply(unstructures_list)
+// result := cmd.Status(unstructures_list)
+
 // Cmd is a wrapper for different structs:
 //   apply, prune and delete
 // These structs share the same client

@@ -236,6 +236,9 @@ func (uc *client) resourceInterfaceFromGVK(gvk schema.GroupVersionKind, ns strin
 	if mapping.Scope.Name() == meta.RESTScopeNameRoot {
 		return uc.client.Resource(mapping.Resource), nil
 	}
+	if ns == "" {
+		return uc.client.Resource(mapping.Resource), nil
+	}
 	return uc.client.Resource(mapping.Resource).Namespace(ns), nil
 }
 

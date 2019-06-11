@@ -18,17 +18,42 @@ import (
 	clientu "sigs.k8s.io/cli-experimental/internal/pkg/client/unstructured"
 )
 
-func readyConditionReader(u *unstructured.Unstructured) (bool, error) {
-	conditions := clientu.GetConditions(u.UnstructuredContent())
-	for _, c := range conditions {
-		if clientu.GetStringField(c, "type", "") == "Ready" && clientu.GetStringField(c, "status", "") == "False" {
-			return false, nil
+// readyConditionReader reads Ready condition from the unstructured object
+func readyConditionReader(u *unstructured.Unstructured) ([]Condition, error) {
+	rv := []Condition{}
+	ready := false
+	obj := u.UnstructuredContent()
+
+	// ensure that the meta generation is observed
+	metaGeneration := clientu.GetIntField(obj, ".metadata.generation", -1)
+	observedGeneration := clientu.GetIntField(obj, ".status.observedGeneration", metaGeneration)
+	if observedGeneration != metaGeneration {
+		reason := "Controller has not observed the latest change. Status generation does not match with metadata"
+		rv = append(rv, Condition{ConditionReady, "False", "", reason})
+		return rv, nil
+	}
+
+	// Conditions
+	objc := clientu.GetObjectWithConditions(obj)
+	for _, c := range objc.Status.Conditions {
+		switch c.Type {
+		case "Ready":
+			ready = true
+			if c.Status == "False" {
+				rv = append(rv, Condition{ConditionReady, "False", c.Reason, c.Message})
+			} else {
+				rv = append(rv, Condition{ConditionReady, "True", c.Reason, c.Message})
+			}
 		}
 	}
-	return true, nil
+	if !ready {
+		rv = append(rv, Condition{ConditionReady, "True", "NoReadyCondition", "No Ready condition found in status"})
+	}
+
+	return rv, nil
 }
 
-// GetGenericReadyFn - True if we handle it as a known type
-func GetGenericReadyFn(u *unstructured.Unstructured) IsReadyFn {
+// GetGenericConditionsFn Return a function that returns condition for an unstructured object
+func GetGenericConditionsFn(u *unstructured.Unstructured) GetConditionsFn {
 	return readyConditionReader
 }

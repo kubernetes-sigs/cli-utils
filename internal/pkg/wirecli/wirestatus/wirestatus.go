@@ -34,5 +34,5 @@ var ProviderSet = wire.NewSet(
 
 // NewStatusCommandResult returns a new status.Result
 func NewStatusCommandResult(s *status.Status, out io.Writer) (status.Result, error) {
-	return s.Do()
+	return s.Do(), nil
 }

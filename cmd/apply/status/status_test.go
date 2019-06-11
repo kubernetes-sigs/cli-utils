@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"sigs.k8s.io/cli-experimental/cmd/apply"
 	"sigs.k8s.io/cli-experimental/cmd/apply/status"
 	"sigs.k8s.io/cli-experimental/internal/pkg/wirecli/wirek8s"
 	"sigs.k8s.io/cli-experimental/internal/pkg/wirecli/wiretest"
@@ -37,7 +38,7 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-func TestStatus(t *testing.T) {
+func TestStatusConfigMap(t *testing.T) {
 	buf := new(bytes.Buffer)
 	fs, cleanup, err := wiretest.InitializeKustomization()
 	defer cleanup()
@@ -45,11 +46,46 @@ func TestStatus(t *testing.T) {
 	assert.NotEmpty(t, fs)
 
 	args := []string{fmt.Sprintf("--server=%s", host), "--namespace=default", fs[0]}
-	cmd := status.GetApplyStatusCommand(args)
+	cmd := apply.GetApplyCommand(args)
 	cmd.SetOutput(buf)
 	cmd.SetArgs(args)
 	wirek8s.Flags(cmd.PersistentFlags())
 
 	assert.NoError(t, cmd.Execute())
-	assert.Equal(t, "Doing `cli-experimental apply status`\nResources: 2\n", buf.String())
+	assert.Equal(t, "Doing `cli-experimental apply`\napplied ConfigMap/inventory\napplied ConfigMap/test-map-k6tb869f64\nResources: 2\n", buf.String()) // nolint
+
+	cmd = status.GetApplyStatusCommand(args)
+	buf.Reset()
+	cmd.SetOutput(buf)
+	cmd.SetArgs(args)
+	wirek8s.Flags(cmd.PersistentFlags())
+
+	assert.NoError(t, cmd.Execute())
+	assert.Equal(t, "ConfigMap/test-map-k6tb869f64   Ready\nConfigMap/inventory   Ready\n", buf.String())
+}
+
+func TestStatusPod(t *testing.T) {
+	buf := new(bytes.Buffer)
+	fs, cleanup, err := wiretest.InitializeKustomization()
+	defer cleanup()
+	assert.NoError(t, err)
+	assert.NotEmpty(t, fs)
+
+	args := []string{fmt.Sprintf("--server=%s", host), "--namespace=default", "../../test-manifests/hello/"}
+	cmd := apply.GetApplyCommand(args)
+	cmd.SetOutput(buf)
+	cmd.SetArgs(args)
+	wirek8s.Flags(cmd.PersistentFlags())
+
+	assert.NoError(t, cmd.Execute())
+	assert.Equal(t, "Doing `cli-experimental apply`\napplied ConfigMap/example-cfgmap\napplied Deployment/frontend\napplied Pod/myapp-pod\napplied StatefulSet/web\nResources: 4\n", buf.String()) // nolint
+
+	cmd = status.GetApplyStatusCommand(args)
+	buf.Reset()
+	cmd.SetOutput(buf)
+	cmd.SetArgs(args)
+	wirek8s.Flags(cmd.PersistentFlags())
+
+	assert.NoError(t, cmd.Execute())
+	assert.Equal(t, "Deployment/frontend   Pending \nStatefulSet/web   Pending \nConfigMap/example-cfgmap   Ready\nPod/myapp-pod   Pending Phase: Pending\n", buf.String())
 }

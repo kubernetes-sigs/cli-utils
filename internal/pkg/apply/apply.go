@@ -17,7 +17,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 
@@ -65,13 +64,13 @@ func (a *Apply) Do() (Result, error) {
 			var err error
 			u, err = a.updateInventoryObject(u)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "failed to update inventory object %v\n", err)
+				fmt.Fprintf(a.Out, "failed to update inventory object %v\n", err)
 			}
 		}
 
 		err := a.DynamicClient.Apply(context.Background(), u)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "failed to apply the object: %s: %v\n", u.GetName(), err)
+			fmt.Fprintf(a.Out, "failed to apply the object: %s/%s: %v\n", u.GetKind(), u.GetName(), err)
 			continue
 		}
 		fmt.Fprintf(a.Out, "applied %s/%s\n", u.GetKind(), u.GetName())
