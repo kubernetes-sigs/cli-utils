@@ -19,12 +19,13 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"sigs.k8s.io/cli-experimental/internal/pkg/constants"
+	"sigs.k8s.io/cli-experimental/internal/pkg/util"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/src-d/go-git.v4/plumbing/object"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/cli-experimental/internal/pkg/apply"
 	"sigs.k8s.io/cli-experimental/internal/pkg/clik8s"
 	"sigs.k8s.io/cli-experimental/internal/pkg/wirecli/wiretest"
@@ -83,7 +84,7 @@ inventory:
     namespace: default
 
 resources:
-- not-apply-service.yaml
+- apply-service.yaml
 
 namespace: default
 `), 0644)
@@ -91,13 +92,11 @@ namespace: default
 		return nil, nil, err
 	}
 
-	err = ioutil.WriteFile(filepath.Join(f1, "not-apply-service.yaml"), []byte(`
+	err = ioutil.WriteFile(filepath.Join(f1, "apply-service.yaml"), []byte(`
 apiVersion: v1
 kind: Service
 metadata:
   name: my-service
-  annotations:
-    kubectl.kubernetes.io/presence: EnsureDoesNotExist
 spec:
   selector:
     app: MyApp
@@ -161,41 +160,248 @@ spec:
 	}, nil
 }
 
+/* TestApplyWithPresenceAnnotation verifies that Apply does not
+   delete resources but ignores deleted resource. Deletion should be delegated.
+   It takes following steps
+   1. create a Kustomization with
+         a ConfigMapGenerator
+         a Service
+         an inventory ConfigMap
+   2. apply the kustomization
+   3. confirm that there are
+         1 Service
+   3. update the service to have the annotation EnsureDoesNotExist
+   4. apply the kustomization again
+   5. confirm that there are
+         1 Service
+   6. confirm that the existing service not updated with the annotation
+   7. manually delete the resource, re-apply
+      verify it is not re-created
+*/
 func TestApplyWithPresenceAnnotation(t *testing.T) {
 	buf := new(bytes.Buffer)
+
+	// set up a kustomization
 	kp := wiretest.InitializConfigProvider()
 	fs, cleanup, err := InitializeKustomizationWithPresence()
 	defer cleanup()
 	assert.NoError(t, err)
 	assert.Equal(t, len(fs), 2)
 
+	// confirm the loaded resources containing a service
+	// without the annotation for EnsureDoesNotExist
 	objects, err := kp.GetConfig(fs[0])
 	assert.NoError(t, err)
+	service := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "v1",
+			"kind":       "Service",
+			"metadata": map[string]interface{}{
+				"name":      "my-service",
+				"namespace": "default",
+			},
+			"spec": map[string]interface{}{
+				"ports": []interface{}{
+					map[string]interface{}{
+						"port":       int64(80),
+						"protocol":   "TCP",
+						"targetPort": int64(9376)},
+				},
+				"selector": map[string]interface{}{"app": "MyApp"},
+			},
+		},
+	}
+	assert.NoError(t, err)
+	assert.Contains(t, objects, service)
 
+	// Initialize the Apply object
 	a, done, err := wiretest.InitializeApply(objects, &object.Commit{}, buf)
 	defer done()
-
-	serviceList := &unstructured.UnstructuredList{}
-	serviceList.SetGroupVersionKind(schema.GroupVersionKind{
-		Kind:    "ServiceList",
-		Version: "v1",
-	})
-	err = a.DynamicClient.List(context.Background(), serviceList, "default", nil)
-	defaultCount := len(serviceList.Items)
-
 	assert.NoError(t, err)
+
+	// Apply the first kustomization
+	// Confirm there is one Service object
+	// Confirm the Service object is the expected one
 	r, err := a.Do()
 	assert.NoError(t, err)
 	assert.Equal(t, apply.Result{objects}, r)
-	err = a.DynamicClient.List(context.Background(), serviceList, "default", nil)
-	assert.Equal(t, len(serviceList.Items), defaultCount)
-
-	updatedObjects, err := kp.GetConfig(fs[1])
-	a.Resources = updatedObjects
+	liveService := service.DeepCopy()
+	exist, err := util.ObjectExist(a.DynamicClient, context.Background(), liveService)
 	assert.NoError(t, err)
+	assert.Equal(t, true, exist)
+	assert.Equal(t, false, util.HasAnnotation(liveService, constants.Presence))
+
+	// Update the kustomization
+	// by adding the annotation EnsureDoesNotExist to the Service object
+	// Confirm there is a Service resource with the annotation EnsureDoesNotExist
+	updatedObjects, err := kp.GetConfig(fs[1])
+	assert.NoError(t, err)
+	updatedService := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "v1",
+			"kind":       "Service",
+			"metadata": map[string]interface{}{
+				"name":      "my-service",
+				"namespace": "default",
+				"annotations": map[string]interface{}{
+					"kubectl.kubernetes.io/presence": "EnsureDoesNotExist",
+				},
+			},
+			"spec": map[string]interface{}{
+				"ports": []interface{}{
+					map[string]interface{}{
+						"port":       int64(80),
+						"protocol":   "TCP",
+						"targetPort": int64(9376)},
+				},
+				"selector": map[string]interface{}{"app": "MyApp"},
+			},
+		},
+	}
+	assert.Contains(t, updatedObjects, updatedService)
+	assert.NotEqual(t, service, updatedService)
+
+	// Apply the second kustomization
+	// Confirm that the Service object is not updated
+	a.Resources = updatedObjects
 	r, err = a.Do()
 	assert.NoError(t, err)
 	assert.Equal(t, apply.Result{updatedObjects}, r)
-	err = a.DynamicClient.List(context.Background(), serviceList, "default", nil)
-	assert.Equal(t, len(serviceList.Items), defaultCount)
+	exist, err = util.ObjectExist(a.DynamicClient, context.Background(), liveService)
+	assert.Equal(t, true, exist)
+	assert.NoError(t, err)
+	assert.Equal(t, false, util.HasAnnotation(liveService, constants.Presence))
+
+	// Delete the Service object
+	// Reapply it and verify
+	// the Service is not re-created
+	err = a.DynamicClient.Delete(context.Background(), liveService, nil)
+	assert.NoError(t, err)
+	exist, err = util.ObjectExist(a.DynamicClient, context.Background(), liveService)
+	assert.NoError(t, err)
+	assert.Equal(t, false, exist)
+
+	r, err = a.Do()
+	assert.NoError(t, err)
+	exist, err = util.ObjectExist(a.DynamicClient, context.Background(), liveService)
+	assert.NoError(t, err)
+	assert.Equal(t, false, exist)
+}
+
+/* TestApplyWithPresenceAnnotationOrder2 verifies that Apply does not
+   create resources with the EnsureDoesNotExist annotation.
+   It takes the following steps
+   1. create a Kustomization with
+         a ConfigMapGenerator
+         a Service with the annotation EnsureDoesNotExist
+         an inventory ConfigMap
+   2. apply the kustomization
+   3. confirm that there are
+         0 Service
+   3. Delete the annotation EnsureDoesNotExist from the service
+   4. apply the kustomization again
+   5. confirm that there are
+         1 Service
+*/
+func TestApplyWithPresenceAnnotationOrder2(t *testing.T) {
+	buf := new(bytes.Buffer)
+
+	// set up a kustomization
+	kp := wiretest.InitializConfigProvider()
+	fs, cleanup, err := InitializeKustomizationWithPresence()
+	defer cleanup()
+	assert.NoError(t, err)
+	assert.Equal(t, len(fs), 2)
+
+	// confirm the loaded resources containing a service
+	// with the annotation for EnsureDoesNotExist
+	objects, err := kp.GetConfig(fs[1])
+	assert.NoError(t, err)
+	service := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "v1",
+			"kind":       "Service",
+			"metadata": map[string]interface{}{
+				"name":      "my-service",
+				"namespace": "default",
+				"annotations": map[string]interface{}{
+					"kubectl.kubernetes.io/presence": "EnsureDoesNotExist",
+				},
+			},
+			"spec": map[string]interface{}{
+				"ports": []interface{}{
+					map[string]interface{}{
+						"port":       int64(80),
+						"protocol":   "TCP",
+						"targetPort": int64(9376)},
+				},
+				"selector": map[string]interface{}{"app": "MyApp"},
+			},
+		},
+	}
+	assert.NoError(t, err)
+	assert.Contains(t, objects, service)
+
+	// Initialize the Apply object
+	a, done, err := wiretest.InitializeApply(objects, &object.Commit{}, buf)
+	defer done()
+	assert.NoError(t, err)
+
+	// Apply the first kustomization
+	// Confirm that the Service object is not created
+	r, err := a.Do()
+	assert.NoError(t, err)
+	assert.Equal(t, apply.Result{objects}, r)
+	liveService := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "v1",
+			"kind":       "Service",
+			"metadata": map[string]interface{}{
+				"name":      "my-service",
+				"namespace": "default",
+			},
+		},
+	}
+	exist, err := util.ObjectExist(a.DynamicClient, context.Background(), liveService)
+	assert.NoError(t, err)
+	assert.Equal(t, false, exist)
+
+	// Update the kustomization
+	// by removing the annotation EnsureDoesNotExist from the Service object
+	// Confirm there is a Service resource without the annotation EnsureDoesNotExist
+	updatedObjects, err := kp.GetConfig(fs[0])
+	assert.NoError(t, err)
+	updatedService := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "v1",
+			"kind":       "Service",
+			"metadata": map[string]interface{}{
+				"name":      "my-service",
+				"namespace": "default",
+			},
+			"spec": map[string]interface{}{
+				"ports": []interface{}{
+					map[string]interface{}{
+						"port":       int64(80),
+						"protocol":   "TCP",
+						"targetPort": int64(9376)},
+				},
+				"selector": map[string]interface{}{"app": "MyApp"},
+			},
+		},
+	}
+	assert.Contains(t, updatedObjects, updatedService)
+	assert.NotEqual(t, service, updatedService)
+
+	// Apply the second kustomization
+	// Confirm that the Service object is created
+	// and without the annotation
+	a.Resources = updatedObjects
+	r, err = a.Do()
+	assert.NoError(t, err)
+	assert.Equal(t, apply.Result{updatedObjects}, r)
+	exist, err = util.ObjectExist(a.DynamicClient, context.Background(), liveService)
+	assert.Equal(t, true, exist)
+	assert.NoError(t, err)
+	assert.Equal(t, false, util.HasAnnotation(liveService, constants.Presence))
 }

@@ -35,4 +35,4 @@ type MasterURL string
 type ResourceConfigs []*unstructured.Unstructured
 
 // ResourcePruneConfigs is a collection of Resource Config used for pruning
-type ResourcePruneConfigs *unstructured.Unstructured
+type ResourcePruneConfigs []*unstructured.Unstructured

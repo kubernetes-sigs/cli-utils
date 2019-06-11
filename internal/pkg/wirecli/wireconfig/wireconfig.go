@@ -101,7 +101,7 @@ func NewResourcePruneConfig(rcp clik8s.ResourceConfigPath,
 	p := string(rcp)
 
 	if cp.IsSupported(p) {
-		return cp.GetPruneConfig(p)
+		return cp.GetConfig(p)
 	}
 
 	return nil, nil

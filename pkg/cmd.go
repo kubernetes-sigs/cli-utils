@@ -18,7 +18,6 @@ import (
 	"sigs.k8s.io/cli-experimental/internal/pkg/apply"
 	"sigs.k8s.io/cli-experimental/internal/pkg/delete"
 	"sigs.k8s.io/cli-experimental/internal/pkg/prune"
-	"sigs.k8s.io/cli-experimental/internal/pkg/resourceconfig"
 	"sigs.k8s.io/cli-experimental/internal/pkg/status"
 )
 
@@ -48,12 +47,8 @@ func (a *Cmd) Apply(resources []*unstructured.Unstructured) error {
 
 // Prune prunes resources given the input as a slice of unstructured resources
 func (a *Cmd) Prune(resources []*unstructured.Unstructured) error {
-	pruneResource, err := resourceconfig.GetPruneResources(resources)
-	if err != nil {
-		return err
-	}
-	a.Pruner.Resources = pruneResource
-	_, err = a.Pruner.Do()
+	a.Pruner.Resources = resources
+	_, err := a.Pruner.Do()
 	return err
 }
 

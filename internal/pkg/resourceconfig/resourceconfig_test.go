@@ -21,7 +21,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"sigs.k8s.io/cli-experimental/internal/pkg/resourceconfig"
 	"sigs.k8s.io/cli-experimental/internal/pkg/wirecli/wiretest"
 	"sigs.k8s.io/kustomize/pkg/inventory"
 	"sigs.k8s.io/yaml"
@@ -59,12 +58,12 @@ func TestKustomizeProvider2(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotEmpty(t, objects)
 	assert.Equal(t, len(objects), 2)
-	pobject, err := kp.GetPruneConfig(f)
+	pobject, err := kp.GetConfig(f)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, pobject)
 	assert.NotNil(t, pobject)
 	inv := inventory.NewInventory()
-	inv.LoadFromAnnotation(pobject.GetAnnotations())
+	inv.LoadFromAnnotation(pobject[1].GetAnnotations())
 	assert.Equal(t, len(inv.Current), 1)
 }
 
@@ -177,7 +176,6 @@ func TestRawConfigFileProvider(t *testing.T) {
 	defer os.RemoveAll(f)
 	expected := setupExpected(t)
 
-
 	cp := wiretest.InitializeRawConfigProvider()
 	b := cp.IsSupported(f)
 	assert.Equal(t, b, true)
@@ -190,14 +188,6 @@ func TestRawConfigFileProvider(t *testing.T) {
 	assert.Equal(t, len(resources), 1)
 	assert.Equal(t, expected[0], resources[0])
 
-	resource, err := cp.GetPruneConfig(f)
-	assert.NoError(t, err)
-	assert.NotNil(t, resource)
-	assert.Equal(t, expected[1], resource)
-	resource, err = cp.GetPruneConfig(filepath.Join(f, "service.yaml"))
-	assert.NoError(t, err)
-	assert.Nil(t, resource)
-
 	b = cp.IsSupported(subdir)
 	resources, err = cp.GetConfig(subdir)
 	assert.NoError(t, err)
@@ -207,87 +197,4 @@ func TestRawConfigFileProvider(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, len(resources), 2)
 	assert.Equal(t, expected[1:3], resources)
-
-	resource, err = cp.GetPruneConfig(subdir)
-	assert.NoError(t, err)
-	assert.NotNil(t, resource)
-	assert.Equal(t, expected[1], resource)
-	resource, err = cp.GetPruneConfig(filepath.Join(subdir, "service.yaml"))
-	assert.NoError(t, err)
-	assert.NotNil(t, resource)
-	assert.Equal(t, expected[1], resource)
-}
-
-func setupKustomizeWithoutInventory(t *testing.T) string {
-	f, err := ioutil.TempDir("/tmp", "TestApply")
-	assert.NoError(t, err)
-	err = ioutil.WriteFile(filepath.Join(f, "kustomization.yaml"), []byte(`
-configMapGenerator:
-- name: testmap
-  literals:
-  - foo=bar
-
-secretGenerator:
-- name: testsc
-  literals:
-  - bar=baz
-
-namespace: default
-`), 0644)
-	assert.NoError(t, err)
-	return f
-}
-
-func TestGetPruneResources(t *testing.T) {
-	// with one inventory object
-	// GetPruneResources can return it
-	f := setupKustomize(t)
-	defer os.RemoveAll(f)
-	kp := wiretest.InitializConfigProvider()
-	objects, err := kp.GetConfig(f)
-	assert.NoError(t, err)
-	assert.Equal(t, len(objects), 2)
-
-	r, err := resourceconfig.GetPruneResources(objects)
-	assert.NoError(t, err)
-	assert.NotNil(t, r)
-
-	// Test the empty input
-	r, err = resourceconfig.GetPruneResources(
-		[]*unstructured.Unstructured{})
-	assert.NoError(t, err)
-	assert.Nil(t, r)
-
-	// Test the nil input
-	r, err = resourceconfig.GetPruneResources(nil)
-	assert.NoError(t, err)
-	assert.Nil(t, r)
-
-	// With no inventory object
-	// GetPruneResources returns nil
-	f2 := setupKustomizeWithoutInventory(t)
-	defer os.RemoveAll(f2)
-	kp = wiretest.InitializConfigProvider()
-	objects, err = kp.GetConfig(f2)
-	assert.NoError(t, err)
-	assert.Equal(t, len(objects), 2)
-	r, err = resourceconfig.GetPruneResources(objects)
-	assert.NoError(t, err)
-	assert.Nil(t, r)
-
-	// With multiple objects with inventory annotations
-	// GetPruneResources returns an error
-	objects, err = kp.GetConfig(f2)
-	assert.NoError(t, err)
-	assert.Equal(t, len(objects), 2)
-	for _, o := range objects {
-		o.SetAnnotations(map[string]string{
-			inventory.HashAnnotation: "12345",
-			inventory.ContentAnnotation:     `{"current": {}}`,
-		})
-	}
-	r, err = resourceconfig.GetPruneResources(objects)
-	assert.Errorf(t, err,
-		"found multiple resources with inventory annotations")
-	assert.Nil(t, r)
 }

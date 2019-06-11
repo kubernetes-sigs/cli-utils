@@ -18,16 +18,16 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"sigs.k8s.io/cli-experimental/internal/pkg/util"
-
-	"k8s.io/apimachinery/pkg/types"
 
 	"gopkg.in/src-d/go-git.v4/plumbing/object"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/cli-experimental/internal/pkg/client"
 	"sigs.k8s.io/cli-experimental/internal/pkg/clik8s"
+	"sigs.k8s.io/cli-experimental/internal/pkg/constants"
+	"sigs.k8s.io/cli-experimental/internal/pkg/util"
 	"sigs.k8s.io/kustomize/pkg/inventory"
 )
 
@@ -62,15 +62,24 @@ func (o *Prune) Do() (Result, error) {
 	fmt.Fprintf(o.Out, "Doing `cli-experimental prune`\n")
 	ctx := context.Background()
 
-	u := (*unstructured.Unstructured)(o.Resources)
-	annotation := u.GetAnnotations()
-	_, ok := annotation[inventory.ContentAnnotation]
-	if !ok {
+	u, found, err := o.findInventoryObject()
+	if err != nil {
 		return Result{}, nil
 	}
 
+	// Couldn't find an inventory object
+	// Will handle the pruning from
+	// annotation kubectl.kubernetes.io/presence: EnsureDoesNotExist
+	if !found {
+		result, err := o.runPruneWithAnnotation(ctx)
+		if err != nil {
+			return Result{}, err
+		}
+		return Result{result}, nil
+	}
+
 	obj := u.DeepCopy()
-	err := o.DynamicClient.Get(ctx,
+	err = o.DynamicClient.Get(ctx,
 		types.NamespacedName{Namespace: u.GetNamespace(), Name: u.GetName()}, obj)
 
 	if err != nil {
@@ -81,7 +90,7 @@ func (o *Prune) Do() (Result, error) {
 		fmt.Fprintf(os.Stderr, "retrieving current configuration of %s from server for %v", u.GetName(), err)
 		return Result{}, err
 	}
-	obj, results, err := o.runPrune(ctx, obj)
+	obj, results, err := o.runPruneWithInventory(ctx, obj)
 	if err != nil {
 		return Result{}, err
 	}
@@ -94,14 +103,14 @@ func (o *Prune) Do() (Result, error) {
 	return Result{Resources: results}, nil
 }
 
-// runPrune deletes the obsolete objects.
+// runPruneWithInventory deletes the obsolete objects.
 // The obsolete objects is derived by parsing
 // an Inventory annotation, which is defined in
 // Kustomize.
 //     https://github.com/kubernetes-sigs/kustomize/tree/master/pkg/inventory
 // This is based on the KEP
 //     https://github.com/kubernetes/enhancements/pull/810
-func (o *Prune) runPrune(ctx context.Context, obj *unstructured.Unstructured) (
+func (o *Prune) runPruneWithInventory(ctx context.Context, obj *unstructured.Unstructured) (
 	*unstructured.Unstructured, []*unstructured.Unstructured, error) {
 	var results []*unstructured.Unstructured
 	annotations := obj.GetAnnotations()
@@ -127,3 +136,45 @@ func (o *Prune) runPrune(ctx context.Context, obj *unstructured.Unstructured) (
 	return obj, results, nil
 }
 
+// runPruneWithAnnotation deletes the objects
+// that are with the annotation
+// kubectl.kubernetes.io/presence: EnsureDoesNotExist
+func (o *Prune) runPruneWithAnnotation(ctx context.Context) (
+	[]*unstructured.Unstructured, error) {
+	var results []*unstructured.Unstructured
+	for _, r := range o.Resources {
+		annotation := r.GetAnnotations()
+		presence, ok := annotation[constants.Presence]
+		if ok && presence == constants.EnsureNoExist {
+			u, err := util.DeleteObject(o.DynamicClient, ctx, r.GroupVersionKind(), r.GetNamespace(), r.GetName())
+			if err != nil {
+				return nil, err
+			}
+			if u != nil {
+				results = append(results, u)
+			}
+		}
+	}
+	return results, nil
+}
+
+// findInventoryObject find if there is an inventory object in
+// the resources
+func (o *Prune) findInventoryObject() (*unstructured.Unstructured, bool, error) {
+	var u *unstructured.Unstructured
+	found := false
+	for _, r := range o.Resources {
+		annotation := r.GetAnnotations()
+		_, ok := annotation[inventory.ContentAnnotation]
+		if ok {
+			if !found {
+				found = true
+				u = r
+			} else {
+				return nil, false,
+					fmt.Errorf("multiple objects with the inventory annotation")
+			}
+		}
+	}
+	return u, found, nil
+}

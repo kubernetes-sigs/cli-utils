@@ -20,21 +20,21 @@ const (
 	Presence = "kubectl.kubernetes.io/presence"
 
 	// Any resource with the annotation
-	//   kubectl.kubernetes.io/presence: EnsureExist
+	//   kubectl.kubernetes.io/presence: PreventDeletion
 	// will not be pruned or deleted.
 	//
-	// It following effect in each command
+	// It has the following effect in each command
 	// - no effect in apply
 	// - prune skips this resource
 	// - delete skips this resource
 
-	EnsureExist = "EnsureExist"
+	PreventDeletion = "PreventDeletion"
 
 	// Any resource with the annotation
 	//  kubectl.kubernetes.io/presence: EnsureDoesNotExist
 	// Will be deleted or skipped in apply.
 	//
-	// It has following effect in each command
+	// It has the following effect in each command
 	// - the resource is skipped in apply
 	// - the resource is deleted in prune
 	// - the resource is deleted in delete

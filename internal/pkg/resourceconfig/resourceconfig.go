@@ -15,7 +15,6 @@ package resourceconfig
 
 import (
 	"bytes"
-	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -27,7 +26,6 @@ import (
 	"sigs.k8s.io/kustomize/pkg/fs"
 	"sigs.k8s.io/kustomize/pkg/ifc"
 	"sigs.k8s.io/kustomize/pkg/ifc/transformer"
-	"sigs.k8s.io/kustomize/pkg/inventory"
 	"sigs.k8s.io/kustomize/pkg/loader"
 	"sigs.k8s.io/kustomize/pkg/plugins"
 	"sigs.k8s.io/kustomize/pkg/resmap"
@@ -43,9 +41,6 @@ type ConfigProvider interface {
 
 	// GetConfig returns the Resource Config as runtime.Objects
 	GetConfig(path string) ([]*unstructured.Unstructured, error)
-
-	// GetPruneConfig returns the Resource Config used for pruning
-	GetPruneConfig(path string) (*unstructured.Unstructured, error)
 }
 
 var _ ConfigProvider = &KustomizeProvider{}
@@ -97,28 +92,6 @@ func (p *KustomizeProvider) GetConfig(path string) ([]*unstructured.Unstructured
 		results = append(results, &unstructured.Unstructured{Object: r.Kunstructured.Map()})
 	}
 	return results, nil
-}
-
-// GetPruneConfig returns the resource configs
-func (p *KustomizeProvider) GetPruneConfig(path string) (*unstructured.Unstructured, error) {
-	ldr, kt, err := p.getKustTarget(path)
-	if err != nil {
-		return nil, err
-	}
-	defer ldr.Cleanup()
-	rm, err := kt.MakePruneConfigMap()
-	if err != nil {
-		return nil, err
-	}
-	if len(rm.Resources()) > 1 {
-		return nil, fmt.Errorf("only allow one object as the Prune config")
-	}
-
-	for _, r := range rm.Resources() {
-		return &unstructured.Unstructured{Object: r.Kunstructured.Map()}, nil
-	}
-
-	return nil, nil
 }
 
 // RawConfigFileProvider provides configs from raw K8s resources
@@ -200,17 +173,6 @@ func (p *RawConfigFileProvider) GetConfig(root string) ([]*unstructured.Unstruct
 	return values, nil
 }
 
-// GetPruneConfig returns the resource configs
-// from a directory or a file containing raw Kubernetes resource configurations
-// The resource used for prune is get by checking the presence of the inventory annotation
-func (p *RawConfigFileProvider) GetPruneConfig(path string) (*unstructured.Unstructured, error) {
-	resources, err := p.GetConfig(path)
-	if err != nil {
-		return nil, err
-	}
-	return GetPruneResources(resources)
-}
-
 // RawConfigHTTPProvider provides configs from HTTP urls
 // TODO: implement RawConfigHTTPProvider
 type RawConfigHTTPProvider struct{}
@@ -223,33 +185,4 @@ func (p *RawConfigHTTPProvider) IsSupported(path string) bool {
 // GetConfig returns the resource configs
 func (p *RawConfigHTTPProvider) GetConfig(path string) ([]*unstructured.Unstructured, error) {
 	return nil, nil
-}
-
-// GetPruneConfig returns the resource configs
-func (p *RawConfigHTTPProvider) GetPruneConfig(path string) (*unstructured.Unstructured, error) {
-	return nil, nil
-}
-
-// GetPruneResources finds the resource used for pruning from a slice of resources
-// by looking for a special annotation in the resource
-// inventory.InventoryAnnotation
-func GetPruneResources(resources []*unstructured.Unstructured) (*unstructured.Unstructured, error) {
-	count := 0
-	var result *unstructured.Unstructured
-
-	for _, res := range resources {
-		annotations := res.GetAnnotations()
-		if _, ok := annotations[inventory.ContentAnnotation]; ok {
-			count++
-			result = res
-		}
-	}
-
-	if count == 0 {
-		return nil, nil
-	}
-	if count > 1 {
-		return nil, fmt.Errorf("found multiple resources with inventory annotations")
-	}
-	return result, nil
 }
