@@ -58,7 +58,7 @@ func (a *Apply) Do() (Result, error) {
 
 	for _, u := range normalizeResourceOrdering(a.Resources) {
 		annotation := u.GetAnnotations()
-		_, ok := annotation[inventory.InventoryAnnotation]
+		_, ok := annotation[inventory.ContentAnnotation]
 
 		if ok {
 			var err error
@@ -91,16 +91,16 @@ func (a Apply) updateInventoryObject(u *unstructured.Unstructured) (*unstructure
 
 	oldAnnotation := obj.GetAnnotations()
 	newAnnotation := u.GetAnnotations()
-	oldhash, okold := oldAnnotation[inventory.InventoryHashAnnotation]
-	newhash, oknew := newAnnotation[inventory.InventoryHashAnnotation]
+	oldhash, okold := oldAnnotation[inventory.HashAnnotation]
+	newhash, oknew := newAnnotation[inventory.HashAnnotation]
 	if okold && oknew && oldhash == newhash {
 		return obj, nil
 	}
 
-	return mergeInventoryAnnotation(u, obj)
+	return mergeContentAnnotation(u, obj)
 }
 
-func mergeInventoryAnnotation(newObj, oldObj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+func mergeContentAnnotation(newObj, oldObj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
 	newInv := inventory.NewInventory()
 	err := newInv.LoadFromAnnotation(newObj.GetAnnotations())
 	if err != nil {
@@ -126,7 +126,7 @@ func normalizeResourceOrdering(resources clik8s.ResourceConfigs) []*unstructured
 	index := -1
 	for i, u := range resources {
 		annotation := u.GetAnnotations()
-		_, ok := annotation[inventory.InventoryAnnotation]
+		_, ok := annotation[inventory.ContentAnnotation]
 		if ok {
 			index = i
 		} else {

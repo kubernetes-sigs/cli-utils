@@ -78,7 +78,7 @@ func TestStatusPod(t *testing.T) {
 	wirek8s.Flags(cmd.PersistentFlags())
 
 	assert.NoError(t, cmd.Execute())
-	assert.Equal(t, "Doing `cli-experimental apply`\napplied ConfigMap/example-cfgmap\napplied Deployment/frontend\napplied Pod/myapp-pod\napplied StatefulSet/web\nResources: 4\n", buf.String()) // nolint
+	assert.Equal(t, "Doing `cli-experimental apply`\napplied Pod/myapp-pod\napplied ConfigMap/example-cfgmap\napplied StatefulSet/web\napplied Deployment/frontend\nResources: 4\n", buf.String()) // nolint
 
 	cmd = status.GetApplyStatusCommand(args, false)
 	buf.Reset()
@@ -87,5 +87,5 @@ func TestStatusPod(t *testing.T) {
 	wirek8s.Flags(cmd.PersistentFlags())
 
 	assert.NoError(t, cmd.Execute())
-	assert.Equal(t, "Deployment/frontend   Pending \nStatefulSet/web   Pending \nConfigMap/example-cfgmap   Ready\nPod/myapp-pod   Pending Phase: Pending\n", buf.String())
+	assert.Equal(t, "Pod/myapp-pod   Pending Phase: Pending\nConfigMap/example-cfgmap   Ready\nStatefulSet/web   Pending \nDeployment/frontend   Pending \n", buf.String())
 }

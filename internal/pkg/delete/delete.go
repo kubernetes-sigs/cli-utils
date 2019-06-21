@@ -56,7 +56,7 @@ func (a *Delete) Do() (Result, error) {
 	ctx := context.Background()
 	for _, u := range normalizeResourceOrdering(a.Resources) {
 		annotations := u.GetAnnotations()
-		_, ok := annotations[inventory.InventoryAnnotation]
+		_, ok := annotations[inventory.ContentAnnotation]
 		if ok {
 			err := a.handleInventroy(ctx, annotations)
 			if err != nil {
@@ -125,7 +125,7 @@ func normalizeResourceOrdering(resources clik8s.ResourceConfigs) []*unstructured
 	index := -1
 	for i, u := range resources {
 		annotation := u.GetAnnotations()
-		_, ok := annotation[inventory.InventoryAnnotation]
+		_, ok := annotation[inventory.ContentAnnotation]
 		if ok {
 			index = i
 		} else {

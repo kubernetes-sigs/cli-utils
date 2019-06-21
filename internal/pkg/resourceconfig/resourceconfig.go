@@ -19,6 +19,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"sigs.k8s.io/kustomize/k8sdeps/validator"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -60,7 +61,8 @@ type KustomizeProvider struct {
 }
 
 func (p *KustomizeProvider) getKustTarget(path string) (ifc.Loader, *target.KustTarget, error) {
-	ldr, err := loader.NewLoader(loader.RestrictionRootOnly, path, p.FS)
+	v := validator.NewKustValidator()
+	ldr, err := loader.NewLoader(loader.RestrictionRootOnly, v, path, p.FS)
 	if err != nil {
 		return ldr, nil, err
 	}
@@ -86,12 +88,12 @@ func (p *KustomizeProvider) GetConfig(path string) ([]*unstructured.Unstructured
 		return nil, err
 	}
 	defer ldr.Cleanup()
-	allResources, err := kt.MakeCustomizedResMap()
+	rm, err := kt.MakeCustomizedResMap()
 	if err != nil {
 		return nil, err
 	}
 	var results []*unstructured.Unstructured
-	for _, r := range allResources {
+	for _, r := range rm.Resources() {
 		results = append(results, &unstructured.Unstructured{Object: r.Kunstructured.Map()})
 	}
 	return results, nil
@@ -104,15 +106,15 @@ func (p *KustomizeProvider) GetPruneConfig(path string) (*unstructured.Unstructu
 		return nil, err
 	}
 	defer ldr.Cleanup()
-	allResources, err := kt.MakePruneConfigMap()
+	rm, err := kt.MakePruneConfigMap()
 	if err != nil {
 		return nil, err
 	}
-	if len(allResources) > 1 {
+	if len(rm.Resources()) > 1 {
 		return nil, fmt.Errorf("only allow one object as the Prune config")
 	}
 
-	for _, r := range allResources {
+	for _, r := range rm.Resources() {
 		return &unstructured.Unstructured{Object: r.Kunstructured.Map()}, nil
 	}
 
@@ -237,7 +239,7 @@ func GetPruneResources(resources []*unstructured.Unstructured) (*unstructured.Un
 
 	for _, res := range resources {
 		annotations := res.GetAnnotations()
-		if _, ok := annotations[inventory.InventoryAnnotation]; ok {
+		if _, ok := annotations[inventory.ContentAnnotation]; ok {
 			count++
 			result = res
 		}

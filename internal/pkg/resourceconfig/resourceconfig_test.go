@@ -282,8 +282,8 @@ func TestGetPruneResources(t *testing.T) {
 	assert.Equal(t, len(objects), 2)
 	for _, o := range objects {
 		o.SetAnnotations(map[string]string{
-			inventory.InventoryHashAnnotation: "12345",
-			inventory.InventoryAnnotation:     `{"current": {}}`,
+			inventory.HashAnnotation: "12345",
+			inventory.ContentAnnotation:     `{"current": {}}`,
 		})
 	}
 	r, err = resourceconfig.GetPruneResources(objects)

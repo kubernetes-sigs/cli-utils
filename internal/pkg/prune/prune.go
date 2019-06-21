@@ -64,7 +64,7 @@ func (o *Prune) Do() (Result, error) {
 
 	u := (*unstructured.Unstructured)(o.Resources)
 	annotation := u.GetAnnotations()
-	_, ok := annotation[inventory.InventoryAnnotation]
+	_, ok := annotation[inventory.ContentAnnotation]
 	if !ok {
 		return Result{}, nil
 	}
