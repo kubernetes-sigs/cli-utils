@@ -129,7 +129,7 @@ func TestPodStatus(t *testing.T) {
 	condition = status.GetCondition(r, status.ConditionCompleted)
 	assert.NotEqual(t, nil, condition)
 	assert.Equal(t, "True", condition.Status)
-	assert.Equal(t, "Pod Succeded", condition.Message)
+	assert.Equal(t, "Pod Succeeded", condition.Message)
 	condition = status.GetCondition(r, status.ConditionFailed)
 	assert.Equal(t, (*status.Condition)(nil), condition)
 

@@ -520,7 +520,7 @@ func podConditions(u *unstructured.Unstructured) ([]Condition, error) {
 				if c.Reason == "PodCompleted" {
 					ready.Status = "True"
 					if phase == "Succeeded" {
-						rv = append(rv, Condition{ConditionCompleted, "True", "PodSucceeded", "Pod Succeded"})
+						rv = append(rv, Condition{ConditionCompleted, "True", "PodSucceeded", "Pod Succeeded"})
 					} else {
 						rv = append(rv, Condition{ConditionFailed, "True", "PodFail", fmt.Sprintf("Pod phase: %s", phase)})
 					}

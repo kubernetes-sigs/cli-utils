@@ -67,6 +67,6 @@ func (a *Cmd) Delete(resources []*unstructured.Unstructured) error {
 // Status returns the status given the input as a slice of unstructured resources
 func (a *Cmd) Status(resources []*unstructured.Unstructured) error {
 	a.StatusGetter.Resources = resources
-	_, err := a.StatusGetter.Do()
-	return err
+	_ = a.StatusGetter.Do()
+	return nil
 }

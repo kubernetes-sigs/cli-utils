@@ -30,6 +30,6 @@ func InitializeStatus(clik8s.ResourceConfigPath, io.Writer, util.Args) (*status.
 }
 
 // DoStatus creates a new Status object and runs it
-func DoStatus(clik8s.ResourceConfigPath, io.Writer, util.Args) status.Result {
+func DoStatus(clik8s.ResourceConfigPath, io.Writer, util.Args) (status.Result, error) {
 	panic(wire.Build(ProviderSet))
 }
