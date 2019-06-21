@@ -26,7 +26,7 @@ import (
 )
 
 // GetApplyStatusCommand returns a new `apply status` command
-func GetApplyStatusCommand(a util.Args) *cobra.Command {
+func GetApplyStatusCommand(a util.Args, exit bool) *cobra.Command {
 	var wait bool
 	var every int
 	var count int
@@ -65,7 +65,9 @@ as an argument.
 
 			if ok || !wait || (count != 0 && iteration >= count) {
 				if !ok {
-					os.Exit(-1)
+					if exit {
+						os.Exit(-1)
+					}
 				}
 				break
 			}

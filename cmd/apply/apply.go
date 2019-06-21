@@ -54,6 +54,6 @@ is used.
 	}
 
 	// Add Commands
-	cmd.AddCommand(status.GetApplyStatusCommand(a))
+	cmd.AddCommand(status.GetApplyStatusCommand(a, true))
 	return cmd
 }

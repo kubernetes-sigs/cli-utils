@@ -54,7 +54,7 @@ func TestStatusConfigMap(t *testing.T) {
 	assert.NoError(t, cmd.Execute())
 	assert.Equal(t, "Doing `cli-experimental apply`\napplied ConfigMap/inventory\napplied ConfigMap/test-map-k6tb869f64\nResources: 2\n", buf.String()) // nolint
 
-	cmd = status.GetApplyStatusCommand(args)
+	cmd = status.GetApplyStatusCommand(args, false)
 	buf.Reset()
 	cmd.SetOutput(buf)
 	cmd.SetArgs(args)
@@ -80,7 +80,7 @@ func TestStatusPod(t *testing.T) {
 	assert.NoError(t, cmd.Execute())
 	assert.Equal(t, "Doing `cli-experimental apply`\napplied ConfigMap/example-cfgmap\napplied Deployment/frontend\napplied Pod/myapp-pod\napplied StatefulSet/web\nResources: 4\n", buf.String()) // nolint
 
-	cmd = status.GetApplyStatusCommand(args)
+	cmd = status.GetApplyStatusCommand(args, false)
 	buf.Reset()
 	cmd.SetOutput(buf)
 	cmd.SetArgs(args)
