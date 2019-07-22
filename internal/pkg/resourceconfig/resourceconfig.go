@@ -16,6 +16,7 @@ package resourceconfig
 import (
 	"bytes"
 	"io/ioutil"
+	"log"
 	"os"
 	"path/filepath"
 	"sigs.k8s.io/kustomize/k8sdeps/validator"
@@ -68,7 +69,11 @@ func (p *KustomizeProvider) getKustTarget(path string) (ifc.Loader, *target.Kust
 // IsSupported checks if the path is supported by KustomizeProvider
 func (p *KustomizeProvider) IsSupported(path string) bool {
 	ldr, _, err := p.getKustTarget(path)
-	defer ldr.Cleanup()
+	defer func() {
+		if err := ldr.Cleanup(); err != nil {
+			log.Fatal("failed to clean up the loader")
+		}
+	}()
 
 	if err != nil {
 		return false
@@ -82,7 +87,12 @@ func (p *KustomizeProvider) GetConfig(path string) ([]*unstructured.Unstructured
 	if err != nil {
 		return nil, err
 	}
-	defer ldr.Cleanup()
+	defer func() {
+		if err := ldr.Cleanup(); err != nil {
+			log.Fatal("failed to clean up the loader")
+		}
+	}()
+
 	rm, err := kt.MakeCustomizedResMap()
 	if err != nil {
 		return nil, err

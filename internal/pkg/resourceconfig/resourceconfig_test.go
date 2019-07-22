@@ -63,7 +63,8 @@ func TestKustomizeProvider2(t *testing.T) {
 	assert.NotEmpty(t, pobject)
 	assert.NotNil(t, pobject)
 	inv := inventory.NewInventory()
-	inv.LoadFromAnnotation(pobject[1].GetAnnotations())
+	err = inv.LoadFromAnnotation(pobject[1].GetAnnotations())
+	assert.NoError(t, err)
 	assert.Equal(t, len(inv.Current), 1)
 }
 
@@ -189,6 +190,8 @@ func TestRawConfigFileProvider(t *testing.T) {
 	assert.Equal(t, expected[0], resources[0])
 
 	b = cp.IsSupported(subdir)
+	assert.Equal(t, b, true)
+	assert.Equal(t, b, true)
 	resources, err = cp.GetConfig(subdir)
 	assert.NoError(t, err)
 	assert.Equal(t, len(resources), 2)

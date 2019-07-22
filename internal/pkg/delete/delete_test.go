@@ -519,6 +519,7 @@ func TestDeleteWithPresenceNoInventory(t *testing.T) {
 	// Then run delete
 	// Confirm that the service is deleted
     _, err = d.Do()
+    assert.NoError(t, err)
 	exist, err = util.ObjectExist(a.DynamicClient, context.Background(), liveService)
 	assert.NoError(t, err)
 	assert.Equal(t, false, exist)

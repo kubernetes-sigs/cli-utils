@@ -21,10 +21,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-func jsonPath(fields []string) string {
-	return "." + strings.Join(fields, ".")
-}
-
 // ObjWithConditions Represent meta object with status.condition array
 type ObjWithConditions struct {
 	// Status as expected to be present in most compliant kubernetes resources

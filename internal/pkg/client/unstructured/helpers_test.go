@@ -20,7 +20,6 @@ import (
 	helperu "sigs.k8s.io/cli-experimental/internal/pkg/client/unstructured"
 )
 
-var emptyObj = map[string]interface{}{}
 var testObj = map[string]interface{}{
 	"f1": map[string]interface{}{
 		"f2": map[string]interface{}{

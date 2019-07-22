@@ -281,7 +281,7 @@ func TestApplyWithPresenceAnnotation(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, false, exist)
 
-	r, err = a.Do()
+	_, err = a.Do()
 	assert.NoError(t, err)
 	exist, err = util.ObjectExist(a.DynamicClient, context.Background(), liveService)
 	assert.NoError(t, err)
