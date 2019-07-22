@@ -18,34 +18,11 @@ set -e
 
 source $(dirname ${BASH_SOURCE})/common.sh
 
-header_text "populating vendor for gometalinter.v2"
-go mod vendor
-
 header_text "running go vet"
 
 go vet ./internal/... ./pkg/... ./cmd/... ./util/...
 
-header_text "running gometalinter.v2"
+header_text "running golangci-lint"
 
-gometalinter.v2 -e $(go env GOROOT) -e vendor/ -e _gen.go --disable-all \
-    --deadline 15m \
-    --enable=misspell \
-    --enable=structcheck \
-    --enable=golint \
-    --enable=deadcode \
-    --enable=errcheck \
-    --enable=varcheck \
-    --enable=goconst \
-    --enable=goimports \
-    --enable=gocyclo \
-    --cyclo-over=20 \
-    --line-length=120 \
-    --enable=lll \
-    --enable=nakedret \
-    --enable=unparam \
-    --enable=ineffassign \
-    --enable=interfacer \
-    --dupl-threshold=400 \
-    --enable=dupl \
-    --enable=misspell \
-    ./pkg/... ./internal/... ./cmd/... ./util/...
+# TODO: enable typecheck
+golangci-lint run ./... -D typecheck

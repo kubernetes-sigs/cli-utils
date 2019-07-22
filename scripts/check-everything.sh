@@ -77,7 +77,6 @@ function install_wire {
 header_text "using tools"
 
 install_wire
-install_metalinter
 
 fetch_kb_tools
 setup_envs

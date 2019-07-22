@@ -1,0 +1,36 @@
+os:
+  - linux
+  - osx
+
+addons:
+  apt:
+    packages:
+      - tree
+  homebrew:
+    packages:
+      - tree
+    update: true
+
+# Only clone the most recent commit.
+git:
+  depth: 1
+
+language: go
+
+go:
+  - "1.12"
+
+go_import_path: sigs.k8s.io/cli-experimental
+
+before_install:
+  - curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh| sh -s -- -b $(go env GOPATH)/bin v1.17.1
+
+# Skip the install process; let pre-commit.sh do it.
+install: true
+
+script:
+  - ./scripts/check-everything.sh
+
+# TBD. Suppressing for now.
+notifications:
+  email: false
