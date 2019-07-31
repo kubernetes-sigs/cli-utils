@@ -1,4 +1,4 @@
-module sigs.k8s.io/cli-experimental
+module sigs.k8s.io/cli-utils
 
 go 1.12
 

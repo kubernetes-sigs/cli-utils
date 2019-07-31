@@ -19,7 +19,7 @@ import (
 	"io"
 
 	"github.com/google/wire"
-	"sigs.k8s.io/cli-experimental/internal/pkg/util"
+	"sigs.k8s.io/cli-utils/internal/pkg/util"
 )
 
 // InitializeCmd creates a new Cmd object

@@ -17,11 +17,11 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	"sigs.k8s.io/cli-experimental/cmd/apply"
-	"sigs.k8s.io/cli-experimental/cmd/delete"
-	"sigs.k8s.io/cli-experimental/cmd/prune"
-	"sigs.k8s.io/cli-experimental/internal/pkg/dy"
-	"sigs.k8s.io/cli-experimental/internal/pkg/wirecli/wirek8s"
+	"sigs.k8s.io/cli-utils/cmd/apply"
+	"sigs.k8s.io/cli-utils/cmd/delete"
+	"sigs.k8s.io/cli-utils/cmd/prune"
+	"sigs.k8s.io/cli-utils/internal/pkg/dy"
+	"sigs.k8s.io/cli-utils/internal/pkg/wirecli/wirek8s"
 )
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -29,7 +29,7 @@ import (
 func Execute(args []string, fn func(*cobra.Command)) error {
 	rootCmd := &cobra.Command{
 		// TODO(Liujingfang1): change this binary to a better name
-		Use:   "cli-experimental",
+		Use:   "cli-utils",
 		Short: "kubectl version 2",
 		Long: `kubectl version 2
 with commands apply, prune, delete and dynamic commands`,

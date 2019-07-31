@@ -24,10 +24,10 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/cli-experimental/internal/pkg/client"
-	"sigs.k8s.io/cli-experimental/internal/pkg/clik8s"
-	"sigs.k8s.io/cli-experimental/internal/pkg/constants"
-	"sigs.k8s.io/cli-experimental/internal/pkg/util"
+	"sigs.k8s.io/cli-utils/internal/pkg/client"
+	"sigs.k8s.io/cli-utils/internal/pkg/clik8s"
+	"sigs.k8s.io/cli-utils/internal/pkg/constants"
+	"sigs.k8s.io/cli-utils/internal/pkg/util"
 	"sigs.k8s.io/kustomize/pkg/inventory"
 )
 
@@ -59,7 +59,7 @@ func (o *Prune) Do() (Result, error) {
 	if o.Resources == nil {
 		return Result{}, nil
 	}
-	fmt.Fprintf(o.Out, "Doing `cli-experimental prune`\n")
+	fmt.Fprintf(o.Out, "Doing `cli-utils prune`\n")
 	ctx := context.Background()
 
 	u, found, err := o.findInventoryObject()

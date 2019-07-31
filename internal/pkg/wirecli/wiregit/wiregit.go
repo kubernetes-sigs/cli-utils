@@ -4,7 +4,7 @@ import (
 	"github.com/google/wire"
 	gogit "gopkg.in/src-d/go-git.v4"
 	"gopkg.in/src-d/go-git.v4/plumbing/object"
-	"sigs.k8s.io/cli-experimental/internal/pkg/clik8s"
+	"sigs.k8s.io/cli-utils/internal/pkg/clik8s"
 )
 
 // OptionalProviderSet provides optional Git dependencies.

@@ -18,11 +18,11 @@ package wireprune
 import (
 	"io"
 
-	"sigs.k8s.io/cli-experimental/internal/pkg/util"
+	"sigs.k8s.io/cli-utils/internal/pkg/util"
 
 	"github.com/google/wire"
-	"sigs.k8s.io/cli-experimental/internal/pkg/clik8s"
-	"sigs.k8s.io/cli-experimental/internal/pkg/prune"
+	"sigs.k8s.io/cli-utils/internal/pkg/clik8s"
+	"sigs.k8s.io/cli-utils/internal/pkg/prune"
 )
 
 // DoPrune creates a new Prune object and runs it

@@ -19,8 +19,8 @@ import (
 	"io"
 
 	"github.com/google/wire"
-	"sigs.k8s.io/cli-experimental/internal/pkg/util"
-	"sigs.k8s.io/cli-experimental/internal/pkg/wirecli"
+	"sigs.k8s.io/cli-utils/internal/pkg/util"
+	"sigs.k8s.io/cli-utils/internal/pkg/wirecli"
 )
 
 // InitializeCommandLister creates a new *CommandLister object

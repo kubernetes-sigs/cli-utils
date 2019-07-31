@@ -17,10 +17,10 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"sigs.k8s.io/cli-experimental/cmd/apply/status"
-	"sigs.k8s.io/cli-experimental/internal/pkg/clik8s"
-	"sigs.k8s.io/cli-experimental/internal/pkg/util"
-	"sigs.k8s.io/cli-experimental/internal/pkg/wirecli/wireapply"
+	"sigs.k8s.io/cli-utils/cmd/apply/status"
+	"sigs.k8s.io/cli-utils/internal/pkg/clik8s"
+	"sigs.k8s.io/cli-utils/internal/pkg/util"
+	"sigs.k8s.io/cli-utils/internal/pkg/wirecli/wireapply"
 )
 
 // GetApplyCommand returns the `apply` cobra Command

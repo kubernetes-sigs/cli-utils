@@ -19,10 +19,10 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"sigs.k8s.io/cli-experimental/internal/pkg/clik8s"
-	"sigs.k8s.io/cli-experimental/internal/pkg/status"
-	"sigs.k8s.io/cli-experimental/internal/pkg/util"
-	"sigs.k8s.io/cli-experimental/internal/pkg/wirecli/wirestatus"
+	"sigs.k8s.io/cli-utils/internal/pkg/clik8s"
+	"sigs.k8s.io/cli-utils/internal/pkg/status"
+	"sigs.k8s.io/cli-utils/internal/pkg/util"
+	"sigs.k8s.io/cli-utils/internal/pkg/wirecli/wirestatus"
 )
 
 // GetApplyStatusCommand returns a new `apply status` command

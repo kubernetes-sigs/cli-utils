@@ -7,12 +7,12 @@ package dy
 
 import (
 	"io"
-	"sigs.k8s.io/cli-experimental/internal/pkg/dy/dispatch"
-	"sigs.k8s.io/cli-experimental/internal/pkg/dy/list"
-	"sigs.k8s.io/cli-experimental/internal/pkg/dy/output"
-	"sigs.k8s.io/cli-experimental/internal/pkg/dy/parse"
-	"sigs.k8s.io/cli-experimental/internal/pkg/util"
-	"sigs.k8s.io/cli-experimental/internal/pkg/wirecli/wirek8s"
+	"sigs.k8s.io/cli-utils/internal/pkg/dy/dispatch"
+	"sigs.k8s.io/cli-utils/internal/pkg/dy/list"
+	"sigs.k8s.io/cli-utils/internal/pkg/dy/output"
+	"sigs.k8s.io/cli-utils/internal/pkg/dy/parse"
+	"sigs.k8s.io/cli-utils/internal/pkg/util"
+	"sigs.k8s.io/cli-utils/internal/pkg/wirecli/wirek8s"
 )
 
 // Injectors from wire.go:

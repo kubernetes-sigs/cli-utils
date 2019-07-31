@@ -7,13 +7,13 @@ package pkg
 
 import (
 	"io"
-	"sigs.k8s.io/cli-experimental/internal/pkg/apply"
-	delete2 "sigs.k8s.io/cli-experimental/internal/pkg/delete"
-	"sigs.k8s.io/cli-experimental/internal/pkg/prune"
-	"sigs.k8s.io/cli-experimental/internal/pkg/status"
-	"sigs.k8s.io/cli-experimental/internal/pkg/util"
-	"sigs.k8s.io/cli-experimental/internal/pkg/wirecli/wirek8s"
-	"sigs.k8s.io/cli-experimental/internal/pkg/wirecli/wiretest"
+	"sigs.k8s.io/cli-utils/internal/pkg/apply"
+	delete2 "sigs.k8s.io/cli-utils/internal/pkg/delete"
+	"sigs.k8s.io/cli-utils/internal/pkg/prune"
+	"sigs.k8s.io/cli-utils/internal/pkg/status"
+	"sigs.k8s.io/cli-utils/internal/pkg/util"
+	"sigs.k8s.io/cli-utils/internal/pkg/wirecli/wirek8s"
+	"sigs.k8s.io/cli-utils/internal/pkg/wirecli/wiretest"
 )
 
 // Injectors from wire.go:

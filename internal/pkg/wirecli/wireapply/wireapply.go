@@ -18,10 +18,10 @@ import (
 
 	"github.com/google/wire"
 
-	"sigs.k8s.io/cli-experimental/internal/pkg/apply"
-	"sigs.k8s.io/cli-experimental/internal/pkg/wirecli/wireconfig"
-	"sigs.k8s.io/cli-experimental/internal/pkg/wirecli/wiregit"
-	"sigs.k8s.io/cli-experimental/internal/pkg/wirecli/wirek8s"
+	"sigs.k8s.io/cli-utils/internal/pkg/apply"
+	"sigs.k8s.io/cli-utils/internal/pkg/wirecli/wireconfig"
+	"sigs.k8s.io/cli-utils/internal/pkg/wirecli/wiregit"
+	"sigs.k8s.io/cli-utils/internal/pkg/wirecli/wirek8s"
 )
 
 // ProviderSet defines dependencies for initializing objects

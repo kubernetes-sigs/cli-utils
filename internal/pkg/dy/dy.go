@@ -21,11 +21,11 @@ import (
 	"github.com/spf13/cobra"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	"sigs.k8s.io/cli-experimental/internal/pkg/apis/dynamic/v1alpha1"
-	"sigs.k8s.io/cli-experimental/internal/pkg/dy/dispatch"
-	"sigs.k8s.io/cli-experimental/internal/pkg/dy/list"
-	"sigs.k8s.io/cli-experimental/internal/pkg/dy/output"
-	"sigs.k8s.io/cli-experimental/internal/pkg/dy/parse"
+	"sigs.k8s.io/cli-utils/internal/pkg/apis/dynamic/v1alpha1"
+	"sigs.k8s.io/cli-utils/internal/pkg/dy/dispatch"
+	"sigs.k8s.io/cli-utils/internal/pkg/dy/list"
+	"sigs.k8s.io/cli-utils/internal/pkg/dy/output"
+	"sigs.k8s.io/cli-utils/internal/pkg/dy/parse"
 )
 
 // ProviderSet provides wiring for initializing types.

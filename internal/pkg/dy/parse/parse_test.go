@@ -21,8 +21,8 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
-	"sigs.k8s.io/cli-experimental/internal/pkg/apis/dynamic/v1alpha1"
-	"sigs.k8s.io/cli-experimental/internal/pkg/dy/parse"
+	"sigs.k8s.io/cli-utils/internal/pkg/apis/dynamic/v1alpha1"
+	"sigs.k8s.io/cli-utils/internal/pkg/dy/parse"
 )
 
 func TestParseDryRunFlag(t *testing.T) {

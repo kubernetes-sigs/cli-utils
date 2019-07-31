@@ -23,7 +23,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"sigs.k8s.io/cli-experimental/internal/pkg/apis/dynamic/v1alpha1"
+	"sigs.k8s.io/cli-utils/internal/pkg/apis/dynamic/v1alpha1"
 	"sigs.k8s.io/yaml"
 )
 
@@ -91,7 +91,7 @@ func AddTo(commandList *v1alpha1.ResourceCommandList, crd v1.Object) error {
 	if lab == nil {
 		lab = map[string]string{}
 	}
-	lab["cli-experimental.sigs.k8s.io/ResourceCommandList"] = ""
+	lab["cli-utils.sigs.k8s.io/ResourceCommandList"] = ""
 	crd.SetLabels(lab)
 
 	// Add the Annotation
@@ -113,7 +113,7 @@ func AddTo(commandList *v1alpha1.ResourceCommandList, crd v1.Object) error {
 	if an == nil {
 		an = map[string]string{}
 	}
-	an["cli-experimental.sigs.k8s.io/ResourceCommandList"] = string(clAnn.String())
+	an["cli-utils.sigs.k8s.io/ResourceCommandList"] = string(clAnn.String())
 	crd.SetAnnotations(an)
 	return nil
 }

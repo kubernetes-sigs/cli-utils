@@ -17,9 +17,9 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"sigs.k8s.io/cli-experimental/internal/pkg/clik8s"
-	"sigs.k8s.io/cli-experimental/internal/pkg/util"
-	"sigs.k8s.io/cli-experimental/internal/pkg/wirecli/wireprune"
+	"sigs.k8s.io/cli-utils/internal/pkg/clik8s"
+	"sigs.k8s.io/cli-utils/internal/pkg/util"
+	"sigs.k8s.io/cli-utils/internal/pkg/wirecli/wireprune"
 )
 
 // GetPruneCommand returns the `prune` cobra Command

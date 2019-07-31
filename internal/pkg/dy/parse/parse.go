@@ -18,7 +18,7 @@ package parse
 
 import (
 	"github.com/spf13/cobra"
-	clidynamic "sigs.k8s.io/cli-experimental/internal/pkg/apis/dynamic/v1alpha1"
+	clidynamic "sigs.k8s.io/cli-utils/internal/pkg/apis/dynamic/v1alpha1"
 )
 
 // CommandParser parses clidnamic.Commands into cobra.Commands

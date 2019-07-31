@@ -1,6 +1,6 @@
 # go build binaries
 main
-cli-experimental
+cli-utils
 dyctl
 
 #intellij

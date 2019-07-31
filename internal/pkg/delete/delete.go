@@ -18,13 +18,13 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"sigs.k8s.io/cli-experimental/internal/pkg/util"
+	"sigs.k8s.io/cli-utils/internal/pkg/util"
 
 	"gopkg.in/src-d/go-git.v4/plumbing/object"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"sigs.k8s.io/cli-experimental/internal/pkg/client"
-	"sigs.k8s.io/cli-experimental/internal/pkg/clik8s"
+	"sigs.k8s.io/cli-utils/internal/pkg/client"
+	"sigs.k8s.io/cli-utils/internal/pkg/clik8s"
 	"sigs.k8s.io/kustomize/pkg/inventory"
 )
 
@@ -51,7 +51,7 @@ type Result struct {
 
 // Do executes the delete
 func (a *Delete) Do() (Result, error) {
-	fmt.Fprintf(a.Out, "Doing `cli-experimental delete`\n")
+	fmt.Fprintf(a.Out, "Doing `cli-utils delete`\n")
 	ctx := context.Background()
 	for _, u := range normalizeResourceOrdering(a.Resources) {
 		annotations := u.GetAnnotations()

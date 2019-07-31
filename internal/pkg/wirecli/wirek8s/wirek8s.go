@@ -23,9 +23,9 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"sigs.k8s.io/cli-experimental/internal/pkg/client"
-	"sigs.k8s.io/cli-experimental/internal/pkg/configflags"
-	"sigs.k8s.io/cli-experimental/internal/pkg/util"
+	"sigs.k8s.io/cli-utils/internal/pkg/client"
+	"sigs.k8s.io/cli-utils/internal/pkg/configflags"
+	"sigs.k8s.io/cli-utils/internal/pkg/util"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
 	// for connecting to various types of hosted clusters

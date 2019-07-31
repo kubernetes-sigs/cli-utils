@@ -19,16 +19,16 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"sigs.k8s.io/cli-experimental/internal/pkg/constants"
-	"sigs.k8s.io/cli-experimental/internal/pkg/util"
+	"sigs.k8s.io/cli-utils/internal/pkg/constants"
+	"sigs.k8s.io/cli-utils/internal/pkg/util"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/src-d/go-git.v4/plumbing/object"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"sigs.k8s.io/cli-experimental/internal/pkg/apply"
-	"sigs.k8s.io/cli-experimental/internal/pkg/clik8s"
-	"sigs.k8s.io/cli-experimental/internal/pkg/wirecli/wiretest"
+	"sigs.k8s.io/cli-utils/internal/pkg/apply"
+	"sigs.k8s.io/cli-utils/internal/pkg/clik8s"
+	"sigs.k8s.io/cli-utils/internal/pkg/wirecli/wiretest"
 )
 
 func TestApplyEmpty(t *testing.T) {

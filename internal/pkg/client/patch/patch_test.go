@@ -27,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	kscheme "k8s.io/client-go/kubernetes/scheme"
-	"sigs.k8s.io/cli-experimental/internal/pkg/client/patch"
+	"sigs.k8s.io/cli-utils/internal/pkg/client/patch"
 )
 
 var _ = Describe("Patch", func() {

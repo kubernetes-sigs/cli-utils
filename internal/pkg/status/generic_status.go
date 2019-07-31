@@ -15,7 +15,7 @@ package status
 
 import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	clientu "sigs.k8s.io/cli-experimental/internal/pkg/client/unstructured"
+	clientu "sigs.k8s.io/cli-utils/internal/pkg/client/unstructured"
 )
 
 // readyConditionReader reads Ready condition from the unstructured object

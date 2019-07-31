@@ -17,7 +17,7 @@ import (
 	"fmt"
 	"os"
 
-	"sigs.k8s.io/cli-experimental/cmd"
+	"sigs.k8s.io/cli-utils/cmd"
 )
 
 func main() {

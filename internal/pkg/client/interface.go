@@ -19,7 +19,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/cli-experimental/internal/pkg/client/patch"
+	"sigs.k8s.io/cli-utils/internal/pkg/client/patch"
 )
 
 // Reader knows how to read and list Kubernetes objects.

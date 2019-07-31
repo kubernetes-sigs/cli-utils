@@ -15,10 +15,10 @@ package pkg
 
 import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"sigs.k8s.io/cli-experimental/internal/pkg/apply"
-	"sigs.k8s.io/cli-experimental/internal/pkg/delete"
-	"sigs.k8s.io/cli-experimental/internal/pkg/prune"
-	"sigs.k8s.io/cli-experimental/internal/pkg/status"
+	"sigs.k8s.io/cli-utils/internal/pkg/apply"
+	"sigs.k8s.io/cli-utils/internal/pkg/delete"
+	"sigs.k8s.io/cli-utils/internal/pkg/prune"
+	"sigs.k8s.io/cli-utils/internal/pkg/status"
 )
 
 // TODO

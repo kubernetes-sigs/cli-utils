@@ -26,10 +26,10 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/cli-experimental/internal/pkg/apis/dynamic/v1alpha1"
-	"sigs.k8s.io/cli-experimental/internal/pkg/dy"
-	"sigs.k8s.io/cli-experimental/internal/pkg/wirecli/wiretest"
-	"sigs.k8s.io/cli-experimental/util/dyctl/cmd"
+	"sigs.k8s.io/cli-utils/internal/pkg/apis/dynamic/v1alpha1"
+	"sigs.k8s.io/cli-utils/internal/pkg/dy"
+	"sigs.k8s.io/cli-utils/internal/pkg/wirecli/wiretest"
+	"sigs.k8s.io/cli-utils/util/dyctl/cmd"
 	"sigs.k8s.io/yaml"
 )
 

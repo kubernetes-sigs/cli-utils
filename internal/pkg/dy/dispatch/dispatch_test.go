@@ -22,16 +22,16 @@ import (
 	"strings"
 	"testing"
 
-	"sigs.k8s.io/cli-experimental/internal/pkg/dy/dispatch"
+	"sigs.k8s.io/cli-utils/internal/pkg/dy/dispatch"
 
 	v1 "k8s.io/api/apps/v1"
 
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/cli-experimental/internal/pkg/apis/dynamic/v1alpha1"
-	"sigs.k8s.io/cli-experimental/internal/pkg/dy/parse"
-	"sigs.k8s.io/cli-experimental/internal/pkg/wirecli/wiretest"
+	"sigs.k8s.io/cli-utils/internal/pkg/apis/dynamic/v1alpha1"
+	"sigs.k8s.io/cli-utils/internal/pkg/dy/parse"
+	"sigs.k8s.io/cli-utils/internal/pkg/wirecli/wiretest"
 	"sigs.k8s.io/yaml"
 )
 

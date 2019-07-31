@@ -15,7 +15,7 @@
 #  limitations under the License.
 
 set -e
-./cli-experimental --kubeconfig ~/.kube/config apply cmd/test-manifests/hello
-./cli-experimental --kubeconfig ~/.kube/config apply status cmd/test-manifests/hello --wait --every 2 --count 30
-./cli-experimental --kubeconfig ~/.kube/config delete cmd/test-manifests/hello
-./cli-experimental --kubeconfig ~/.kube/config apply status cmd/test-manifests/hello
+./cli-utils --kubeconfig ~/.kube/config apply cmd/test-manifests/hello
+./cli-utils --kubeconfig ~/.kube/config apply status cmd/test-manifests/hello --wait --every 2 --count 30
+./cli-utils --kubeconfig ~/.kube/config delete cmd/test-manifests/hello
+./cli-utils --kubeconfig ~/.kube/config apply status cmd/test-manifests/hello

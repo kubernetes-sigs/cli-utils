@@ -13,7 +13,7 @@ limitations under the License.
 
 package main
 
-import "sigs.k8s.io/cli-experimental/util/dyctl/cmd"
+import "sigs.k8s.io/cli-utils/util/dyctl/cmd"
 
 func main() {
 	cmd.Execute()

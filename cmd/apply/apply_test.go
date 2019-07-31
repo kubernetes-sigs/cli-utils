@@ -20,9 +20,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"sigs.k8s.io/cli-experimental/cmd/apply"
-	"sigs.k8s.io/cli-experimental/internal/pkg/wirecli/wirek8s"
-	"sigs.k8s.io/cli-experimental/internal/pkg/wirecli/wiretest"
+	"sigs.k8s.io/cli-utils/cmd/apply"
+	"sigs.k8s.io/cli-utils/internal/pkg/wirecli/wirek8s"
+	"sigs.k8s.io/cli-utils/internal/pkg/wirecli/wiretest"
 )
 
 var host string
@@ -51,5 +51,5 @@ func TestApply(t *testing.T) {
 	wirek8s.Flags(cmd.PersistentFlags())
 
 	assert.NoError(t, cmd.Execute())
-	assert.Equal(t, "Doing `cli-experimental apply`\napplied ConfigMap/inventory\napplied ConfigMap/test-map-k6tb869f64\nResources: 2\n", buf.String()) // nolint
+	assert.Equal(t, "Doing `cli-utils apply`\napplied ConfigMap/inventory\napplied ConfigMap/test-map-k6tb869f64\nResources: 2\n", buf.String()) // nolint
 }

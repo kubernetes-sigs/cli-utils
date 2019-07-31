@@ -20,16 +20,16 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"sigs.k8s.io/cli-experimental/cmd"
+	"sigs.k8s.io/cli-utils/cmd"
 
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/client-go/rest"
-	"sigs.k8s.io/cli-experimental/internal/pkg/apis/dynamic/v1alpha1"
-	"sigs.k8s.io/cli-experimental/internal/pkg/wirecli/wiretest"
-	dycmd "sigs.k8s.io/cli-experimental/util/dyctl/cmd"
+	"sigs.k8s.io/cli-utils/internal/pkg/apis/dynamic/v1alpha1"
+	"sigs.k8s.io/cli-utils/internal/pkg/wirecli/wiretest"
+	dycmd "sigs.k8s.io/cli-utils/util/dyctl/cmd"
 	"sigs.k8s.io/yaml"
 )
 

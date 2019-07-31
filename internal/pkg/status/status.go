@@ -23,9 +23,9 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/cli-experimental/internal/pkg/client"
-	clientu "sigs.k8s.io/cli-experimental/internal/pkg/client/unstructured"
-	"sigs.k8s.io/cli-experimental/internal/pkg/clik8s"
+	"sigs.k8s.io/cli-utils/internal/pkg/client"
+	clientu "sigs.k8s.io/cli-utils/internal/pkg/client/unstructured"
+	"sigs.k8s.io/cli-utils/internal/pkg/clik8s"
 )
 
 // Condition types

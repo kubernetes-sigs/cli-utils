@@ -28,9 +28,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/util/jsonpath"
-	"sigs.k8s.io/cli-experimental/internal/pkg/apis/dynamic/v1alpha1"
-	"sigs.k8s.io/cli-experimental/internal/pkg/dy/output"
-	"sigs.k8s.io/cli-experimental/internal/pkg/dy/parse"
+	"sigs.k8s.io/cli-utils/internal/pkg/apis/dynamic/v1alpha1"
+	"sigs.k8s.io/cli-utils/internal/pkg/dy/output"
+	"sigs.k8s.io/cli-utils/internal/pkg/dy/parse"
 	"sigs.k8s.io/yaml"
 )
 

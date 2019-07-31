@@ -18,11 +18,11 @@ package wiredelete
 import (
 	"io"
 
-	"sigs.k8s.io/cli-experimental/internal/pkg/util"
+	"sigs.k8s.io/cli-utils/internal/pkg/util"
 
 	"github.com/google/wire"
-	"sigs.k8s.io/cli-experimental/internal/pkg/clik8s"
-	"sigs.k8s.io/cli-experimental/internal/pkg/delete"
+	"sigs.k8s.io/cli-utils/internal/pkg/clik8s"
+	"sigs.k8s.io/cli-utils/internal/pkg/delete"
 )
 
 // DoDelete creates a new Delete object and runs it

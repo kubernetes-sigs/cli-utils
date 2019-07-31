@@ -3,7 +3,7 @@ FROM golang:alpine AS builder
 # Install git
 RUN apk update && apk add --no-cache git
 
-WORKDIR $GOPATH/src/cli-experimental
+WORKDIR $GOPATH/src/cli-utils
 COPY . .
 
 # Install wire

@@ -26,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
-	"sigs.k8s.io/cli-experimental/internal/pkg/client/patch"
+	"sigs.k8s.io/cli-utils/internal/pkg/client/patch"
 )
 
 // NewForConfig returns a new Client using the provided config and Options.

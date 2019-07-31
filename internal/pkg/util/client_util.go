@@ -10,8 +10,8 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/cli-experimental/internal/pkg/client"
-	"sigs.k8s.io/cli-experimental/internal/pkg/constants"
+	"sigs.k8s.io/cli-utils/internal/pkg/client"
+	"sigs.k8s.io/cli-utils/internal/pkg/constants"
 )
 
 // DeleteObject delete an object given a client and Group,Version,Kind,Name,Namespace of an object

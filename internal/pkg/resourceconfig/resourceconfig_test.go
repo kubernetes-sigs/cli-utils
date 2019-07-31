@@ -21,7 +21,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"sigs.k8s.io/cli-experimental/internal/pkg/wirecli/wiretest"
+	"sigs.k8s.io/cli-utils/internal/pkg/wirecli/wiretest"
 	"sigs.k8s.io/kustomize/pkg/inventory"
 	"sigs.k8s.io/yaml"
 )

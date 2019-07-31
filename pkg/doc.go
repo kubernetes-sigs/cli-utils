@@ -12,6 +12,6 @@ limitations under the License.
 */
 
 /*
-Package pkg contains public libraries for building tools on top of cli-experimental.
+Package pkg contains public libraries for building tools on top of cli-utils.
 */
 package pkg

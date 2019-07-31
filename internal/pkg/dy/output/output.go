@@ -22,8 +22,8 @@ import (
 	"io"
 	"text/template"
 
-	clidynamic "sigs.k8s.io/cli-experimental/internal/pkg/apis/dynamic/v1alpha1"
-	"sigs.k8s.io/cli-experimental/internal/pkg/dy/parse"
+	clidynamic "sigs.k8s.io/cli-utils/internal/pkg/apis/dynamic/v1alpha1"
+	"sigs.k8s.io/cli-utils/internal/pkg/dy/parse"
 )
 
 // CommandOutputWriter writes command Response values

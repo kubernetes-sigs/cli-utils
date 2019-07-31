@@ -25,12 +25,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
-	clidynamic "sigs.k8s.io/cli-experimental/internal/pkg/apis/dynamic/v1alpha1"
+	clidynamic "sigs.k8s.io/cli-utils/internal/pkg/apis/dynamic/v1alpha1"
 	"sigs.k8s.io/yaml"
 )
 
 const (
-	annotation = "cli-experimental.sigs.k8s.io/ResourceCommandList"
+	annotation = "cli-utils.sigs.k8s.io/ResourceCommandList"
 	label      = annotation
 )
 

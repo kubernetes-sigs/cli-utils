@@ -17,7 +17,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	helperu "sigs.k8s.io/cli-experimental/internal/pkg/client/unstructured"
+	helperu "sigs.k8s.io/cli-utils/internal/pkg/client/unstructured"
 )
 
 var testObj = map[string]interface{}{

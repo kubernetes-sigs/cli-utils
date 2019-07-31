@@ -23,18 +23,18 @@ kubectl apply -f .sample/cli_v1alpha1_clitestresource.yaml
 
 ### List the Commands from the cli
 
-New `cli-experimental create deployment` Command will now appear in help
+New `cli-utils create deployment` Command will now appear in help
 
 ```bash
-cli-experimental -h
+cli-utils -h
 ```
 
 ```bash
-cli-experimental create -h
+cli-utils create -h
 ```
 
 ```bash
-cli-experimental deployment -h
+cli-utils deployment -h
 ```
 
 ### Run the Command in dry-run
@@ -42,7 +42,7 @@ cli-experimental deployment -h
 Run the command, but print the Resources rather than creating them.
 
 ```bash
-cli-experimental create deployment --image ubuntu --name foo --dry-run
+cli-utils create deployment --image ubuntu --name foo --dry-run
 ```
 
 ### Run the Command
@@ -50,7 +50,7 @@ cli-experimental create deployment --image ubuntu --name foo --dry-run
 Run the command to create the Resources.
 
 ```bash
-cli-experimental create deployment --image ubuntu --name foo
+cli-utils create deployment --image ubuntu --name foo
 ```
 
 ## Publishing a Command
@@ -80,5 +80,5 @@ kubectl apply -f path/to/crd.yaml
 ### Run the new Command
 
 ```bash
-cli-experimental your command -h
+cli-utils your command -h
 ```
