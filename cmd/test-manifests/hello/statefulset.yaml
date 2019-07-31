@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  #finalizers:
+  #- sigapps.k8s.io/cleanup
+  name: web
+  labels:
+    app: nginx
+spec:
+  serviceName: "nginx"
+  selector:
+    matchLabels:
+      app: nginx
+  replicas: 10
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: k8s.gcr.io/nginx-slim:0.8
+        ports:
+        - containerPort: 80
+          name: web
+  volumeClaimTemplates:

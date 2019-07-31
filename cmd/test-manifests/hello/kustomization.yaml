@@ -1,0 +1,13 @@
+commonLabels:
+  app: hello
+
+namespace: default
+resources:
+- pod.yaml
+- configmap.yaml
+- statefulset.yaml
+- deployment.yaml
+# TODO add these
+#- daemonset.yaml
+#- service.yaml
+#- job.yaml

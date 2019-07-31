@@ -1,0 +1,14 @@
+# go build binaries
+main
+cli-utils
+dyctl
+
+#intellij
+.idea/
+*.iml
+
+# scripts/verify.sh creates a vendor for metalinter
+vendor/
+
+# go artifacts
+cover.out
