@@ -68,11 +68,15 @@ var _ = Describe("Patch", func() {
 		unstructuredCRD = &unstructured.Unstructured{}
 		modifiedCRD = &unstructured.Unstructured{}
 		scheme = kscheme.Scheme
-		scheme.Convert(dep, unstructuredDeployment, nil)
-		scheme.Convert(dep, unstructuredCRD, nil)
+		err := scheme.Convert(dep, unstructuredDeployment, nil)
+		Expect(err).NotTo(HaveOccurred())
+		err = scheme.Convert(dep, unstructuredCRD, nil)
+		Expect(err).NotTo(HaveOccurred())
 		dep.Spec.Template.Spec.Containers[0].Image = "nginx23"
-		scheme.Convert(dep, modifiedDeployment, nil)
-		scheme.Convert(dep, modifiedCRD, nil)
+		err = scheme.Convert(dep, modifiedDeployment, nil)
+		Expect(err).NotTo(HaveOccurred())
+		err = scheme.Convert(dep, modifiedCRD, nil)
+		Expect(err).NotTo(HaveOccurred())
 		modifiedDeployment.SetGroupVersionKind(schema.GroupVersionKind{
 			Group:   "apps",
 			Kind:    "Deployment",

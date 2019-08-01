@@ -91,7 +91,7 @@ func GetClientSideApplyPatch(current, desired runtime.Object) (Patch, error) {
 		if err != nil {
 			return patch, err
 		}
-	case err != nil:
+	default:
 		return patch, err
 	}
 	return patch, nil

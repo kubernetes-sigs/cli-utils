@@ -41,7 +41,7 @@ with commands apply, prune, delete and dynamic commands`,
 	rootCmd.AddCommand(prune.GetPruneCommand(os.Args))
 	rootCmd.AddCommand(delete.GetDeleteCommand(os.Args))
 	wirek8s.Flags(rootCmd.PersistentFlags())
-	rootCmd.PersistentFlags().Set("namespace", "default")
+	rootCmd.PersistentFlags().Set("namespace", "default") //nolint
 
 	// Add dynamic Commands published by CRDs as go-templates
 	b, err := dy.InitializeCommandBuilder(rootCmd.OutOrStdout(), args)

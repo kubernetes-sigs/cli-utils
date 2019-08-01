@@ -65,7 +65,10 @@ func (uc *client) Create(ctx context.Context, obj runtime.Object, options *metav
 // create Creates an object using dynamic client
 func (uc *client) create(_ context.Context, obj runtime.Object, recordPatch bool, options *metav1.CreateOptions) error {
 	if recordPatch {
-		patch.SetLastApplied(obj)
+		err := patch.SetLastApplied(obj)
+		if err != nil {
+			return err
+		}
 	}
 	u, r, err := uc.resourceInterface(obj, "")
 	if err != nil {

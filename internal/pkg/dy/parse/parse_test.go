@@ -32,9 +32,10 @@ func TestParseDryRunFlag(t *testing.T) {
 
 	assert.Equal(t, false, *values.Flags.Bools["dry-run"])
 	// Check the flags get updated
-	cobracmd.Flags().Parse([]string{
+	err := cobracmd.Flags().Parse([]string{
 		"--dry-run",
 	})
+	assert.NoError(t, err)
 	assert.Equal(t, true, *values.Flags.Bools["dry-run"])
 }
 
@@ -73,9 +74,10 @@ func TestCommandParser_Parse_StringFlags(t *testing.T) {
 	assert.Equal(t, "", *values.Flags.Strings["string-flag-3"])
 
 	// Check the flags get updated
-	cobracmd.Flags().Parse([]string{
+	err := cobracmd.Flags().Parse([]string{
 		"--string-flag-1=foo 1",
 	})
+	assert.NoError(t, err)
 	assert.Equal(t, "foo 1", *values.Flags.Strings["string-flag-1"])
 	assert.Equal(t, "hello world 2", *values.Flags.Strings["string-flag-2"])
 	assert.Equal(t, "", *values.Flags.Strings["string-flag-3"])
@@ -116,13 +118,14 @@ func TestCommandParser_Parse_StringSliceFlags(t *testing.T) {
 	assert.Equal(t, []string(nil), *values.Flags.StringSlices["string-slice-flag-3"])
 
 	// Check the flags get updated
-	cobracmd.Flags().Parse([]string{
+	err := cobracmd.Flags().Parse([]string{
 		"--string-slice-flag-1=foo1",
 		"--string-slice-flag-1=bar1",
 		"--string-slice-flag-1=11",
 		"--string-slice-flag-3=foo3",
 		"--string-slice-flag-3=baz3",
 	})
+	assert.NoError(t, err)
 	assert.Equal(t, []string{"foo1", "bar1", "11"}, *values.Flags.StringSlices["string-slice-flag-1"])
 	assert.Equal(t, []string{"hello2", "world2"}, *values.Flags.StringSlices["string-slice-flag-2"])
 	assert.Equal(t, []string{"foo3", "baz3"}, *values.Flags.StringSlices["string-slice-flag-3"])
@@ -163,10 +166,11 @@ func TestCommandParser_Parse_IntFlags(t *testing.T) {
 	assert.Equal(t, int32(0), *values.Flags.Ints["int-flag-3"])
 
 	// Check the flags get updated
-	cobracmd.Flags().Parse([]string{
+	err := cobracmd.Flags().Parse([]string{
 		"--int-flag-1=10",
 		"--int-flag-3=3",
 	})
+	assert.NoError(t, err)
 	assert.Equal(t, int32(10), *values.Flags.Ints["int-flag-1"])
 	assert.Equal(t, int32(2), *values.Flags.Ints["int-flag-2"])
 	assert.Equal(t, int32(3), *values.Flags.Ints["int-flag-3"])
@@ -207,10 +211,11 @@ func TestCommandParser_Parse_FloatFlags(t *testing.T) {
 	assert.Equal(t, 0.0, *values.Flags.Floats["float-flag-3"])
 
 	// Check the flags get updated
-	cobracmd.Flags().Parse([]string{
+	err := cobracmd.Flags().Parse([]string{
 		"--float-flag-1=10.10",
 		"--float-flag-3=3.3",
 	})
+	assert.NoError(t, err)
 	assert.Equal(t, 10.10, *values.Flags.Floats["float-flag-1"])
 	assert.Equal(t, 2.2, *values.Flags.Floats["float-flag-2"])
 	assert.Equal(t, 3.3, *values.Flags.Floats["float-flag-3"])
@@ -251,10 +256,11 @@ func TestCommandParser_Parse_BoolFlags(t *testing.T) {
 	assert.Equal(t, false, *values.Flags.Bools["bool-flag-3"])
 
 	// Check the flags get updated
-	cobracmd.Flags().Parse([]string{
+	err := cobracmd.Flags().Parse([]string{
 		"--bool-flag-1=false",
 		"--bool-flag-3=true",
 	})
+	assert.NoError(t, err)
 	assert.Equal(t, false, *values.Flags.Bools["bool-flag-1"])
 	assert.Equal(t, false, *values.Flags.Bools["bool-flag-2"])
 	assert.Equal(t, true, *values.Flags.Bools["bool-flag-3"])
@@ -311,13 +317,15 @@ func TestCommandParser_Parse_RequiredFlags(t *testing.T) {
 	}
 	cobracmd, _ := instance.Parse(cmd)
 	cobracmd.Run = func(cmd *cobra.Command, args []string) {}
-	cobracmd.Flags().Parse([]string{})
-	err := cobracmd.Execute()
+	err := cobracmd.Flags().Parse([]string{})
+	assert.NoError(t, err)
+	err = cobracmd.Execute()
 	assert.Error(t, err)
 
 	cobracmd, _ = instance.Parse(cmd)
 	cobracmd.Run = func(cmd *cobra.Command, args []string) {}
-	cobracmd.Flags().Parse([]string{"--float-flag-1=10.10"})
+	err = cobracmd.Flags().Parse([]string{"--float-flag-1=10.10"})
+	assert.NoError(t, err)
 	err = cobracmd.Execute()
 	assert.NoError(t, err)
 }

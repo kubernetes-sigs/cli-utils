@@ -116,8 +116,6 @@ func (a *Status) Do() Result {
 		err := a.DynamicClient.Get(ctx,
 			types.NamespacedName{Namespace: u.GetNamespace(), Name: u.GetName()}, u)
 		if err != nil {
-			if errors.IsNotFound(err) {
-			}
 			rs = append(rs, ResourceStatus{Resource: u, Error: err})
 			continue
 		}

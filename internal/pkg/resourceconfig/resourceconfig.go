@@ -75,10 +75,7 @@ func (p *KustomizeProvider) IsSupported(path string) bool {
 		}
 	}()
 
-	if err != nil {
-		return false
-	}
-	return true
+	return err == nil
 }
 
 // GetConfig returns the resource configs

@@ -76,8 +76,8 @@ func (p *CommandParser) Parse(cmd *clidynamic.Command) (*cobra.Command, Values) 
 			// Create a bool flag and register it
 			values.Flags.Bools[cmdFlag.Name] = cbra.Flags().Bool(cmdFlag.Name, cmdFlag.BoolValue, cmdFlag.Description)
 		}
-		if cmdFlag.Required != nil && *cmdFlag.Required == true {
-			cbra.MarkFlagRequired(cmdFlag.Name)
+		if cmdFlag.Required != nil && *cmdFlag.Required {
+			cbra.MarkFlagRequired(cmdFlag.Name)  //nolint
 		}
 	}
 
@@ -144,7 +144,7 @@ func AddAtPath(root, subcmd *cobra.Command, path []string) {
 			}
 		}
 
-		if found == false {
+		if !found {
 			// Missing, create the sub-command
 			cbra := &cobra.Command{Use: p}
 			next.AddCommand(cbra)
