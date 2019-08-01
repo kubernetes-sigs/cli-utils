@@ -36,5 +36,5 @@ var ProviderSet = wire.NewSet(
 func NewRestConfig() (*rest.Config, func(), error) {
 	e := envtest.Environment{}
 	c, err := e.Start()
-	return c, func() { e.Stop() }, err
+	return c, func() { e.Stop() }, err  //nolint
 }

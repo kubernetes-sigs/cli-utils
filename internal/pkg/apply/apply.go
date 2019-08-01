@@ -118,7 +118,10 @@ func mergeContentAnnotation(newObj, oldObj *unstructured.Unstructured) (*unstruc
 	newInv.Previous.Merge(oldInv.Current)
 
 	annotations := newObj.GetAnnotations()
-	newInv.UpdateAnnotations(annotations)
+	err = newInv.UpdateAnnotations(annotations)
+	if err != nil {
+		return nil, err
+	}
 	newObj.SetAnnotations(annotations)
 	return newObj, nil
 }

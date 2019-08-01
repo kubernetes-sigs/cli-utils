@@ -34,5 +34,5 @@ var _ = BeforeSuite(func(done Done) {
 }, 60)
 
 var _ = AfterSuite(func() {
-	testenv.Stop()
+	testenv.Stop()  //nolint
 })

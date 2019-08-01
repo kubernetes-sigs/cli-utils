@@ -87,7 +87,7 @@ func (b *CommandBuilder) build(cmd *v1alpha1.ResourceCommand) *cobra.Command {
 		}
 
 		// Write the output
-		if values.IsDryRun() != true {
+		if !values.IsDryRun() {
 			return b.Writer.Write(cmd, &values)
 		}
 		return nil

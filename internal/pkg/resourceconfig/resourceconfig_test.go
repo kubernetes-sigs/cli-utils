@@ -147,9 +147,9 @@ key: value
 	assert.NoError(t, err)
 	err = ioutil.WriteFile(filepath.Join(f, "service.yaml"), []byte(serviceA), 0644)
 	assert.NoError(t, err)
-	subdir1, err := ioutil.TempDir(f, "subdir")
+	subdir1, err := ioutil.TempDir(f, "subdir1")
 	assert.NoError(t, err)
-	subdir2, err := ioutil.TempDir(f, "subdir")
+	subdir2, err := ioutil.TempDir(f, "subdir2")
 	assert.NoError(t, err)
 	err = ioutil.WriteFile(filepath.Join(subdir1, "service.yaml"), []byte(
 		serviceB + "\n---\n" + cm), 0644)

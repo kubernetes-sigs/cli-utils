@@ -68,7 +68,7 @@ func NewConfigFlags(ar util.Args) (*configflags.ConfigFlags, error) {
 	kubeConfigFlagSet := pflag.NewFlagSet("dispatcher-kube-config", pflag.ContinueOnError)
 	kubeConfigFlagSet.ParseErrorsWhitelist.UnknownFlags = true
 	kubeConfigFlagSet.SetNormalizeFunc(WordSepNormalizeFunc)
-	kubeConfigFlagSet.Set("namespace", "default")
+	kubeConfigFlagSet.Set("namespace", "default") //nolint
 
 	unusedParameter := true // Could be either true or false
 	kubeConfigFlags := configflags.NewConfigFlags(unusedParameter)

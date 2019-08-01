@@ -72,10 +72,7 @@ func MatchAnnotations(u *unstructured.Unstructured, annotations map[string]strin
 		return false
 	}
 	s := labels.SelectorFromSet(labels.Set(annotations))
-	if s.Matches(labels.Set(u.GetAnnotations())) {
-		return true
-	}
-	return false
+	return s.Matches(labels.Set(u.GetAnnotations()))
 }
 
 // HasAnnotation checks if an unstructured has a given annotation key
@@ -85,8 +82,5 @@ func HasAnnotation(u *unstructured.Unstructured, key string) bool {
 		return false
 	}
 	_, ok := annotation[key]
-	if ok {
-		return true
-	}
-	return false
+	return ok
 }
