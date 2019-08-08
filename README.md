@@ -1,6 +1,6 @@
 # cli-utils
 
-This repo will contains binaries that built from libraries in cli-runtime.
+This repo will contains binaries that built from libraries in cli-utils and cli-runtime.
 
 ## commands
 This repo can build a binary `cli-utils` by
@@ -68,7 +68,7 @@ import (
 ```
 
  ## Examples
-TODO: add examples
+Here is a list of [examples](docs/README.md) for using the binary.
 
 ## Community, discussion, contribution, and support
 
