@@ -8,6 +8,7 @@ package wirestatus
 import (
 	"io"
 	"sigs.k8s.io/cli-utils/internal/pkg/clik8s"
+	"sigs.k8s.io/cli-utils/internal/pkg/resourceconfig"
 	"sigs.k8s.io/cli-utils/internal/pkg/status"
 	"sigs.k8s.io/cli-utils/internal/pkg/util"
 	"sigs.k8s.io/cli-utils/internal/pkg/wirecli/wireconfig"
@@ -43,7 +44,9 @@ func InitializeStatus(resourceConfigPath clik8s.ResourceConfigPath, writer io.Wr
 	fileSystem := wireconfig.NewFileSystem()
 	transformerFactory := wireconfig.NewTransformerFactory()
 	kustomizeProvider := wireconfig.NewKustomizeProvider(factory, fileSystem, transformerFactory, pluginConfig)
-	resourceConfigs, err := wireconfig.NewResourceConfig(resourceConfigPath, kustomizeProvider)
+	rawConfigFileProvider := &resourceconfig.RawConfigFileProvider{}
+	configProvider := wireconfig.NewConfigProvider(resourceConfigPath, kustomizeProvider, rawConfigFileProvider)
+	resourceConfigs, err := wireconfig.NewResourceConfig(resourceConfigPath, configProvider)
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +88,9 @@ func DoStatus(resourceConfigPath clik8s.ResourceConfigPath, writer io.Writer, ar
 	fileSystem := wireconfig.NewFileSystem()
 	transformerFactory := wireconfig.NewTransformerFactory()
 	kustomizeProvider := wireconfig.NewKustomizeProvider(factory, fileSystem, transformerFactory, pluginConfig)
-	resourceConfigs, err := wireconfig.NewResourceConfig(resourceConfigPath, kustomizeProvider)
+	rawConfigFileProvider := &resourceconfig.RawConfigFileProvider{}
+	configProvider := wireconfig.NewConfigProvider(resourceConfigPath, kustomizeProvider, rawConfigFileProvider)
+	resourceConfigs, err := wireconfig.NewResourceConfig(resourceConfigPath, configProvider)
 	if err != nil {
 		return status.Result{}, err
 	}

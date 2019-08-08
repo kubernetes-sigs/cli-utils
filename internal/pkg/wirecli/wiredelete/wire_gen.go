@@ -9,6 +9,7 @@ import (
 	"io"
 	"sigs.k8s.io/cli-utils/internal/pkg/clik8s"
 	delete2 "sigs.k8s.io/cli-utils/internal/pkg/delete"
+	"sigs.k8s.io/cli-utils/internal/pkg/resourceconfig"
 	"sigs.k8s.io/cli-utils/internal/pkg/util"
 	"sigs.k8s.io/cli-utils/internal/pkg/wirecli/wireconfig"
 	"sigs.k8s.io/cli-utils/internal/pkg/wirecli/wiregit"
@@ -43,7 +44,9 @@ func DoDelete(resourceConfigPath clik8s.ResourceConfigPath, writer io.Writer, ar
 	fileSystem := wireconfig.NewFileSystem()
 	transformerFactory := wireconfig.NewTransformerFactory()
 	kustomizeProvider := wireconfig.NewKustomizeProvider(factory, fileSystem, transformerFactory, pluginConfig)
-	resourceConfigs, err := wireconfig.NewResourceConfig(resourceConfigPath, kustomizeProvider)
+	rawConfigFileProvider := &resourceconfig.RawConfigFileProvider{}
+	configProvider := wireconfig.NewConfigProvider(resourceConfigPath, kustomizeProvider, rawConfigFileProvider)
+	resourceConfigs, err := wireconfig.NewResourceConfig(resourceConfigPath, configProvider)
 	if err != nil {
 		return delete2.Result{}, err
 	}
