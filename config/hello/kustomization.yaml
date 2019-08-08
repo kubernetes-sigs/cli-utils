@@ -1,0 +1,10 @@
+commonLabels:
+  app: hello
+
+namespace: default
+resources:
+- pod.yaml
+- configmap.yaml
+- statefulset.yaml
+- deployment.yaml
+

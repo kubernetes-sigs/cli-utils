@@ -1,0 +1,16 @@
+commonLabels:
+  app: hello
+
+namespace: default
+resources:
+- pod.yaml
+- configmap.yaml
+- statefulset.yaml
+- deployment.yaml
+
+inventory:
+  type: ConfigMap
+  configMap:
+    name: prune-cm-name
+    namespace: default
+
