@@ -15,8 +15,11 @@ git:
 
 go_import_path: sigs.k8s.io/cli-utils
 
-install:
+before_install:
   - curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh| sh -s -- -b $(go env GOPATH)/bin v1.17.1
+
+install:
+  -
 
 script:
   - TRACE=1 ./scripts/check-everything.sh

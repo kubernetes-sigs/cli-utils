@@ -22,5 +22,4 @@ setup_envs
 
 header_text "running go test"
 
-go test ./... -parallel 4
-
+go test ./...
