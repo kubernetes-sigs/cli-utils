@@ -20,7 +20,6 @@ cli-utils apply status config/hello
 
 The output is like the following
 ```
-2019/08/07 16:38:04 nil value at `volumeClaimTemplates[].metadata.labels` ignored in mutation attempt
 Pod/myapp-pod   Ready
 ConfigMap/example-cfgmap   Ready
 StatefulSet/web   Pending Replicas: 4/10
