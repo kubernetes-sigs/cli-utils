@@ -9,6 +9,7 @@ import (
 	"io"
 	"sigs.k8s.io/cli-utils/internal/pkg/clik8s"
 	"sigs.k8s.io/cli-utils/internal/pkg/prune"
+	"sigs.k8s.io/cli-utils/internal/pkg/resourceconfig"
 	"sigs.k8s.io/cli-utils/internal/pkg/util"
 	"sigs.k8s.io/cli-utils/internal/pkg/wirecli/wireconfig"
 	"sigs.k8s.io/cli-utils/internal/pkg/wirecli/wiregit"
@@ -43,7 +44,9 @@ func DoPrune(resourceConfigPath clik8s.ResourceConfigPath, writer io.Writer, arg
 	fileSystem := wireconfig.NewFileSystem()
 	transformerFactory := wireconfig.NewTransformerFactory()
 	kustomizeProvider := wireconfig.NewKustomizeProvider(factory, fileSystem, transformerFactory, pluginConfig)
-	resourcePruneConfigs, err := wireconfig.NewResourcePruneConfig(resourceConfigPath, kustomizeProvider)
+	rawConfigFileProvider := &resourceconfig.RawConfigFileProvider{}
+	configProvider := wireconfig.NewConfigProvider(resourceConfigPath, kustomizeProvider, rawConfigFileProvider)
+	resourcePruneConfigs, err := wireconfig.NewResourcePruneConfig(resourceConfigPath, configProvider)
 	if err != nil {
 		return prune.Result{}, err
 	}

@@ -64,7 +64,7 @@ func InitializePrune(clik8s.ResourcePruneConfigs, *object.Commit, io.Writer) (*p
 }
 
 func InitializConfigProvider() resourceconfig.ConfigProvider {
-	panic(wire.Build(wireconfig.ConfigProviderSet))
+	panic(wire.Build(wireconfig.KustomizeConfigProviderSet))
 }
 
 func InitializeRawConfigProvider() resourceconfig.ConfigProvider {

@@ -33,20 +33,35 @@ import (
 
 // ConfigProviderSet defines dependencies for initializing ConfigProvider
 var ConfigProviderSet = wire.NewSet(
-	NewPluginConfig,
-	NewResMapFactory,
-	NewTransformerFactory,
-	NewFileSystem,
-	NewKustomizeProvider,
-	wire.Bind(new(resourceconfig.ConfigProvider), new(*resourceconfig.KustomizeProvider)),
+	KustomizeConfigProvider,
+	RawYAMLConfigProvider,
+	NewConfigProvider,
 	NewResourceConfig,
 	NewResourcePruneConfig,
 )
+
+var KustomizeConfigProviderSet = wire.NewSet(
+	KustomizeConfigProvider,
+	wire.Bind(new(resourceconfig.ConfigProvider),
+		new(*resourceconfig.KustomizeProvider)),
+	)
 
 // RawConfigProviderSet defines dependencies for initializing a RawConfigFileProvider
 var RawConfigProviderSet = wire.NewSet(
 	wire.Struct(new(resourceconfig.RawConfigFileProvider), "*"),
 	wire.Bind(new(resourceconfig.ConfigProvider), new(*resourceconfig.RawConfigFileProvider)),
+)
+
+var KustomizeConfigProvider = wire.NewSet(
+	NewPluginConfig,
+	NewResMapFactory,
+	NewTransformerFactory,
+	NewFileSystem,
+	NewKustomizeProvider,
+)
+
+var RawYAMLConfigProvider = wire.NewSet(
+	wire.Struct(new(resourceconfig.RawConfigFileProvider), "*"),
 )
 
 // NewPluginConfig returns a new PluginConfig
@@ -105,4 +120,17 @@ func NewResourcePruneConfig(rcp clik8s.ResourceConfigPath,
 	}
 
 	return nil, nil
+}
+
+func NewConfigProvider(rcp clik8s.ResourceConfigPath,
+	kcf *resourceconfig.KustomizeProvider, rcf *resourceconfig.RawConfigFileProvider) resourceconfig.ConfigProvider {
+	p := string(rcp)
+
+	if kcf.IsSupported(p) {
+		return kcf
+	}
+	if rcf.IsSupported(p) {
+		return rcf
+	}
+	return nil
 }
