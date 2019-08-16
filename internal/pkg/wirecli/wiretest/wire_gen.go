@@ -315,3 +315,40 @@ namespace: default
 		os.RemoveAll(f2)
 	}, nil
 }
+
+func InitializeRawConfigs() (string, func(), error) {
+	f, err := ioutil.TempDir("/tmp", "TestApply")
+	if err != nil {
+		return "", nil, err
+	}
+	err = ioutil.WriteFile(filepath.Join(f, "resources.yaml"), []byte(`apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+  namespace: default
+  labels:
+    app: nginx
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:1.7.9
+        ports:
+        - containerPort: 80
+`), 0644)
+	if err != nil {
+		return "", nil, err
+	}
+
+	return f, func() {
+		os.RemoveAll(f)
+	}, nil
+}

@@ -53,3 +53,20 @@ func TestApply(t *testing.T) {
 	assert.NoError(t, cmd.Execute())
 	assert.Equal(t, "Doing `cli-utils apply`\napplied ConfigMap/inventory\napplied ConfigMap/test-map-k6tb869f64\nResources: 2\n", buf.String()) // nolint
 }
+
+func TestApplyRawConfigs(t *testing.T) {
+	buf := new(bytes.Buffer)
+	f, cleanup, err := wiretest.InitializeRawConfigs()
+	defer cleanup()
+	assert.NoError(t, err)
+	assert.NotEmpty(t, f)
+
+	args := []string{fmt.Sprintf("--server=%s", host), f}
+	cmd := apply.GetApplyCommand(args)
+	cmd.SetOutput(buf)
+	cmd.SetArgs(args)
+	wirek8s.Flags(cmd.PersistentFlags())
+
+	assert.NoError(t, cmd.Execute())
+	assert.Equal(t, "Doing `cli-utils apply`\napplied Deployment/nginx-deployment\nResources: 1\n", buf.String()) // nolint
+}
