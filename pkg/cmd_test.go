@@ -16,6 +16,8 @@ package pkg
 import (
 	"bytes"
 	"context"
+	"fmt"
+	"k8s.io/apimachinery/pkg/types"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -166,4 +168,122 @@ func TestCmd(t *testing.T) {
 	err = c.List(context.Background(), cmList, "default", nil)
 	assert.NoError(t, err)
 	assert.Equal(t, len(cmList.Items), 0)
+}
+
+func setupResourcesCRD() []*unstructured.Unstructured {
+	r1 := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "apiextensions.k8s.io/v1beta1",
+			"kind": "CustomResourceDefinition",
+			"metadata": map[string]interface{}{
+				"name": "applications.app.k8s.io",
+			},
+			"spec": map[string]interface{}{
+				"group": "app.k8s.io",
+				"versions": []interface{}{
+					map[string]interface{}{
+						"name": "v1beta1",
+						"served": true,
+						"storage": true,
+					},
+				},
+				"scope": "Namespaced",
+				"names": map[string]interface{}{
+					"plural": "applications",
+					"singular": "application",
+					"kind": "Application",
+				},
+			},
+		},
+	}
+	return []*unstructured.Unstructured{r1}
+}
+
+func setupResourcesCR() []*unstructured.Unstructured {
+	r := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "app.k8s.io/v1beta1",
+			"kind": "Application",
+			"metadata": map[string]interface{}{
+				"name": "demo-app",
+				"namespace": "kalm-e2e",
+			},
+			"spec": map[string]interface{}{
+				"uri": "some uri",
+				"Command": "some command",
+				"image": "my-image",
+			},
+		},
+	}
+	return []*unstructured.Unstructured{r}
+}
+
+func setupNamespace() []*unstructured.Unstructured {
+	namespace := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "v1",
+			"kind":       "Namespace",
+			"metadata": map[string]interface{}{
+				"name": "kalm-e2e",
+			},
+		},
+	}
+	return []*unstructured.Unstructured{namespace}
+}
+
+func TestCmdForCRD(t *testing.T) {
+	buf := new(bytes.Buffer)
+	cmd, done, err := InitializeFakeCmd(buf, nil)
+	defer done()
+	assert.NoError(t, err)
+	assert.NotNil(t, cmd)
+
+	crdList := &unstructured.UnstructuredList{}
+	crdList.SetGroupVersionKind(schema.GroupVersionKind{
+		Kind:    "CustomResourceDefinitionList",
+		Version: "v1beta1",
+		Group: "apiextensions.k8s.io",
+	})
+
+	c := cmd.Applier.DynamicClient
+	err = c.List(context.Background(), crdList, "", nil)
+	assert.NoError(t, err)
+	assert.Equal(t, len(crdList.Items), 0)
+
+	resources := setupResourcesCRD()
+	err = cmd.Apply(resources)
+	assert.NoError(t, err)
+
+	err = c.List(context.Background(), crdList, "", nil)
+	assert.NoError(t, err)
+	assert.Equal(t, len(crdList.Items), 1)
+	fmt.Println("Successfully installed the CRD")
+
+	namespaces := setupNamespace()
+	err = cmd.Apply(namespaces)
+	assert.NoError(t, err)
+
+	resources = setupResourcesCR()
+	err = cmd.Apply(resources)
+	assert.NoError(t, err)
+
+	// make sure the Application CR is successfully applied
+	obj := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "app.k8s.io/v1beta1",
+			"kind":       "Application",
+			"metadata": map[string]interface{}{
+				"name": "demo-app",
+				"namespace": "kalm-e2e",
+			},
+		},
+	}
+	err = cmd.Applier.DynamicClient.Get(context.TODO(), types.NamespacedName{
+		Name: "demo-app",
+		Namespace: "kalm-e2e",
+	}, obj)
+	if err != nil {
+		t.Fatalf("not able to get the application %v", err)
+	}
+	fmt.Println("Successfully created the application")
 }
