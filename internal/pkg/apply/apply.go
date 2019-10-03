@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/cli-utils/internal/pkg/client"
 	"sigs.k8s.io/cli-utils/internal/pkg/clik8s"
@@ -46,13 +47,15 @@ type Apply struct {
 	// Commit is a git commit object
 	Commit *object.Commit
 
-	// TODO: add prune and dry-run flags here
+	Prune bool
 }
 
 // Result contains the Apply Result
 type Result struct {
 	Resources clik8s.ResourceConfigs
 }
+
+const InventoryId = "config.k8s.io/InventoryId"
 
 // Do executes the apply
 func (a *Apply) Do() (Result, error) {
@@ -62,6 +65,7 @@ func (a *Apply) Do() (Result, error) {
 	// When the dry-run passes, proceed to the actual apply
 
 	var director *unstructured.Unstructured
+	var currentInv *unstructured.Unstructured
 	var inventoryRef *metav1.OwnerReference
 	for _, u := range normalizeResourceOrdering(a.Resources) {
 		if util.HasAnnotation(u, inventory.ContentAnnotation) {
@@ -79,6 +83,9 @@ func (a *Apply) Do() (Result, error) {
 					director.SetGroupVersionKind(u.GroupVersionKind())
 					director.SetNamespace(u.GetNamespace())
 					director.SetName(u.GetName())
+					inventoryId := createUniqueId()
+					annotations := map[string]string{InventoryId: inventoryId}
+					director.SetAnnotations(annotations)
 					err = a.DynamicClient.Create(context.Background(), director, &metav1.CreateOptions{})
 					if err != nil {
 						fmt.Fprintf(a.Out, "Failed to create inventory director: %v\n", err)
@@ -91,7 +98,13 @@ func (a *Apply) Do() (Result, error) {
 			a.addOwnerReference(u, *directorRef)
 			suffix := createUniqueId()
 			u.SetName(u.GetName() + "-" + suffix)
-			// director.Items = append([]unstructured.Unstructured{*u}, director.Items...)
+			inventoryId := director.GetAnnotations()[InventoryId]
+			labels := u.GetLabels()
+			if labels == nil {
+				labels = make(map[string]string)
+			}
+			labels[InventoryId] = inventoryId
+			u.SetLabels(labels)
 		} else if inventoryRef != nil {
 			a.addOwnerReference(u, *inventoryRef)
 		}
@@ -105,15 +118,46 @@ func (a *Apply) Do() (Result, error) {
 
 		// Create after applying, so the UID field is included.
 		if util.HasAnnotation(u, inventory.ContentAnnotation) {
+			currentInv = u
 			inventoryRef = createOwnerReference(u)
 		}
 	}
+
+	a.prune(director, currentInv)
+
 	return Result{Resources: a.Resources}, nil
+}
+
+func (a *Apply) prune(director *unstructured.Unstructured, currentInv *unstructured.Unstructured) {
+	if a.Prune && director != nil && currentInv != nil {
+		fmt.Fprintf(a.Out, "Pruning...")
+		annotations := director.GetAnnotations()
+		if annotations == nil {
+			fmt.Errorf("Inventory director missing InventoryId annotation")
+			return
+		}
+		if inventoryId, ok := annotations[InventoryId]; ok {
+			selector := fmt.Sprintf("%s=%s", InventoryId, inventoryId)
+			listOptions := &metav1.ListOptions{LabelSelector: selector}
+			prevInventory := &unstructured.UnstructuredList{}
+			prevInventory.SetGroupVersionKind(schema.GroupVersionKind{
+				Kind:    "ConfigMapList",
+				Version: "v1",
+			})
+			err := a.DynamicClient.List(context.Background(), prevInventory,
+				director.GetNamespace(), listOptions)
+			if err != nil {
+				fmt.Errorf("Error retrieving previous inventory objects: %#v", err)
+				return
+			}
+			fmt.Fprintf(a.Out, "Retrieved %d previous inventory objects\n", len(prevInventory.Items))
+		}
+	}
 }
 
 // createUniqueId creates a string from the current Unix time.
 func createUniqueId() string {
-	// TODO: probably change this to a random number
+	// TODO: probably change this to a random number/string
 	nanoSeconds := time.Now().UnixNano()
 	return strconv.FormatInt(nanoSeconds, 10) // base 10
 }
