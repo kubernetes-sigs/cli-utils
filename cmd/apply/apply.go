@@ -42,6 +42,7 @@ is used.
 	}
 
 	cmd.Flags().Bool("prune", false, "Declarative delete.")
+	cmd.Flags().Bool("dry-run", false, "Do not actually persist applied/deleted resources.")
 
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
 		for i := range args {
@@ -49,11 +50,17 @@ is used.
 			if err != nil {
 				return err
 			}
+
 			prune, perr := cmd.Flags().GetBool("prune")
 			if perr != nil {
 				return perr
 			}
 			apply.Prune = prune
+			dryRun, derr := cmd.Flags().GetBool("dry-run")
+			if derr != nil {
+				return derr
+			}
+			apply.DryRun = dryRun
 
 			r, aerr := wireapply.NewApplyCommandResult(apply, cmd.OutOrStdout())
 			if aerr != nil {

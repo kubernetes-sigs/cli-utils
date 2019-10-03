@@ -48,6 +48,8 @@ type Apply struct {
 	Commit *object.Commit
 
 	Prune bool
+
+	DryRun bool
 }
 
 // Result contains the Apply Result
@@ -61,8 +63,9 @@ const InventoryId = "config.k8s.io/InventoryId"
 func (a *Apply) Do() (Result, error) {
 	fmt.Fprintf(a.Out, "Doing `cli-utils apply`\n")
 
-	// TODO(Liuijngfang1): add a dry-run for all objects
-	// When the dry-run passes, proceed to the actual apply
+	if a.DryRun {
+		fmt.Fprintf(a.Out, "Dry Run...not actually persisting\n")
+	}
 
 	var director *unstructured.Unstructured
 	var currentInv *unstructured.Unstructured
@@ -79,19 +82,11 @@ func (a *Apply) Do() (Result, error) {
 					break
 				}
 				if err != nil && errors.IsNotFound(err) {
-					director = &unstructured.Unstructured{}
-					director.SetGroupVersionKind(u.GroupVersionKind())
-					director.SetNamespace(u.GetNamespace())
-					director.SetName(u.GetName())
-					inventoryId := createUniqueId()
-					annotations := map[string]string{InventoryId: inventoryId}
-					director.SetAnnotations(annotations)
-					err = a.DynamicClient.Create(context.Background(), director, &metav1.CreateOptions{})
+					director, err = a.createInventoryDirector(u)
 					if err != nil {
-						fmt.Fprintf(a.Out, "Failed to create inventory director: %v\n", err)
+						fmt.Fprintf(a.Out, "Failure creating inventory director: %v\n", err)
 						break
 					}
-					fmt.Fprintf(a.Out, "Created inventory director: %s/%s\n", director.GetKind(), u.GetName())
 				}
 			}
 			directorRef := createOwnerReference(director)
@@ -109,10 +104,12 @@ func (a *Apply) Do() (Result, error) {
 			a.addOwnerReference(u, *inventoryRef)
 		}
 
-		err := a.DynamicClient.Apply(context.Background(), u)
-		if err != nil {
-			fmt.Fprintf(a.Out, "failed to apply the object: %s/%s: %v\n", u.GetKind(), u.GetName(), err)
-			continue
+		if !a.DryRun {
+			err := a.DynamicClient.Apply(context.Background(), u)
+			if err != nil {
+				fmt.Fprintf(a.Out, "failed to apply the object: %s/%s: %v\n", u.GetKind(), u.GetName(), err)
+				continue
+			}
 		}
 		fmt.Fprintf(a.Out, "applied %s/%s\n", u.GetKind(), u.GetName())
 
@@ -126,6 +123,25 @@ func (a *Apply) Do() (Result, error) {
 	a.prune(director, currentInv)
 
 	return Result{Resources: a.Resources}, nil
+}
+
+func (a *Apply) createInventoryDirector(inv *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+	director := &unstructured.Unstructured{}
+	director.SetGroupVersionKind(inv.GroupVersionKind())
+	director.SetNamespace(inv.GetNamespace())
+	director.SetName(inv.GetName())
+	inventoryId := createUniqueId()
+	annotations := map[string]string{InventoryId: inventoryId}
+	director.SetAnnotations(annotations)
+	if !a.DryRun {
+		err := a.DynamicClient.Create(context.Background(), director, &metav1.CreateOptions{})
+		if err != nil {
+			return nil, err
+		}
+	}
+	fmt.Fprintf(a.Out, "Created inventory director: %s/%s\n", director.GetKind(), inv.GetName())
+
+	return director, nil
 }
 
 func (a *Apply) prune(director *unstructured.Unstructured, currentInv *unstructured.Unstructured) {
