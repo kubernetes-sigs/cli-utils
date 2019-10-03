@@ -133,7 +133,7 @@ func (a *Apply) prune(director *unstructured.Unstructured, currentInv *unstructu
 		fmt.Fprintf(a.Out, "Pruning...")
 		annotations := director.GetAnnotations()
 		if annotations == nil {
-			fmt.Errorf("Inventory director missing InventoryId annotation")
+			fmt.Fprintf(a.Out, "Error: Inventory director missing InventoryId annotation")
 			return
 		}
 		if inventoryId, ok := annotations[InventoryId]; ok {
@@ -147,10 +147,18 @@ func (a *Apply) prune(director *unstructured.Unstructured, currentInv *unstructu
 			err := a.DynamicClient.List(context.Background(), prevInventory,
 				director.GetNamespace(), listOptions)
 			if err != nil {
-				fmt.Errorf("Error retrieving previous inventory objects: %#v", err)
+				fmt.Fprintf(a.Out, "Error retrieving previous inventory objects: %#v", err)
 				return
 			}
 			fmt.Fprintf(a.Out, "Retrieved %d previous inventory objects\n", len(prevInventory.Items))
+			for _, inv := range prevInventory.Items {
+				if currentInv.GetUID() != inv.GetUID() {
+					err := a.DynamicClient.Delete(context.Background(), &inv, &metav1.DeleteOptions{})
+					if err != nil {
+						fmt.Fprintf(a.Out, "Error deleting inventory object: %#v", err)
+					}
+				}
+			}
 		}
 	}
 }

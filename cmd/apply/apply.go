@@ -41,11 +41,23 @@ is used.
 		Args: cobra.MinimumNArgs(1),
 	}
 
+	cmd.Flags().Bool("prune", false, "Declarative delete.")
+
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
 		for i := range args {
-			r, err := wireapply.DoApply(clik8s.ResourceConfigPath(args[i]), cmd.OutOrStdout(), a)
+			apply, err := wireapply.InitializeApply(clik8s.ResourceConfigPath(args[i]), cmd.OutOrStdout(), a)
 			if err != nil {
 				return err
+			}
+			prune, perr := cmd.Flags().GetBool("prune")
+			if perr != nil {
+				return perr
+			}
+			apply.Prune = prune
+
+			r, aerr := wireapply.NewApplyCommandResult(apply, cmd.OutOrStdout())
+			if aerr != nil {
+				return aerr
 			}
 			fmt.Fprintf(cmd.OutOrStdout(), "Resources: %v\n", len(r.Resources))
 		}
