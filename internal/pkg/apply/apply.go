@@ -47,8 +47,10 @@ type Apply struct {
 	// Commit is a git commit object
 	Commit *object.Commit
 
+	// Flag; deletes objects previously applied, but not applied currently.
 	Prune bool
 
+	// Flag; don't actually persist created/updated/deleted resources.
 	DryRun bool
 }
 
@@ -66,6 +68,7 @@ func (a *Apply) Do() (Result, error) {
 	if a.DryRun {
 		fmt.Fprintf(a.Out, "Dry Run...not actually persisting\n")
 	}
+	fmt.Fprintf(a.Out, "\n")
 
 	var director *unstructured.Unstructured
 	var currentInv *unstructured.Unstructured
@@ -74,9 +77,8 @@ func (a *Apply) Do() (Result, error) {
 		if util.HasAnnotation(u, inventory.ContentAnnotation) {
 			// Validate that i == 0
 			if director == nil {
-				director = u.DeepCopy()
-				err := a.DynamicClient.Get(context.Background(),
-					types.NamespacedName{Namespace: u.GetNamespace(), Name: u.GetName()}, director)
+				var err error
+				director, err = a.getInventoryDirector(u)
 				if err != nil && !errors.IsNotFound(err) {
 					fmt.Fprintf(a.Out, "Failure during inventory director search: %v\n", err)
 					break
@@ -111,7 +113,7 @@ func (a *Apply) Do() (Result, error) {
 				continue
 			}
 		}
-		fmt.Fprintf(a.Out, "applied %s/%s\n", u.GetKind(), u.GetName())
+		fmt.Fprintf(a.Out, "[applied] %s/%s\n", u.GetKind(), u.GetName())
 
 		// Create after applying, so the UID field is included.
 		if util.HasAnnotation(u, inventory.ContentAnnotation) {
@@ -123,6 +125,16 @@ func (a *Apply) Do() (Result, error) {
 	a.prune(director, currentInv)
 
 	return Result{Resources: a.Resources}, nil
+}
+
+func (a *Apply) getInventoryDirector(inv *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+	director := inv.DeepCopy()
+	err := a.DynamicClient.Get(context.Background(),
+		types.NamespacedName{Namespace: inv.GetNamespace(), Name: inv.GetName()}, director)
+	if err != nil {
+		return nil, err
+	}
+	return director, nil
 }
 
 func (a *Apply) createInventoryDirector(inv *unstructured.Unstructured) (*unstructured.Unstructured, error) {
@@ -139,7 +151,7 @@ func (a *Apply) createInventoryDirector(inv *unstructured.Unstructured) (*unstru
 			return nil, err
 		}
 	}
-	fmt.Fprintf(a.Out, "Created inventory director: %s/%s\n", director.GetKind(), inv.GetName())
+	fmt.Fprintf(a.Out, "[created] %s/%s\n", director.GetKind(), inv.GetName())
 
 	return director, nil
 }
