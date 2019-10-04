@@ -3,11 +3,8 @@
 
 namespace: default
 
-#commonLabels:
-#  prune-test: true
-
 resources:
-- pod-c.yaml
+- pod-a.yaml
 - pod-b.yaml
 
 inventory:

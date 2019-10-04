@@ -29,7 +29,9 @@ import (
 	"sigs.k8s.io/cli-utils/internal/pkg/client"
 	"sigs.k8s.io/cli-utils/internal/pkg/clik8s"
 	"sigs.k8s.io/cli-utils/internal/pkg/util"
+	"sigs.k8s.io/kustomize/pkg/gvk"
 	"sigs.k8s.io/kustomize/pkg/inventory"
+	"sigs.k8s.io/kustomize/pkg/resid"
 )
 
 // Apply applies directories
@@ -52,6 +54,12 @@ type Apply struct {
 
 	// Flag; don't actually persist created/updated/deleted resources.
 	DryRun bool
+
+	// List of previous inventory objects associated with director.
+	PrevInventory []*unstructured.Unstructured
+
+	// List of resources managed by previous inventory objects.
+	PrevResources map[resid.ResId]bool
 }
 
 // Result contains the Apply Result
@@ -66,12 +74,11 @@ func (a *Apply) Do() (Result, error) {
 	fmt.Fprintf(a.Out, "Doing `cli-utils apply`\n")
 
 	if a.DryRun {
-		fmt.Fprintf(a.Out, "Dry Run...not actually persisting\n")
+		fmt.Fprintf(a.Out, "\n**Dry Run...not actually persisting**\n")
 	}
 	fmt.Fprintf(a.Out, "\n")
 
 	var director *unstructured.Unstructured
-	var currentInv *unstructured.Unstructured
 	var inventoryRef *metav1.OwnerReference
 	for _, u := range normalizeResourceOrdering(a.Resources) {
 		if util.HasAnnotation(u, inventory.ContentAnnotation) {
@@ -90,6 +97,7 @@ func (a *Apply) Do() (Result, error) {
 						break
 					}
 				}
+				a.getPrevInventory(director)
 			}
 			directorRef := createOwnerReference(director)
 			a.addOwnerReference(u, *directorRef)
@@ -109,22 +117,95 @@ func (a *Apply) Do() (Result, error) {
 		if !a.DryRun {
 			err := a.DynamicClient.Apply(context.Background(), u)
 			if err != nil {
-				fmt.Fprintf(a.Out, "failed to apply the object: %s/%s: %v\n", u.GetKind(), u.GetName(), err)
+				fmt.Fprintf(a.Out, "failed to apply the object: %s/%s: %v\n",
+					u.GetKind(), u.GetName(), err)
 				continue
 			}
 		}
-		fmt.Fprintf(a.Out, "[applied] %s/%s\n", u.GetKind(), u.GetName())
+		// TODO: clean this conversion up
+		g := u.GroupVersionKind()
+		currentGvk := gvk.Gvk{
+			Group:   g.Group,
+			Version: g.Version,
+			Kind:    g.Kind,
+		}
+		currentResId := resid.NewResIdWithNamespace(currentGvk,
+			u.GetName(), u.GetNamespace())
+		if _, ok := a.PrevResources[currentResId]; ok {
+			a.PrevResources[currentResId] = false
+			fmt.Fprintf(a.Out, "[updated] %s/%s\n", u.GetKind(), u.GetName())
+		} else {
+			fmt.Fprintf(a.Out, "[created] %s/%s\n", u.GetKind(), u.GetName())
+		}
 
 		// Create after applying, so the UID field is included.
 		if util.HasAnnotation(u, inventory.ContentAnnotation) {
-			currentInv = u
 			inventoryRef = createOwnerReference(u)
 		}
 	}
 
-	a.prune(director, currentInv)
+	if a.Prune {
+		for resId, exists := range a.PrevResources {
+			if exists {
+				fmt.Fprintf(a.Out, "[deleted] %s/%s\n", resId.Gvk.Kind, resId.Name)
+			}
+		}
+		a.prune()
+	} else {
+		for resId, exists := range a.PrevResources {
+			if exists {
+				fmt.Fprintf(a.Out, "[unmodified] %s/%s\n", resId.Gvk.Kind, resId.Name)
+			}
+		}
+	}
 
 	return Result{Resources: a.Resources}, nil
+}
+
+// Gets and stores the previous inventory objects in the Apply struct.
+func (a *Apply) getPrevInventory(director *unstructured.Unstructured) error {
+	// Get the director InventoryId annotation to identify inventory objects.
+	annotations := director.GetAnnotations()
+	if annotations == nil {
+		return fmt.Errorf("Inventory director missing `InventoryId` annotation")
+	}
+	if _, ok := annotations[InventoryId]; !ok {
+		return fmt.Errorf("Inventory director missing `InventoryId` annotation")
+	}
+	inventoryId := annotations[InventoryId]
+
+	// Retrieve inventory object with the InventoryId label.
+	selector := fmt.Sprintf("%s=%s", InventoryId, inventoryId)
+	listOptions := &metav1.ListOptions{LabelSelector: selector}
+	prevInventory := &unstructured.UnstructuredList{}
+	prevInventory.SetGroupVersionKind(schema.GroupVersionKind{
+		Kind:    "ConfigMapList",
+		Version: "v1",
+	})
+	err := a.DynamicClient.List(context.Background(), prevInventory,
+		director.GetNamespace(), listOptions)
+	if err != nil {
+		return fmt.Errorf("Error etrieving previous inventory objects: %#v", err)
+	}
+	// Store the resource ids from each inventory object.
+	for _, inv := range prevInventory.Items {
+		newInv := inventory.NewInventory()
+		err := newInv.LoadFromAnnotation(inv.GetAnnotations())
+		if err != nil {
+			return err
+		}
+		for resId, _ := range newInv.Current {
+			//fmt.Fprintf(a.Out, "Storing resource id: %s\n", resId.String())
+			if a.PrevResources == nil {
+				a.PrevResources = make(map[resid.ResId]bool)
+			}
+			a.PrevResources[resId] = true
+		}
+		// Store the previous inventory object also.
+		a.PrevInventory = append(a.PrevInventory, &inv)
+	}
+
+	return nil
 }
 
 func (a *Apply) getInventoryDirector(inv *unstructured.Unstructured) (*unstructured.Unstructured, error) {
@@ -156,38 +237,16 @@ func (a *Apply) createInventoryDirector(inv *unstructured.Unstructured) (*unstru
 	return director, nil
 }
 
-func (a *Apply) prune(director *unstructured.Unstructured, currentInv *unstructured.Unstructured) {
-	if a.Prune && director != nil && currentInv != nil {
-		fmt.Fprintf(a.Out, "Pruning...")
-		annotations := director.GetAnnotations()
-		if annotations == nil {
-			fmt.Fprintf(a.Out, "Error: Inventory director missing InventoryId annotation")
-			return
-		}
-		if inventoryId, ok := annotations[InventoryId]; ok {
-			selector := fmt.Sprintf("%s=%s", InventoryId, inventoryId)
-			listOptions := &metav1.ListOptions{LabelSelector: selector}
-			prevInventory := &unstructured.UnstructuredList{}
-			prevInventory.SetGroupVersionKind(schema.GroupVersionKind{
-				Kind:    "ConfigMapList",
-				Version: "v1",
-			})
-			err := a.DynamicClient.List(context.Background(), prevInventory,
-				director.GetNamespace(), listOptions)
+func (a *Apply) prune() {
+	for _, inv := range a.PrevInventory {
+		// TODO: Look closer at DeleteOptions; esp. DeletePropogation
+		if !a.DryRun {
+			err := a.DynamicClient.Delete(context.Background(), inv, &metav1.DeleteOptions{})
 			if err != nil {
-				fmt.Fprintf(a.Out, "Error retrieving previous inventory objects: %#v", err)
-				return
-			}
-			fmt.Fprintf(a.Out, "Retrieved %d previous inventory objects\n", len(prevInventory.Items))
-			for _, inv := range prevInventory.Items {
-				if currentInv.GetUID() != inv.GetUID() {
-					err := a.DynamicClient.Delete(context.Background(), &inv, &metav1.DeleteOptions{})
-					if err != nil {
-						fmt.Fprintf(a.Out, "Error deleting inventory object: %#v", err)
-					}
-				}
+				fmt.Fprintf(a.Out, "Error deleting inventory object: %#v", err)
 			}
 		}
+		fmt.Fprintf(a.Out, "[deleted:meta] %s/%s\n", inv.GetKind(), inv.GetName())
 	}
 }
 
