@@ -56,7 +56,7 @@ type Apply struct {
 	DryRun bool
 
 	// List of previous inventory objects associated with director.
-	PrevInventory []*unstructured.Unstructured
+	PrevInventory []unstructured.Unstructured
 
 	// List of resources managed by previous inventory objects.
 	PrevResources map[resid.ResId]bool
@@ -195,14 +195,13 @@ func (a *Apply) getPrevInventory(director *unstructured.Unstructured) error {
 			return err
 		}
 		for resId, _ := range newInv.Current {
-			//fmt.Fprintf(a.Out, "Storing resource id: %s\n", resId.String())
 			if a.PrevResources == nil {
 				a.PrevResources = make(map[resid.ResId]bool)
 			}
 			a.PrevResources[resId] = true
 		}
 		// Store the previous inventory object also.
-		a.PrevInventory = append(a.PrevInventory, &inv)
+		a.PrevInventory = append(a.PrevInventory, inv)
 	}
 
 	return nil
@@ -239,14 +238,14 @@ func (a *Apply) createInventoryDirector(inv *unstructured.Unstructured) (*unstru
 
 func (a *Apply) prune() {
 	for _, inv := range a.PrevInventory {
+		fmt.Fprintf(a.Out, "[deleted:meta] %s/%s\n", inv.GetKind(), inv.GetName())
 		// TODO: Look closer at DeleteOptions; esp. DeletePropogation
 		if !a.DryRun {
-			err := a.DynamicClient.Delete(context.Background(), inv, &metav1.DeleteOptions{})
+			err := a.DynamicClient.Delete(context.Background(), &inv, &metav1.DeleteOptions{})
 			if err != nil {
 				fmt.Fprintf(a.Out, "Error deleting inventory object: %#v", err)
 			}
 		}
-		fmt.Fprintf(a.Out, "[deleted:meta] %s/%s\n", inv.GetKind(), inv.GetName())
 	}
 }
 
