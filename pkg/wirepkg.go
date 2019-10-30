@@ -28,7 +28,7 @@ var ProviderSet = wire.NewSet(
 	wire.Struct(new(apply.Apply), "DynamicClient", "Out"),
 	wire.Struct(new(prune.Prune), "DynamicClient", "Out"),
 	wire.Struct(new(delete.Delete), "DynamicClient", "Out"),
-	wire.Struct(new(status.Status), "DynamicClient", "Out"),
+	wire.Struct(new(status.Resolver), "DynamicClient"),
 	wire.Struct(new(Cmd), "*"),
 	wirek8s.ProviderSet,
 )
@@ -38,7 +38,7 @@ var ProviderSetForTesting = wire.NewSet(
 	wiretest.NewRestConfig, wirek8s.NewClient, wirek8s.NewRestMapper,
 	wire.Struct(new(apply.Apply), "DynamicClient", "Out"),
 	wire.Struct(new(prune.Prune), "DynamicClient", "Out"),
-	wire.Struct(new(status.Status), "DynamicClient", "Out"),
+	wire.Struct(new(status.Resolver), "DynamicClient"),
 	wire.Struct(new(delete.Delete), "DynamicClient", "Out"),
 	wire.Struct(new(Cmd), "*"),
 )

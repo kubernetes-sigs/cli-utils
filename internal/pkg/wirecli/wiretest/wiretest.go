@@ -29,7 +29,7 @@ import (
 var ProviderSet = wire.NewSet(
 	dy.ProviderSet, wirek8s.NewKubernetesClientSet, wirek8s.NewExtensionsClientSet, wirek8s.NewDynamicClient,
 	NewRestConfig, wirek8s.NewClient, wirek8s.NewRestMapper,
-	wire.Struct(new(status.Status), "*"), wire.Struct(new(apply.Apply), "*"),
+	wire.Struct(new(status.Resolver), "*"), wire.Struct(new(apply.Apply), "*"),
 	wire.Struct(new(delete.Delete), "*"), wire.Struct(new(prune.Prune), "*"))
 
 // NewRestConfig provides a rest.Config for a testing environment

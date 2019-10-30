@@ -12,16 +12,17 @@ require (
 	github.com/go-logr/zapr v0.1.1 // indirect
 	github.com/go-openapi/spec v0.19.0 // indirect
 	github.com/gogo/protobuf v1.2.1 // indirect
-	github.com/golang/mock v1.2.0 // indirect
 	github.com/google/btree v1.0.0 // indirect
 	github.com/google/wire v0.2.2-0.20190423202733-d079521b6f51
 	github.com/googleapis/gnostic v0.2.0 // indirect
 	github.com/gophercloud/gophercloud v0.0.0-20190328150603-33e54f40ffcf // indirect
 	github.com/gregjones/httpcache v0.0.0-20190212212710-3befbb6ad0cc // indirect
-	github.com/grpc-ecosystem/grpc-gateway v1.6.2 // indirect
+	github.com/grpc-ecosystem/grpc-gateway v1.11.3 // indirect
 	github.com/imdario/mergo v0.3.7 // indirect
 	github.com/json-iterator/go v1.1.6 // indirect
+	github.com/mattn/go-runewidth v0.0.5 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
+	github.com/olekukonko/tablewriter v0.0.1
 	github.com/onsi/ginkgo v1.8.0
 	github.com/onsi/gomega v1.5.0
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect

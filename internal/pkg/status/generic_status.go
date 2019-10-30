@@ -14,46 +14,44 @@ limitations under the License.
 package status
 
 import (
+	"fmt"
+
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	clientu "sigs.k8s.io/cli-utils/internal/pkg/client/unstructured"
 )
 
-// readyConditionReader reads Ready condition from the unstructured object
-func readyConditionReader(u *unstructured.Unstructured) ([]Condition, error) {
-	rv := []Condition{}
-	ready := false
+// checkGenericProperties look at the common properties for k8s resources. We
+// make these checks before looking at type-specific properties.
+// Currently this only checks generation and observedGeneration, but when
+// we have a set of standard conditions for CRDs (and eventually the built-in
+// types), these could be added here.
+func checkGenericProperties(u *unstructured.Unstructured) (*Result, error) {
 	obj := u.UnstructuredContent()
+
+	// Check if the resource is scheduled for deletion
+	deletionTimestamp, found, err := unstructured.NestedString(obj, "metadata", "deletionTimestamp")
+	if err != nil {
+		return nil, fmt.Errorf("unable to fetch deletionTimestamp from resource: %v", err)
+	}
+	if found && deletionTimestamp != "" {
+		return &Result{
+			Status: TerminatingStatus,
+			Message: "Resource scheduled for deletion",
+			Conditions: []Condition{},
+		}, nil
+	}
 
 	// ensure that the meta generation is observed
 	metaGeneration := clientu.GetIntField(obj, ".metadata.generation", -1)
 	observedGeneration := clientu.GetIntField(obj, ".status.observedGeneration", metaGeneration)
 	if observedGeneration != metaGeneration {
-		reason := "Controller has not observed the latest change. Status generation does not match with metadata"
-		rv = append(rv, Condition{ConditionReady, "False", "", reason})
-		return rv, nil
+		message := fmt.Sprintf("%s generation is %d, but latest observed generation is %d", u.GetKind(), metaGeneration, observedGeneration)
+		return &Result{
+			Status: InProgressStatus,
+			Message: message,
+			Conditions: []Condition{newInProgressCondition("LatestGenerationNotObserved", message)},
+		}, nil
 	}
 
-	// Conditions
-	objc := clientu.GetObjectWithConditions(obj)
-	for _, c := range objc.Status.Conditions {
-		switch c.Type {
-		case "Ready":
-			ready = true
-			if c.Status == "False" {
-				rv = append(rv, Condition{ConditionReady, "False", c.Reason, c.Message})
-			} else {
-				rv = append(rv, Condition{ConditionReady, "True", c.Reason, c.Message})
-			}
-		}
-	}
-	if !ready {
-		rv = append(rv, Condition{ConditionReady, "True", "NoReadyCondition", "No Ready condition found in status"})
-	}
-
-	return rv, nil
-}
-
-// GetGenericConditionsFn Return a function that returns condition for an unstructured object
-func GetGenericConditionsFn(u *unstructured.Unstructured) GetConditionsFn {
-	return readyConditionReader
+	return nil, nil
 }

@@ -14,12 +14,11 @@ limitations under the License.
 package status_test
 
 import (
-	"bytes"
 	"testing"
 
 	"github.com/ghodss/yaml"
 	"github.com/stretchr/testify/assert"
-	"gopkg.in/src-d/go-git.v4/plumbing/object"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/cli-utils/internal/pkg/clik8s"
 	"sigs.k8s.io/cli-utils/internal/pkg/status"
@@ -39,12 +38,48 @@ func y2u(t *testing.T, spec string) *unstructured.Unstructured {
 }
 
 func TestEmptyStatus(t *testing.T) {
-	buf := new(bytes.Buffer)
-	a, done, err := wiretest.InitializeStatus(noitems(), &object.Commit{}, buf)
+	a, done, err := wiretest.InitializeStatus()
 	defer done()
 	assert.NoError(t, err)
-	r := a.Do()
-	assert.Equal(t, status.Result{Resources: []status.ResourceStatus{}}, r)
+	r := a.FetchResourcesAndGetStatus(noitems())
+	var expected []status.ResourceResult
+	assert.Equal(t, expected, r)
+}
+
+type testSpec struct {
+	spec string
+	expectedStatus status.Status
+	expectedConditions []status.Condition
+	absentConditionTypes []status.ConditionType
+}
+
+func runStatusTest(t *testing.T, tc testSpec) {
+	res, err := status.GetStatus(y2u(t, tc.spec))
+	assert.NoError(t, err)
+	assert.Equal(t, tc.expectedStatus, res.Status)
+
+	for _, expectedCondition := range tc.expectedConditions {
+		found := false
+		for _, condition := range res.Conditions {
+			if condition.Type != expectedCondition.Type {
+				continue
+			}
+			found = true
+			assert.Equal(t, expectedCondition.Status, condition.Status)
+			assert.Equal(t, expectedCondition.Reason, condition.Reason)
+		}
+		if !found {
+			t.Errorf("Expected condition of type %s, but didn't find it", expectedCondition.Type)
+		}
+	}
+
+	for _, absentConditionType := range tc.absentConditionTypes {
+		for _, condition := range res.Conditions {
+			if condition.Type == absentConditionType {
+				t.Errorf("Expected condition %s to be absent, but found it", absentConditionType)
+			}
+		}
+	}
 }
 
 var podNoStatus = `
@@ -98,53 +133,56 @@ status:
 
 // Test coverage using GetConditions
 func TestPodStatus(t *testing.T) {
-	r, err := status.GetConditions(y2u(t, podNoStatus))
-	assert.NoError(t, err)
-	ready := status.GetCondition(r, status.ConditionReady)
-	assert.NotEqual(t, nil, ready)
-	assert.Equal(t, "False", ready.Status)
-	assert.Equal(t, "Phase: unknown", ready.Message)
-	condition := status.GetCondition(r, status.ConditionCompleted)
-	assert.Equal(t, (*status.Condition)(nil), condition)
-	condition = status.GetCondition(r, status.ConditionFailed)
-	assert.Equal(t, (*status.Condition)(nil), condition)
+	testCases := map[string]testSpec{
+		"podNoStatus": {
+			spec: podNoStatus,
+			expectedStatus: status.InProgressStatus,
+			expectedConditions: []status.Condition{{
+				Type: status.ConditionInProgress,
+				Status: corev1.ConditionTrue,
+				Reason: "PodNotReady",
+			}},
+			absentConditionTypes: []status.ConditionType{
+				status.ConditionFailed,
+			},
+		},
+		"podReady": {
+			spec: podReady,
+			expectedStatus: status.CurrentStatus,
+			expectedConditions: []status.Condition{},
+			absentConditionTypes: []status.ConditionType{
+				status.ConditionInProgress,
+				status.ConditionFailed,
+			},
+		},
+		"podCompletedSuccessfully": {
+			spec: podCompletedOK,
+			expectedStatus: status.CurrentStatus,
+			expectedConditions: []status.Condition{},
+			absentConditionTypes: []status.ConditionType{
+				status.ConditionInProgress,
+				status.ConditionFailed,
+			},
+		},
+		"podCompletedFailed": {
+			spec: podCompletedFail,
+			expectedStatus: status.FailedStatus,
+			expectedConditions: []status.Condition{{
+				Type: status.ConditionFailed,
+				Status: corev1.ConditionTrue,
+				Reason: "PodFailed",
+			}},
+			absentConditionTypes: []status.ConditionType{
+				status.ConditionInProgress,
+			},
+		},
+	}
 
-	r, err = status.GetConditions(y2u(t, podReady))
-	assert.NoError(t, err)
-	ready = status.GetCondition(r, status.ConditionReady)
-	assert.NotEqual(t, nil, ready)
-	assert.Equal(t, "True", ready.Status)
-	assert.Equal(t, "Phase: Running", ready.Message)
-	condition = status.GetCondition(r, status.ConditionCompleted)
-	assert.Equal(t, (*status.Condition)(nil), condition)
-	condition = status.GetCondition(r, status.ConditionFailed)
-	assert.Equal(t, (*status.Condition)(nil), condition)
-
-	r, err = status.GetConditions(y2u(t, podCompletedOK))
-	assert.NoError(t, err)
-	ready = status.GetCondition(r, status.ConditionReady)
-	assert.NotEqual(t, nil, ready)
-	assert.Equal(t, "True", ready.Status)
-	assert.Equal(t, "Phase: Succeeded, PodCompleted", ready.Message)
-	condition = status.GetCondition(r, status.ConditionCompleted)
-	assert.NotEqual(t, nil, condition)
-	assert.Equal(t, "True", condition.Status)
-	assert.Equal(t, "Pod Succeeded", condition.Message)
-	condition = status.GetCondition(r, status.ConditionFailed)
-	assert.Equal(t, (*status.Condition)(nil), condition)
-
-	r, err = status.GetConditions(y2u(t, podCompletedFail))
-	assert.NoError(t, err)
-	ready = status.GetCondition(r, status.ConditionReady)
-	assert.NotEqual(t, nil, ready)
-	assert.Equal(t, "True", ready.Status)
-	assert.Equal(t, "Phase: Failed, PodCompleted", ready.Message)
-	condition = status.GetCondition(r, status.ConditionCompleted)
-	assert.Equal(t, (*status.Condition)(nil), condition)
-	condition = status.GetCondition(r, status.ConditionFailed)
-	assert.NotEqual(t, nil, condition)
-	assert.Equal(t, "True", condition.Status)
-	assert.Equal(t, "Pod phase: Failed", condition.Message)
+	for tn, tc := range testCases {
+		t.Run(tn, func(t *testing.T) {
+			runStatusTest(t, tc)
+		})
+	}
 }
 
 var pvcNoStatus = `
@@ -163,37 +201,36 @@ status:
    phase: Bound
 `
 
-var pvcUnBound = `
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-   name: test
-   namespace: qual
-status:
-   phase: UnBound
-`
-
 func TestPVCStatus(t *testing.T) {
-	r, err := status.GetConditions(y2u(t, pvcNoStatus))
-	assert.NoError(t, err)
-	ready := status.GetCondition(r, status.ConditionReady)
-	assert.NotEqual(t, nil, ready)
-	assert.Equal(t, "False", ready.Status)
-	assert.Equal(t, "PVC is not Bound. phase: unknown", ready.Message)
+	testCases := map[string]testSpec{
+		"pvcNoStatus": {
+			spec: pvcNoStatus,
+			expectedStatus: status.InProgressStatus,
+			expectedConditions: []status.Condition{{
+				Type: status.ConditionInProgress,
+				Status: corev1.ConditionTrue,
+				Reason: "NotBound",
+			}},
+			absentConditionTypes: []status.ConditionType{
+				status.ConditionFailed,
+			},
+		},
+		"pvcBound": {
+			spec: pvcBound,
+			expectedStatus: status.CurrentStatus,
+			expectedConditions: []status.Condition{},
+			absentConditionTypes: []status.ConditionType{
+				status.ConditionFailed,
+				status.ConditionInProgress,
+			},
+		},
+	}
 
-	r, err = status.GetConditions(y2u(t, pvcBound))
-	assert.NoError(t, err)
-	ready = status.GetCondition(r, status.ConditionReady)
-	assert.NotEqual(t, nil, ready)
-	assert.Equal(t, "True", ready.Status)
-	assert.Equal(t, "PVC is Bound", ready.Message)
-
-	r, err = status.GetConditions(y2u(t, pvcUnBound))
-	assert.NoError(t, err)
-	ready = status.GetCondition(r, status.ConditionReady)
-	assert.NotEqual(t, nil, ready)
-	assert.Equal(t, "False", ready.Status)
-	assert.Equal(t, "PVC is not Bound. phase: UnBound", ready.Message)
+	for tn, tc := range testCases {
+		t.Run(tn, func(t *testing.T) {
+			runStatusTest(t, tc)
+		})
+	}
 }
 
 var stsNoStatus = `
@@ -263,45 +300,71 @@ status:
 `
 
 func TestStsStatus(t *testing.T) {
-	r, err := status.GetConditions(y2u(t, stsNoStatus))
-	assert.NoError(t, err)
-	ready := status.GetCondition(r, status.ConditionReady)
-	assert.NotEqual(t, nil, ready)
-	assert.Equal(t, "False", ready.Status)
-	assert.Equal(t, "Controller has not observed the latest change. Status generation does not match with metadata", ready.Message)
-	assert.Equal(t, "NotObserved", ready.Reason)
+	testCases := map[string]testSpec{
+		"stsNoStatus": {
+			spec: stsNoStatus,
+			expectedStatus: status.InProgressStatus,
+			expectedConditions: []status.Condition{{
+				Type: status.ConditionInProgress,
+				Status: corev1.ConditionTrue,
+				Reason: "LessReplicas",
+			}},
+			absentConditionTypes: []status.ConditionType{
+				status.ConditionFailed,
+			},
+		},
+		"stsBadStatus": {
+			spec: stsBadStatus,
+			expectedStatus: status.InProgressStatus,
+			expectedConditions: []status.Condition{{
+				Type: status.ConditionInProgress,
+				Status: corev1.ConditionTrue,
+				Reason: "LessReplicas",
+			}},
+			absentConditionTypes: []status.ConditionType{
+				status.ConditionFailed,
+			},
+		},
+		"stsOK": {
+			spec: stsOK,
+			expectedStatus: status.CurrentStatus,
+			expectedConditions: []status.Condition{},
+			absentConditionTypes: []status.ConditionType{
+				status.ConditionFailed,
+				status.ConditionInProgress,
+			},
+		},
+		"stsLessReady": {
+			spec: stsLessReady,
+			expectedStatus: status.InProgressStatus,
+			expectedConditions: []status.Condition{{
+				Type: status.ConditionInProgress,
+				Status: corev1.ConditionTrue,
+				Reason: "LessReady",
+			}},
+			absentConditionTypes: []status.ConditionType{
+				status.ConditionFailed,
+			},
+		},
+		"stsLessCurrent": {
+			spec: stsLessCurrent,
+			expectedStatus: status.InProgressStatus,
+			expectedConditions: []status.Condition{{
+				Type: status.ConditionInProgress,
+				Status: corev1.ConditionTrue,
+				Reason: "LessCurrent",
+			}},
+			absentConditionTypes: []status.ConditionType{
+				status.ConditionFailed,
+			},
+		},
+	}
 
-	r, err = status.GetConditions(y2u(t, stsBadStatus))
-	assert.NoError(t, err)
-	ready = status.GetCondition(r, status.ConditionReady)
-	assert.NotEqual(t, nil, ready)
-	assert.Equal(t, "False", ready.Status)
-	assert.Equal(t, "LessReplicas", ready.Reason)
-	assert.Equal(t, "Waiting for requested replicas. Replicas: 0/1", ready.Message)
-
-	r, err = status.GetConditions(y2u(t, stsOK))
-	assert.NoError(t, err)
-	ready = status.GetCondition(r, status.ConditionReady)
-	assert.NotEqual(t, nil, ready)
-	assert.Equal(t, "True", ready.Status)
-	assert.Equal(t, "ReplicasOK", ready.Reason)
-	assert.Equal(t, "All replicas scheduled as expected. Replicas: 4", ready.Message)
-
-	r, err = status.GetConditions(y2u(t, stsLessReady))
-	assert.NoError(t, err)
-	ready = status.GetCondition(r, status.ConditionReady)
-	assert.NotEqual(t, nil, ready)
-	assert.Equal(t, "False", ready.Status)
-	assert.Equal(t, "LessReady", ready.Reason)
-	assert.Equal(t, "Waiting for replicas to become Ready. Ready: 2/4", ready.Message)
-
-	r, err = status.GetConditions(y2u(t, stsLessCurrent))
-	assert.NoError(t, err)
-	ready = status.GetCondition(r, status.ConditionReady)
-	assert.NotEqual(t, nil, ready)
-	assert.Equal(t, "False", ready.Status)
-	assert.Equal(t, "LessCurrent", ready.Reason)
-	assert.Equal(t, "Waiting for replicas to become current. current: 2/4", ready.Message)
+	for tn, tc := range testCases {
+		t.Run(tn, func(t *testing.T) {
+			runStatusTest(t, tc)
+		})
+	}
 }
 
 var dsNoStatus = `
@@ -371,40 +434,71 @@ status:
 `
 
 func TestDaemonsetStatus(t *testing.T) {
-	r, err := status.GetConditions(y2u(t, dsNoStatus))
-	assert.NoError(t, err)
-	ready := status.GetCondition(r, status.ConditionReady)
-	assert.NotEqual(t, nil, ready)
-	assert.Equal(t, "False", ready.Status)
-	assert.Equal(t, "Controller has not observed the latest change. Status generation does not match with metadata", ready.Message)
+	testCases := map[string]testSpec{
+		"dsNoStatus": {
+			spec: dsNoStatus,
+			expectedStatus: status.InProgressStatus,
+			expectedConditions: []status.Condition{{
+				Type: status.ConditionInProgress,
+				Status: corev1.ConditionTrue,
+				Reason: "NoDesiredNumber",
+			}},
+			absentConditionTypes: []status.ConditionType{
+				status.ConditionFailed,
+			},
+		},
+		"dsBadStatus": {
+			spec: dsBadStatus,
+			expectedStatus: status.InProgressStatus,
+			expectedConditions: []status.Condition{{
+				Type: status.ConditionInProgress,
+				Status: corev1.ConditionTrue,
+				Reason: "NoDesiredNumber",
+			}},
+			absentConditionTypes: []status.ConditionType{
+				status.ConditionFailed,
+			},
+		},
+		"dsOK": {
+			spec: dsOK,
+			expectedStatus: status.CurrentStatus,
+			expectedConditions: []status.Condition{},
+			absentConditionTypes: []status.ConditionType{
+				status.ConditionFailed,
+				status.ConditionInProgress,
+			},
+		},
+		"dsLessReady": {
+			spec: dsLessReady,
+			expectedStatus: status.InProgressStatus,
+			expectedConditions: []status.Condition{{
+				Type: status.ConditionInProgress,
+				Status: corev1.ConditionTrue,
+				Reason: "LessReady",
+			}},
+			absentConditionTypes: []status.ConditionType{
+				status.ConditionFailed,
+			},
+		},
+		"dsLessAvailable": {
+			spec: dsLessAvailable,
+			expectedStatus: status.InProgressStatus,
+			expectedConditions: []status.Condition{{
+				Type: status.ConditionInProgress,
+				Status: corev1.ConditionTrue,
+				Reason: "LessAvailable",
+			}},
+			absentConditionTypes: []status.ConditionType{
+				status.ConditionFailed,
+			},
+		},
+	}
 
-	r, err = status.GetConditions(y2u(t, dsBadStatus))
-	assert.NoError(t, err)
-	ready = status.GetCondition(r, status.ConditionReady)
-	assert.NotEqual(t, nil, ready)
-	assert.Equal(t, "False", ready.Status)
-	assert.Equal(t, "Missing .status.desiredNumberScheduled", ready.Message)
-
-	r, err = status.GetConditions(y2u(t, dsOK))
-	assert.NoError(t, err)
-	ready = status.GetCondition(r, status.ConditionReady)
-	assert.NotEqual(t, nil, ready)
-	assert.Equal(t, "True", ready.Status)
-	assert.Equal(t, "All replicas scheduled as expected. Replicas: 4", ready.Message)
-
-	r, err = status.GetConditions(y2u(t, dsLessReady))
-	assert.NoError(t, err)
-	ready = status.GetCondition(r, status.ConditionReady)
-	assert.NotEqual(t, nil, ready)
-	assert.Equal(t, "False", ready.Status)
-	assert.Equal(t, "Waiting for replicas to be ready. Ready: 2/4", ready.Message)
-
-	r, err = status.GetConditions(y2u(t, dsLessAvailable))
-	assert.NoError(t, err)
-	ready = status.GetCondition(r, status.ConditionReady)
-	assert.NotEqual(t, nil, ready)
-	assert.Equal(t, "False", ready.Status)
-	assert.Equal(t, "Waiting for replicas to be available. Available: 2/4", ready.Message)
+	for tn, tc := range testCases {
+		t.Run(tn, func(t *testing.T) {
+			runStatusTest(t, tc)
+		})
+	}
 }
 
 var depNoStatus = `
@@ -481,37 +575,59 @@ status:
 `
 
 func TestDeploymentStatus(t *testing.T) {
-	r, err := status.GetConditions(y2u(t, depNoStatus))
-	assert.NoError(t, err)
-	ready := status.GetCondition(r, status.ConditionReady)
-	assert.NotEqual(t, nil, ready)
-	assert.Equal(t, "False", ready.Status)
-	assert.Equal(t, "Controller has not observed the latest change. Status generation does not match with metadata", ready.Message)
-	assert.Equal(t, "NotObserved", ready.Reason)
+	testCases := map[string]testSpec{
+		"depNoStatus": {
+			spec: depNoStatus,
+			expectedStatus: status.InProgressStatus,
+			expectedConditions: []status.Condition{{
+				Type: status.ConditionInProgress,
+				Status: corev1.ConditionTrue,
+				Reason: "LessReplicas",
+			}},
+			absentConditionTypes: []status.ConditionType{
+				status.ConditionFailed,
+			},
+		},
+		"depOK": {
+			spec: depOK,
+			expectedStatus: status.CurrentStatus,
+			expectedConditions: []status.Condition{},
+			absentConditionTypes: []status.ConditionType{
+				status.ConditionFailed,
+				status.ConditionInProgress,
+			},
+		},
+		"depNotProgressing": {
+			spec: depNotProgressing,
+			expectedStatus: status.InProgressStatus,
+			expectedConditions: []status.Condition{{
+				Type: status.ConditionInProgress,
+				Status: corev1.ConditionTrue,
+				Reason: "ReplicaSetNotAvailable",
+			}},
+			absentConditionTypes: []status.ConditionType{
+				status.ConditionFailed,
+			},
+		},
+		"depNotAvailable": {
+			spec: depNotAvailable,
+			expectedStatus: status.InProgressStatus,
+			expectedConditions: []status.Condition{{
+				Type: status.ConditionInProgress,
+				Status: corev1.ConditionTrue,
+				Reason: "DeploymentNotAvailable",
+			}},
+			absentConditionTypes: []status.ConditionType{
+				status.ConditionFailed,
+			},
+		},
+	}
 
-	r, err = status.GetConditions(y2u(t, depOK))
-	assert.NoError(t, err)
-	ready = status.GetCondition(r, status.ConditionReady)
-	assert.NotEqual(t, nil, ready)
-	assert.Equal(t, "True", ready.Status)
-	assert.Equal(t, "ReplicasOK", ready.Reason)
-	assert.Equal(t, "Deployment is available. Replicas: 1", ready.Message)
-
-	r, err = status.GetConditions(y2u(t, depNotProgressing))
-	assert.NoError(t, err)
-	ready = status.GetCondition(r, status.ConditionReady)
-	assert.NotEqual(t, nil, ready)
-	assert.Equal(t, "False", ready.Status)
-	assert.Equal(t, "ReplicaSetNotAvailable", ready.Reason)
-	assert.Equal(t, "ReplicaSet not Available", ready.Message)
-
-	r, err = status.GetConditions(y2u(t, depNotAvailable))
-	assert.NoError(t, err)
-	ready = status.GetCondition(r, status.ConditionReady)
-	assert.NotEqual(t, nil, ready)
-	assert.Equal(t, "False", ready.Status)
-	assert.Equal(t, "DeploymentNotAvailable", ready.Reason)
-	assert.Equal(t, "Deployment not Available", ready.Message)
+	for tn, tc := range testCases {
+		t.Run(tn, func(t *testing.T) {
+			runStatusTest(t, tc)
+		})
+	}
 }
 
 var rsNoStatus = `
@@ -614,47 +730,80 @@ status:
 `
 
 func TestReplicasetStatus(t *testing.T) {
-	r, err := status.GetConditions(y2u(t, rsNoStatus))
-	assert.NoError(t, err)
-	ready := status.GetCondition(r, status.ConditionReady)
-	assert.NotEqual(t, nil, ready)
-	assert.Equal(t, "False", ready.Status)
-	assert.Equal(t, "Controller has not observed the latest change. Status generation does not match with metadata", ready.Message)
+	testCases := map[string]testSpec{
+		"rsNoStatus": {
+			spec: rsNoStatus,
+			expectedStatus: status.InProgressStatus,
+			expectedConditions: []status.Condition{{
+				Type: status.ConditionInProgress,
+				Status: corev1.ConditionTrue,
+				Reason: "LessLabelled",
+			}},
+			absentConditionTypes: []status.ConditionType{
+				status.ConditionFailed,
+			},
+		},
+		"rsOK1": {
+			spec: rsOK1,
+			expectedStatus: status.CurrentStatus,
+			expectedConditions: []status.Condition{},
+			absentConditionTypes: []status.ConditionType{
+				status.ConditionFailed,
+				status.ConditionInProgress,
+			},
+		},
+		"rsOK2": {
+			spec: rsOK2,
+			expectedStatus: status.CurrentStatus,
+			expectedConditions: []status.Condition{},
+			absentConditionTypes: []status.ConditionType{
+				status.ConditionFailed,
+				status.ConditionInProgress,
+			},
+		},
+		"rsLessAvailable": {
+			spec: rsLessAvailable,
+			expectedStatus: status.InProgressStatus,
+			expectedConditions: []status.Condition{{
+				Type: status.ConditionInProgress,
+				Status: corev1.ConditionTrue,
+				Reason: "LessAvailable",
+			}},
+			absentConditionTypes: []status.ConditionType{
+				status.ConditionFailed,
+			},
+		},
+		"rsLessReady": {
+			spec: rsLessReady,
+			expectedStatus: status.InProgressStatus,
+			expectedConditions: []status.Condition{{
+				Type: status.ConditionInProgress,
+				Status: corev1.ConditionTrue,
+				Reason: "LessReady",
+			}},
+			absentConditionTypes: []status.ConditionType{
+				status.ConditionFailed,
+			},
+		},
+		"rsReplicaFailure": {
+			spec: rsReplicaFailure,
+			expectedStatus: status.InProgressStatus,
+			expectedConditions: []status.Condition{{
+				Type: status.ConditionInProgress,
+				Status: corev1.ConditionTrue,
+				Reason: "ReplicaFailure",
+			}},
+			absentConditionTypes: []status.ConditionType{
+				status.ConditionFailed,
+			},
+		},
+	}
 
-	r, err = status.GetConditions(y2u(t, rsOK1))
-	assert.NoError(t, err)
-	ready = status.GetCondition(r, status.ConditionReady)
-	assert.NotEqual(t, nil, ready)
-	assert.Equal(t, "True", ready.Status)
-	assert.Equal(t, "ReplicaSet is available. Replicas: 2", ready.Message)
-
-	r, err = status.GetConditions(y2u(t, rsOK2))
-	assert.NoError(t, err)
-	ready = status.GetCondition(r, status.ConditionReady)
-	assert.NotEqual(t, nil, ready)
-	assert.Equal(t, "True", ready.Status)
-	assert.Equal(t, "ReplicaSet is available. Replicas: 2", ready.Message)
-
-	r, err = status.GetConditions(y2u(t, rsLessAvailable))
-	assert.NoError(t, err)
-	ready = status.GetCondition(r, status.ConditionReady)
-	assert.NotEqual(t, nil, ready)
-	assert.Equal(t, "False", ready.Status)
-	assert.Equal(t, "Waiting for all replicas to be available. Available: 2/4", ready.Message)
-
-	r, err = status.GetConditions(y2u(t, rsLessReady))
-	assert.NoError(t, err)
-	ready = status.GetCondition(r, status.ConditionReady)
-	assert.NotEqual(t, nil, ready)
-	assert.Equal(t, "False", ready.Status)
-	assert.Equal(t, "Waiting for all replicas to be ready. Ready: 2/4", ready.Message)
-
-	r, err = status.GetConditions(y2u(t, rsReplicaFailure))
-	assert.NoError(t, err)
-	ready = status.GetCondition(r, status.ConditionReady)
-	assert.NotEqual(t, nil, ready)
-	assert.Equal(t, "False", ready.Status)
-	assert.Equal(t, "Replica Failure condition. Check Pods", ready.Message)
+	for tn, tc := range testCases {
+		t.Run(tn, func(t *testing.T) {
+			runStatusTest(t, tc)
+		})
+	}
 }
 
 var pdbNoStatus = `
@@ -698,33 +847,56 @@ status:
 `
 
 func TestPDBStatus(t *testing.T) {
-	r, err := status.GetConditions(y2u(t, pdbNoStatus))
-	assert.NoError(t, err)
-	ready := status.GetCondition(r, status.ConditionReady)
-	assert.NotEqual(t, nil, ready)
-	assert.Equal(t, "False", ready.Status)
-	assert.Equal(t, "Missing or zero .status.desiredHealthy", ready.Reason)
+	testCases := map[string]testSpec{
+		"pdbNoStatus": {
+			spec: pdbNoStatus,
+			expectedStatus: status.InProgressStatus,
+			expectedConditions: []status.Condition{{
+				Type: status.ConditionInProgress,
+				Status: corev1.ConditionTrue,
+				Reason: "ZeroDesiredHealthy",
+			}},
+			absentConditionTypes: []status.ConditionType{
+				status.ConditionFailed,
+			},
+		},
+		"pdbOK1": {
+			spec: pdbOK1,
+			expectedStatus: status.CurrentStatus,
+			expectedConditions: []status.Condition{},
+			absentConditionTypes: []status.ConditionType{
+				status.ConditionFailed,
+				status.ConditionInProgress,
+			},
+		},
+		"pdbMoreHealthy": {
+			spec: pdbMoreHealthy,
+			expectedStatus: status.CurrentStatus,
+			expectedConditions: []status.Condition{},
+			absentConditionTypes: []status.ConditionType{
+				status.ConditionFailed,
+				status.ConditionInProgress,
+			},
+		},
+		"pdbLessHealthy": {
+			spec: pdbLessHealthy,
+			expectedStatus: status.InProgressStatus,
+			expectedConditions: []status.Condition{{
+				Type: status.ConditionInProgress,
+				Status: corev1.ConditionTrue,
+				Reason: "BudgetNotMet",
+			}},
+			absentConditionTypes: []status.ConditionType{
+				status.ConditionFailed,
+			},
+		},
+	}
 
-	r, err = status.GetConditions(y2u(t, pdbOK1))
-	assert.NoError(t, err)
-	ready = status.GetCondition(r, status.ConditionReady)
-	assert.NotEqual(t, nil, ready)
-	assert.Equal(t, "True", ready.Status)
-	assert.Equal(t, "Budget is met. Replicas: 2/2", ready.Reason)
-
-	r, err = status.GetConditions(y2u(t, pdbMoreHealthy))
-	assert.NoError(t, err)
-	ready = status.GetCondition(r, status.ConditionReady)
-	assert.NotEqual(t, nil, ready)
-	assert.Equal(t, "True", ready.Status)
-	assert.Equal(t, "Budget is met. Replicas: 4/2", ready.Reason)
-
-	r, err = status.GetConditions(y2u(t, pdbLessHealthy))
-	assert.NoError(t, err)
-	ready = status.GetCondition(r, status.ConditionReady)
-	assert.NotEqual(t, nil, ready)
-	assert.Equal(t, "False", ready.Status)
-	assert.Equal(t, "Budget not met. healthy replicas: 2/4", ready.Reason)
+	for tn, tc := range testCases {
+		t.Run(tn, func(t *testing.T) {
+			runStatusTest(t, tc)
+		})
+	}
 }
 
 var crdNoStatus = `
@@ -787,40 +959,62 @@ status:
 `
 
 func TestCRDGenericStatus(t *testing.T) {
-	r, err := status.GetConditions(y2u(t, crdNoStatus))
-	assert.NoError(t, err)
-	ready := status.GetCondition(r, status.ConditionReady)
-	assert.NotEqual(t, nil, ready)
-	assert.Equal(t, "True", ready.Status)
-	assert.Equal(t, "No Ready condition found in status", ready.Message)
+	testCases := map[string]testSpec{
+		"crdNoStatus": {
+			spec: crdNoStatus,
+			expectedStatus: status.UnknownStatus,
+			expectedConditions: []status.Condition{},
+			absentConditionTypes: []status.ConditionType{
+				status.ConditionFailed,
+				status.ConditionInProgress,
+			},
+		},
+		"crdReady": {
+			spec: crdReady,
+			expectedStatus: status.UnknownStatus,
+			expectedConditions: []status.Condition{},
+			absentConditionTypes: []status.ConditionType{
+				status.ConditionFailed,
+				status.ConditionInProgress,
+			},
+		},
+		"crdNotReady": {
+			spec: crdNotReady,
+			expectedStatus: status.UnknownStatus,
+			expectedConditions: []status.Condition{},
+			absentConditionTypes: []status.ConditionType{
+				status.ConditionFailed,
+				status.ConditionInProgress,
+			},
+		},
+		"crdNoCondition": {
+			spec: crdNoCondition,
+			expectedStatus: status.UnknownStatus,
+			expectedConditions: []status.Condition{},
+			absentConditionTypes: []status.ConditionType{
+				status.ConditionFailed,
+				status.ConditionInProgress,
+			},
+		},
+		"crdMismatchStatusGeneration": {
+			spec: crdMismatchStatusGeneration,
+			expectedStatus: status.InProgressStatus,
+			expectedConditions: []status.Condition{{
+				Type: status.ConditionInProgress,
+				Status: corev1.ConditionTrue,
+				Reason: "LatestGenerationNotObserved",
+			}},
+			absentConditionTypes: []status.ConditionType{
+				status.ConditionFailed,
+			},
+		},
+	}
 
-	r, err = status.GetConditions(y2u(t, crdReady))
-	assert.NoError(t, err)
-	ready = status.GetCondition(r, status.ConditionReady)
-	assert.NotEqual(t, nil, ready)
-	assert.Equal(t, "True", ready.Status)
-	assert.Equal(t, "All looks ok", ready.Message)
-
-	r, err = status.GetConditions(y2u(t, crdNotReady))
-	assert.NoError(t, err)
-	ready = status.GetCondition(r, status.ConditionReady)
-	assert.NotEqual(t, nil, ready)
-	assert.Equal(t, "False", ready.Status)
-	assert.Equal(t, "", ready.Message)
-
-	r, err = status.GetConditions(y2u(t, crdNoCondition))
-	assert.NoError(t, err)
-	ready = status.GetCondition(r, status.ConditionReady)
-	assert.NotEqual(t, nil, ready)
-	assert.Equal(t, "True", ready.Status)
-	assert.Equal(t, "No Ready condition found in status", ready.Message)
-
-	r, err = status.GetConditions(y2u(t, crdMismatchStatusGeneration))
-	assert.NoError(t, err)
-	ready = status.GetCondition(r, status.ConditionReady)
-	assert.NotEqual(t, nil, ready)
-	assert.Equal(t, "False", ready.Status)
-	assert.Equal(t, "Controller has not observed the latest change. Status generation does not match with metadata", ready.Message)
+	for tn, tc := range testCases {
+		t.Run(tn, func(t *testing.T) {
+			runStatusTest(t, tc)
+		})
+	}
 }
 
 var jobNoStatus = `
@@ -883,45 +1077,56 @@ status:
 `
 
 func TestJobStatus(t *testing.T) {
-	r, err := status.GetConditions(y2u(t, jobNoStatus))
-	assert.NoError(t, err)
-	ready := status.GetCondition(r, status.ConditionReady)
-	assert.NotEqual(t, nil, ready)
-	assert.Equal(t, "False", ready.Status)
-	assert.Equal(t, "Job not started", ready.Message)
-	condition := status.GetCondition(r, status.ConditionFailed)
-	assert.Equal(t, (*status.Condition)(nil), condition)
+	testCases := map[string]testSpec{
+		"jobNoStatus": {
+			spec: jobNoStatus,
+			expectedStatus: status.InProgressStatus,
+			expectedConditions: []status.Condition{{
+				Type: status.ConditionInProgress,
+				Status: corev1.ConditionTrue,
+				Reason: "JobNotStarted",
+			}},
+			absentConditionTypes: []status.ConditionType{
+				status.ConditionFailed,
+			},
+		},
+		"jobComplete": {
+			spec: jobComplete,
+			expectedStatus: status.CurrentStatus,
+			expectedConditions: []status.Condition{},
+			absentConditionTypes: []status.ConditionType{
+				status.ConditionFailed,
+				status.ConditionInProgress,
+			},
+		},
+		"jobFailed": {
+			spec: jobFailed,
+			expectedStatus: status.FailedStatus,
+			expectedConditions: []status.Condition{{
+				Type: status.ConditionFailed,
+				Status: corev1.ConditionTrue,
+				Reason: "JobFailed",
+			}},
+			absentConditionTypes: []status.ConditionType{
+				status.ConditionInProgress,
+			},
+		},
+		"jobInProgress": {
+			spec: jobInProgress,
+			expectedStatus: status.CurrentStatus,
+			expectedConditions: []status.Condition{},
+			absentConditionTypes: []status.ConditionType{
+				status.ConditionInProgress,
+				status.ConditionFailed,
+			},
+		},
+	}
 
-	r, err = status.GetConditions(y2u(t, jobComplete))
-	assert.NoError(t, err)
-	ready = status.GetCondition(r, status.ConditionReady)
-	assert.NotEqual(t, nil, ready)
-	assert.Equal(t, "True", ready.Status)
-	assert.Equal(t, "Job Completed. succeded: 1/1", ready.Message)
-	condition = status.GetCondition(r, status.ConditionCompleted)
-	assert.NotEqual(t, (*status.Condition)(nil), condition)
-	assert.Equal(t, "True", condition.Status)
-	assert.Equal(t, "Job Completed. succeded: 1/1", condition.Message)
-
-	r, err = status.GetConditions(y2u(t, jobFailed))
-	assert.NoError(t, err)
-	ready = status.GetCondition(r, status.ConditionReady)
-	assert.NotEqual(t, nil, ready)
-	assert.Equal(t, "True", ready.Status)
-	assert.Equal(t, "Job Failed. failed: 1/4", ready.Message)
-	condition = status.GetCondition(r, status.ConditionFailed)
-	assert.NotEqual(t, (*status.Condition)(nil), condition)
-	assert.Equal(t, "True", condition.Status)
-	assert.Equal(t, "Job Failed. failed: 1/4", condition.Message)
-
-	r, err = status.GetConditions(y2u(t, jobInProgress))
-	assert.NoError(t, err)
-	ready = status.GetCondition(r, status.ConditionReady)
-	assert.NotEqual(t, nil, ready)
-	assert.Equal(t, "True", ready.Status)
-	assert.Equal(t, "Job in progress. success:3, active: 2, failed: 1", ready.Message)
-	condition = status.GetCondition(r, status.ConditionFailed)
-	assert.Equal(t, (*status.Condition)(nil), condition)
+	for tn, tc := range testCases {
+		t.Run(tn, func(t *testing.T) {
+			runStatusTest(t, tc)
+		})
+	}
 }
 
 var cronjobNoStatus = `
@@ -942,19 +1147,32 @@ status:
 `
 
 func TestCronJobStatus(t *testing.T) {
-	r, err := status.GetConditions(y2u(t, cronjobNoStatus))
-	assert.NoError(t, err)
-	ready := status.GetCondition(r, status.ConditionReady)
-	assert.NotEqual(t, nil, ready)
-	assert.Equal(t, "True", ready.Status)
-	assert.Equal(t, "Always", ready.Reason)
+	testCases := map[string]testSpec{
+		"cronjobNoStatus": {
+			spec: cronjobNoStatus,
+			expectedStatus: status.CurrentStatus,
+			expectedConditions: []status.Condition{},
+			absentConditionTypes: []status.ConditionType{
+				status.ConditionFailed,
+				status.ConditionInProgress,
+			},
+		},
+		"cronjobWithStatus": {
+			spec: cronjobWithStatus,
+			expectedStatus: status.CurrentStatus,
+			expectedConditions: []status.Condition{},
+			absentConditionTypes: []status.ConditionType{
+				status.ConditionFailed,
+				status.ConditionInProgress,
+			},
+		},
+	}
 
-	r, err = status.GetConditions(y2u(t, cronjobWithStatus))
-	assert.NoError(t, err)
-	ready = status.GetCondition(r, status.ConditionReady)
-	assert.NotEqual(t, nil, ready)
-	assert.Equal(t, "True", ready.Status)
-	assert.Equal(t, "Always", ready.Reason)
+	for tn, tc := range testCases {
+		t.Run(tn, func(t *testing.T) {
+			runStatusTest(t, tc)
+		})
+	}
 }
 
 var serviceDefault = `
@@ -996,31 +1214,51 @@ spec:
 `
 
 func TestServiceStatus(t *testing.T) {
-	r, err := status.GetConditions(y2u(t, serviceDefault))
-	assert.NoError(t, err)
-	ready := status.GetCondition(r, status.ConditionReady)
-	assert.NotEqual(t, nil, ready)
-	assert.Equal(t, "True", ready.Status)
-	assert.Equal(t, "Always Ready. Service type: ClusterIP", ready.Message)
+	testCases := map[string]testSpec{
+		"serviceDefault": {
+			spec: serviceDefault,
+			expectedStatus: status.CurrentStatus,
+			expectedConditions: []status.Condition{},
+			absentConditionTypes: []status.ConditionType{
+				status.ConditionFailed,
+				status.ConditionInProgress,
+			},
+		},
+		"serviceNodePort": {
+			spec: serviceNodePort,
+			expectedStatus: status.CurrentStatus,
+			expectedConditions: []status.Condition{},
+			absentConditionTypes: []status.ConditionType{
+				status.ConditionFailed,
+				status.ConditionInProgress,
+			},
+		},
+		"serviceLBnok": {
+			spec: serviceLBnok,
+			expectedStatus: status.InProgressStatus,
+			expectedConditions: []status.Condition{{
+				Type: status.ConditionInProgress,
+				Status: corev1.ConditionTrue,
+				Reason: "NoIPAssigned",
+			}},
+			absentConditionTypes: []status.ConditionType{
+				status.ConditionFailed,
+			},
+		},
+		"serviceLBok": {
+			spec: serviceLBok,
+			expectedStatus: status.CurrentStatus,
+			expectedConditions: []status.Condition{},
+			absentConditionTypes: []status.ConditionType{
+				status.ConditionFailed,
+				status.ConditionInProgress,
+			},
+		},
+	}
 
-	r, err = status.GetConditions(y2u(t, serviceNodePort))
-	assert.NoError(t, err)
-	ready = status.GetCondition(r, status.ConditionReady)
-	assert.NotEqual(t, nil, ready)
-	assert.Equal(t, "True", ready.Status)
-	assert.Equal(t, "Always Ready. Service type: NodePort", ready.Message)
-
-	r, err = status.GetConditions(y2u(t, serviceLBnok))
-	assert.NoError(t, err)
-	ready = status.GetCondition(r, status.ConditionReady)
-	assert.NotEqual(t, nil, ready)
-	assert.Equal(t, "False", ready.Status)
-	assert.Equal(t, "ClusterIP not set. Service type: LoadBalancer", ready.Message)
-
-	r, err = status.GetConditions(y2u(t, serviceLBok))
-	assert.NoError(t, err)
-	ready = status.GetCondition(r, status.ConditionReady)
-	assert.NotEqual(t, nil, ready)
-	assert.Equal(t, "True", ready.Status)
-	assert.Equal(t, "ClusterIP: 1.2.3.4", ready.Message)
+	for tn, tc := range testCases {
+		t.Run(tn, func(t *testing.T) {
+			runStatusTest(t, tc)
+		})
+	}
 }

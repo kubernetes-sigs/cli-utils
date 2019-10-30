@@ -32,10 +32,10 @@ import (
 //   apply, prune and delete
 // These structs share the same client
 type Cmd struct {
-	Applier      *apply.Apply
-	Pruner       *prune.Prune
-	Deleter      *delete.Delete
-	StatusGetter *status.Status
+	Applier        *apply.Apply
+	Pruner         *prune.Prune
+	Deleter        *delete.Delete
+	StatusResolver *status.Resolver
 }
 
 // Apply applies resources given the input as a slice of unstructured resources
@@ -61,7 +61,6 @@ func (a *Cmd) Delete(resources []*unstructured.Unstructured) error {
 
 // Status returns the status given the input as a slice of unstructured resources
 func (a *Cmd) Status(resources []*unstructured.Unstructured) error {
-	a.StatusGetter.Resources = resources
-	_ = a.StatusGetter.Do()
+	_ = a.StatusResolver.FetchResourcesAndGetStatus(resources)
 	return nil
 }
