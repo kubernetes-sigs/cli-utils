@@ -17,7 +17,6 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"sigs.k8s.io/cli-utils/cmd/apply/status"
 	"sigs.k8s.io/cli-utils/internal/pkg/clik8s"
 	"sigs.k8s.io/cli-utils/internal/pkg/util"
 	"sigs.k8s.io/cli-utils/internal/pkg/wirecli/wireapply"
@@ -53,7 +52,5 @@ is used.
 		return nil
 	}
 
-	// Add Commands
-	cmd.AddCommand(status.GetApplyStatusCommand(a, true))
 	return cmd
 }

@@ -51,15 +51,14 @@ func InitializeCmd(writer io.Writer, args util.Args) (*Cmd, error) {
 		DynamicClient: client,
 		Out:           writer,
 	}
-	statusStatus := &status.Status{
+	resolver := &status.Resolver{
 		DynamicClient: client,
-		Out:           writer,
 	}
 	cmd := &Cmd{
-		Applier:      applyApply,
-		Pruner:       prunePrune,
-		Deleter:      deleteDelete,
-		StatusGetter: statusStatus,
+		Applier:        applyApply,
+		Pruner:         prunePrune,
+		Deleter:        deleteDelete,
+		StatusResolver: resolver,
 	}
 	return cmd, nil
 }
@@ -96,15 +95,14 @@ func InitializeFakeCmd(writer io.Writer, args util.Args) (*Cmd, func(), error) {
 		DynamicClient: client,
 		Out:           writer,
 	}
-	statusStatus := &status.Status{
+	resolver := &status.Resolver{
 		DynamicClient: client,
-		Out:           writer,
 	}
 	cmd := &Cmd{
-		Applier:      applyApply,
-		Pruner:       prunePrune,
-		Deleter:      deleteDelete,
-		StatusGetter: statusStatus,
+		Applier:        applyApply,
+		Pruner:         prunePrune,
+		Deleter:        deleteDelete,
+		StatusResolver: resolver,
 	}
 	return cmd, func() {
 		cleanup()

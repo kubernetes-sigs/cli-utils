@@ -16,20 +16,13 @@ limitations under the License.
 package wirestatus
 
 import (
-	"io"
-
 	"github.com/google/wire"
 	"sigs.k8s.io/cli-utils/internal/pkg/clik8s"
 	"sigs.k8s.io/cli-utils/internal/pkg/status"
 	"sigs.k8s.io/cli-utils/internal/pkg/util"
 )
 
-// InitializeStatus creates a new *status.Status object
-func InitializeStatus(clik8s.ResourceConfigPath, io.Writer, util.Args) (*status.Status, error) {
-	panic(wire.Build(ProviderSet))
-}
-
 // DoStatus creates a new Status object and runs it
-func DoStatus(clik8s.ResourceConfigPath, io.Writer, util.Args) (status.Result, error) {
+func DoStatus(clik8s.ResourceConfigPath, util.Args) ([]status.ResourceResult, error) {
 	panic(wire.Build(ProviderSet))
 }

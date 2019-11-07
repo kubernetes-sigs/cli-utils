@@ -14,9 +14,8 @@ limitations under the License.
 package wirestatus
 
 import (
-	"io"
-
 	"github.com/google/wire"
+	"sigs.k8s.io/cli-utils/internal/pkg/clik8s"
 	"sigs.k8s.io/cli-utils/internal/pkg/status"
 	"sigs.k8s.io/cli-utils/internal/pkg/wirecli/wireconfig"
 	"sigs.k8s.io/cli-utils/internal/pkg/wirecli/wiregit"
@@ -27,12 +26,12 @@ import (
 var ProviderSet = wire.NewSet(
 	wirek8s.ProviderSet,
 	wiregit.OptionalProviderSet,
-	wire.Struct(new(status.Status), "*"),
+	wire.Struct(new(status.Resolver), "*"),
 	NewStatusCommandResult,
 	wireconfig.ConfigProviderSet,
 )
 
 // NewStatusCommandResult returns a new status.Result
-func NewStatusCommandResult(s *status.Status, out io.Writer) (status.Result, error) {
-	return s.Do(), nil
+func NewStatusCommandResult(s *status.Resolver, resources clik8s.ResourceConfigs) ([]status.ResourceResult, error) {
+	return s.FetchResourcesAndGetStatus(resources), nil
 }

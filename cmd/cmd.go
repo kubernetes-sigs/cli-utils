@@ -20,6 +20,7 @@ import (
 	"sigs.k8s.io/cli-utils/cmd/apply"
 	"sigs.k8s.io/cli-utils/cmd/delete"
 	"sigs.k8s.io/cli-utils/cmd/prune"
+	"sigs.k8s.io/cli-utils/cmd/status"
 	"sigs.k8s.io/cli-utils/internal/pkg/dy"
 	"sigs.k8s.io/cli-utils/internal/pkg/wirecli/wirek8s"
 )
@@ -40,6 +41,7 @@ with commands apply, prune, delete and dynamic commands`,
 	rootCmd.AddCommand(apply.GetApplyCommand(os.Args))
 	rootCmd.AddCommand(prune.GetPruneCommand(os.Args))
 	rootCmd.AddCommand(delete.GetDeleteCommand(os.Args))
+	rootCmd.AddCommand(status.GetStatusCommand(os.Args))
 	wirek8s.Flags(rootCmd.PersistentFlags())
 	rootCmd.PersistentFlags().Set("namespace", "default") //nolint
 

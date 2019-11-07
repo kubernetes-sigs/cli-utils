@@ -11,225 +11,163 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// The status package computes the status for Kubernetes resources. Status in this context
+// mean a single value that can be used by tools and/or developers to determine if resources
+// has been fully reconciled, has reached a failure state or is still in progress. For custom
+// resources this is based on a convention that the creators of CRDs must follow while for the
+// built-in resources, the status is computed from the fields available in the .status section
+// of the resource manifest.
+// The package will also return a set of standard conditions for each resource. This is
+// used to amend the conditions already available in some of the standard Kubernetes resources.
 package status
 
 import (
 	"context"
 	"fmt"
-	"io"
 
-	"gopkg.in/src-d/go-git.v4/plumbing/object"
-	//metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/cli-utils/internal/pkg/client"
-	clientu "sigs.k8s.io/cli-utils/internal/pkg/client/unstructured"
 	"sigs.k8s.io/cli-utils/internal/pkg/clik8s"
 )
 
-// Condition types
 const (
-	// Level Conditions
-
-	// ConditionReady Indicates the object is resource for use
-	ConditionReady ConditionType = "Ready"
-	// ConditionSettled Indicates the controller is done reconciling the spec
-	// This is not implemented yet
-	ConditionSettled ConditionType = "Settled"
-
-	// Terminal condition
-
-	// ConditionFailed The resource is in failed condition and the controller will not process it further
+	// The set of standard conditions defined in this package. These follow the "abnormality-true"
+	// convention where conditions should have a true value for abnormal/error situations and the absence
+	// of a condition should be interpreted as a false value, i.e. everything is normal.
 	ConditionFailed ConditionType = "Failed"
-	// ConditionCompleted The resource is done doing what it intends. Example Job, Pods can have completed state.
-	ConditionCompleted ConditionType = "Completed"
-	// Terminating Indicates the resource is being deleted.
-	ConditionTermination ConditionType = "Terminating"
+	ConditionInProgress ConditionType = "InProgress"
 
-	// Progress condition
-
-	// ConditionProgress Indicates the controller is still working to satisfy the intent in the resource spec.
-	ConditionProgress ConditionType = "Progress"
+	// The set of status conditions which can be assigned to resources.
+	InProgressStatus Status = "InProgress"
+	FailedStatus Status = "Failed"
+	CurrentStatus Status = "Current"
+	TerminatingStatus Status = "Terminating"
+	UnknownStatus Status = "Unknown"
 )
 
-// Status returns the status for rollouts
-type Status struct {
+// Defines the set of condition types allowed inside a Condition struct.
+type ConditionType string
+
+// Defines the set of statuses a resource can have.
+type Status string
+
+// String returns the status as a string.
+func (s Status) String() string {
+	return string(s)
+}
+
+// Resolver can compute the Status and Conditions for resources.
+type Resolver struct {
 	// DynamicClient is the client used to talk
 	// with the cluster
 	DynamicClient client.Client
-	// Out stores the output
-	Out io.Writer
-	// Resources is a list of resource configurations
-	Resources clik8s.ResourceConfigs
-	// Commit is a git commit object
-	Commit *object.Commit
 }
 
-// ConditionType condition types
-type ConditionType string
-
-// Condition condition object computed by status package
+// Condition defines the general format for conditions on Kubernetes resources.
+// In practice, each kubernetes resource defines their own format for conditions, but
+// most (maybe all) follows this structure.
 type Condition struct {
 	// Type condition type
 	Type ConditionType
 	// Status String that describes the condition status
-	Status string // metav1.ConditionStatus
-	// Reason one work CamleCase reason
+	Status corev1.ConditionStatus
+	// Reason one work CamelCase reason
 	Reason string
 	// Message Human readable reason string
 	Message string
 }
 
-// ResourceStatus resource status
-type ResourceStatus struct {
-	// Resource unstructured object whose resource is being described
-	Resource *unstructured.Unstructured // Deletion in progress
+// Result defines the result of computing the status for a single resource. It will
+// contain the status for the resource, a message fields with more details about the
+// status, and a list of the standard conditions that could be amended to the resource.
+type Result struct {
+	//Status
+	Status Status
+	// Message
+	Message string
 	// Conditions list of extracted conditions from Resource
 	Conditions []Condition
-	// Errror Any error encountered extracting status for this Resource
+}
+
+// ResourceResult wraps the Result together with the Resource from which the
+// status was computed as well as the error if one was encountered while computing
+// the status.
+type ResourceResult struct {
+	Result *Result
+
+	Resource *unstructured.Unstructured
+
 	Error error
 }
 
-// Result contains the Status Result
-type Result struct {
-	// Resources list of resource status
-	Resources []ResourceStatus
-}
-
-// GetCondition Returns the condition matching the type
-func GetCondition(cs []Condition, ct ConditionType) *Condition {
-	for i := range cs {
-		if cs[i].Type == ct {
-			return &cs[i]
-		}
-	}
-	return nil
-}
-
-// Do works on the list of resources and computes status for the resources.
-func (a *Status) Do() Result {
-	var rs = []ResourceStatus{}
+// FetchResourcesAndGetStatus computes the status for all the resources provided and returns a slice of
+// ResourceResult. The resources does NOT need to be complete as the up-to-date state for all the resources
+// will be fetched from the API server before computing the status.
+func (r *Resolver) FetchResourcesAndGetStatus(resources clik8s.ResourceConfigs) []ResourceResult {
+	var rs []ResourceResult
 
 	ctx := context.Background()
-	for _, u := range a.Resources {
-		err := a.DynamicClient.Get(ctx,
+	for _, u := range resources {
+		err := r.DynamicClient.Get(ctx,
 			types.NamespacedName{Namespace: u.GetNamespace(), Name: u.GetName()}, u)
 		if err != nil {
-			rs = append(rs, ResourceStatus{Resource: u, Error: err})
+			rs = append(rs, ResourceResult{Resource: u, Error: err})
 			continue
 		}
 
-		// Ready indicator is a simple ANDing of all the individual resource readiness
-		conditions, err := GetConditions(u)
+		res, err := GetStatus(u)
 		if err != nil {
-			rs = append(rs, ResourceStatus{Resource: u, Error: err})
+			rs = append(rs, ResourceResult{Resource: u, Error: err})
 			continue
 		}
-		rs = append(rs, ResourceStatus{Resource: u, Conditions: conditions, Error: nil})
+		rs = append(rs, ResourceResult{Resource: u, Result: res})
 	}
-
-	a.OutputResult(rs)
-	return Result{Resources: rs}
+	return rs
 }
 
-// OutputResult print to output writer
-func (a *Status) OutputResult(resources []ResourceStatus) {
-	for i := range resources {
-		u := resources[i].Resource
-		fmt.Fprintf(a.Out, "%s/%s   ", u.GetKind(), u.GetName())
-		outputConditions(a.Out, resources[i].Conditions)
-		outputError(a.Out, resources[i].Error)
-		fmt.Fprintf(a.Out, "\n")
+// GetStatus computes the status for the given resource. The state of the resource will NOT be
+// fetched from the API server, so the resource passed in must already have the status field
+// populated.
+func GetStatus(u *unstructured.Unstructured) (*Result, error) {
+	res, err := checkGenericProperties(u)
+	if err != nil || res != nil {
+		return res, err
 	}
-}
-
-// GetConditions Return a list of standardizes conditions for the given unstructured object
-func GetConditions(u *unstructured.Unstructured) ([]Condition, error) {
-	var conditions []Condition
-	var err error
 
 	fn := GetLegacyConditionsFn(u)
-	if fn == nil {
-		fn = GetGenericConditionsFn(u)
-	}
-
 	if fn != nil {
-		conditions, err = fn(u)
+		return fn(u)
 	}
 
-	conditions = addTerminationCondition(u, conditions)
-
-	return conditions, err
+	// The resource is not one of the built-in types with specific
+	// rules and we were unable to make a decision based on the
+	// generic rules. At this point we don't really know the status.
+	return &Result{
+		Status: UnknownStatus,
+		Message: fmt.Sprintf("Unknown type %s", u.GetKind()),
+		Conditions: []Condition{},
+	}, err
 }
 
-// SetReasonMessage set
-func (s *Condition) SetReasonMessage(reason, message string) {
-	s.Reason = reason
-	s.Message = message
-}
-
-// addTerminationCondition injects termination condition if applicable
-func addTerminationCondition(u *unstructured.Unstructured, conditions []Condition) []Condition {
-
-	deletionTimestamp := clientu.GetStringField(u.UnstructuredContent(), ".metadata.deletionTimestamp", "")
-	finalizers := u.GetFinalizers()
-	if deletionTimestamp != "" {
-		reason := "Terminating"
-		if len(finalizers) != 0 {
-			reason += fmt.Sprintf(" finalizers: %s", finalizers)
-		}
-		conditions = append(conditions, Condition{ConditionTermination, "True", reason, ""})
-	}
-	return conditions
-}
-
-func outputConditions(out io.Writer, sc []Condition) {
-	ready := GetCondition(sc, ConditionReady)
-	progress := GetCondition(sc, ConditionProgress)
-	if ready != nil {
-		if ready.Status == "True" {
-			fmt.Fprintf(out, "Ready")
-		} else {
-			fmt.Fprintf(out, "Pending")
-		}
-	}
-	terminating := GetCondition(sc, ConditionTermination)
-	if terminating != nil {
-		if terminating.Status == "True" {
-			fmt.Fprintf(out, " %s", terminating.Reason)
-		}
-	}
-	if progress != nil && progress.Status == "True" {
-		fmt.Fprintf(out, " %s", progress.Message)
+// newInProgressCondition creates an inProgress condition with the given
+// reason and message.
+func newInProgressCondition(reason, message string) Condition {
+	return Condition{
+		Type: ConditionInProgress,
+		Status: corev1.ConditionTrue,
+		Reason: reason,
+		Message: message,
 	}
 }
 
-func outputError(out io.Writer, err error) {
-	if err == nil {
-		return
+// newInProgressStatus creates a status Result with the InProgress status
+// and an InProgress condition.
+func newInProgressStatus(reason, message string) *Result {
+	return &Result{
+		Status: InProgressStatus,
+		Message: message,
+		Conditions: []Condition{newInProgressCondition(reason, message)},
 	}
-	if errors.IsNotFound(err) {
-		fmt.Fprintf(out, " Not Found")
-	} else {
-		fmt.Fprintf(out, " ERR: %s", err)
-	}
-}
-
-// StableOrTerminal returns True if all of the resources are stable or terminal
-func StableOrTerminal(resources []ResourceStatus) bool {
-	ok := true
-	for i := range resources {
-		ready := GetCondition(resources[i].Conditions, ConditionReady)
-		if ready != nil {
-			if ready.Status != "True" {
-				ok = false
-				break
-			}
-		} else {
-			ok = false
-			break
-		}
-	}
-	return ok
 }

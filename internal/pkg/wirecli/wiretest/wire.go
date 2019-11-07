@@ -35,7 +35,7 @@ import (
 	"sigs.k8s.io/cli-utils/internal/pkg/wirecli/wireconfig"
 )
 
-func InitializeStatus(clik8s.ResourceConfigs, *object.Commit, io.Writer) (*status.Status, func(), error) {
+func InitializeStatus() (*status.Resolver, func(), error) {
 	panic(wire.Build(ProviderSet))
 }
 

@@ -28,7 +28,7 @@ import (
 
 // Injectors from wire.go:
 
-func InitializeStatus(resourceConfigs clik8s.ResourceConfigs, commit *object.Commit, writer io.Writer) (*status.Status, func(), error) {
+func InitializeStatus() (*status.Resolver, func(), error) {
 	config, cleanup, err := NewRestConfig()
 	if err != nil {
 		return nil, nil, err
@@ -48,13 +48,10 @@ func InitializeStatus(resourceConfigs clik8s.ResourceConfigs, commit *object.Com
 		cleanup()
 		return nil, nil, err
 	}
-	statusStatus := &status.Status{
+	resolver := &status.Resolver{
 		DynamicClient: client,
-		Out:           writer,
-		Resources:     resourceConfigs,
-		Commit:        commit,
 	}
-	return statusStatus, func() {
+	return resolver, func() {
 		cleanup()
 	}, nil
 }

@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"strings"
 
+	corev1 "k8s.io/api/core/v1"
 	api_unstructured "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -38,7 +39,7 @@ type BasicCondition struct {
 	// Type Condition type
 	Type string `json:"type"`
 	// Status is one of True,False,Unknown
-	Status string `json:"status"`
+	Status corev1.ConditionStatus `json:"status"`
 	// Reason simple single word reason in CamleCase
 	// +optional
 	Reason string `json:"reason,omitempty"`
