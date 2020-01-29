@@ -69,20 +69,20 @@ function install_metalinter {
 }
 
 
-# Install wire
-function install_wire {
-   which wire|| go get -v -u github.com/google/wire/cmd/wire
-}
+# # Install wire
+# function install_wire {
+#    which wire|| go get -v -u github.com/google/wire/cmd/wire
+# }
 
-header_text "using tools"
+# header_text "using tools"
 
-install_wire
+# install_wire
 
 fetch_kb_tools
 setup_envs
 
-${hack_dir}/verify.sh
-${hack_dir}/test-all.sh
+# ${hack_dir}/verify.sh
+# ${hack_dir}/test-all.sh
 
 echo "passed"
 exit 0
