@@ -1,7 +1,7 @@
 // Copyright 2019 The Kubernetes Authors.
 // SPDX-License-Identifier: Apache-2.0
 
-package apply
+package prune
 
 import (
 	"testing"
@@ -103,7 +103,7 @@ func createGroupingInfo(name string, children ...(*resource.Info)) *resource.Inf
 	}
 	infos := []*resource.Info{groupingInfo}
 	infos = append(infos, children...)
-	_ = addInventoryToGroupingObj(infos)
+	_ = AddInventoryToGroupingObj(infos)
 	return groupingInfo
 }
 

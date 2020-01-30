@@ -17,6 +17,7 @@ import (
 	"k8s.io/kubectl/pkg/cmd/util"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/i18n"
+	"sigs.k8s.io/cli-utils/pkg/apply/prune"
 )
 
 // GetCommand returns a command from kubectl to install
@@ -132,12 +133,12 @@ func PrependGroupingObject(o *apply.ApplyOptions) func() error {
 		if err != nil {
 			return err
 		}
-		_, exists := findGroupingObject(infos)
+		_, exists := prune.FindGroupingObject(infos)
 		if exists {
-			if err := addInventoryToGroupingObj(infos); err != nil {
+			if err := prune.AddInventoryToGroupingObj(infos); err != nil {
 				return err
 			}
-			if !sortGroupingObject(infos) {
+			if !prune.SortGroupingObject(infos) {
 				return err
 			}
 		}
@@ -148,9 +149,9 @@ func PrependGroupingObject(o *apply.ApplyOptions) func() error {
 // Prune deletes previously applied objects that have been
 // omitted in the current apply. The previously applied objects
 // are reached through ConfigMap grouping objects.
-func prune(f util.Factory, o *apply.ApplyOptions) func() error {
+func Prune(f util.Factory, o *apply.ApplyOptions) func() error {
 	return func() error {
-		po, err := NewPruneOptions(f, o)
+		po, err := prune.NewPruneOptions(f, o)
 		if err != nil {
 			return err
 		}
