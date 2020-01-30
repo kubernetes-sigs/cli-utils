@@ -22,18 +22,11 @@ import (
 
 // GetCommand returns a command from kubectl to install
 func GetCommand(parent *cobra.Command) *cobra.Command {
-	// if !commandutil.GetAlphaEnabled() {
-	// 	return &cobra.Command{
-	// 		Use:   "resources",
-	// 		Short: "[Alpha] To enable set KUSTOMIZE_ENABLE_ALPHA_COMMANDS=true",
-	// 		Long:  "[Alpha] To enable set KUSTOMIZE_ENABLE_ALPHA_COMMANDS=true",
-	// 	}
-	// }
 
 	r := &cobra.Command{
-		Use:   "resources",
-		Short: "[Alpha] Perform cluster operations using declarative configuration",
-		Long:  "[Alpha] Perform cluster operations using declarative configuration",
+		Use:   "kapply",
+		Short: "Perform cluster operations using declarative configuration",
+		Long:  "Perform cluster operations using declarative configuration",
 	}
 
 	// configure kubectl dependencies and flags
@@ -58,7 +51,7 @@ func GetCommand(parent *cobra.Command) *cobra.Command {
 	}
 
 	names := []string{"apply", "diff"}
-	applyCmd := NewCmdApply("kustomize", f, ioStreams)
+	applyCmd := NewCmdApply("kapply", f, ioStreams)
 	updateHelp(names, applyCmd)
 	diffCmd := diff.NewCmdDiff(f, ioStreams)
 	updateHelp(names, diffCmd)
@@ -71,9 +64,9 @@ func GetCommand(parent *cobra.Command) *cobra.Command {
 func updateHelp(names []string, c *cobra.Command) {
 	for i := range names {
 		name := names[i]
-		c.Short = strings.ReplaceAll(c.Short, "kubectl "+name, "kustomize "+name)
-		c.Long = strings.ReplaceAll(c.Long, "kubectl "+name, "kustomize "+name)
-		c.Example = strings.ReplaceAll(c.Example, "kubectl "+name, "kustomize "+name)
+		c.Short = strings.ReplaceAll(c.Short, "kubectl "+name, "kapply "+name)
+		c.Long = strings.ReplaceAll(c.Long, "kubectl "+name, "kapply "+name)
+		c.Example = strings.ReplaceAll(c.Example, "kubectl "+name, "kapply "+name)
 	}
 }
 
