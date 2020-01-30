@@ -1,7 +1,7 @@
 // Copyright 2019 The Kubernetes Authors.
 // SPDX-License-Identifier: Apache-2.0
 
-package apply
+package prune
 
 import (
 	"fmt"
@@ -76,7 +76,7 @@ func NewPruneOptions(f util.Factory, ao *apply.ApplyOptions) (*PruneOptions, err
 	if err != nil {
 		return nil, err
 	}
-	currentGroupingObject, found := findGroupingObject(currentObjects)
+	currentGroupingObject, found := FindGroupingObject(currentObjects)
 	if !found {
 		return nil, fmt.Errorf("Current grouping object not found during prune.")
 	}
@@ -174,7 +174,7 @@ func infoToInventory(info *resource.Info) (*Inventory, error) {
 func unionPastInventory(infos []*resource.Info) (*InventorySet, error) {
 	inventorySet := NewInventorySet([]*Inventory{})
 	for _, info := range infos {
-		inv, err := retrieveInventoryFromGroupingObj([]*resource.Info{info})
+		inv, err := RetrieveInventoryFromGroupingObj([]*resource.Info{info})
 		if err != nil {
 			return nil, err
 		}
@@ -200,7 +200,7 @@ func (po *PruneOptions) calcPruneSet(pastGroupingInfos []*resource.Info) (*Inven
 	}
 	// Current grouping object as inventory set.
 	c := []*resource.Info{po.currentGroupingObject}
-	currentInv, err := retrieveInventoryFromGroupingObj(c)
+	currentInv, err := RetrieveInventoryFromGroupingObj(c)
 	if err != nil {
 		return nil, err
 	}

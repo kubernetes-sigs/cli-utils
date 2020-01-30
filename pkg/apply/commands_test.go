@@ -6,9 +6,84 @@ package apply
 import (
 	"testing"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/kubectl/pkg/cmd/apply"
+	"sigs.k8s.io/cli-utils/pkg/apply/prune"
 )
+
+var testNamespace = "test-grouping-namespace"
+var groupingObjName = "test-grouping-obj"
+var pod1Name = "pod-1"
+var pod2Name = "pod-2"
+var pod3Name = "pod-3"
+
+var testGroupingLabel = "test-app-label"
+
+var groupingObj = unstructured.Unstructured{
+	Object: map[string]interface{}{
+		"apiVersion": "v1",
+		"kind":       "ConfigMap",
+		"metadata": map[string]interface{}{
+			"name":      groupingObjName,
+			"namespace": testNamespace,
+			"labels": map[string]interface{}{
+				prune.GroupingLabel: testGroupingLabel,
+			},
+		},
+	},
+}
+
+var pod1 = unstructured.Unstructured{
+	Object: map[string]interface{}{
+		"apiVersion": "v1",
+		"kind":       "Pod",
+		"metadata": map[string]interface{}{
+			"name":      pod1Name,
+			"namespace": testNamespace,
+		},
+	},
+}
+
+var pod1Info = &resource.Info{
+	Namespace: testNamespace,
+	Name:      pod1Name,
+	Object:    &pod1,
+}
+
+var pod2 = unstructured.Unstructured{
+	Object: map[string]interface{}{
+		"apiVersion": "v1",
+		"kind":       "Pod",
+		"metadata": map[string]interface{}{
+			"name":      pod2Name,
+			"namespace": testNamespace,
+		},
+	},
+}
+
+var pod2Info = &resource.Info{
+	Namespace: testNamespace,
+	Name:      pod2Name,
+	Object:    &pod2,
+}
+
+var pod3 = unstructured.Unstructured{
+	Object: map[string]interface{}{
+		"apiVersion": "v1",
+		"kind":       "Pod",
+		"metadata": map[string]interface{}{
+			"name":      pod3Name,
+			"namespace": testNamespace,
+		},
+	},
+}
+
+var pod3Info = &resource.Info{
+	Namespace: testNamespace,
+	Name:      pod3Name,
+	Object:    &pod3,
+}
 
 func TestPrependGroupingObject(t *testing.T) {
 	tests := []struct {
@@ -37,10 +112,10 @@ func TestPrependGroupingObject(t *testing.T) {
 			t.Fatalf("Wrong number of objects after prepending grouping object")
 		}
 		groupingInfo := infos[0]
-		if !isGroupingObject(groupingInfo.Object) {
+		if !prune.IsGroupingObject(groupingInfo.Object) {
 			t.Fatalf("First object is not the grouping object")
 		}
-		inventory, _ := retrieveInventoryFromGroupingObj(infos)
+		inventory, _ := prune.RetrieveInventoryFromGroupingObj(infos)
 		if len(inventory) != (len(infos) - 1) {
 			t.Errorf("Wrong number of inventory items stored in grouping object")
 		}
@@ -54,4 +129,14 @@ func createApplyOptions(infos []*resource.Info) *apply.ApplyOptions {
 	applyOptions := &apply.ApplyOptions{}
 	applyOptions.SetObjects(infos)
 	return applyOptions
+}
+
+func copyGroupingInfo() *resource.Info {
+	groupingObjCopy := groupingObj.DeepCopy()
+	var groupingInfo = &resource.Info{
+		Namespace: testNamespace,
+		Name:      groupingObjName,
+		Object:    groupingObjCopy,
+	}
+	return groupingInfo
 }

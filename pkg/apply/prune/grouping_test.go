@@ -1,7 +1,7 @@
 // Copyright 2020 The Kubernetes Authors.
 // SPDX-License-Identifier: Apache-2.0
 
-package apply
+package prune
 
 import (
 	"fmt"
@@ -191,7 +191,7 @@ func TestIsGroupingObject(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		grouping := isGroupingObject(test.obj)
+		grouping := IsGroupingObject(test.obj)
 		if test.isGrouping && !grouping {
 			t.Errorf("Grouping object not identified: %#v", test.obj)
 		}
@@ -240,7 +240,7 @@ func TestFindGroupingObject(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		groupingObj, found := findGroupingObject(test.infos)
+		groupingObj, found := FindGroupingObject(test.infos)
 		if test.exists && !found {
 			t.Errorf("Should have found grouping object")
 		}
@@ -297,7 +297,7 @@ func TestSortGroupingObject(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		wasSorted := sortGroupingObject(test.infos)
+		wasSorted := SortGroupingObject(test.infos)
 		if wasSorted && !test.sorted {
 			t.Errorf("Grouping object was sorted, but it shouldn't have been")
 		}
@@ -306,7 +306,7 @@ func TestSortGroupingObject(t *testing.T) {
 		}
 		if wasSorted {
 			first := test.infos[0]
-			if !isGroupingObject(first.Object) {
+			if !IsGroupingObject(first.Object) {
 				t.Errorf("Grouping object was not sorted into first position")
 			}
 		}
@@ -477,7 +477,7 @@ func TestAddRetrieveInventoryToFromGroupingObject(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		err := addInventoryToGroupingObj(test.infos)
+		err := AddInventoryToGroupingObj(test.infos)
 		if test.isError && err == nil {
 			t.Errorf("Should have produced an error, but returned none.")
 		}
@@ -485,7 +485,7 @@ func TestAddRetrieveInventoryToFromGroupingObject(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Received error when expecting none (%s)\n", err)
 			}
-			retrieved, err := retrieveInventoryFromGroupingObj(test.infos)
+			retrieved, err := RetrieveInventoryFromGroupingObj(test.infos)
 			if err != nil {
 				t.Fatalf("Error retrieving inventory: %s\n", err)
 			}
@@ -507,7 +507,7 @@ func TestAddRetrieveInventoryToFromGroupingObject(t *testing.T) {
 			}
 			// If the grouping object has an inventory, check the
 			// grouping object has an inventory hash.
-			groupingInfo, exists := findGroupingObject(test.infos)
+			groupingInfo, exists := FindGroupingObject(test.infos)
 			if exists && len(test.expected) > 0 {
 				invHash := retrieveInventoryHash(groupingInfo)
 				if len(invHash) == 0 {

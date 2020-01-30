@@ -63,7 +63,7 @@ func (a *Applier) Initialize(cmd *cobra.Command) error {
 	}
 	// Default PostProcessor is configured in "Complete" function,
 	// so the prune must happen after "Complete".
-	a.applyOptions.PostProcessorFn = prune(a.factory, a.applyOptions)
+	a.applyOptions.PostProcessorFn = Prune(a.factory, a.applyOptions)
 
 	resolver, err := a.newResolver(a.statusOptions.period)
 	if err != nil {
