@@ -19,7 +19,7 @@ import (
 // from the channel in the default format for kubectl.
 // We need to support different printers for different output formats.
 type BasicPrinter struct {
-	ioStreams genericclioptions.IOStreams
+	IOStreams genericclioptions.IOStreams
 }
 
 // Print outputs the events from the provided channel in a simple
@@ -40,18 +40,18 @@ func (b *BasicPrinter) Print(ch <-chan Event) {
 					name = n
 				}
 			}
-			fmt.Fprintf(b.ioStreams.Out, "%s %s\n", resourceIdToString(gvk.GroupKind(), name), event.ApplyEvent.Operation)
+			fmt.Fprintf(b.IOStreams.Out, "%s %s\n", resourceIdToString(gvk.GroupKind(), name), event.ApplyEvent.Operation)
 		case StatusEventType:
 			statusEvent := event.StatusEvent
 			switch statusEvent.Type {
 			case wait.ResourceUpdate:
 				id := statusEvent.EventResource.ResourceIdentifier
 				gk := id.GroupKind
-				fmt.Fprintf(b.ioStreams.Out, "%s is %s: %s\n", resourceIdToString(gk, id.Name), statusEvent.EventResource.Status.String(), statusEvent.EventResource.Message)
+				fmt.Fprintf(b.IOStreams.Out, "%s is %s: %s\n", resourceIdToString(gk, id.Name), statusEvent.EventResource.Status.String(), statusEvent.EventResource.Message)
 			case wait.Completed:
-				fmt.Fprint(b.ioStreams.Out, "all resources has reached the Current status\n")
+				fmt.Fprint(b.IOStreams.Out, "all resources has reached the Current status\n")
 			case wait.Aborted:
-				fmt.Fprintf(b.ioStreams.Out, "resources failed to the reached Current status\n")
+				fmt.Fprintf(b.IOStreams.Out, "resources failed to the reached Current status\n")
 			}
 		}
 	}

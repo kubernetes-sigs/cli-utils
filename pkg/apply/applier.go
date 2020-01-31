@@ -5,6 +5,7 @@ package apply
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/go-errors/errors"
@@ -16,20 +17,21 @@ import (
 	"k8s.io/kubectl/pkg/cmd/apply"
 	"k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
+	"sigs.k8s.io/cli-utils/pkg/apply/prune"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/wait"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// newApplier returns a new Applier. It will set up the applyOptions and
-// statusOptions which are responsible for capturing any command line flags.
+// newApplier returns a new Applier. It will set up the ApplyOptions and
+// StatusOptions which are responsible for capturing any command line flags.
 // It currently requires IOStreams, but this is a legacy from when
 // the ApplyOptions were responsible for printing progress. This is now
 // handled by a separate printer with the KubectlPrinterAdapter bridging
 // between the two.
-func newApplier(factory util.Factory, ioStreams genericclioptions.IOStreams) *Applier {
+func NewApplier(factory util.Factory, ioStreams genericclioptions.IOStreams) *Applier {
 	return &Applier{
-		applyOptions:  apply.NewApplyOptions(ioStreams),
-		statusOptions: NewStatusOptions(),
+		ApplyOptions:  apply.NewApplyOptions(ioStreams),
+		StatusOptions: NewStatusOptions(),
 		factory:       factory,
 		ioStreams:     ioStreams,
 	}
@@ -47,8 +49,8 @@ type Applier struct {
 	factory   util.Factory
 	ioStreams genericclioptions.IOStreams
 
-	applyOptions  *apply.ApplyOptions
-	statusOptions *StatusOptions
+	ApplyOptions  *apply.ApplyOptions
+	StatusOptions *StatusOptions
 	resolver      resolver
 }
 
@@ -56,16 +58,16 @@ type Applier struct {
 // a cluster. This involves validating command line inputs and configuring
 // clients for communicating with the cluster.
 func (a *Applier) Initialize(cmd *cobra.Command) error {
-	a.applyOptions.PreProcessorFn = PrependGroupingObject(a.applyOptions)
-	err := a.applyOptions.Complete(a.factory, cmd)
+	a.ApplyOptions.PreProcessorFn = prependGroupingObject(a.ApplyOptions)
+	err := a.ApplyOptions.Complete(a.factory, cmd)
 	if err != nil {
 		return errors.WrapPrefix(err, "error setting up ApplyOptions", 1)
 	}
 	// Default PostProcessor is configured in "Complete" function,
 	// so the prune must happen after "Complete".
-	a.applyOptions.PostProcessorFn = Prune(a.factory, a.applyOptions)
+	a.ApplyOptions.PostProcessorFn = pruneExec(a.factory, a.ApplyOptions)
 
-	resolver, err := a.newResolver(a.statusOptions.period)
+	resolver, err := a.newResolver(a.StatusOptions.period)
 	if err != nil {
 		return errors.WrapPrefix(err, "error creating resolver", 1)
 	}
@@ -77,11 +79,11 @@ func (a *Applier) Initialize(cmd *cobra.Command) error {
 // status. This is a temporary solution as we should separate the configuration
 // of cobra flags from the Applier.
 func (a *Applier) SetFlags(cmd *cobra.Command) {
-	a.applyOptions.DeleteFlags.AddFlags(cmd)
-	a.applyOptions.RecordFlags.AddFlags(cmd)
-	a.applyOptions.PrintFlags.AddFlags(cmd)
-	a.statusOptions.AddFlags(cmd)
-	a.applyOptions.Overwrite = true
+	a.ApplyOptions.DeleteFlags.AddFlags(cmd)
+	a.ApplyOptions.RecordFlags.AddFlags(cmd)
+	a.ApplyOptions.PrintFlags.AddFlags(cmd)
+	a.StatusOptions.AddFlags(cmd)
+	a.ApplyOptions.Overwrite = true
 }
 
 // newResolver sets up a new Resolver for computing status. The configuration
@@ -123,11 +125,11 @@ func (a *Applier) Run(ctx context.Context) <-chan Event {
 		}
 		// The adapter is used to intercept what is meant to be printing
 		// in the ApplyOptions, and instead turn those into events.
-		a.applyOptions.ToPrinter = adapter.toPrinterFunc()
+		a.ApplyOptions.ToPrinter = adapter.toPrinterFunc()
 		// This provides us with a slice of all the objects that will be
 		// applied to the cluster.
-		infos, _ := a.applyOptions.GetObjects()
-		err := a.applyOptions.Run()
+		infos, _ := a.ApplyOptions.GetObjects()
+		err := a.ApplyOptions.Run()
 		if err != nil {
 			// If we see an error here we just report it on the channel and then
 			// give up. Eventually we might be able to determine which errors
@@ -141,7 +143,7 @@ func (a *Applier) Run(ctx context.Context) <-chan Event {
 			return
 		}
 
-		if a.statusOptions.wait {
+		if a.StatusOptions.wait {
 			statusChannel := a.resolver.WaitForStatusOfObjects(ctx, infosToObjects(infos))
 			// As long as the statusChannel remains open, we take every statusEvent,
 			// wrap it in an Event and send it on the channel.
@@ -202,4 +204,41 @@ type ErrorEvent struct {
 type ApplyEvent struct {
 	Operation string
 	Object    runtime.Object
+}
+
+// PrependGroupingObject orders the objects to apply so the "grouping"
+// object stores the inventory, and it is first to be applied.
+func prependGroupingObject(o *apply.ApplyOptions) func() error {
+	return func() error {
+		if o == nil {
+			return fmt.Errorf("ApplyOptions are nil")
+		}
+		infos, err := o.GetObjects()
+		if err != nil {
+			return err
+		}
+		_, exists := prune.FindGroupingObject(infos)
+		if exists {
+			if err := prune.AddInventoryToGroupingObj(infos); err != nil {
+				return err
+			}
+			if !prune.SortGroupingObject(infos) {
+				return err
+			}
+		}
+		return nil
+	}
+}
+
+// Prune deletes previously applied objects that have been
+// omitted in the current apply. The previously applied objects
+// are reached through ConfigMap grouping objects.
+func pruneExec(f util.Factory, o *apply.ApplyOptions) func() error {
+	return func() error {
+		po, err := prune.NewPruneOptions(f, o)
+		if err != nil {
+			return err
+		}
+		return po.Prune()
+	}
 }
