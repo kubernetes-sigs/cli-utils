@@ -6,16 +6,14 @@ package main
 import (
 	"os"
 
-	"sigs.k8s.io/cli-utils/pkg/apply"
-
 	// This is here rather than in the libraries because of
 	// https://github.com/kubernetes-sigs/kustomize/issues/2060
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
+	"sigs.k8s.io/cli-utils/cmd/common"
 )
 
 func main() {
-	//os.Setenv(commandutil.EnableAlphaCommmandsEnvName, "true")
-	if err := apply.GetCommand(nil).Execute(); err != nil {
+	if err := common.NewKapplyCommand(nil).Execute(); err != nil {
 		os.Exit(1)
 	}
 }

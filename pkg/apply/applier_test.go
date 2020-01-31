@@ -102,7 +102,7 @@ func TestPrependGroupingObject(t *testing.T) {
 
 	for _, test := range tests {
 		applyOptions := createApplyOptions(test.infos)
-		f := PrependGroupingObject(applyOptions)
+		f := prependGroupingObject(applyOptions)
 		err := f()
 		if err != nil {
 			t.Errorf("Error running pre-processor callback: %s", err)
