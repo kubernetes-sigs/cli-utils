@@ -28,16 +28,14 @@ type Inventory struct {
 // createInventory returns a pointer to an Inventory struct filled
 // with the passed values. This function validates the passed fields
 // and returns an error for bad parameters.
-func createInventory(namespace string,
-	name string, gk schema.GroupKind) (*Inventory, error) {
-
+func createInventory(namespace string, name string, gk schema.GroupKind) (*Inventory, error) {
 	// Namespace can be empty, but name cannot.
 	name = strings.TrimSpace(name)
 	if name == "" {
-		return nil, fmt.Errorf("Empty name for inventory object")
+		return nil, fmt.Errorf("empty name for inventory object")
 	}
 	if gk.Empty() {
-		return nil, fmt.Errorf("Empty GroupKind for inventory object")
+		return nil, fmt.Errorf("empty GroupKind for inventory object")
 	}
 
 	return &Inventory{
@@ -64,7 +62,7 @@ func parseInventory(inv string) (*Inventory, error) {
 		}
 		return createInventory(parts[0], parts[1], gk)
 	}
-	return nil, fmt.Errorf("Unable to decode inventory: %s\n", inv)
+	return nil, fmt.Errorf("unable to decode inventory: %s", inv)
 }
 
 // Equals returns true if the Inventory structs are identical;
@@ -142,7 +140,7 @@ func (is *InventorySet) DeleteItem(item *Inventory) bool {
 // is nil.
 func (is *InventorySet) Merge(other *InventorySet) (*InventorySet, error) {
 	if other == nil {
-		return nil, fmt.Errorf("InventorySet to merge is nil.")
+		return nil, fmt.Errorf("inventorySet to merge is nil")
 	}
 	// Copy the current InventorySet into result
 	result := NewInventorySet(is.GetItems())
@@ -155,7 +153,7 @@ func (is *InventorySet) Merge(other *InventorySet) (*InventorySet, error) {
 // set. Returns an error if the passed set to subtract is nil.
 func (is *InventorySet) Subtract(other *InventorySet) (*InventorySet, error) {
 	if other == nil {
-		return nil, fmt.Errorf("InventorySet to subtract is nil.")
+		return nil, fmt.Errorf("inventorySet to subtract is nil")
 	}
 	// Copy the current InventorySet into result
 	result := NewInventorySet(is.GetItems())

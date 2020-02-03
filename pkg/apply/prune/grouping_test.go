@@ -359,7 +359,7 @@ func TestAddRetrieveInventoryToFromGroupingObject(t *testing.T) {
 		{
 			infos: []*resource.Info{copyGroupingInfo(), pod1Info},
 			expected: []*Inventory{
-				&Inventory{
+				{
 					Namespace: testNamespace,
 					Name:      pod1Name,
 					GroupKind: schema.GroupKind{
@@ -373,7 +373,7 @@ func TestAddRetrieveInventoryToFromGroupingObject(t *testing.T) {
 		{
 			infos: []*resource.Info{pod1Info, copyGroupingInfo()},
 			expected: []*Inventory{
-				&Inventory{
+				{
 					Namespace: testNamespace,
 					Name:      pod1Name,
 					GroupKind: schema.GroupKind{
@@ -387,7 +387,7 @@ func TestAddRetrieveInventoryToFromGroupingObject(t *testing.T) {
 		{
 			infos: []*resource.Info{pod1Info, pod2Info, copyGroupingInfo(), pod3Info},
 			expected: []*Inventory{
-				&Inventory{
+				{
 					Namespace: testNamespace,
 					Name:      pod1Name,
 					GroupKind: schema.GroupKind{
@@ -395,7 +395,7 @@ func TestAddRetrieveInventoryToFromGroupingObject(t *testing.T) {
 						Kind:  "Pod",
 					},
 				},
-				&Inventory{
+				{
 					Namespace: testNamespace,
 					Name:      pod2Name,
 					GroupKind: schema.GroupKind{
@@ -403,7 +403,7 @@ func TestAddRetrieveInventoryToFromGroupingObject(t *testing.T) {
 						Kind:  "Pod",
 					},
 				},
-				&Inventory{
+				{
 					Namespace: testNamespace,
 					Name:      pod3Name,
 					GroupKind: schema.GroupKind{
@@ -417,7 +417,7 @@ func TestAddRetrieveInventoryToFromGroupingObject(t *testing.T) {
 		{
 			infos: []*resource.Info{pod1Info, pod2Info, pod3Info, copyGroupingInfo()},
 			expected: []*Inventory{
-				&Inventory{
+				{
 					Namespace: testNamespace,
 					Name:      pod1Name,
 					GroupKind: schema.GroupKind{
@@ -425,7 +425,7 @@ func TestAddRetrieveInventoryToFromGroupingObject(t *testing.T) {
 						Kind:  "Pod",
 					},
 				},
-				&Inventory{
+				{
 					Namespace: testNamespace,
 					Name:      pod2Name,
 					GroupKind: schema.GroupKind{
@@ -433,7 +433,7 @@ func TestAddRetrieveInventoryToFromGroupingObject(t *testing.T) {
 						Kind:  "Pod",
 					},
 				},
-				&Inventory{
+				{
 					Namespace: testNamespace,
 					Name:      pod3Name,
 					GroupKind: schema.GroupKind{
@@ -447,7 +447,7 @@ func TestAddRetrieveInventoryToFromGroupingObject(t *testing.T) {
 		{
 			infos: []*resource.Info{copyGroupingInfo(), pod1Info, pod2Info, pod3Info},
 			expected: []*Inventory{
-				&Inventory{
+				{
 					Namespace: testNamespace,
 					Name:      pod1Name,
 					GroupKind: schema.GroupKind{
@@ -455,7 +455,7 @@ func TestAddRetrieveInventoryToFromGroupingObject(t *testing.T) {
 						Kind:  "Pod",
 					},
 				},
-				&Inventory{
+				{
 					Namespace: testNamespace,
 					Name:      pod2Name,
 					GroupKind: schema.GroupKind{
@@ -463,7 +463,7 @@ func TestAddRetrieveInventoryToFromGroupingObject(t *testing.T) {
 						Kind:  "Pod",
 					},
 				},
-				&Inventory{
+				{
 					Namespace: testNamespace,
 					Name:      pod3Name,
 					GroupKind: schema.GroupKind{

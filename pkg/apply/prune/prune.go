@@ -50,7 +50,6 @@ type PruneOptions struct {
 // gathering this information.
 // TODO: Add dry-run options.
 func NewPruneOptions(f util.Factory, ao *apply.ApplyOptions) (*PruneOptions, error) {
-
 	po := &PruneOptions{}
 	var err error
 	// Fields copied from ApplyOptions.
@@ -78,7 +77,7 @@ func NewPruneOptions(f util.Factory, ao *apply.ApplyOptions) (*PruneOptions, err
 	}
 	currentGroupingObject, found := FindGroupingObject(currentObjects)
 	if !found {
-		return nil, fmt.Errorf("Current grouping object not found during prune.")
+		return nil, fmt.Errorf("current grouping object not found during prune")
 	}
 	po.currentGroupingObject = currentGroupingObject
 	// Initialize past grouping objects as empty.
@@ -93,7 +92,6 @@ func NewPruneOptions(f util.Factory, ao *apply.ApplyOptions) (*PruneOptions, err
 // the current grouping object from this set. Returns an error
 // if there is a problem retrieving the grouping objects.
 func (po *PruneOptions) getPreviousGroupingObjects() ([]*resource.Info, error) {
-
 	// Ensures the "pastGroupingObjects" is set.
 	if !po.retrievedGroupingObjects {
 		if err := po.retrievePreviousGroupingObjects(); err != nil {
@@ -128,7 +126,7 @@ func (po *PruneOptions) retrievePreviousGroupingObjects() error {
 	// Get the grouping label for this grouping object, and create
 	// a label selector from it.
 	if po.currentGroupingObject == nil || po.currentGroupingObject.Object == nil {
-		return fmt.Errorf("Missing current grouping object.\n")
+		return fmt.Errorf("missing current grouping object")
 	}
 	groupingLabel, err := retrieveGroupingLabel(po.currentGroupingObject.Object)
 	if err != nil {
@@ -159,7 +157,7 @@ func (po *PruneOptions) retrievePreviousGroupingObjects() error {
 // is nil, or the Object in the Info is empty.
 func infoToInventory(info *resource.Info) (*Inventory, error) {
 	if info == nil || info.Object == nil {
-		return nil, fmt.Errorf("Empty resource.Info can not calculate as inventory.\n")
+		return nil, fmt.Errorf("empty resource.Info can not calculate as inventory")
 	}
 	obj := info.Object
 	gk := obj.GetObjectKind().GroupVersionKind().GroupKind()
@@ -212,7 +210,6 @@ func (po *PruneOptions) calcPruneSet(pastGroupingInfos []*resource.Info) (*Inven
 // the current apply. Prune also delete all previous grouping
 // objects. Returns an error if there was a problem.
 func (po *PruneOptions) Prune() error {
-
 	// Retrieve previous grouping objects, and calculate the
 	// union of the previous applies as an inventory set.
 	pastGroupingInfos, err := po.getPreviousGroupingObjects()

@@ -74,18 +74,18 @@ func TestInfoToInventory(t *testing.T) {
 		},
 	}
 
-	for name, test := range tests {
+	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			actual, err := infoToInventory(test.info)
-			if test.isError && err == nil {
+			actual, err := infoToInventory(tc.info)
+			if tc.isError && err == nil {
 				t.Errorf("Did not receive expected error.\n")
 			}
-			if !test.isError {
+			if !tc.isError {
 				if err != nil {
 					t.Errorf("Receieved unexpected error: %s\n", err)
 				}
-				if !test.expected.Equals(actual) {
-					t.Errorf("Expected inventory (%s), got (%s)\n", test.expected, actual)
+				if !tc.expected.Equals(actual) {
+					t.Errorf("Expected inventory (%s), got (%s)\n", tc.expected, actual)
 				}
 			}
 		})
@@ -94,7 +94,7 @@ func TestInfoToInventory(t *testing.T) {
 
 // Returns a grouping object with the inventory set from
 // the passed "children".
-func createGroupingInfo(name string, children ...(*resource.Info)) *resource.Info {
+func createGroupingInfo(_ string, children ...*resource.Info) *resource.Info {
 	groupingObjCopy := groupingObj.DeepCopy()
 	var groupingInfo = &resource.Info{
 		Namespace: testNamespace,
@@ -146,10 +146,10 @@ func TestUnionPastInventory(t *testing.T) {
 		},
 	}
 
-	for name, test := range tests {
+	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			actual, err := unionPastInventory(test.groupingInfos)
-			expected := NewInventorySet(test.expected)
+			actual, err := unionPastInventory(tc.groupingInfos)
+			expected := NewInventorySet(tc.expected)
 			if err != nil {
 				t.Errorf("Unexpected error received: %s\n", err)
 			}
@@ -221,16 +221,16 @@ func TestCalcPruneSet(t *testing.T) {
 		},
 	}
 
-	for name, test := range tests {
+	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			po := &PruneOptions{}
-			po.currentGroupingObject = test.current
-			actual, err := po.calcPruneSet(test.past)
-			expected := NewInventorySet(test.expected)
-			if test.isError && err == nil {
+			po.currentGroupingObject = tc.current
+			actual, err := po.calcPruneSet(tc.past)
+			expected := NewInventorySet(tc.expected)
+			if tc.isError && err == nil {
 				t.Errorf("Did not receive expected error.\n")
 			}
-			if !test.isError {
+			if !tc.isError {
 				if err != nil {
 					t.Errorf("Unexpected error received: %s\n", err)
 				}

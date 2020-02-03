@@ -120,7 +120,6 @@ func TestPrependGroupingObject(t *testing.T) {
 			t.Errorf("Wrong number of inventory items stored in grouping object")
 		}
 	}
-
 }
 
 // createApplyOptions is a helper function to assemble the ApplyOptions
