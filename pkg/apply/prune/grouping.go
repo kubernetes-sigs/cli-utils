@@ -120,11 +120,11 @@ func AddInventoryToGroupingObj(infos []*resource.Info) error {
 				return fmt.Errorf("creating inventory; object is nil")
 			}
 			gk := obj.GetObjectKind().GroupVersionKind().GroupKind()
-			inventory, err := createInventory(info.Namespace, info.Name, gk)
+			objMetadata, err := createObjMetadata(info.Namespace, info.Name, gk)
 			if err != nil {
 				return err
 			}
-			inventoryMap[inventory.String()] = ""
+			inventoryMap[objMetadata.String()] = ""
 		}
 	}
 
@@ -172,8 +172,8 @@ func AddInventoryToGroupingObj(infos []*resource.Info) error {
 // structs, or if the grouping object is not in Unstructured format; nil
 // otherwise. If a grouping object does not exist, or it does not have a
 // "data" map, then returns an empty slice and no error.
-func RetrieveInventoryFromGroupingObj(infos []*resource.Info) ([]*Inventory, error) {
-	inventory := []*Inventory{}
+func RetrieveInventoryFromGroupingObj(infos []*resource.Info) ([]*ObjMetadata, error) {
+	inventory := []*ObjMetadata{}
 	groupingInfo, exists := FindGroupingObject(infos)
 	if exists {
 		groupingObj, ok := groupingInfo.Object.(*unstructured.Unstructured)
@@ -188,7 +188,7 @@ func RetrieveInventoryFromGroupingObj(infos []*resource.Info) ([]*Inventory, err
 		}
 		if exists {
 			for invStr := range invMap {
-				inv, err := parseInventory(invStr)
+				inv, err := parseObjMetadata(invStr)
 				if err != nil {
 					return inventory, err
 				}

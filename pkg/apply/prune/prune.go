@@ -1,5 +1,13 @@
 // Copyright 2019 The Kubernetes Authors.
 // SPDX-License-Identifier: Apache-2.0
+//
+// Prune functionality deletes previously applied objects
+// which are subsequently omitted in further apply operations.
+// This functionality relies on "grouping" objects to store
+// object metadata for each apply operation. This file defines
+// PruneOptions to encapsulate information necessary to
+// calculate the prune set, and to delete the objects in
+// this prune set.
 
 package prune
 
@@ -98,19 +106,18 @@ func (po *PruneOptions) getPreviousGroupingObjects() ([]*resource.Info, error) {
 			return nil, err
 		}
 	}
-
 	// Remove the current grouping info from the previous grouping infos.
-	currentInventory, err := infoToInventory(po.currentGroupingObject)
+	current, err := infoToObjMetadata(po.currentGroupingObject)
 	if err != nil {
 		return nil, err
 	}
 	pastGroupInfos := []*resource.Info{}
 	for _, pastInfo := range po.pastGroupingObjects {
-		pastInventory, err := infoToInventory(pastInfo)
+		past, err := infoToObjMetadata(pastInfo)
 		if err != nil {
 			return nil, err
 		}
-		if !currentInventory.Equals(pastInventory) {
+		if !current.Equals(past) {
 			pastGroupInfos = append(pastGroupInfos, pastInfo)
 		}
 	}
@@ -152,25 +159,25 @@ func (po *PruneOptions) retrievePreviousGroupingObjects() error {
 	return nil
 }
 
-// infoToInventory transforms the object represented by the passed "info"
+// infoToObjMetadata transforms the object represented by the passed "info"
 // into its Inventory representation. Returns error if the passed Info
 // is nil, or the Object in the Info is empty.
-func infoToInventory(info *resource.Info) (*Inventory, error) {
+func infoToObjMetadata(info *resource.Info) (*ObjMetadata, error) {
 	if info == nil || info.Object == nil {
 		return nil, fmt.Errorf("empty resource.Info can not calculate as inventory")
 	}
 	obj := info.Object
 	gk := obj.GetObjectKind().GroupVersionKind().GroupKind()
-	return createInventory(info.Namespace, info.Name, gk)
+	return createObjMetadata(info.Namespace, info.Name, gk)
 }
 
 // unionPastInventory takes a set of grouping objects (infos), returning the
 // union of the objects referenced by these grouping objects as an
-// InventorySet. Returns an error if any of the passed objects are not
+// Inventory. Returns an error if any of the passed objects are not
 // grouping objects, or if unable to retrieve the inventory from any
 // grouping object.
-func unionPastInventory(infos []*resource.Info) (*InventorySet, error) {
-	inventorySet := NewInventorySet([]*Inventory{})
+func unionPastInventory(infos []*resource.Info) (*Inventory, error) {
+	inventorySet := NewInventory([]*ObjMetadata{})
 	for _, info := range infos {
 		inv, err := RetrieveInventoryFromGroupingObj([]*resource.Info{info})
 		if err != nil {
@@ -181,7 +188,7 @@ func unionPastInventory(infos []*resource.Info) (*InventorySet, error) {
 	return inventorySet, nil
 }
 
-// calcPruneSet returns the InventorySet representing the objects to
+// calcPruneSet returns the Inventory representing the objects to
 // delete (prune). pastGroupInfos are the set of past applied grouping
 // objects, storing the inventory of the objects applied at the same time.
 // Calculates the prune set as:
@@ -191,7 +198,7 @@ func unionPastInventory(infos []*resource.Info) (*InventorySet, error) {
 // Returns an error if we are unable to retrieve the set of previously
 // applied objects, or if we are unable to get the currently applied objects
 // from the current grouping object.
-func (po *PruneOptions) calcPruneSet(pastGroupingInfos []*resource.Info) (*InventorySet, error) {
+func (po *PruneOptions) calcPruneSet(pastGroupingInfos []*resource.Info) (*Inventory, error) {
 	pastInventory, err := unionPastInventory(pastGroupingInfos)
 	if err != nil {
 		return nil, err
@@ -202,7 +209,7 @@ func (po *PruneOptions) calcPruneSet(pastGroupingInfos []*resource.Info) (*Inven
 	if err != nil {
 		return nil, err
 	}
-	return pastInventory.Subtract(NewInventorySet(currentInv))
+	return pastInventory.Subtract(NewInventory(currentInv))
 }
 
 // Prune deletes the set of resources which were previously applied
@@ -220,7 +227,6 @@ func (po *PruneOptions) Prune() error {
 	if err != nil {
 		return err
 	}
-
 	// Delete the prune objects.
 	for _, inv := range pruneSet.GetItems() {
 		mapping, err := po.mapper.RESTMapping(inv.GroupKind)
@@ -249,6 +255,5 @@ func (po *PruneOptions) Prune() error {
 			return err
 		}
 	}
-
 	return nil
 }

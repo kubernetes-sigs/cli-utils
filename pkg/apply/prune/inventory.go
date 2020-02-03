@@ -1,5 +1,8 @@
 // Copyright 2020 The Kubernetes Authors.
 // SPDX-License-Identifier: Apache-2.0
+//
+// Inventory encapsulates a set of ObjMetadata structs,
+// providing easy functionality to manipulate these sets.
 
 package prune
 
@@ -7,102 +10,28 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-
-	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-// Separates inventory fields. This string is allowable as a
-// ConfigMap key, but it is not allowed as a character in
-// resource name.
-const fieldSeparator = "_"
-
-// Inventory organizes and stores the indentifying information
-// for an object. This struct (as a string) is stored in a
-// grouping object to keep track of sets of applied objects.
-type Inventory struct {
-	Namespace string
-	Name      string
-	GroupKind schema.GroupKind
-}
-
-// createInventory returns a pointer to an Inventory struct filled
-// with the passed values. This function validates the passed fields
-// and returns an error for bad parameters.
-func createInventory(namespace string, name string, gk schema.GroupKind) (*Inventory, error) {
-	// Namespace can be empty, but name cannot.
-	name = strings.TrimSpace(name)
-	if name == "" {
-		return nil, fmt.Errorf("empty name for inventory object")
-	}
-	if gk.Empty() {
-		return nil, fmt.Errorf("empty GroupKind for inventory object")
-	}
-
-	return &Inventory{
-		Namespace: strings.TrimSpace(namespace),
-		Name:      name,
-		GroupKind: gk,
-	}, nil
-}
-
-// parseInventory takes a string, splits it into its five fields,
-// and returns a pointer to an Inventory struct storing the
-// five fields. Example inventory string:
-//
-//   test-namespace/test-name/apps/v1/ReplicaSet
-//
-// Returns an error if unable to parse and create the Inventory
-// struct.
-func parseInventory(inv string) (*Inventory, error) {
-	parts := strings.Split(inv, fieldSeparator)
-	if len(parts) == 4 {
-		gk := schema.GroupKind{
-			Group: strings.TrimSpace(parts[2]),
-			Kind:  strings.TrimSpace(parts[3]),
-		}
-		return createInventory(parts[0], parts[1], gk)
-	}
-	return nil, fmt.Errorf("unable to decode inventory: %s", inv)
-}
-
-// Equals returns true if the Inventory structs are identical;
-// false otherwise.
-func (i *Inventory) Equals(other *Inventory) bool {
-	if other == nil {
-		return false
-	}
-	return i.String() == other.String()
-}
-
-// String create a string version of the Inventory struct.
-func (i *Inventory) String() string {
-	return fmt.Sprintf("%s%s%s%s%s%s%s",
-		i.Namespace, fieldSeparator,
-		i.Name, fieldSeparator,
-		i.GroupKind.Group, fieldSeparator,
-		i.GroupKind.Kind)
-}
-
-// InventorySet encapsulates a grouping of unique Inventory
+// Inventory encapsulates a grouping of unique Inventory
 // structs. Organizes the Inventory structs with a map,
 // which ensures there are no duplicates. Allows set
 // operations such as merging sets and subtracting sets.
-type InventorySet struct {
-	set map[string]*Inventory
+type Inventory struct {
+	set map[string]*ObjMetadata
 }
 
-// NewInventorySet returns a pointer to an InventorySet
+// NewInventory returns a pointer to an Inventory
 // struct grouping the passed Inventory items.
-func NewInventorySet(items []*Inventory) *InventorySet {
-	invSet := InventorySet{set: map[string]*Inventory{}}
-	invSet.AddItems(items)
-	return &invSet
+func NewInventory(items []*ObjMetadata) *Inventory {
+	inventory := Inventory{set: map[string]*ObjMetadata{}}
+	inventory.AddItems(items)
+	return &inventory
 }
 
-// GetItems returns the set of pointers to Inventory
+// GetItems returns the set of pointers to ObjMetadata
 // structs.
-func (is *InventorySet) GetItems() []*Inventory {
-	items := []*Inventory{}
+func (is *Inventory) GetItems() []*ObjMetadata {
+	items := []*ObjMetadata{}
 	for _, item := range is.set {
 		items = append(items, item)
 	}
@@ -111,7 +40,7 @@ func (is *InventorySet) GetItems() []*Inventory {
 
 // AddItems adds Inventory structs to the set which
 // are not already in the set.
-func (is *InventorySet) AddItems(items []*Inventory) {
+func (is *Inventory) AddItems(items []*ObjMetadata) {
 	for _, item := range items {
 		if item != nil {
 			is.set[item.String()] = item
@@ -119,11 +48,11 @@ func (is *InventorySet) AddItems(items []*Inventory) {
 	}
 }
 
-// DeleteItem removes an Inventory struct from the
+// DeleteItem removes an ObjMetadata struct from the
 // set if it exists in the set. Returns true if the
-// Inventory item was deleted, false if it did not exist
+// ObjMetadata item was deleted, false if it did not exist
 // in the set.
-func (is *InventorySet) DeleteItem(item *Inventory) bool {
+func (is *Inventory) DeleteItem(item *ObjMetadata) bool {
 	if item == nil {
 		return false
 	}
@@ -134,16 +63,16 @@ func (is *InventorySet) DeleteItem(item *Inventory) bool {
 	return false
 }
 
-// Merge combines the unique set of Inventory items from the
+// Merge combines the unique set of ObjMetadata items from the
 // current set with the passed "other" set, returning a new
 // set or error. Returns an error if the passed set to merge
 // is nil.
-func (is *InventorySet) Merge(other *InventorySet) (*InventorySet, error) {
+func (is *Inventory) Merge(other *Inventory) (*Inventory, error) {
 	if other == nil {
-		return nil, fmt.Errorf("inventorySet to merge is nil")
+		return nil, fmt.Errorf("inventory to merge is nil")
 	}
-	// Copy the current InventorySet into result
-	result := NewInventorySet(is.GetItems())
+	// Copy the current Inventory into result
+	result := NewInventory(is.GetItems())
 	result.AddItems(other.GetItems())
 	return result, nil
 }
@@ -151,12 +80,12 @@ func (is *InventorySet) Merge(other *InventorySet) (*InventorySet, error) {
 // Subtract removes the Inventory items in the "other" set from the
 // current set, returning a new set. This does not modify the current
 // set. Returns an error if the passed set to subtract is nil.
-func (is *InventorySet) Subtract(other *InventorySet) (*InventorySet, error) {
+func (is *Inventory) Subtract(other *Inventory) (*Inventory, error) {
 	if other == nil {
-		return nil, fmt.Errorf("inventorySet to subtract is nil")
+		return nil, fmt.Errorf("inventory to subtract is nil")
 	}
-	// Copy the current InventorySet into result
-	result := NewInventorySet(is.GetItems())
+	// Copy the current Inventory into result
+	result := NewInventory(is.GetItems())
 	// Remove each item in "other" which exists in "result"
 	for _, item := range other.GetItems() {
 		result.DeleteItem(item)
@@ -167,15 +96,15 @@ func (is *InventorySet) Subtract(other *InventorySet) (*InventorySet, error) {
 // Equals returns true if the "other" inventory set is the same
 // as this current inventory set. Relies on the fact that the
 // inventory items are sorted for the String() function.
-func (is *InventorySet) Equals(other *InventorySet) bool {
+func (is *Inventory) Equals(other *Inventory) bool {
 	if other == nil {
 		return false
 	}
 	return is.String() == other.String()
 }
 
-// String returns a string describing set of Inventory structs.
-func (is *InventorySet) String() string {
+// String returns a string describing set of ObjMetadata structs.
+func (is *Inventory) String() string {
 	strs := []string{}
 	for _, item := range is.GetItems() {
 		strs = append(strs, item.String())
@@ -184,7 +113,7 @@ func (is *InventorySet) String() string {
 	return strings.Join(strs, ", ")
 }
 
-// Size returns the number of Inventory structs in the set.
-func (is *InventorySet) Size() int {
+// Size returns the number of ObjMetadata structs in the set.
+func (is *Inventory) Size() int {
 	return len(is.set)
 }

@@ -18,7 +18,7 @@ generate:
 
 license:
 	(which $(GOPATH)/bin/addlicense || go get github.com/google/addlicense)
-	$(GOPATH)/bin/addlicense  -y 2019 -c "The Kubernetes Authors." -f LICENSE_TEMPLATE .
+	$(GOPATH)/bin/addlicense  -y 2020 -c "The Kubernetes Authors." -f LICENSE_TEMPLATE .
 
 tidy:
 	go mod tidy
