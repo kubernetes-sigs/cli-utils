@@ -1,5 +1,13 @@
 // Copyright 2020 The Kubernetes Authors.
 // SPDX-License-Identifier: Apache-2.0
+//
+// This file contains code for a "grouping" object which
+// stores object metadata to keep track of sets of
+// resources. This "grouping" object must be a ConfigMap
+// and it stores the object metadata in the data field
+// of the ConfigMap. By storing metadata from all applied
+// objects, we can correctly prune and teardown groupings
+// of resources.
 
 package prune
 
