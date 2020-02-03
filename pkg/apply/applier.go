@@ -154,7 +154,6 @@ func (a *Applier) Run(ctx context.Context) <-chan Event {
 				}
 			}
 		}
-
 	}()
 	return ch
 }

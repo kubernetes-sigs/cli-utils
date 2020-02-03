@@ -15,6 +15,5 @@ go_import_path: sigs.k8s.io/cli-utils
 script:
   - make lint test
 
-# TBD. Suppressing for now.
 notifications:
   email: false

@@ -20,7 +20,6 @@ import (
 
 // NewKapplyCommand returns a command from kubectl to install
 func NewKapplyCommand(parent *cobra.Command) *cobra.Command {
-
 	r := &cobra.Command{
 		Use:   "kapply",
 		Short: "Perform cluster operations using declarative configuration",
@@ -104,8 +103,11 @@ func NewCmdApply(baseName string, f util.Factory, ioStreams genericclioptions.IO
 	applier.SetFlags(cmd)
 
 	cmdutil.AddValidateFlags(cmd)
-	cmd.Flags().BoolVar(&applier.ApplyOptions.ServerDryRun, "server-dry-run", applier.ApplyOptions.ServerDryRun, "If true, request will be sent to server with dry-run flag, which means the modifications won't be persisted. This is an alpha feature and flag.")
-	cmd.Flags().Bool("dry-run", false, "If true, only print the object that would be sent, without sending it. Warning: --dry-run cannot accurately output the result of merging the local manifest and the server-side data. Use --server-dry-run to get the merged result instead.")
+	cmd.Flags().BoolVar(&applier.ApplyOptions.ServerDryRun, "server-dry-run", applier.ApplyOptions.ServerDryRun,
+		"If true, request will be sent to server with dry-run flag, which means the modifications won't be persisted. This is an alpha feature and flag.")
+	cmd.Flags().Bool("dry-run", false,
+		"If true, only print the object that would be sent, without sending it. Warning: --dry-run cannot accurately output the result "+
+			"of merging the local manifest and the server-side data. Use --server-dry-run to get the merged result instead.")
 	cmdutil.AddServerSideApplyFlags(cmd)
 
 	return cmd
