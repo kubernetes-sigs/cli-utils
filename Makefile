@@ -1,11 +1,44 @@
 # Copyright 2019 The Kubernetes Authors.
 # SPDX-License-Identifier: Apache-2.0
-#
-# Makefile for kapply CLI.
 
+.PHONY: generate license fix vet fmt test lint tidy openapi
+
+GOPATH := $(shell go env GOPATH)
 MYGOBIN := $(shell go env GOPATH)/bin
 SHELL := /bin/bash
 export PATH := $(MYGOBIN):$(PATH)
+
+all: generate license fix vet fmt test lint tidy
+
+fix:
+	go fix ./...
+
+fmt:
+	go fmt ./...
+
+generate:
+	go generate ./...
+
+license:
+	(which $(GOPATH)/bin/addlicense || go get github.com/google/addlicense)
+	$(GOPATH)/bin/addlicense  -y 2020 -c "The Kubernetes Authors." -f LICENSE_TEMPLATE .
+
+tidy:
+	go mod tidy
+
+lint:
+	(which $(GOPATH)/bin/golangci-lint || go get github.com/golangci/golangci-lint/cmd/golangci-lint@v1.19.1)
+	$(GOPATH)/bin/golangci-lint run ./...
+
+test:
+	go test -cover ./...
+
+vet:
+	go vet ./...
+
+build:
+	go build -o bin/kapply sigs.k8s.io/cli-utils/cmd;
+	mv bin/kapply $(MYGOBIN)
 
 .PHONY: verify-kapply-e2e
 verify-kapply-e2e: test-examples-e2e-kapply
@@ -17,9 +50,10 @@ $(MYGOBIN)/mdrip:
 test-examples-e2e-kapply: $(MYGOBIN)/mdrip $(MYGOBIN)/kind
 	( \
 		set -e; \
+		/bin/rm -f bin/kapply; \
 		/bin/rm -f $(MYGOBIN)/kapply; \
 		echo "Installing kapply from ."; \
-		cd cmd/kapply/; go install .; cd ../..; \
+		make build; \
 		./hack/testExamplesE2EAgainstKapply.sh .; \
 	)
 

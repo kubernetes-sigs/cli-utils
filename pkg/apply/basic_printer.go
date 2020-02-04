@@ -40,14 +40,14 @@ func (b *BasicPrinter) Print(ch <-chan Event) {
 					name = n
 				}
 			}
-			fmt.Fprintf(b.IOStreams.Out, "%s %s\n", resourceIdToString(gvk.GroupKind(), name), event.ApplyEvent.Operation)
+			fmt.Fprintf(b.IOStreams.Out, "%s %s\n", resourceIDToString(gvk.GroupKind(), name), event.ApplyEvent.Operation)
 		case StatusEventType:
 			statusEvent := event.StatusEvent
 			switch statusEvent.Type {
 			case wait.ResourceUpdate:
 				id := statusEvent.EventResource.ResourceIdentifier
 				gk := id.GroupKind
-				fmt.Fprintf(b.IOStreams.Out, "%s is %s: %s\n", resourceIdToString(gk, id.Name), statusEvent.EventResource.Status.String(), statusEvent.EventResource.Message)
+				fmt.Fprintf(b.IOStreams.Out, "%s is %s: %s\n", resourceIDToString(gk, id.Name), statusEvent.EventResource.Status.String(), statusEvent.EventResource.Message)
 			case wait.Completed:
 				fmt.Fprint(b.IOStreams.Out, "all resources has reached the Current status\n")
 			case wait.Aborted:
@@ -57,7 +57,7 @@ func (b *BasicPrinter) Print(ch <-chan Event) {
 	}
 }
 
-// resourceIdToString returns the string representation of a GroupKind and a resource name.
-func resourceIdToString(gk schema.GroupKind, name string) string {
+// resourceIDToString returns the string representation of a GroupKind and a resource name.
+func resourceIDToString(gk schema.GroupKind, name string) string {
 	return fmt.Sprintf("%s/%s", strings.ToLower(gk.String()), name)
 }

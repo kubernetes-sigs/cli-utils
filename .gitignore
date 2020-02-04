@@ -2,6 +2,8 @@
 main
 cli-utils
 dyctl
+kapply
+bin
 
 #intellij
 .idea/

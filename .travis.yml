@@ -4,9 +4,6 @@ os:
 - linux
 - osx
 
-env:
-- GO111MODULE=on 
-
 go:
 - "1.13"
 
@@ -15,12 +12,8 @@ git:
 
 go_import_path: sigs.k8s.io/cli-utils
 
-before_install:
-  - curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh| sh -s -- -b $(go env GOPATH)/bin v1.17.1
-
 script:
-  - TRACE=1 ./scripts/check-everything.sh
+  - make lint test
 
-# TBD. Suppressing for now.
 notifications:
   email: false
