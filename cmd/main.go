@@ -10,6 +10,10 @@ import (
 	"k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/cli-utils/cmd/apply"
 	"sigs.k8s.io/cli-utils/cmd/diff"
+
+	// This is here rather than in the libraries because of
+	// https://github.com/kubernetes-sigs/kustomize/issues/2060
+	_ "k8s.io/client-go/plugin/pkg/client/auth"
 )
 
 var cmd = &cobra.Command{
