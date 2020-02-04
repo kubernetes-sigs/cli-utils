@@ -1,74 +1,18 @@
-// Copyright 2019 The Kubernetes Authors.
-// SPDX-License-Identifier: Apache-2.0
-
-package common
+package apply
 
 import (
 	"context"
-	"flag"
-	"os"
-	"strings"
 
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/kubectl/pkg/cmd/diff"
 	"k8s.io/kubectl/pkg/cmd/util"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"sigs.k8s.io/cli-utils/pkg/apply"
 )
 
-// NewKapplyCommand returns a command from kubectl to install
-func NewKapplyCommand(parent *cobra.Command) *cobra.Command {
-	r := &cobra.Command{
-		Use:   "kapply",
-		Short: "Perform cluster operations using declarative configuration",
-		Long:  "Perform cluster operations using declarative configuration",
-	}
-
-	// configure kubectl dependencies and flags
-	flags := r.Flags()
-	kubeConfigFlags := genericclioptions.NewConfigFlags(true).WithDeprecatedPasswordFlag()
-	kubeConfigFlags.AddFlags(flags)
-	matchVersionKubeConfigFlags := util.NewMatchVersionFlags(kubeConfigFlags)
-	matchVersionKubeConfigFlags.AddFlags(r.PersistentFlags())
-	r.PersistentFlags().AddGoFlagSet(flag.CommandLine)
-	f := util.NewFactory(matchVersionKubeConfigFlags)
-
-	var ioStreams genericclioptions.IOStreams
-
-	if parent != nil {
-		ioStreams.In = parent.InOrStdin()
-		ioStreams.Out = parent.OutOrStdout()
-		ioStreams.ErrOut = parent.ErrOrStderr()
-	} else {
-		ioStreams.In = os.Stdin
-		ioStreams.Out = os.Stdout
-		ioStreams.ErrOut = os.Stderr
-	}
-
-	names := []string{"apply", "diff"}
-	applyCmd := NewCmdApply("kapply", f, ioStreams)
-	updateHelp(names, applyCmd)
-	diffCmd := diff.NewCmdDiff(f, ioStreams)
-	updateHelp(names, diffCmd)
-
-	r.AddCommand(applyCmd, diffCmd)
-	return r
-}
-
-// updateHelp replaces `kubectl` help messaging with `kustomize` help messaging
-func updateHelp(names []string, c *cobra.Command) {
-	for i := range names {
-		name := names[i]
-		c.Short = strings.ReplaceAll(c.Short, "kubectl "+name, "kapply "+name)
-		c.Long = strings.ReplaceAll(c.Long, "kubectl "+name, "kapply "+name)
-		c.Example = strings.ReplaceAll(c.Example, "kubectl "+name, "kapply "+name)
-	}
-}
-
 // NewCmdApply creates the `apply` command
-func NewCmdApply(baseName string, f util.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdApply(f util.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	applier := apply.NewApplier(f, ioStreams)
 	printer := &apply.BasicPrinter{
 		IOStreams: ioStreams,

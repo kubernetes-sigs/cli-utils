@@ -32,3 +32,6 @@ test:
 
 vet:
 	go vet ./...
+
+build:
+	go build -o bin/kapply sigs.k8s.io/cli-utils/cmd
