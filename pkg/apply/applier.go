@@ -54,6 +54,9 @@ type Applier struct {
 	StatusOptions *StatusOptions
 	PruneOptions  *prune.PruneOptions
 	resolver      resolver
+
+	NoPrune bool
+	DryRun  bool
 }
 
 // Initialize sets up the Applier for actually doing an apply against
@@ -67,8 +70,12 @@ func (a *Applier) Initialize(cmd *cobra.Command) error {
 	}
 	err = a.PruneOptions.Initialize(a.factory, a.ApplyOptions.Namespace)
 	if err != nil {
-		return errors.WrapPrefix(err, "error setting up PruntOptions", 1)
+		return errors.WrapPrefix(err, "error setting up PruneOptions", 1)
 	}
+
+	// Propagate dry-run flags.
+	a.ApplyOptions.DryRun = a.DryRun
+	a.PruneOptions.DryRun = a.DryRun
 
 	resolver, err := a.newResolver(a.StatusOptions.period)
 	if err != nil {
@@ -158,19 +165,21 @@ func (a *Applier) Run(ctx context.Context) <-chan Event {
 				}
 			}
 		}
-		infos, _ = a.ApplyOptions.GetObjects()
-		err = a.PruneOptions.Prune(infos)
-		if err != nil {
-			// If we see an error here we just report it on the channel and then
-			// give up. Eventually we might be able to determine which errors
-			// are fatal and which might allow us to continue.
-			ch <- Event{
-				EventType: ErrorEventType,
-				ErrorEvent: ErrorEvent{
-					Err: errors.WrapPrefix(err, "error pruning resources", 1),
-				},
+
+		if !a.NoPrune {
+			err = a.PruneOptions.Prune(infos)
+			if err != nil {
+				// If we see an error here we just report it on the channel and then
+				// give up. Eventually we might be able to determine which errors
+				// are fatal and which might allow us to continue.
+				ch <- Event{
+					EventType: ErrorEventType,
+					ErrorEvent: ErrorEvent{
+						Err: errors.WrapPrefix(err, "error pruning resources", 1),
+					},
+				}
+				return
 			}
-			return
 		}
 	}()
 	return ch

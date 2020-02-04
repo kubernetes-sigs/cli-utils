@@ -46,6 +46,7 @@ type PruneOptions struct {
 	ToPrinter func(string) (printers.ResourcePrinter, error)
 	out       io.Writer
 
+	DryRun    bool
 	validator validation.Schema
 
 	// TODO: DeleteOptions--cascade?
@@ -54,7 +55,6 @@ type PruneOptions struct {
 // NewPruneOptions returns a struct (PruneOptions) encapsulating the necessary
 // information to run the prune. Returns an error if an error occurs
 // gathering this information.
-// TODO: Add dry-run options.
 func NewPruneOptions() *PruneOptions {
 	po := &PruneOptions{}
 	return po
@@ -235,9 +235,11 @@ func (po *PruneOptions) Prune(currentObjects []*resource.Info) error {
 		if err != nil {
 			return err
 		}
-		err = namespacedClient.Delete(inv.Name, &metav1.DeleteOptions{})
-		if err != nil {
-			return err
+		if !po.DryRun {
+			err = namespacedClient.Delete(inv.Name, &metav1.DeleteOptions{})
+			if err != nil {
+				return err
+			}
 		}
 		printer, err := po.ToPrinter("deleted")
 		if err != nil {
@@ -249,11 +251,13 @@ func (po *PruneOptions) Prune(currentObjects []*resource.Info) error {
 	}
 	// Delete previous grouping objects.
 	for _, pastGroupInfo := range pastGroupingInfos {
-		err = po.client.Resource(pastGroupInfo.Mapping.Resource).
-			Namespace(pastGroupInfo.Namespace).
-			Delete(pastGroupInfo.Name, &metav1.DeleteOptions{})
-		if err != nil {
-			return err
+		if !po.DryRun {
+			err = po.client.Resource(pastGroupInfo.Mapping.Resource).
+				Namespace(pastGroupInfo.Namespace).
+				Delete(pastGroupInfo.Name, &metav1.DeleteOptions{})
+			if err != nil {
+				return err
+			}
 		}
 		printer, err := po.ToPrinter("deleted")
 		if err != nil {
