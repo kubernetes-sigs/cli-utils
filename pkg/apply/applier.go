@@ -32,6 +32,7 @@ func NewApplier(factory util.Factory, ioStreams genericclioptions.IOStreams) *Ap
 	return &Applier{
 		ApplyOptions:  apply.NewApplyOptions(ioStreams),
 		StatusOptions: NewStatusOptions(),
+		PruneOptions:  prune.NewPruneOptions(),
 		factory:       factory,
 		ioStreams:     ioStreams,
 	}
@@ -51,6 +52,7 @@ type Applier struct {
 
 	ApplyOptions  *apply.ApplyOptions
 	StatusOptions *StatusOptions
+	PruneOptions  *prune.PruneOptions
 	resolver      resolver
 }
 
@@ -63,9 +65,10 @@ func (a *Applier) Initialize(cmd *cobra.Command) error {
 	if err != nil {
 		return errors.WrapPrefix(err, "error setting up ApplyOptions", 1)
 	}
-	// Default PostProcessor is configured in "Complete" function,
-	// so the prune must happen after "Complete".
-	a.ApplyOptions.PostProcessorFn = pruneExec(a.factory, a.ApplyOptions)
+	err = a.PruneOptions.Initialize(a.factory, a.ApplyOptions.Namespace)
+	if err != nil {
+		return errors.WrapPrefix(err, "error setting up PruntOptions", 1)
+	}
 
 	resolver, err := a.newResolver(a.StatusOptions.period)
 	if err != nil {
@@ -126,6 +129,7 @@ func (a *Applier) Run(ctx context.Context) <-chan Event {
 		// The adapter is used to intercept what is meant to be printing
 		// in the ApplyOptions, and instead turn those into events.
 		a.ApplyOptions.ToPrinter = adapter.toPrinterFunc()
+		a.PruneOptions.ToPrinter = adapter.toPrinterFunc()
 		// This provides us with a slice of all the objects that will be
 		// applied to the cluster.
 		infos, _ := a.ApplyOptions.GetObjects()
@@ -153,6 +157,20 @@ func (a *Applier) Run(ctx context.Context) <-chan Event {
 					StatusEvent: statusEvent,
 				}
 			}
+		}
+		infos, _ = a.ApplyOptions.GetObjects()
+		err = a.PruneOptions.Prune(infos)
+		if err != nil {
+			// If we see an error here we just report it on the channel and then
+			// give up. Eventually we might be able to determine which errors
+			// are fatal and which might allow us to continue.
+			ch <- Event{
+				EventType: ErrorEventType,
+				ErrorEvent: ErrorEvent{
+					Err: errors.WrapPrefix(err, "error pruning resources", 1),
+				},
+			}
+			return
 		}
 	}()
 	return ch
@@ -226,18 +244,5 @@ func prependGroupingObject(o *apply.ApplyOptions) func() error {
 			}
 		}
 		return nil
-	}
-}
-
-// Prune deletes previously applied objects that have been
-// omitted in the current apply. The previously applied objects
-// are reached through ConfigMap grouping objects.
-func pruneExec(f util.Factory, o *apply.ApplyOptions) func() error {
-	return func() error {
-		po, err := prune.NewPruneOptions(f, o)
-		if err != nil {
-			return err
-		}
-		return po.Prune()
 	}
 }

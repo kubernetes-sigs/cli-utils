@@ -14,14 +14,12 @@ package prune
 import (
 	"fmt"
 	"io"
-	"strings"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/kubectl/pkg/cmd/apply"
 	"k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/validation"
 )
@@ -45,7 +43,7 @@ type PruneOptions struct {
 	pastGroupingObjects      []*resource.Info
 	retrievedGroupingObjects bool
 
-	toPrinter func(string) (printers.ResourcePrinter, error)
+	ToPrinter func(string) (printers.ResourcePrinter, error)
 	out       io.Writer
 
 	validator validation.Schema
@@ -57,42 +55,30 @@ type PruneOptions struct {
 // information to run the prune. Returns an error if an error occurs
 // gathering this information.
 // TODO: Add dry-run options.
-func NewPruneOptions(f util.Factory, ao *apply.ApplyOptions) (*PruneOptions, error) {
+func NewPruneOptions() *PruneOptions {
 	po := &PruneOptions{}
+	return po
+}
+
+func (po *PruneOptions) Initialize(factory util.Factory, namespace string) error {
 	var err error
 	// Fields copied from ApplyOptions.
-	po.namespace = ao.Namespace
-	po.toPrinter = ao.ToPrinter
-	po.out = ao.Out
+	po.namespace = namespace
 	// Client/Builder fields from the Factory.
-	po.client, err = f.DynamicClient()
+	po.client, err = factory.DynamicClient()
 	if err != nil {
-		return nil, err
+		return err
 	}
-	po.builder = f.NewBuilder()
-	po.mapper, err = f.ToRESTMapper()
+	po.builder = factory.NewBuilder()
+	po.mapper, err = factory.ToRESTMapper()
 	if err != nil {
-		return nil, err
+		return err
 	}
-	po.validator, err = f.Validator(false)
+	po.validator, err = factory.Validator(false)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	// Retrieve/store the grouping object for current apply.
-	currentObjects, err := ao.GetObjects()
-	if err != nil {
-		return nil, err
-	}
-	currentGroupingObject, found := FindGroupingObject(currentObjects)
-	if !found {
-		return nil, fmt.Errorf("current grouping object not found during prune")
-	}
-	po.currentGroupingObject = currentGroupingObject
-	// Initialize past grouping objects as empty.
-	po.pastGroupingObjects = []*resource.Info{}
-	po.retrievedGroupingObjects = false
-
-	return po, nil
+	return nil
 }
 
 // getPreviousGroupingObjects returns the set of grouping objects
@@ -216,7 +202,16 @@ func (po *PruneOptions) calcPruneSet(pastGroupingInfos []*resource.Info) (*Inven
 // (retrieved from previous grouping objects) but omitted in
 // the current apply. Prune also delete all previous grouping
 // objects. Returns an error if there was a problem.
-func (po *PruneOptions) Prune() error {
+func (po *PruneOptions) Prune(currentObjects []*resource.Info) error {
+	currentGroupingObject, found := FindGroupingObject(currentObjects)
+	if !found {
+		return fmt.Errorf("current grouping object not found during prune")
+	}
+	po.currentGroupingObject = currentGroupingObject
+	// Initialize past grouping objects as empty.
+	po.pastGroupingObjects = []*resource.Info{}
+	po.retrievedGroupingObjects = false
+
 	// Retrieve previous grouping objects, and calculate the
 	// union of the previous applies as an inventory set.
 	pastGroupingInfos, err := po.getPreviousGroupingObjects()
@@ -233,11 +228,24 @@ func (po *PruneOptions) Prune() error {
 		if err != nil {
 			return err
 		}
-		err = po.client.Resource(mapping.Resource).Namespace(inv.Namespace).Delete(inv.Name, &metav1.DeleteOptions{})
+		// Fetching the resource here before deletion seems a bit unnecessary, but
+		// it allows us to work with the ResourcePrinter.
+		namespacedClient := po.client.Resource(mapping.Resource).Namespace(inv.Namespace)
+		obj, err := namespacedClient.Get(inv.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
-		fmt.Fprintf(po.out, "%s/%s deleted\n", strings.ToLower(inv.GroupKind.Kind), inv.Name)
+		err = namespacedClient.Delete(inv.Name, &metav1.DeleteOptions{})
+		if err != nil {
+			return err
+		}
+		printer, err := po.ToPrinter("deleted")
+		if err != nil {
+			return err
+		}
+		if err = printer.PrintObj(obj, po.out); err != nil {
+			return err
+		}
 	}
 	// Delete previous grouping objects.
 	for _, pastGroupInfo := range pastGroupingInfos {
@@ -247,7 +255,7 @@ func (po *PruneOptions) Prune() error {
 		if err != nil {
 			return err
 		}
-		printer, err := po.toPrinter("deleted")
+		printer, err := po.ToPrinter("deleted")
 		if err != nil {
 			return err
 		}
