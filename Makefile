@@ -4,6 +4,9 @@
 .PHONY: generate license fix vet fmt test lint tidy openapi
 
 GOPATH := $(shell go env GOPATH)
+MYGOBIN := $(shell go env GOPATH)/bin
+SHELL := /bin/bash
+export PATH := $(MYGOBIN):$(PATH)
 
 all: generate license fix vet fmt test lint tidy
 
@@ -34,4 +37,36 @@ vet:
 	go vet ./...
 
 build:
-	go build -o bin/kapply sigs.k8s.io/cli-utils/cmd
+	go build -o bin/kapply sigs.k8s.io/cli-utils/cmd;
+	mv bin/kapply $(MYGOBIN)
+
+.PHONY: verify-kapply-e2e
+verify-kapply-e2e: test-examples-e2e-kapply
+
+$(MYGOBIN)/mdrip:
+	go install github.com/monopole/mdrip
+
+.PHONY:
+test-examples-e2e-kapply: $(MYGOBIN)/mdrip $(MYGOBIN)/kind
+	( \
+		set -e; \
+		/bin/rm -f bin/kapply; \
+		/bin/rm -f $(MYGOBIN)/kapply; \
+		echo "Installing kapply from ."; \
+		make build; \
+		./hack/testExamplesE2EAgainstKapply.sh .; \
+	)
+
+$(MYGOBIN)/kind:
+	( \
+        set -e; \
+        d=$(shell mktemp -d); cd $$d; \
+        wget -O ./kind https://github.com/kubernetes-sigs/kind/releases/download/v0.7.0/kind-$(shell uname)-amd64; \
+        chmod +x ./kind; \
+        mv ./kind $(MYGOBIN); \
+        rm -rf $$d; \
+	)
+
+.PHONY: nuke
+nuke: clean
+	sudo rm -rf $(shell go env GOPATH)/pkg/mod/sigs.k8s.io
