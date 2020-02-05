@@ -127,5 +127,7 @@ kapply apply -f $BASE;
 Clean-up the cluster 
 <!-- @deleteKindCluster @testE2EAgainstLatestRelease -->
 ```
+kapply destroy -f $BASE;
+
 kind delete cluster
 ```

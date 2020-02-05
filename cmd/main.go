@@ -12,6 +12,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/cli-utils/cmd/apply"
+	"sigs.k8s.io/cli-utils/cmd/destroy"
 	"sigs.k8s.io/cli-utils/cmd/diff"
 
 	// This is here rather than in the libraries because of
@@ -41,13 +42,14 @@ func main() {
 		ErrOut: os.Stderr,
 	}
 
-	names := []string{"apply", "diff"}
+	names := []string{"apply", "diff", "destroy"}
 	applyCmd := apply.NewCmdApply(f, ioStreams)
 	updateHelp(names, applyCmd)
 	diffCmd := diff.NewCmdDiff(f, ioStreams)
 	updateHelp(names, diffCmd)
+	destroyCmd := destroy.NewCmdDestroy(f, ioStreams)
 
-	cmd.AddCommand(applyCmd, diffCmd)
+	cmd.AddCommand(applyCmd, diffCmd, destroyCmd)
 
 	if err := cmd.Execute(); err != nil {
 		os.Exit(1)
