@@ -3,12 +3,12 @@
 
 # Demo: hello app
 
-This demo helps you to deploy an example hello app end-to-end using kustomize.
+This demo helps you to deploy an example hello app end-to-end using `kapply`.
 
 Steps:
 1. Create the resources files.
-3. Spin-up kubernetes cluster on local using [kind].
-4. Deploy the app using kapply and verify the status.
+2. Spin-up kubernetes cluster on local using [kind].
+3. Deploy the app using `kapply` and verify the status.
 
 First define a place to work:
 
@@ -70,7 +70,9 @@ spec:
 EOF
 ```
 
-Create a `grouping.yaml` resource. By this, you are defining the grouping of the current directory, `base`. Kustomize uses the unique label in this file to track any future state changes made to this directory. Make sure the label key is `kustomize.config.k8s.io/inventory-id` and give any unique label value and DO NOT change it in future.
+Create a `grouping.yaml` resource. By this, you are defining the grouping of the current directory, `base`.
+`kapply` uses the unique label in this file to track any future state changes made to this directory.
+Make sure the label key is `cli-utils.sigs.k8s.io/inventory-id` and give any unique label value and DO NOT change it in future.
 
 <!-- @createGroupingYaml @testE2EAgainstLatestRelease-->
 ```
@@ -95,14 +97,15 @@ kind delete cluster
 kind create cluster
 ```
 
-Use the kapply binary in MYGOBIN to apply a deployment and verify it is successful.
+Use the `kapply` binary in `MYGOBIN` to apply a deployment and verify it is successful.
 <!-- @runHelloApp @testE2EAgainstLatestRelease -->
 ```
 kapply apply -f $BASE;
 
 ```
 
-Now let's replace the configMap with configMap2 apply the config, fetch and verify the status. This should delete the-map from deployment and add the-map2.
+Now let's replace the configMap with configMap2 apply the config, fetch and verify the status.
+This should delete the-map from deployment and add the-map2.
 <!-- @replaceConfigMapInHello @testE2EAgainstLatestRelease -->
 ```
 cat <<EOF >$BASE/configMap2.yaml
