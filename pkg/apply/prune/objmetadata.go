@@ -85,11 +85,26 @@ func (o *ObjMetadata) Equals(other *ObjMetadata) bool {
 	return o.String() == other.String()
 }
 
+// GroupKinds that must be normalized from the "extensions" group.
+var normalizeGK = map[schema.GroupKind]schema.GroupKind{
+	{Group: "extensions", Kind: "Deployment"}:        {Group: "apps", Kind: "Deployment"},
+	{Group: "extensions", Kind: "DaemonSet"}:         {Group: "apps", Kind: "DaemonSet"},
+	{Group: "extensions", Kind: "ReplicaSet"}:        {Group: "apps", Kind: "ReplicaSet"},
+	{Group: "extensions", Kind: "Ingress"}:           {Group: "networking", Kind: "Ingress"},
+	{Group: "extensions", Kind: "NetworkPolicy"}:     {Group: "networking", Kind: "NetworkPolicy"},
+	{Group: "extensions", Kind: "PodSecurityPolicy"}: {Group: "policy", Kind: "PodSecurityPolicy"},
+}
+
 // String create a string version of the ObjMetadata struct.
 func (o *ObjMetadata) String() string {
+	gk := o.GroupKind
+	normalized, exists := normalizeGK[o.GroupKind]
+	if exists {
+		gk = normalized
+	}
 	return fmt.Sprintf("%s%s%s%s%s%s%s",
 		o.Namespace, fieldSeparator,
 		o.Name, fieldSeparator,
-		o.GroupKind.Group, fieldSeparator,
-		o.GroupKind.Kind)
+		gk.Group, fieldSeparator,
+		gk.Kind)
 }

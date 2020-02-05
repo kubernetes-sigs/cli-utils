@@ -166,6 +166,60 @@ func TestObjMetadataEqual(t *testing.T) {
 			},
 			isEqual: false,
 		},
+		// Normalized Deployment is the same.
+		{
+			inventory1: &ObjMetadata{
+				Name: "test-inv",
+				GroupKind: schema.GroupKind{
+					Group: "extensions",
+					Kind:  "Deployment",
+				},
+			},
+			inventory2: &ObjMetadata{
+				Name: "test-inv",
+				GroupKind: schema.GroupKind{
+					Group: "apps",
+					Kind:  "Deployment",
+				},
+			},
+			isEqual: true,
+		},
+		// Normalized NetworkPolicy is the same
+		{
+			inventory1: &ObjMetadata{
+				Name: "test-inv",
+				GroupKind: schema.GroupKind{
+					Group: "extensions",
+					Kind:  "NetworkPolicy",
+				},
+			},
+			inventory2: &ObjMetadata{
+				Name: "test-inv",
+				GroupKind: schema.GroupKind{
+					Group: "networking",
+					Kind:  "NetworkPolicy",
+				},
+			},
+			isEqual: true,
+		},
+		// Normalized PodSecurityPolicy is the same
+		{
+			inventory1: &ObjMetadata{
+				Name: "test-inv",
+				GroupKind: schema.GroupKind{
+					Group: "extensions",
+					Kind:  "PodSecurityPolicy",
+				},
+			},
+			inventory2: &ObjMetadata{
+				Name: "test-inv",
+				GroupKind: schema.GroupKind{
+					Group: "policy",
+					Kind:  "PodSecurityPolicy",
+				},
+			},
+			isEqual: true,
+		},
 	}
 
 	for _, test := range tests {
