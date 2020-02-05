@@ -13,6 +13,7 @@ import (
 	"k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/cli-utils/cmd/apply"
 	"sigs.k8s.io/cli-utils/cmd/diff"
+	"sigs.k8s.io/cli-utils/cmd/preview"
 
 	// This is here rather than in the libraries because of
 	// https://github.com/kubernetes-sigs/kustomize/issues/2060
@@ -41,13 +42,15 @@ func main() {
 		ErrOut: os.Stderr,
 	}
 
-	names := []string{"apply", "diff"}
+	names := []string{"apply", "preview", "diff"}
 	applyCmd := apply.NewCmdApply(f, ioStreams)
 	updateHelp(names, applyCmd)
+	previewCmd := preview.NewCmdPreview(f, ioStreams)
+	updateHelp(names, previewCmd)
 	diffCmd := diff.NewCmdDiff(f, ioStreams)
 	updateHelp(names, diffCmd)
 
-	cmd.AddCommand(applyCmd, diffCmd)
+	cmd.AddCommand(applyCmd, previewCmd, diffCmd)
 
 	if err := cmd.Execute(); err != nil {
 		os.Exit(1)
