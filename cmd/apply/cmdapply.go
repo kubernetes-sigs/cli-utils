@@ -22,17 +22,12 @@ func NewCmdApply(f util.Factory, ioStreams genericclioptions.IOStreams) *cobra.C
 	}
 
 	cmd := &cobra.Command{
-		Use:                   "apply (-f FILENAME | -k DIRECTORY)",
+		Use:                   "apply (FILENAME... | DIRECTORY)",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Apply a configuration to a resource by filename or stdin"),
-		Args:                  cobra.MaximumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			if len(args) > 0 {
-				// check is kustomize, if so update
-				applier.ApplyOptions.DeleteFlags.FileNameFlags.Kustomize = &args[0]
-			}
-
-			cmdutil.CheckErr(applier.Initialize(cmd))
+			paths := args
+			cmdutil.CheckErr(applier.Initialize(cmd, paths))
 
 			// Create a context with the provided timout from the cobra parameter.
 			ctx, cancel := context.WithTimeout(context.Background(), applier.StatusOptions.Timeout)
@@ -47,7 +42,7 @@ func NewCmdApply(f util.Factory, ioStreams genericclioptions.IOStreams) *cobra.C
 		},
 	}
 
-	applier.SetFlags(cmd)
+	cmdutil.CheckErr(applier.SetFlags(cmd))
 
 	cmdutil.AddValidateFlags(cmd)
 	cmd.Flags().BoolVar(&applier.NoPrune, "no-prune", applier.NoPrune, "If true, do not prune previously applied objects.")

@@ -27,15 +27,10 @@ func NewCmdPreview(f util.Factory, ioStreams genericclioptions.IOStreams) *cobra
 		Short:                 i18n.T("Preview the apply of a configuration"),
 		Args:                  cobra.MaximumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			if len(args) > 0 {
-				// check is kustomize, if so update
-				applier.ApplyOptions.DeleteFlags.FileNameFlags.Kustomize = &args[0]
-			}
-
 			// Set DryRun option true before Initialize. DryRun is propagated to
 			// ApplyOptions and PruneOptions in Initialize.
 			applier.DryRun = true
-			cmdutil.CheckErr(applier.Initialize(cmd))
+			cmdutil.CheckErr(applier.Initialize(cmd, args))
 
 			// Create a context with the provided timout from the cobra parameter.
 			ctx, cancel := context.WithTimeout(context.Background(), applier.StatusOptions.Timeout)
@@ -50,7 +45,7 @@ func NewCmdPreview(f util.Factory, ioStreams genericclioptions.IOStreams) *cobra
 		},
 	}
 
-	applier.SetFlags(cmd)
+	cmdutil.CheckErr(applier.SetFlags(cmd))
 
 	cmdutil.AddValidateFlags(cmd)
 	cmd.Flags().BoolVar(&applier.NoPrune, "no-prune", applier.NoPrune, "If true, do not prune previously applied objects.")
