@@ -57,6 +57,7 @@ type Applier struct {
 
 	NoPrune bool
 	DryRun  bool
+	Preview bool
 }
 
 // Initialize sets up the Applier for actually doing an apply against

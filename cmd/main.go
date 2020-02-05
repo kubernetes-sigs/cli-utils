@@ -6,6 +6,7 @@ package main
 import (
 	"flag"
 	"os"
+	"sigs.k8s.io/cli-utils/cmd/preview"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -46,8 +47,10 @@ func main() {
 	updateHelp(names, applyCmd)
 	diffCmd := diff.NewCmdDiff(f, ioStreams)
 	updateHelp(names, diffCmd)
+	previewCmd := preview.NewCmdPreview(f, ioStreams)
+	updateHelp(names, previewCmd)
 
-	cmd.AddCommand(applyCmd, diffCmd)
+	cmd.AddCommand(applyCmd, diffCmd, previewCmd)
 
 	if err := cmd.Execute(); err != nil {
 		os.Exit(1)
