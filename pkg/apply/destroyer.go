@@ -13,7 +13,7 @@ import (
 )
 
 // NewDestroyer returns a new destroyer. It will set up the ApplyOptions and
-// StatusOptions which are responsible for capturing any command line flags.
+// PruneOptions which are responsible for capturing any command line flags.
 // It currently requires IOStreams, but this is a legacy from when
 // the ApplyOptions were responsible for printing progress. This is now
 // handled by a separate printer with the KubectlPrinterAdapter bridging
@@ -100,6 +100,5 @@ func (d *Destroyer) Run() <-chan Event {
 func (d *Destroyer) SetFlags(cmd *cobra.Command) {
 	d.ApplyOptions.DeleteFlags.AddFlags(cmd)
 	d.ApplyOptions.RecordFlags.AddFlags(cmd)
-	d.ApplyOptions.PrintFlags.AddFlags(cmd)
 	d.ApplyOptions.Overwrite = true
 }
