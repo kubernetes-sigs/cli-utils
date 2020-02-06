@@ -10,10 +10,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/cli-utils/pkg/apply/event"
 )
 
 func TestKubectlPrinterAdapter(t *testing.T) {
-	ch := make(chan Event)
+	ch := make(chan event.Event)
 	buffer := bytes.Buffer{}
 	operation := "operation"
 

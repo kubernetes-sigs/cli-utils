@@ -10,12 +10,12 @@ import (
 	"github.com/go-errors/errors"
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/kubectl/pkg/cmd/apply"
 	"k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
+	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/prune"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/wait"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -124,8 +124,8 @@ func (a *Applier) newResolver(pollInterval time.Duration) (*wait.Resolver, error
 // before all the given resources have been applied to the cluster. Any
 // cancellation or timeout will only affect how long we wait for the
 // resources to become current.
-func (a *Applier) Run(ctx context.Context) <-chan Event {
-	ch := make(chan Event)
+func (a *Applier) Run(ctx context.Context) <-chan event.Event {
+	ch := make(chan event.Event)
 
 	go func() {
 		defer close(ch)
@@ -135,7 +135,6 @@ func (a *Applier) Run(ctx context.Context) <-chan Event {
 		// The adapter is used to intercept what is meant to be printing
 		// in the ApplyOptions, and instead turn those into events.
 		a.ApplyOptions.ToPrinter = adapter.toPrinterFunc()
-		a.PruneOptions.ToPrinter = adapter.toPrinterFunc()
 		// This provides us with a slice of all the objects that will be
 		// applied to the cluster.
 		infos, _ := a.ApplyOptions.GetObjects()
@@ -144,9 +143,9 @@ func (a *Applier) Run(ctx context.Context) <-chan Event {
 			// If we see an error here we just report it on the channel and then
 			// give up. Eventually we might be able to determine which errors
 			// are fatal and which might allow us to continue.
-			ch <- Event{
-				EventType: ErrorEventType,
-				ErrorEvent: ErrorEvent{
+			ch <- event.Event{
+				Type: event.ErrorEventType,
+				ErrorEvent: event.ErrorEvent{
 					Err: errors.WrapPrefix(err, "error applying resources", 1),
 				},
 			}
@@ -158,22 +157,22 @@ func (a *Applier) Run(ctx context.Context) <-chan Event {
 			// As long as the statusChannel remains open, we take every statusEvent,
 			// wrap it in an Event and send it on the channel.
 			for statusEvent := range statusChannel {
-				ch <- Event{
-					EventType:   StatusEventType,
+				ch <- event.Event{
+					Type:        event.StatusEventType,
 					StatusEvent: statusEvent,
 				}
 			}
 		}
 
 		if !a.NoPrune {
-			err = a.PruneOptions.Prune(infos)
+			err = a.PruneOptions.Prune(infos, ch)
 			if err != nil {
 				// If we see an error here we just report it on the channel and then
 				// give up. Eventually we might be able to determine which errors
 				// are fatal and which might allow us to continue.
-				ch <- Event{
-					EventType: ErrorEventType,
-					ErrorEvent: ErrorEvent{
+				ch <- event.Event{
+					Type: event.ErrorEventType,
+					ErrorEvent: event.ErrorEvent{
 						Err: errors.WrapPrefix(err, "error pruning resources", 1),
 					},
 				}
@@ -191,42 +190,4 @@ func infosToObjects(infos []*resource.Info) []wait.KubernetesObject {
 		objects = append(objects, u)
 	}
 	return objects
-}
-
-// EventType determines the type of events that are available.
-type EventType string
-
-const (
-	ErrorEventType  EventType = "error"
-	ApplyEventType  EventType = "apply"
-	StatusEventType EventType = "status"
-)
-
-// Event is the type of the objects that will be returned through
-// the channel that is returned from a call to Run. It contains
-// information about progress and errors encountered during
-// the process of doing apply, waiting for status and doing a prune.
-type Event struct {
-	// EventType is the type of event.
-	EventType EventType
-
-	// ErrorEvent contains information about any errors encountered.
-	ErrorEvent ErrorEvent
-
-	// ApplyEvent contains information about progress pertaining to
-	// applying a resource to the cluster.
-	ApplyEvent ApplyEvent
-
-	// StatusEvents contains information about the status of one of
-	// the applied resources.
-	StatusEvent wait.Event
-}
-
-type ErrorEvent struct {
-	Err error
-}
-
-type ApplyEvent struct {
-	Operation string
-	Object    runtime.Object
 }

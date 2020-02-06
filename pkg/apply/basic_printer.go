@@ -7,11 +7,12 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/apimachinery/pkg/runtime/schema"
-
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/wait"
 )
 
@@ -26,23 +27,18 @@ type BasicPrinter struct {
 // format on StdOut. As we support other printer implementations
 // this should probably be an interface.
 // This function will block until the channel is closed.
-func (b *BasicPrinter) Print(ch <-chan Event) {
-	for event := range ch {
-		switch event.EventType {
-		case ErrorEventType:
-			cmdutil.CheckErr(event.ErrorEvent.Err)
-		case ApplyEventType:
-			obj := event.ApplyEvent.Object
+func (b *BasicPrinter) Print(ch <-chan event.Event) {
+	for e := range ch {
+		switch e.Type {
+		case event.ErrorEventType:
+			cmdutil.CheckErr(e.ErrorEvent.Err)
+		case event.ApplyEventType:
+			obj := e.ApplyEvent.Object
 			gvk := obj.GetObjectKind().GroupVersionKind()
-			name := "<unknown>"
-			if acc, err := meta.Accessor(obj); err == nil {
-				if n := acc.GetName(); len(n) > 0 {
-					name = n
-				}
-			}
-			fmt.Fprintf(b.IOStreams.Out, "%s %s\n", resourceIDToString(gvk.GroupKind(), name), event.ApplyEvent.Operation)
-		case StatusEventType:
-			statusEvent := event.StatusEvent
+			name := getName(obj)
+			fmt.Fprintf(b.IOStreams.Out, "%s %s\n", resourceIDToString(gvk.GroupKind(), name), e.ApplyEvent.Operation)
+		case event.StatusEventType:
+			statusEvent := e.StatusEvent
 			switch statusEvent.Type {
 			case wait.ResourceUpdate:
 				id := statusEvent.EventResource.ResourceIdentifier
@@ -53,8 +49,22 @@ func (b *BasicPrinter) Print(ch <-chan Event) {
 			case wait.Aborted:
 				fmt.Fprintf(b.IOStreams.Out, "resources failed to the reached Current status\n")
 			}
+		case event.PruneEventType:
+			obj := e.PruneEvent.Object
+			gvk := obj.GetObjectKind().GroupVersionKind()
+			name := getName(obj)
+			fmt.Fprintf(b.IOStreams.Out, "%s %s\n", resourceIDToString(gvk.GroupKind(), name), "pruned")
 		}
 	}
+}
+
+func getName(obj runtime.Object) string {
+	if acc, err := meta.Accessor(obj); err == nil {
+		if n := acc.GetName(); len(n) > 0 {
+			return n
+		}
+	}
+	return "<unknown>"
 }
 
 // resourceIDToString returns the string representation of a GroupKind and a resource name.
