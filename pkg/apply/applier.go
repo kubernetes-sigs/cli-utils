@@ -5,7 +5,6 @@ package apply
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/go-errors/errors"
@@ -63,7 +62,7 @@ type Applier struct {
 // a cluster. This involves validating command line inputs and configuring
 // clients for communicating with the cluster.
 func (a *Applier) Initialize(cmd *cobra.Command) error {
-	a.ApplyOptions.PreProcessorFn = prependGroupingObject(a.ApplyOptions)
+	a.ApplyOptions.PreProcessorFn = prune.PrependGroupingObject(a.ApplyOptions)
 	err := a.ApplyOptions.Complete(a.factory, cmd)
 	if err != nil {
 		return errors.WrapPrefix(err, "error setting up ApplyOptions", 1)
@@ -230,28 +229,4 @@ type ErrorEvent struct {
 type ApplyEvent struct {
 	Operation string
 	Object    runtime.Object
-}
-
-// PrependGroupingObject orders the objects to apply so the "grouping"
-// object stores the inventory, and it is first to be applied.
-func prependGroupingObject(o *apply.ApplyOptions) func() error {
-	return func() error {
-		if o == nil {
-			return fmt.Errorf("ApplyOptions are nil")
-		}
-		infos, err := o.GetObjects()
-		if err != nil {
-			return err
-		}
-		_, exists := prune.FindGroupingObject(infos)
-		if exists {
-			if err := prune.AddInventoryToGroupingObj(infos); err != nil {
-				return err
-			}
-			if !prune.SortGroupingObject(infos) {
-				return err
-			}
-		}
-		return nil
-	}
 }

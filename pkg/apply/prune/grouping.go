@@ -22,6 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/resource"
+	"k8s.io/kubectl/pkg/cmd/apply"
 )
 
 const (
@@ -89,6 +90,30 @@ func SortGroupingObject(infos []*resource.Info) bool {
 		}
 	}
 	return false
+}
+
+// PrependGroupingObject orders the objects to apply so the "grouping"
+// object stores the inventory, and it is first to be applied.
+func PrependGroupingObject(o *apply.ApplyOptions) func() error {
+	return func() error {
+		if o == nil {
+			return fmt.Errorf("ApplyOptions are nil")
+		}
+		infos, err := o.GetObjects()
+		if err != nil {
+			return err
+		}
+		_, exists := FindGroupingObject(infos)
+		if exists {
+			if err := AddInventoryToGroupingObj(infos); err != nil {
+				return err
+			}
+			if !SortGroupingObject(infos) {
+				return err
+			}
+		}
+		return nil
+	}
 }
 
 // Adds the inventory of all objects (passed as infos) to the
