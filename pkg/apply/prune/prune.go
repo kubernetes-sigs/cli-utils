@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"io"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/printers"
@@ -233,6 +234,10 @@ func (po *PruneOptions) Prune(currentObjects []*resource.Info) error {
 		namespacedClient := po.client.Resource(mapping.Resource).Namespace(inv.Namespace)
 		obj, err := namespacedClient.Get(inv.Name, metav1.GetOptions{})
 		if err != nil {
+			// Do not return if object to prune (delete) is not found
+			if apierrors.IsNotFound(err) {
+				continue
+			}
 			return err
 		}
 		if !po.DryRun {
