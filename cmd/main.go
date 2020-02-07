@@ -12,6 +12,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/cli-utils/cmd/apply"
+	"sigs.k8s.io/cli-utils/cmd/destroy"
 	"sigs.k8s.io/cli-utils/cmd/diff"
 	"sigs.k8s.io/cli-utils/cmd/preview"
 
@@ -42,15 +43,15 @@ func main() {
 		ErrOut: os.Stderr,
 	}
 
-	names := []string{"apply", "preview", "diff"}
+	names := []string{"apply", "preview", "diff", "destroy"}
 	applyCmd := apply.NewCmdApply(f, ioStreams)
 	updateHelp(names, applyCmd)
 	previewCmd := preview.NewCmdPreview(f, ioStreams)
 	updateHelp(names, previewCmd)
 	diffCmd := diff.NewCmdDiff(f, ioStreams)
 	updateHelp(names, diffCmd)
-
-	cmd.AddCommand(applyCmd, previewCmd, diffCmd)
+	destroyCmd := destroy.NewCmdDestroy(f, ioStreams)
+	cmd.AddCommand(applyCmd, diffCmd, destroyCmd, previewCmd)
 
 	if err := cmd.Execute(); err != nil {
 		os.Exit(1)
