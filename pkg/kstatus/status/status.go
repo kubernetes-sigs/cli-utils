@@ -24,6 +24,7 @@ const (
 	FailedStatus      Status = "Failed"
 	CurrentStatus     Status = "Current"
 	TerminatingStatus Status = "Terminating"
+	NotFoundStatus    Status = "NotFound"
 	UnknownStatus     Status = "Unknown"
 )
 
