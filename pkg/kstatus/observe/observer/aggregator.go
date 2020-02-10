@@ -5,7 +5,9 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
 )
 
-// StatusAggregator provides the interface the observer uses to compute the aggregate status.
+// StatusAggregator provides the interface the observer uses to compute the aggregate status over
+// a set of statuses for individual resources. The implementation of this interface that should
+// be used is set by providing an appropriate factory function when creating an Observer.
 // It also include a function that will be used by the observer to determine if all resources
 // should be considered fully reconciled.
 type StatusAggregator interface {

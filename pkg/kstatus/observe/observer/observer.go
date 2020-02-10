@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/go-errors/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/observe/event"
@@ -25,7 +26,7 @@ type ReaderFactoryFunc func(reader client.Reader, mapper meta.RESTMapper,
 type ObserversFactoryFunc func(reader ObserverReader, mapper meta.RESTMapper) (
 	resourceObservers map[schema.GroupKind]ResourceObserver, defaultObserver ResourceObserver)
 
-// Observer provides functionality for polling a cluster for status for a set of resources.
+// Observer provides functionality for polling a cluster for status of a set of resources.
 type Observer struct {
 	Reader client.Reader
 	Mapper meta.RESTMapper
@@ -65,7 +66,7 @@ func (s *Observer) Observe(ctx context.Context, identifiers []wait.ResourceIdent
 		if err != nil {
 			eventChannel <- event.Event{
 				EventType: event.ErrorEvent,
-				Error:     err,
+				Error:     errors.WrapPrefix(err, "error creating new ObserverReader", 1),
 			}
 			return
 		}
@@ -231,5 +232,5 @@ func (r *statusObserverRunner) isUpdatedObservedResource(observedResource *event
 	if !found {
 		return true
 	}
-	return !event.DeepEqual(observedResource, oldObservedResource)
+	return !event.ObservedStatusChanged(observedResource, oldObservedResource)
 }

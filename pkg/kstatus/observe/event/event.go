@@ -8,20 +8,22 @@ import (
 
 // EventType is the type that describes the type of an Event that is passed back to the caller
 // as resources in the cluster are being observed.
-type EventType string
+//
+//go:generate stringer -type=EventType
+type EventType int
 
 const (
 	// ResourceUpdateEvent describes events related to a change in the status of one of the observed resources.
-	ResourceUpdateEvent EventType = "ResourceUpdated"
+	ResourceUpdateEvent EventType = iota
 	// CompletedEvent signals that all resources have been reconciled and the observer has completed its work. The
 	// event channel will be closed after this event.
-	CompletedEvent EventType = "Completed"
+	CompletedEvent
 	// AbortedEvent signals that the observer is shutting down because it has been cancelled. All resources might
 	// not have been reconciled. The event channel will be closed after this event.
-	AbortedEvent EventType = "Aborted"
+	AbortedEvent
 	// ErrorEvent signals that the observer has encountered an error that it can not recover from. The observer
 	// is shutting down and the event channel will be closed after this event.
-	ErrorEvent EventType = "Error"
+	ErrorEvent
 )
 
 // Event defines that type that is passed back through the event channel to notify the caller of changes
@@ -96,9 +98,14 @@ func (g ObservedResources) Swap(i, j int) {
 	g[i], g[j] = g[j], g[i]
 }
 
-// DeepEqual checks if two instances of ObservedResource are identical. This is used
-// to determine whether status has changed for a particular resource.
-func DeepEqual(or1, or2 *ObservedResource) bool {
+// ObservedStatusChanged checks if two instances of ObservedResource are the same.
+// This is used to determine whether status has changed for a particular resource.
+// Important to note that this does not check all fields, but only the ones
+// that are considered part of the status for a resource. So if the status
+// or the message of an ObservedResource (or any of its generated ObservedResources)
+// have changed, this will return true. Changes to the state of the resource
+// itself that doesn't impact status are not considered.
+func ObservedStatusChanged(or1, or2 *ObservedResource) bool {
 	if or1.Identifier != or2.Identifier ||
 		or1.Status != or2.Status ||
 		or1.Message != or2.Message {
@@ -117,7 +124,7 @@ func DeepEqual(or1, or2 *ObservedResource) bool {
 	}
 
 	for i := range or1.GeneratedResources {
-		if !DeepEqual(or1.GeneratedResources[i], or2.GeneratedResources[i]) {
+		if !ObservedStatusChanged(or1.GeneratedResources[i], or2.GeneratedResources[i]) {
 			return false
 		}
 	}
