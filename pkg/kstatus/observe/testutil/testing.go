@@ -44,11 +44,13 @@ func (n *NoopObserverReader) Get(_ context.Context, _ client.ObjectKey, _ *unstr
 	return nil
 }
 
-func (n *NoopObserverReader) ListNamespaceScoped(_ context.Context, _ *unstructured.UnstructuredList, _ string, _ labels.Selector) error {
+func (n *NoopObserverReader) ListNamespaceScoped(_ context.Context, _ *unstructured.UnstructuredList,
+	_ string, _ labels.Selector) error {
 	return nil
 }
 
-func (n *NoopObserverReader) ListClusterScoped(_ context.Context, _ *unstructured.UnstructuredList, _ labels.Selector) error {
+func (n *NoopObserverReader) ListClusterScoped(_ context.Context, _ *unstructured.UnstructuredList,
+	_ labels.Selector) error {
 	return nil
 }
 

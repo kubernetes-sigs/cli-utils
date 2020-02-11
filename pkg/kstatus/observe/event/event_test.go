@@ -265,7 +265,7 @@ func TestDeepEqual(t *testing.T) {
 
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
-			res := DeepEqual(&tc.actual, &tc.expected)
+			res := ObservedStatusChanged(&tc.actual, &tc.expected)
 
 			assert.Equal(t, tc.equal, res)
 		})
