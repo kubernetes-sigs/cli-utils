@@ -9,6 +9,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/kubectl/pkg/cmd/apply"
 	"k8s.io/kubectl/pkg/cmd/util"
+	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/prune"
 )
 
@@ -63,28 +64,20 @@ func (d *Destroyer) Initialize(cmd *cobra.Command) error {
 
 // Run performs the destroy step. This happens asynchronously
 // on progress and any errors are reported back on the event channel.
-func (d *Destroyer) Run() <-chan Event {
-	ch := make(chan Event)
+func (d *Destroyer) Run() <-chan event.Event {
+	ch := make(chan event.Event)
 
 	go func() {
 		defer close(ch)
-		adapter := &KubectlPrinterAdapter{
-			ch: ch,
-		}
-		// The adapter is used to intercept what is meant to be printing
-		// in the PruneOptions, and instead turn those into events.
-		d.PruneOptions.ToPrinter = adapter.toPrinterFunc()
-
 		infos, _ := d.ApplyOptions.GetObjects()
-
-		err := d.PruneOptions.Prune(infos)
+		err := d.PruneOptions.Prune(infos, ch)
 		if err != nil {
 			// If we see an error here we just report it on the channel and then
 			// give up. Eventually we might be able to determine which errors
 			// are fatal and which might allow us to continue.
-			ch <- Event{
-				EventType: ErrorEventType,
-				ErrorEvent: ErrorEvent{
+			ch <- event.Event{
+				Type: event.ErrorEventType,
+				ErrorEvent: event.ErrorEvent{
 					Err: errors.WrapPrefix(err, "error pruning resources", 1),
 				},
 			}
