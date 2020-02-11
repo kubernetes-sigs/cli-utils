@@ -8,6 +8,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/printers"
+	"sigs.k8s.io/cli-utils/pkg/apply/event"
 )
 
 // KubectlPrinterAdapter is a workaround for capturing progress from
@@ -16,22 +17,22 @@ import (
 // plugs into ApplyOptions as a ToPrinter function, but instead of
 // printing the info, it emits it as an event on the provided channel.
 type KubectlPrinterAdapter struct {
-	ch chan<- Event
+	ch chan<- event.Event
 }
 
 // resourcePrinterImpl implements the ResourcePrinter interface. But
 // instead of printing, it emits information on the provided channel.
 type resourcePrinterImpl struct {
 	operation string
-	ch        chan<- Event
+	ch        chan<- event.Event
 }
 
 // PrintObj takes the provided object and operation and emits
 // it on the channel.
 func (r *resourcePrinterImpl) PrintObj(obj runtime.Object, _ io.Writer) error {
-	r.ch <- Event{
-		EventType: ApplyEventType,
-		ApplyEvent: ApplyEvent{
+	r.ch <- event.Event{
+		Type: event.ApplyEventType,
+		ApplyEvent: event.ApplyEvent{
 			Operation: r.operation,
 			Object:    obj,
 		},

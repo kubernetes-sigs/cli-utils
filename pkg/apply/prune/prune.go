@@ -13,16 +13,15 @@ package prune
 
 import (
 	"fmt"
-	"io"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/validation"
+	"sigs.k8s.io/cli-utils/pkg/apply/event"
 )
 
 // PruneOptions encapsulates the necessary information to
@@ -43,9 +42,6 @@ type PruneOptions struct {
 	// easier by manually setting the retrieved grouping infos.
 	pastGroupingObjects      []*resource.Info
 	retrievedGroupingObjects bool
-
-	ToPrinter func(string) (printers.ResourcePrinter, error)
-	out       io.Writer
 
 	DryRun    bool
 	validator validation.Schema
@@ -203,7 +199,7 @@ func (po *PruneOptions) calcPruneSet(pastGroupingInfos []*resource.Info) (*Inven
 // (retrieved from previous grouping objects) but omitted in
 // the current apply. Prune also delete all previous grouping
 // objects. Returns an error if there was a problem.
-func (po *PruneOptions) Prune(currentObjects []*resource.Info) error {
+func (po *PruneOptions) Prune(currentObjects []*resource.Info, eventChannel chan<- event.Event) error {
 	currentGroupingObject, found := FindGroupingObject(currentObjects)
 	if !found {
 		return fmt.Errorf("current grouping object not found during prune")
@@ -246,12 +242,11 @@ func (po *PruneOptions) Prune(currentObjects []*resource.Info) error {
 				return err
 			}
 		}
-		printer, err := po.ToPrinter("deleted")
-		if err != nil {
-			return err
-		}
-		if err = printer.PrintObj(obj, po.out); err != nil {
-			return err
+		eventChannel <- event.Event{
+			Type: event.PruneEventType,
+			PruneEvent: event.PruneEvent{
+				Object: obj,
+			},
 		}
 	}
 	// Delete previous grouping objects.
@@ -264,12 +259,11 @@ func (po *PruneOptions) Prune(currentObjects []*resource.Info) error {
 				return err
 			}
 		}
-		printer, err := po.ToPrinter("deleted")
-		if err != nil {
-			return err
-		}
-		if err = printer.PrintObj(pastGroupInfo.Object, po.out); err != nil {
-			return err
+		eventChannel <- event.Event{
+			Type: event.PruneEventType,
+			PruneEvent: event.PruneEvent{
+				Object: pastGroupInfo.Object,
+			},
 		}
 	}
 	return nil
