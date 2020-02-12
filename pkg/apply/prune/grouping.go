@@ -230,6 +230,7 @@ func RetrieveInventoryFromGroupingObj(infos []*resource.Info) ([]*ObjMetadata, e
 // we can't set the empty inventory on the grouping object. If successful,
 // returns nil.
 func ClearGroupingObj(infos []*resource.Info) error {
+	// Initially, find the grouping object ConfigMap (in Unstructured format).
 	var groupingObj *unstructured.Unstructured
 	for _, info := range infos {
 		obj := info.Object
@@ -242,13 +243,9 @@ func ClearGroupingObj(infos []*resource.Info) error {
 			break
 		}
 	}
-
-	// If we've found the grouping object, store the object metadata inventory
-	// in the grouping config map.
 	if groupingObj == nil {
 		return fmt.Errorf("grouping object not found")
 	}
-
 	// Clears the inventory map of the ConfigMap "data" section.
 	emptyMap := map[string]string{}
 	err := unstructured.SetNestedStringMap(groupingObj.UnstructuredContent(),
