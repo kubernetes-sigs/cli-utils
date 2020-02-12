@@ -224,6 +224,42 @@ func RetrieveInventoryFromGroupingObj(infos []*resource.Info) ([]*ObjMetadata, e
 	return inventory, nil
 }
 
+// ClearGroupingObj finds the grouping object in the list of objects,
+// and sets an empty inventory. Returns error if the grouping object
+// is not Unstructured, the grouping object does not exist, or if
+// we can't set the empty inventory on the grouping object. If successful,
+// returns nil.
+func ClearGroupingObj(infos []*resource.Info) error {
+	var groupingObj *unstructured.Unstructured
+	for _, info := range infos {
+		obj := info.Object
+		if IsGroupingObject(obj) {
+			var ok bool
+			groupingObj, ok = obj.(*unstructured.Unstructured)
+			if !ok {
+				return fmt.Errorf("grouping object is not an Unstructured: %#v", groupingObj)
+			}
+			break
+		}
+	}
+
+	// If we've found the grouping object, store the object metadata inventory
+	// in the grouping config map.
+	if groupingObj == nil {
+		return fmt.Errorf("grouping object not found")
+	}
+
+	// Clears the inventory map of the ConfigMap "data" section.
+	emptyMap := map[string]string{}
+	err := unstructured.SetNestedStringMap(groupingObj.UnstructuredContent(),
+		emptyMap, "data")
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // calcInventoryHash returns an unsigned int32 representing the hash
 // of the inventory strings. If there is an error writing bytes to
 // the hash, then the error is returned; nil is returned otherwise.
