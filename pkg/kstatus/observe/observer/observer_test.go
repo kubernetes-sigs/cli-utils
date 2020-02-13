@@ -106,10 +106,10 @@ func TestStatusObserverRunner(t *testing.T) {
 					return newFakeAggregator(identifiers)
 				},
 				ReaderFactoryFunc: func(_ client.Reader, _ meta.RESTMapper, _ []wait.ResourceIdentifier) (
-					ObserverReader, error) {
+					ClusterReader, error) {
 					return testutil.NewNoopObserverReader(), nil
 				},
-				ObserversFactoryFunc: func(_ ObserverReader, _ meta.RESTMapper) (
+				ObserversFactoryFunc: func(_ ClusterReader, _ meta.RESTMapper) (
 					resourceObservers map[schema.GroupKind]ResourceObserver, defaultObserver ResourceObserver) {
 					return make(map[schema.GroupKind]ResourceObserver), tc.defaultObserver
 				},
@@ -141,10 +141,10 @@ func TestNewStatusObserverRunnerCancellation(t *testing.T) {
 			//return aggregator.NewAllCurrentOrNotFoundStatusAggregator(identifiers)
 		},
 		ReaderFactoryFunc: func(_ client.Reader, _ meta.RESTMapper, _ []wait.ResourceIdentifier) (
-			ObserverReader, error) {
+			ClusterReader, error) {
 			return testutil.NewNoopObserverReader(), nil
 		},
-		ObserversFactoryFunc: func(_ ObserverReader, _ meta.RESTMapper) (
+		ObserversFactoryFunc: func(_ ClusterReader, _ meta.RESTMapper) (
 			resourceObservers map[schema.GroupKind]ResourceObserver, defaultObserver ResourceObserver) {
 			return make(map[schema.GroupKind]ResourceObserver), nil
 		},

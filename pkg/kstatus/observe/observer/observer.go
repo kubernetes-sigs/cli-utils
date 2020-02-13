@@ -17,13 +17,13 @@ import (
 type AggregatorFactoryFunc func(identifiers []wait.ResourceIdentifier) StatusAggregator
 
 // ReaderFactoryFunc defines the signature for the function the Observer will use to create
-// a new ObserverReader for each statusObserverRunner.
+// a new ClusterReader for each statusObserverRunner.
 type ReaderFactoryFunc func(reader client.Reader, mapper meta.RESTMapper,
-	identifiers []wait.ResourceIdentifier) (ObserverReader, error)
+	identifiers []wait.ResourceIdentifier) (ClusterReader, error)
 
 // ObserversFactoryFunc defines the signature for the function the Observer will use to
 // create the resource observers and the default observer for each statusObserverRunner.
-type ObserversFactoryFunc func(reader ObserverReader, mapper meta.RESTMapper) (
+type ObserversFactoryFunc func(reader ClusterReader, mapper meta.RESTMapper) (
 	resourceObservers map[schema.GroupKind]ResourceObserver, defaultObserver ResourceObserver)
 
 // Observer provides functionality for polling a cluster for status of a set of resources.
@@ -38,7 +38,7 @@ type Observer struct {
 
 	// ReaderFactoryFunc provides the Observer with a factory function for creating new
 	// ObserverReaders. Since these can be stateful, every call to Observe will create a new
-	// ObserverReader.
+	// ClusterReader.
 	ReaderFactoryFunc ReaderFactoryFunc
 
 	// ObserversFactoryFunc provides the Observer with a factory function for creating resource
@@ -66,7 +66,7 @@ func (s *Observer) Observe(ctx context.Context, identifiers []wait.ResourceIdent
 		if err != nil {
 			eventChannel <- event.Event{
 				EventType: event.ErrorEvent,
-				Error:     errors.WrapPrefix(err, "error creating new ObserverReader", 1),
+				Error:     errors.WrapPrefix(err, "error creating new ClusterReader", 1),
 			}
 			return
 		}
@@ -94,9 +94,9 @@ func (s *Observer) Observe(ctx context.Context, identifiers []wait.ResourceIdent
 // statusObserverRunner is responsible for polling of a set of resources. Each call to Observe will create
 // a new statusObserverRunner, which means we can keep state in the runner and all data will only be accessed
 // by a single goroutine, meaning we don't need synchronization.
-// The statusObserverRunner uses an implementation of the ObserverReader interface to talk to the
-// kubernetes cluster. Currently this can be either the cached ObserverReader that syncs all needed resources
-// with LIST calls before each polling loop, or the normal ObserverReader that just forwards each call
+// The statusObserverRunner uses an implementation of the ClusterReader interface to talk to the
+// kubernetes cluster. Currently this can be either the cached ClusterReader that syncs all needed resources
+// with LIST calls before each polling loop, or the normal ClusterReader that just forwards each call
 // to the client.Reader from controller-runtime.
 type statusObserverRunner struct {
 	// ctx is the context for the runner. It will be used by the caller of Observe to cancel
@@ -105,10 +105,10 @@ type statusObserverRunner struct {
 
 	// reader is the interface for fetching and listing resources from the cluster. It can be implemented
 	// to make call directly to the cluster or use caching to reduce the number of calls to the cluster.
-	reader ObserverReader
+	reader ClusterReader
 
 	// observers contains the resource specific observers. These will contain logic for how to
-	// compute status for specific GroupKinds. These will use an ObserverReader to fetch
+	// compute status for specific GroupKinds. These will use an ClusterReader to fetch
 	// status of a resource and any generated resources.
 	observers map[schema.GroupKind]ResourceObserver
 
@@ -164,7 +164,7 @@ func (r *statusObserverRunner) Run() {
 			}
 			return
 		case <-ticker.C:
-			// First trigger a sync of the ObserverReader. This may or may not actually
+			// First trigger a sync of the ClusterReader. This may or may not actually
 			// result in calls to the cluster, depending on the implementation.
 			// If this call fails, there is no clean way to recover, so we just return an ErrorEvent
 			// and shut down.
