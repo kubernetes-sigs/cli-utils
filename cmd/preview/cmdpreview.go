@@ -46,10 +46,11 @@ func NewCmdPreview(f util.Factory, ioStreams genericclioptions.IOStreams) *cobra
 	}
 
 	cmdutil.CheckErr(applier.SetFlags(cmd))
-
 	cmdutil.AddValidateFlags(cmd)
+	_ = cmd.Flags().MarkHidden("validate")
+
 	cmd.Flags().BoolVar(&applier.NoPrune, "no-prune", applier.NoPrune, "If true, do not prune previously applied objects.")
-	// Necessary because ApplyOptions depends on it--not used.
+	// Necessary because ApplyOptions depends on it--hidden.
 	cmd.Flags().BoolVar(&applier.DryRun, "dry-run", applier.DryRun, "NOT USED")
 	_ = cmd.Flags().MarkHidden("dry-run")
 

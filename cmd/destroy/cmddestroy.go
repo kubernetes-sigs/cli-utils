@@ -44,8 +44,10 @@ func NewCmdDestroy(f util.Factory, ioStreams genericclioptions.IOStreams) *cobra
 	destroyer.SetFlags(cmd)
 
 	cmdutil.AddValidateFlags(cmd)
-	cmd.Flags().BoolVar(&destroyer.DryRun, "dry-run", destroyer.DryRun,
-		"If true, only print the object that would be sent and action which would be performed, without performing it.")
+	_ = cmd.Flags().MarkHidden("validate")
+
+	cmd.Flags().BoolVar(&destroyer.DryRun, "dry-run", destroyer.DryRun, "If true, only print the objects that would be deleted, without performing it.")
+
 	cmdutil.AddServerSideApplyFlags(cmd)
 	return cmd
 }
