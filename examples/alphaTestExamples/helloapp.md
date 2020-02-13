@@ -8,7 +8,7 @@ This demo helps you to deploy an example hello app end-to-end using `kapply`.
 Steps:
 1. Create the resources files.
 2. Spin-up kubernetes cluster on local using [kind].
-3. Deploy the app using `kapply` and verify the status.
+3. Deploy, modify and delete the app using `kapply` and verify the status.
 
 First define a place to work:
 
@@ -33,6 +33,12 @@ BASE=$DEMO_HOME/base
 mkdir -p $BASE
 OUTPUT=$DEMO_HOME/output
 mkdir -p $OUTPUT
+
+function expectedOutputLine() {
+  test 1 == \
+  $(grep "$@" $OUTPUT/status | wc -l); \
+  echo $?
+}
 ```
 
 Now lets add a simple config map resource to the `base`
@@ -47,6 +53,51 @@ metadata:
 data:
   altGreeting: "Good Morning!"
   enableRisky: "false"
+EOF
+```
+
+Create a deployment file with the following example configuration
+
+<!-- @createDeploymentYaml @testE2EAgainstLatestRelease-->
+```
+cat <<EOF >$BASE/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: hello
+  name: the-deployment
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: hello
+  template:
+    metadata:
+      labels:
+        app: hello
+        deployment: hello
+    spec:
+      containers:
+      - command:
+        - /hello
+        - --port=8080
+        - --enableRiskyFeature=\$(ENABLE_RISKY)
+        env:
+        - name: ALT_GREETING
+          valueFrom:
+            configMapKeyRef:
+              key: altGreeting
+              name: the-map
+        - name: ENABLE_RISKY
+          valueFrom:
+            configMapKeyRef:
+              key: enableRisky
+              name: the-map
+        image: monopole/hello:1
+        name: the-container
+        ports:
+        - containerPort: 8080
 EOF
 ```
 
@@ -70,9 +121,10 @@ spec:
 EOF
 ```
 
-Create a `grouping.yaml` resource. By this, you are defining the grouping of the current directory, `base`.
-`kapply` uses the unique label in this file to track any future state changes made to this directory.
-Make sure the label key is `cli-utils.sigs.k8s.io/inventory-id` and give any unique label value and DO NOT change it in future.
+Create a `grouping.yaml` resource. By this, you are defining the grouping of the current directory,
+`base`. `kapply` uses the unique label in this file to track any future state changes made to this
+directory. Make sure the label key is `cli-utils.sigs.k8s.io/inventory-id` and give any unique
+label value and DO NOT change it in future.
 
 <!-- @createGroupingYaml @testE2EAgainstLatestRelease-->
 ```
@@ -100,7 +152,15 @@ kind create cluster
 Use the `kapply` binary in `MYGOBIN` to apply a deployment and verify it is successful.
 <!-- @runHelloApp @testE2EAgainstLatestRelease -->
 ```
-kapply apply -f $BASE;
+kapply apply $BASE --status > $OUTPUT/status;
+
+expectedOutputLine "deployment.apps/the-deployment is Current: Deployment is available. Replicas: 3"
+
+expectedOutputLine "service/the-service is Current: Service is ready"
+
+expectedOutputLine "configmap/inventory-map-7eabe827 is Current: Resource is always ready"
+
+expectedOutputLine "configmap/the-map is Current: Resource is always ready"
 
 ```
 
@@ -120,14 +180,34 @@ EOF
 
 rm $BASE/configMap.yaml
 
-kapply apply -f $BASE;
+kapply apply $BASE --status > $OUTPUT/status;
+
+expectedOutputLine "deployment.apps/the-deployment is Current: Deployment is available. Replicas: 3"
+
+expectedOutputLine "service/the-service is Current: Service is ready"
+
+expectedOutputLine "configmap/inventory-map-f124085f is Current: Resource is always ready"
+
+expectedOutputLine "configmap/the-map2 is Current: Resource is always ready"
+
+expectedOutputLine "configmap/the-map pruned"
+
+expectedOutputLine "configmap/inventory-map-7eabe827 pruned"
 
 ```
 
 Clean-up the cluster 
 <!-- @deleteKindCluster @testE2EAgainstLatestRelease -->
 ```
-kapply destroy -f $BASE;
+kapply destroy $BASE > $OUTPUT/status;
 
-kind delete cluster
+expectedOutputLine "deployment.apps/the-deployment pruned"
+
+expectedOutputLine "configmap/the-map2 pruned"
+
+expectedOutputLine "service/the-service pruned"
+
+expectedOutputLine "configmap/inventory-map-f124085f pruned"
+
+kind delete cluster;
 ```

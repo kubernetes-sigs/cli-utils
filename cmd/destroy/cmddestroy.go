@@ -20,16 +20,13 @@ func NewCmdDestroy(f util.Factory, ioStreams genericclioptions.IOStreams) *cobra
 	}
 
 	cmd := &cobra.Command{
-		Use:                   "destroy (-f FILENAME | -k DIRECTORY)",
+		Use:                   "destroy (FILENAME... | DIRECTORY)",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Destroy all the resources related to configuration managed by kpt"),
+		Short:                 i18n.T("Destroy all the resources related to configuration"),
 		Args:                  cobra.MaximumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			if len(args) > 0 {
-				destroyer.ApplyOptions.DeleteFlags.FileNameFlags.Kustomize = &args[0]
-			}
-
-			cmdutil.CheckErr(destroyer.Initialize(cmd))
+			paths := args
+			cmdutil.CheckErr(destroyer.Initialize(cmd, paths))
 
 			// Run the destroyer. It will return a channel where we can receive updates
 			// to keep track of progress and any issues.
@@ -41,7 +38,7 @@ func NewCmdDestroy(f util.Factory, ioStreams genericclioptions.IOStreams) *cobra
 		},
 	}
 
-	destroyer.SetFlags(cmd)
+	cmdutil.CheckErr(destroyer.SetFlags(cmd))
 
 	cmdutil.AddValidateFlags(cmd)
 	_ = cmd.Flags().MarkHidden("validate")
