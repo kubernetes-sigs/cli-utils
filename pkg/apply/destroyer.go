@@ -70,6 +70,11 @@ func (d *Destroyer) Run() <-chan event.Event {
 	go func() {
 		defer close(ch)
 		infos, _ := d.ApplyOptions.GetObjects()
+		// Clear the data/inventory section of the grouping object configmap,
+		// so the prune will calculate the prune set as all the objects,
+		// deleting everything. We can ignore the error, since the Prune
+		// will catch the same problems.
+		_ = prune.ClearGroupingObj(infos)
 		err := d.PruneOptions.Prune(infos, ch)
 		if err != nil {
 			// If we see an error here we just report it on the channel and then
@@ -92,6 +97,10 @@ func (d *Destroyer) Run() <-chan event.Event {
 // of cobra flags from the Destroyer.
 func (d *Destroyer) SetFlags(cmd *cobra.Command) {
 	d.ApplyOptions.DeleteFlags.AddFlags(cmd)
-	d.ApplyOptions.RecordFlags.AddFlags(cmd)
+	_ = cmd.Flags().MarkHidden("cascade")
+	_ = cmd.Flags().MarkHidden("force")
+	_ = cmd.Flags().MarkHidden("grace-period")
+	_ = cmd.Flags().MarkHidden("timeout")
+	_ = cmd.Flags().MarkHidden("wait")
 	d.ApplyOptions.Overwrite = true
 }

@@ -61,12 +61,14 @@ type Applier struct {
 // Initialize sets up the Applier for actually doing an apply against
 // a cluster. This involves validating command line inputs and configuring
 // clients for communicating with the cluster.
-func (a *Applier) Initialize(cmd *cobra.Command) error {
-	a.ApplyOptions.PreProcessorFn = prune.PrependGroupingObject(a.ApplyOptions)
+func (a *Applier) Initialize(cmd *cobra.Command, paths []string) error {
+	fileNameFlags := processPaths(paths)
+	a.ApplyOptions.DeleteFlags.FileNameFlags = &fileNameFlags
 	err := a.ApplyOptions.Complete(a.factory, cmd)
 	if err != nil {
 		return errors.WrapPrefix(err, "error setting up ApplyOptions", 1)
 	}
+	a.ApplyOptions.PreProcessorFn = prune.PrependGroupingObject(a.ApplyOptions)
 	err = a.PruneOptions.Initialize(a.factory, a.ApplyOptions.Namespace)
 	if err != nil {
 		return errors.WrapPrefix(err, "error setting up PruneOptions", 1)
@@ -87,12 +89,23 @@ func (a *Applier) Initialize(cmd *cobra.Command) error {
 // SetFlags configures the command line flags needed for apply and
 // status. This is a temporary solution as we should separate the configuration
 // of cobra flags from the Applier.
-func (a *Applier) SetFlags(cmd *cobra.Command) {
+func (a *Applier) SetFlags(cmd *cobra.Command) error {
 	a.ApplyOptions.DeleteFlags.AddFlags(cmd)
+	for _, flag := range []string{"kustomize", "filename", "recursive"} {
+		err := cmd.Flags().MarkHidden(flag)
+		if err != nil {
+			return err
+		}
+	}
 	a.ApplyOptions.RecordFlags.AddFlags(cmd)
-	a.ApplyOptions.PrintFlags.AddFlags(cmd)
+	_ = cmd.Flags().MarkHidden("cascade")
+	_ = cmd.Flags().MarkHidden("force")
+	_ = cmd.Flags().MarkHidden("grace-period")
+	_ = cmd.Flags().MarkHidden("timeout")
+	_ = cmd.Flags().MarkHidden("wait")
 	a.StatusOptions.AddFlags(cmd)
 	a.ApplyOptions.Overwrite = true
+	return nil
 }
 
 // newResolver sets up a new Resolver for computing status. The configuration
