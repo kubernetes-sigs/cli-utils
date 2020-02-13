@@ -1,13 +1,13 @@
 [kind]: https://github.com/kubernetes-sigs/kind
 
-# Demo: Multiple Apps
+# Demo: Multiple Services
 
-This demo helps you to multiple services on same kubenetes cluster using kapply.
+The following demonstrates applying and destroying multiple services to a `kind` cluster.
 
 Steps:
 1. Download the resources files for wordpress, mysql services.
 2. Spin-up kubernetes cluster on local using [kind].
-3. Deploy the wordpress, mysql apps using kapply and verify the status.
+3. Deploy the wordpress, mysql services using kapply and verify the status.
 4. Destroy wordpress service and verify that only wordpress service is destroyed.
 
 First define a place to work:
@@ -45,11 +45,20 @@ curl -s -o "$BASE/mysql/#1.yaml" "https://raw.githubusercontent.com\
 /kubernetes-sigs/kustomize\
 /master/examples/wordpress/mysql\
 /{secret,deployment,service}.yaml"
+
+expectedOutputLine()
+{
+  test 1 == \
+  $(grep "$@" $OUTPUT/status | wc -l); \
+  echo $?
+
+}
 ```
 
-Create a `grouping.yaml` resource. By this, you are defining the grouping of the current directories. kapply uses 
-the unique label in this file to track any future state changes made to this directory. Make sure the label key is 
-`cli-utils.sigs.k8s.io/inventory-id` and give any unique label value and DO NOT change it in future.
+Create a `grouping.yaml` resource. By this, you are defining the grouping of the current 
+directories. kapply uses the unique label in this file to track any future state changes 
+made to this directory. Make sure the label key is `cli-utils.sigs.k8s.io/inventory-id` 
+and give any unique label value and DO NOT change it in future.
 
 <!-- @createGroupingYaml @testE2EAgainstLatestRelease-->
 ```
@@ -85,35 +94,21 @@ Let's apply the wordpress and mysql services.
 ```
 kapply apply -f $BASE/mysql --status > $OUTPUT/status;
 
-test 1 == \
-  $(grep "deployment.apps/mysql is Current: Deployment is available. Replicas: 1" $OUTPUT/status | wc -l); \
-  echo $?
+expectedOutputLine "deployment.apps/mysql is Current: Deployment is available. Replicas: 1"
 
-test 1 == \
-  $(grep "secret/mysql-pass is Current: Resource is always ready" $OUTPUT/status | wc -l); \
-  echo $?
+expectedOutputLine "secret/mysql-pass is Current: Resource is always ready"
 
-test 1 == \
-  $(grep "configmap/inventory-map-mysql-57005c71 is Current: Resource is always ready" $OUTPUT/status | wc -l); \
-  echo $?
+expectedOutputLine "configmap/inventory-map-mysql-57005c71 is Current: Resource is always ready"
 
-test 1 == \
-  $(grep "service/mysql is Current: Service is ready" $OUTPUT/status | wc -l); \
-  echo $?
+expectedOutputLine "service/mysql is Current: Service is ready"
 
 kapply apply -f $BASE/wordpress --status > $OUTPUT/status;
 
-test 1 == \
-  $(grep "configmap/inventory-map-wordpress-2fbd5b91 is Current: Resource is always ready" $OUTPUT/status | wc -l); \
-  echo $?
+expectedOutputLine "configmap/inventory-map-wordpress-2fbd5b91 is Current: Resource is always ready"
 
-test 1 == \
-  $(grep "service/wordpress is Current: Service is ready" $OUTPUT/status | wc -l); \
-  echo $?
+expectedOutputLine "service/wordpress is Current: Service is ready"
 
-test 1 == \
-  $(grep "deployment.apps/wordpress is Current: Deployment is available. Replicas: 1" $OUTPUT/status | wc -l); \
-  echo $?
+expectedOutputLine "deployment.apps/wordpress is Current: Deployment is available. Replicas: 1"
 
 ```
 
@@ -122,17 +117,11 @@ Destroy one service and make sure that only that service is destroyed and clean-
 ```
 kapply destroy -f $BASE/wordpress > $OUTPUT/status;
 
-test 1 == \
-  $(grep "service/wordpress pruned" $OUTPUT/status | wc -l); \
-  echo $?
+expectedOutputLine "service/wordpress pruned"
 
-test 1 == \
-  $(grep "deployment.apps/wordpress pruned" $OUTPUT/status | wc -l); \
-  echo $?
+expectedOutputLine "deployment.apps/wordpress pruned"
 
-test 1 == \
-  $(grep "configmap/inventory-map-wordpress-2fbd5b91 pruned" $OUTPUT/status | wc -l); \
-  echo $?
+expectedOutputLine "configmap/inventory-map-wordpress-2fbd5b91 pruned"
 
 test 3 == \
   $(grep "" $OUTPUT/status | wc -l); \

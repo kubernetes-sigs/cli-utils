@@ -33,6 +33,14 @@ BASE=$DEMO_HOME/base
 mkdir -p $BASE
 OUTPUT=$DEMO_HOME/output
 mkdir -p $OUTPUT
+
+expectedOutputLine()
+{
+  test 1 == \
+  $(grep "$@" $OUTPUT/status | wc -l); \
+  echo $?
+
+}
 ```
 
 Now lets add a simple config map resource to the `base`
@@ -115,9 +123,10 @@ spec:
 EOF
 ```
 
-Create a `grouping.yaml` resource. By this, you are defining the grouping of the current directory, `base`.
-`kapply` uses the unique label in this file to track any future state changes made to this directory.
-Make sure the label key is `cli-utils.sigs.k8s.io/inventory-id` and give any unique label value and DO NOT change it in future.
+Create a `grouping.yaml` resource. By this, you are defining the grouping of the current directory,
+`base`. `kapply` uses the unique label in this file to track any future state changes made to this
+directory. Make sure the label key is `cli-utils.sigs.k8s.io/inventory-id` and give any unique
+label value and DO NOT change it in future.
 
 <!-- @createGroupingYaml @testE2EAgainstLatestRelease-->
 ```
@@ -147,23 +156,13 @@ Use the `kapply` binary in `MYGOBIN` to apply a deployment and verify it is succ
 ```
 kapply apply -f $BASE --status > $OUTPUT/status;
 
-echo $BASE
+expectedOutputLine "deployment.apps/the-deployment is Current: Deployment is available. Replicas: 3"
 
-test 1 == \
-  $(grep "deployment.apps/the-deployment is Current: Deployment is available. Replicas: 3" $OUTPUT/status | grep "" | wc -l); \
-  echo $?
+expectedOutputLine "service/the-service is Current: Service is ready"
 
-test 1 == \
-  $(grep "service/the-service is Current: Service is ready" $OUTPUT/status | wc -l); \
-  echo $?
+expectedOutputLine "configmap/inventory-map-7eabe827 is Current: Resource is always ready"
 
-test 1 == \
-  $(grep "configmap/inventory-map-7eabe827 is Current: Resource is always ready" $OUTPUT/status | wc -l); \
-  echo $?
-
-test 1 == \
-  $(grep "configmap/the-map is Current: Resource is always ready" $OUTPUT/status | wc -l); \
-  echo $?
+expectedOutputLine "configmap/the-map is Current: Resource is always ready"
 
 ```
 
@@ -185,32 +184,17 @@ rm $BASE/configMap.yaml
 
 kapply apply -f $BASE --status > $OUTPUT/status;
 
-cat $OUTPUT/status;
+expectedOutputLine "deployment.apps/the-deployment is Current: Deployment is available. Replicas: 3"
 
-test 1 == \
-  $(grep "deployment.apps/the-deployment is Current: Deployment is available. Replicas: 3" $OUTPUT/status | grep "" | wc -l); \
-  echo $?
+expectedOutputLine "service/the-service is Current: Service is ready"
 
-test 1 == \
-  $(grep "service/the-service is Current: Service is ready" $OUTPUT/status | wc -l); \
-  echo $?
+expectedOutputLine "configmap/inventory-map-f124085f is Current: Resource is always ready"
 
-test 1 == \
-  $(grep "configmap/inventory-map-f124085f is Current: Resource is always ready" $OUTPUT/status | wc -l); \
-  echo $?
+expectedOutputLine "configmap/the-map2 is Current: Resource is always ready"
 
-test 1 == \
-  $(grep "configmap/the-map2 is Current: Resource is always ready" $OUTPUT/status | wc -l); \
-  echo $?
+expectedOutputLine "configmap/the-map pruned"
 
-test 1 == \
-  $(grep "configmap/the-map pruned" $OUTPUT/status | wc -l); \
-  echo $?
-
-test 1 == \
-  $(grep "configmap/inventory-map-7eabe827 pruned" $OUTPUT/status | wc -l); \
-  echo $?
-
+expectedOutputLine "configmap/inventory-map-7eabe827 pruned"
 
 ```
 
@@ -219,21 +203,13 @@ Clean-up the cluster
 ```
 kapply destroy -f $BASE > $OUTPUT/status;
 
-test 1 == \
-  $(grep "deployment.apps/the-deployment pruned" $OUTPUT/status | wc -l); \
-  echo $?
+expectedOutputLine "deployment.apps/the-deployment pruned"
 
-test 1 == \
-  $(grep "configmap/the-map2 pruned" $OUTPUT/status | wc -l); \
-  echo $?
+expectedOutputLine "configmap/the-map2 pruned"
 
-test 1 == \
-  $(grep "service/the-service pruned" $OUTPUT/status | wc -l); \
-  echo $?
+expectedOutputLine "service/the-service pruned"
 
-test 1 == \
-  $(grep "configmap/inventory-map-f124085f pruned" $OUTPUT/status | wc -l); \
-  echo $?
+expectedOutputLine "configmap/inventory-map-f124085f pruned"
 
 kind delete cluster;
 ```
