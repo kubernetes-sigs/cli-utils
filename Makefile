@@ -10,6 +10,12 @@ export PATH := $(MYGOBIN):$(PATH)
 
 all: generate license fix vet fmt test lint tidy
 
+# The following target intended for reference by a file in
+# https://github.com/kubernetes/test-infra/tree/master/config/jobs/kubernetes-sigs/cli-utils
+.PHONY: prow-presubmit-check
+prow-presubmit-check: \
+	test
+
 fix:
 	go fix ./...
 
