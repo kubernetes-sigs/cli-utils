@@ -97,6 +97,10 @@ func (d *Destroyer) Run() <-chan event.Event {
 // of cobra flags from the Destroyer.
 func (d *Destroyer) SetFlags(cmd *cobra.Command) {
 	d.ApplyOptions.DeleteFlags.AddFlags(cmd)
-	d.ApplyOptions.RecordFlags.AddFlags(cmd)
+	_ = cmd.Flags().MarkHidden("cascade")
+	_ = cmd.Flags().MarkHidden("force")
+	_ = cmd.Flags().MarkHidden("grace-period")
+	_ = cmd.Flags().MarkHidden("timeout")
+	_ = cmd.Flags().MarkHidden("wait")
 	d.ApplyOptions.Overwrite = true
 }
