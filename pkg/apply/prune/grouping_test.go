@@ -581,6 +581,65 @@ func TestAddSuffixToName(t *testing.T) {
 	}
 }
 
+func TestClearGroupingObject(t *testing.T) {
+	tests := map[string]struct {
+		infos   []*resource.Info
+		isError bool
+	}{
+		"Empty infos should error": {
+			infos:   []*resource.Info{},
+			isError: true,
+		},
+		"Non-Unstructured grouping object should error": {
+			infos:   []*resource.Info{nonUnstructuredGroupingInfo},
+			isError: true,
+		},
+		"Info with nil Object should error": {
+			infos:   []*resource.Info{nilInfo},
+			isError: true,
+		},
+		"Single grouping object should work": {
+			infos:   []*resource.Info{copyGroupingInfo()},
+			isError: false,
+		},
+		"Single non-grouping object should error": {
+			infos:   []*resource.Info{pod1Info},
+			isError: true,
+		},
+		"Multiple non-grouping objects should error": {
+			infos:   []*resource.Info{pod1Info, pod2Info},
+			isError: true,
+		},
+		"Grouping object with single inventory object should work": {
+			infos:   []*resource.Info{copyGroupingInfo(), pod1Info},
+			isError: false,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			err := ClearGroupingObj(tc.infos)
+			if tc.isError {
+				if err == nil {
+					t.Errorf("Should have produced an error, but returned none.")
+				}
+			}
+			if !tc.isError {
+				if err != nil {
+					t.Fatalf("Received unexpected error: %#v", err)
+				}
+				objMetadata, err := RetrieveInventoryFromGroupingObj(tc.infos)
+				if err != nil {
+					t.Fatalf("Received unexpected error: %#v", err)
+				}
+				if len(objMetadata) > 0 {
+					t.Errorf("Grouping object inventory not cleared: %#v\n", objMetadata)
+				}
+			}
+		})
+	}
+}
+
 func TestPrependGroupingObject(t *testing.T) {
 	tests := []struct {
 		infos []*resource.Info
