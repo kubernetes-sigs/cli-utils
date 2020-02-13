@@ -42,7 +42,9 @@ type Destroyer struct {
 // Initialize sets up the Destroyer for actually doing an destroy against
 // a cluster. This involves validating command line inputs and configuring
 // clients for communicating with the cluster.
-func (d *Destroyer) Initialize(cmd *cobra.Command) error {
+func (d *Destroyer) Initialize(cmd *cobra.Command, paths []string) error {
+	fileNameFlags := processPaths(paths)
+	d.ApplyOptions.DeleteFlags.FileNameFlags = &fileNameFlags
 	err := d.ApplyOptions.Complete(d.factory, cmd)
 	if err != nil {
 		return errors.WrapPrefix(err, "error setting up ApplyOptions", 1)
@@ -95,12 +97,20 @@ func (d *Destroyer) Run() <-chan event.Event {
 // SetFlags configures the command line flags needed for destroy
 // This is a temporary solution as we should separate the configuration
 // of cobra flags from the Destroyer.
-func (d *Destroyer) SetFlags(cmd *cobra.Command) {
+func (d *Destroyer) SetFlags(cmd *cobra.Command) error {
 	d.ApplyOptions.DeleteFlags.AddFlags(cmd)
+	for _, flag := range []string{"kustomize", "filename", "recursive"} {
+		err := cmd.Flags().MarkHidden(flag)
+		if err != nil {
+			return err
+		}
+	}
+	d.ApplyOptions.RecordFlags.AddFlags(cmd)
 	_ = cmd.Flags().MarkHidden("cascade")
 	_ = cmd.Flags().MarkHidden("force")
 	_ = cmd.Flags().MarkHidden("grace-period")
 	_ = cmd.Flags().MarkHidden("timeout")
 	_ = cmd.Flags().MarkHidden("wait")
 	d.ApplyOptions.Overwrite = true
+	return nil
 }

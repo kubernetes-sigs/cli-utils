@@ -46,12 +46,10 @@ curl -s -o "$BASE/mysql/#1.yaml" "https://raw.githubusercontent.com\
 /master/examples/wordpress/mysql\
 /{secret,deployment,service}.yaml"
 
-expectedOutputLine()
-{
+function expectedOutputLine() {
   test 1 == \
   $(grep "$@" $OUTPUT/status | wc -l); \
   echo $?
-
 }
 ```
 
@@ -92,7 +90,7 @@ kind create cluster
 Let's apply the wordpress and mysql services.
 <!-- @RunWordpressAndMysql @testE2EAgainstLatestRelease -->
 ```
-kapply apply -f $BASE/mysql --status > $OUTPUT/status;
+kapply apply $BASE/mysql --status > $OUTPUT/status;
 
 expectedOutputLine "deployment.apps/mysql is Current: Deployment is available. Replicas: 1"
 
@@ -102,7 +100,7 @@ expectedOutputLine "configmap/inventory-map-mysql-57005c71 is Current: Resource 
 
 expectedOutputLine "service/mysql is Current: Service is ready"
 
-kapply apply -f $BASE/wordpress --status > $OUTPUT/status;
+kapply apply $BASE/wordpress --status > $OUTPUT/status;
 
 expectedOutputLine "configmap/inventory-map-wordpress-2fbd5b91 is Current: Resource is always ready"
 
@@ -115,7 +113,7 @@ expectedOutputLine "deployment.apps/wordpress is Current: Deployment is availabl
 Destroy one service and make sure that only that service is destroyed and clean-up the cluster.
 <!-- @destroyAppDeleteKindCluster @testE2EAgainstLatestRelease -->
 ```
-kapply destroy -f $BASE/wordpress > $OUTPUT/status;
+kapply destroy $BASE/wordpress > $OUTPUT/status;
 
 expectedOutputLine "service/wordpress pruned"
 

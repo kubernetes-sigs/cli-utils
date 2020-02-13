@@ -34,12 +34,10 @@ mkdir -p $BASE
 OUTPUT=$DEMO_HOME/output
 mkdir -p $OUTPUT
 
-expectedOutputLine()
-{
+function expectedOutputLine() {
   test 1 == \
   $(grep "$@" $OUTPUT/status | wc -l); \
   echo $?
-
 }
 ```
 
@@ -154,7 +152,7 @@ kind create cluster
 Use the `kapply` binary in `MYGOBIN` to apply a deployment and verify it is successful.
 <!-- @runHelloApp @testE2EAgainstLatestRelease -->
 ```
-kapply apply -f $BASE --status > $OUTPUT/status;
+kapply apply $BASE --status > $OUTPUT/status;
 
 expectedOutputLine "deployment.apps/the-deployment is Current: Deployment is available. Replicas: 3"
 
@@ -182,7 +180,7 @@ EOF
 
 rm $BASE/configMap.yaml
 
-kapply apply -f $BASE --status > $OUTPUT/status;
+kapply apply $BASE --status > $OUTPUT/status;
 
 expectedOutputLine "deployment.apps/the-deployment is Current: Deployment is available. Replicas: 3"
 
@@ -201,7 +199,7 @@ expectedOutputLine "configmap/inventory-map-7eabe827 pruned"
 Clean-up the cluster 
 <!-- @deleteKindCluster @testE2EAgainstLatestRelease -->
 ```
-kapply destroy -f $BASE > $OUTPUT/status;
+kapply destroy $BASE > $OUTPUT/status;
 
 expectedOutputLine "deployment.apps/the-deployment pruned"
 
