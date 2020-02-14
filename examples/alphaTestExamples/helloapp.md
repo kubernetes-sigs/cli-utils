@@ -41,7 +41,19 @@ function expectedOutputLine() {
 }
 ```
 
-Now lets add a simple config map resource to the `base`
+Let's create a namespace config in `base`
+
+<!-- @createNamespaceYaml @testE2EAgainstLatestRelease-->
+```
+cat <<EOF >$BASE/namespace.yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: hellospace
+EOF
+```
+
+Now let's add a simple config map resource to the `base`
 
 <!-- @createConfigMapYaml @testE2EAgainstLatestRelease-->
 ```
@@ -50,6 +62,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: the-map
+  namespace: hellospace
 data:
   altGreeting: "Good Morning!"
   enableRisky: "false"
@@ -67,6 +80,7 @@ metadata:
   labels:
     app: hello
   name: the-deployment
+  namespace: hellospace
 spec:
   replicas: 3
   selector:
@@ -110,6 +124,7 @@ kind: Service
 apiVersion: v1
 metadata:
   name: the-service
+  namespace: hellospace
 spec:
   selector:
     deployment: hello
@@ -154,11 +169,13 @@ Use the `kapply` binary in `MYGOBIN` to apply a deployment and verify it is succ
 ```
 kapply apply $BASE --status > $OUTPUT/status;
 
+expectedOutputLine "namespace/hellospace is Current: Resource is current"
+
 expectedOutputLine "deployment.apps/the-deployment is Current: Deployment is available. Replicas: 3"
 
 expectedOutputLine "service/the-service is Current: Service is ready"
 
-expectedOutputLine "configmap/inventory-map-7eabe827 is Current: Resource is always ready"
+expectedOutputLine "configmap/inventory-map-78829196 is Current: Resource is always ready"
 
 expectedOutputLine "configmap/the-map is Current: Resource is always ready"
 
@@ -173,6 +190,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: the-map2
+  namespace: hellospace
 data:
   altGreeting: "Good Evening!"
   enableRisky: "false"
@@ -186,13 +204,13 @@ expectedOutputLine "deployment.apps/the-deployment is Current: Deployment is ava
 
 expectedOutputLine "service/the-service is Current: Service is ready"
 
-expectedOutputLine "configmap/inventory-map-f124085f is Current: Resource is always ready"
+expectedOutputLine "configmap/inventory-map-7e38956e is Current: Resource is always ready"
 
 expectedOutputLine "configmap/the-map2 is Current: Resource is always ready"
 
 expectedOutputLine "configmap/the-map pruned"
 
-expectedOutputLine "configmap/inventory-map-7eabe827 pruned"
+expectedOutputLine "configmap/inventory-map-78829196 pruned"
 
 ```
 
@@ -207,7 +225,7 @@ expectedOutputLine "configmap/the-map2 pruned"
 
 expectedOutputLine "service/the-service pruned"
 
-expectedOutputLine "configmap/inventory-map-f124085f pruned"
+expectedOutputLine "configmap/inventory-map-7e38956e pruned"
 
 kind delete cluster;
 ```
