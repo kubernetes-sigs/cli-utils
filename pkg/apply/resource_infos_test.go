@@ -4,12 +4,12 @@
 package apply
 
 import (
-	"fmt"
 	"sort"
 	"testing"
 
 	"gotest.tools/assert"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/resource"
 )
 
@@ -64,47 +64,43 @@ func TestResourceOrdering(t *testing.T) {
 	infos := []*resource.Info{&deploymentInfo, &configMapInfo, &namespaceInfo}
 	sort.Sort(ResourceInfos(infos))
 
-	var result string
-	for _, info := range infos {
-		result += fmt.Sprintf("Name: %s, Kind: %s\n", info.Name, info.Object.GetObjectKind().GroupVersionKind().Kind)
-	}
+	assert.Equal(t, infos[0].Name, "testspace")
+	assert.Equal(t, infos[1].Name, "the-map")
+	assert.Equal(t, infos[2].Name, "testdeployment")
 
-	expected := `Name: testspace, Kind: Namespace
-Name: the-map, Kind: ConfigMap
-Name: testdeployment, Kind: Deployment
-`
-
-	assert.Equal(t, result, expected)
+	assert.Equal(t, infos[0].Object.GetObjectKind().GroupVersionKind().Kind, "Namespace")
+	assert.Equal(t, infos[1].Object.GetObjectKind().GroupVersionKind().Kind, "ConfigMap")
+	assert.Equal(t, infos[2].Object.GetObjectKind().GroupVersionKind().Kind, "Deployment")
 }
 
 func TestGvkLessThan(t *testing.T) {
-	gvk1 := Gvk{
+	gvk1 := schema.GroupVersionKind{
 		Group:   "",
 		Version: "v1",
 		Kind:    "Deployment",
 	}
 
-	gvk2 := Gvk{
+	gvk2 := schema.GroupVersionKind{
 		Group:   "",
 		Version: "v1",
 		Kind:    "Namespace",
 	}
 
-	assert.Equal(t, gvk1.IsLessThan(gvk2), false)
+	assert.Equal(t, IsLessThan(gvk1, gvk2), false)
 }
 
 func TestGvkEquals(t *testing.T) {
-	gvk1 := Gvk{
+	gvk1 := schema.GroupVersionKind{
 		Group:   "",
 		Version: "v1",
 		Kind:    "Deployment",
 	}
 
-	gvk2 := Gvk{
+	gvk2 := schema.GroupVersionKind{
 		Group:   "",
 		Version: "v1",
 		Kind:    "Deployment",
 	}
 
-	assert.Equal(t, gvk1.Equals(gvk2), true)
+	assert.Equal(t, Equals(gvk1, gvk2), true)
 }
