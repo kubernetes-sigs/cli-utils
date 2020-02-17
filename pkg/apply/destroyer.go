@@ -83,7 +83,7 @@ func (d *Destroyer) Run() <-chan event.Event {
 			// give up. Eventually we might be able to determine which errors
 			// are fatal and which might allow us to continue.
 			ch <- event.Event{
-				Type: event.ErrorEventType,
+				Type: event.ErrorType,
 				ErrorEvent: event.ErrorEvent{
 					Err: errors.WrapPrefix(err, "error pruning resources", 1),
 				},
