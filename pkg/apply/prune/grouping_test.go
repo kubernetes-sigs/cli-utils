@@ -641,39 +641,58 @@ func TestClearGroupingObject(t *testing.T) {
 }
 
 func TestPrependGroupingObject(t *testing.T) {
-	tests := []struct {
-		infos []*resource.Info
+	tests := map[string]struct {
+		infos       []*resource.Info
+		expectError bool
 	}{
-		{
+		"grouping object is the only resource": {
 			infos: []*resource.Info{copyGroupingInfo()},
 		},
-		{
+		"grouping object is the last resource": {
 			infos: []*resource.Info{pod1Info, pod3Info, copyGroupingInfo()},
 		},
-		{
+		"grouping object is in the middle of the list of resources": {
 			infos: []*resource.Info{pod1Info, pod2Info, copyGroupingInfo(), pod3Info},
+		},
+		"grouping object is already first": {
+			infos: []*resource.Info{copyGroupingInfo(), pod1Info, pod2Info, pod3Info},
+		},
+		"no grouping object among the resources": {
+			infos:       []*resource.Info{pod1Info, pod2Info, pod3Info},
+			expectError: true,
 		},
 	}
 
-	for _, test := range tests {
-		applyOptions := createApplyOptions(test.infos)
-		f := PrependGroupingObject(applyOptions)
-		err := f()
-		if err != nil {
-			t.Errorf("Error running pre-processor callback: %s", err)
-		}
-		infos, _ := applyOptions.GetObjects()
-		if len(test.infos) != len(infos) {
-			t.Fatalf("Wrong number of objects after prepending grouping object")
-		}
-		groupingInfo := infos[0]
-		if !IsGroupingObject(groupingInfo.Object) {
-			t.Fatalf("First object is not the grouping object")
-		}
-		inventory, _ := RetrieveInventoryFromGroupingObj(infos)
-		if len(inventory) != (len(infos) - 1) {
-			t.Errorf("Wrong number of inventory items stored in grouping object")
-		}
+	for tn, tc := range tests {
+		t.Run(tn, func(t *testing.T) {
+			applyOptions := createApplyOptions(tc.infos)
+			f := PrependGroupingObject(applyOptions)
+			err := f()
+
+			if tc.expectError {
+				if err == nil {
+					t.Errorf("Expected error, but didn't get one")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Errorf("Error running pre-processor callback: %s", err)
+			}
+
+			infos, _ := applyOptions.GetObjects()
+			if len(tc.infos) != len(infos) {
+				t.Fatalf("Wrong number of objects after prepending grouping object")
+			}
+			groupingInfo := infos[0]
+			if !IsGroupingObject(groupingInfo.Object) {
+				t.Fatalf("First object is not the grouping object")
+			}
+			inventory, _ := RetrieveInventoryFromGroupingObj(infos)
+			if len(inventory) != (len(infos) - 1) {
+				t.Errorf("Wrong number of inventory items stored in grouping object")
+			}
+		})
 	}
 }
 
