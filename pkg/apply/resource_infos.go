@@ -22,7 +22,9 @@ func (a ResourceInfos) Less(i, j int) bool {
 	if !Equals(x, o) {
 		return IsLessThan(x, o)
 	}
-	return a[i].String() < a[j].String()
+	// In case of tie, compare the namespace and name combination so that the output
+	// order is consistent irrespective of input order
+	return a[i].Namespace+a[i].Name < a[j].Namespace+a[j].Name
 }
 
 // An attempt to order things to help k8s, e.g.
