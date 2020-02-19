@@ -43,6 +43,8 @@ func NewCmdDestroy(f util.Factory, ioStreams genericclioptions.IOStreams) *cobra
 	cmdutil.AddValidateFlags(cmd)
 	_ = cmd.Flags().MarkHidden("validate")
 
+	// This flag should be hidden but not removed as this flag is referenced in
+	// the dependencies
 	cmd.Flags().BoolVar(&destroyer.DryRun, "dry-run", destroyer.DryRun, "NOT USED")
 	_ = cmd.Flags().MarkHidden("dry-run")
 
