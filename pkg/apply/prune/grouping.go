@@ -104,13 +104,14 @@ func PrependGroupingObject(o *apply.ApplyOptions) func() error {
 			return err
 		}
 		_, exists := FindGroupingObject(infos)
-		if exists {
-			if err := AddInventoryToGroupingObj(infos); err != nil {
-				return err
-			}
-			if !SortGroupingObject(infos) {
-				return err
-			}
+		if !exists {
+			return fmt.Errorf("no grouping object found")
+		}
+		if err := AddInventoryToGroupingObj(infos); err != nil {
+			return err
+		}
+		if !SortGroupingObject(infos) {
+			return err
 		}
 		return nil
 	}
