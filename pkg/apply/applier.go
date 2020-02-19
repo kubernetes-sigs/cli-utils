@@ -5,6 +5,7 @@ package apply
 
 import (
 	"context"
+	"sort"
 	"time"
 
 	"github.com/go-errors/errors"
@@ -151,6 +152,12 @@ func (a *Applier) Run(ctx context.Context) <-chan event.Event {
 		// This provides us with a slice of all the objects that will be
 		// applied to the cluster.
 		infos, _ := a.ApplyOptions.GetObjects()
+
+		// sort the info objects starting from independent to dependent objects, and set them back
+		// ordering precedence can be found in gvk.go
+		sort.Sort(ResourceInfos(infos))
+		a.ApplyOptions.SetObjects(infos)
+
 		err := a.ApplyOptions.Run()
 		if err != nil {
 			// If we see an error here we just report it on the channel and then
