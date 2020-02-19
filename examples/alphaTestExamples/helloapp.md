@@ -199,6 +199,16 @@ expectedOutputLine "configmap/inventory-map-7eabe827 pruned"
 Clean-up the cluster 
 <!-- @deleteKindCluster @testE2EAgainstLatestRelease -->
 ```
+kapply preview $BASE --destroy > $OUTPUT/status;
+
+expectedOutputLine "deployment.apps/the-deployment pruned"
+
+expectedOutputLine "configmap/the-map2 pruned"
+
+expectedOutputLine "service/the-service pruned"
+
+expectedOutputLine "configmap/inventory-map-f124085f pruned"
+
 kapply destroy $BASE > $OUTPUT/status;
 
 expectedOutputLine "deployment.apps/the-deployment pruned"
