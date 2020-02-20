@@ -99,6 +99,7 @@ func (a *Applier) SetFlags(cmd *cobra.Command) error {
 		}
 	}
 	a.ApplyOptions.RecordFlags.AddFlags(cmd)
+	_ = cmd.Flags().MarkHidden("record")
 	_ = cmd.Flags().MarkHidden("cascade")
 	_ = cmd.Flags().MarkHidden("force")
 	_ = cmd.Flags().MarkHidden("grace-period")

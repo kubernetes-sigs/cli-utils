@@ -106,6 +106,7 @@ func (d *Destroyer) SetFlags(cmd *cobra.Command) error {
 		}
 	}
 	d.ApplyOptions.RecordFlags.AddFlags(cmd)
+	_ = cmd.Flags().MarkHidden("record")
 	_ = cmd.Flags().MarkHidden("cascade")
 	_ = cmd.Flags().MarkHidden("force")
 	_ = cmd.Flags().MarkHidden("grace-period")
