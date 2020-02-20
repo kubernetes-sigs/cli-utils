@@ -66,6 +66,16 @@ func (b *BasicPrinter) Print(ch <-chan event.Event) {
 				name := getName(obj)
 				fmt.Fprintf(b.IOStreams.Out, "%s %s\n", resourceIDToString(gvk.GroupKind(), name), "pruned")
 			}
+		case event.DeleteType:
+			de := e.DeleteEvent
+			if de.Type == event.DeleteEventCompleted {
+				fmt.Fprintf(b.IOStreams.Out, "destroy completed\n")
+			} else {
+				obj := de.Object
+				gvk := obj.GetObjectKind().GroupVersionKind()
+				name := getName(obj)
+				fmt.Fprintf(b.IOStreams.Out, "%s %s\n", resourceIDToString(gvk.GroupKind(), name), "deleted")
+			}
 		}
 	}
 }

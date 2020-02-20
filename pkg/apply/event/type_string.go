@@ -12,11 +12,12 @@ func _() {
 	_ = x[ApplyType-1]
 	_ = x[StatusType-2]
 	_ = x[PruneType-3]
+	_ = x[DeleteType-4]
 }
 
-const _Type_name = "ErrorTypeApplyTypeStatusTypePruneType"
+const _Type_name = "ErrorTypeApplyTypeStatusTypePruneTypeDeleteType"
 
-var _Type_index = [...]uint8{0, 9, 18, 28, 37}
+var _Type_index = [...]uint8{0, 9, 18, 28, 37, 47}
 
 func (i Type) String() string {
 	if i < 0 || i >= Type(len(_Type_index)-1) {

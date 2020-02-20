@@ -17,6 +17,7 @@ const (
 	ApplyType
 	StatusType
 	PruneType
+	DeleteType
 )
 
 // Event is the type of the objects that will be returned through
@@ -41,6 +42,10 @@ type Event struct {
 	// PruneEvent contains information about objects that have been
 	// pruned.
 	PruneEvent PruneEvent
+
+	// DeleteEvent contains information about object that have been
+	// deleted.
+	DeleteEvent DeleteEvent
 }
 
 type ErrorEvent struct {
@@ -81,5 +86,18 @@ const (
 
 type PruneEvent struct {
 	Type   PruneEventType
+	Object runtime.Object
+}
+
+//go:generate stringer -type=DeleteEventType
+type DeleteEventType int
+
+const (
+	DeleteEventResourceUpdate DeleteEventType = iota
+	DeleteEventCompleted
+)
+
+type DeleteEvent struct {
+	Type   DeleteEventType
 	Object runtime.Object
 }
