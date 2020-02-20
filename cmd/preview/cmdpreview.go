@@ -45,16 +45,21 @@ func NewCmdPreview(f util.Factory, ioStreams genericclioptions.IOStreams) *cobra
 		},
 	}
 
+	cmd.Flags().BoolVar(&applier.NoPrune, "no-prune", applier.NoPrune, "If true, do not prune previously applied objects.")
 	cmdutil.CheckErr(applier.SetFlags(cmd))
+
+	// The following flags are added, but hidden because other code
+	// dependend on them when parsing flags. These flags are hidden and unused.
+	var unusedBool bool
+	cmd.Flags().BoolVar(&unusedBool, "dry-run", unusedBool, "NOT USED")
+	_ = cmd.Flags().MarkHidden("dry-run")
 	cmdutil.AddValidateFlags(cmd)
 	_ = cmd.Flags().MarkHidden("validate")
-
-	cmd.Flags().BoolVar(&applier.NoPrune, "no-prune", applier.NoPrune, "If true, do not prune previously applied objects.")
-	// Necessary because ApplyOptions depends on it--hidden.
-	cmd.Flags().BoolVar(&applier.DryRun, "dry-run", applier.DryRun, "NOT USED")
-	_ = cmd.Flags().MarkHidden("dry-run")
-
+	// Server-side flags are hidden for now.
 	cmdutil.AddServerSideApplyFlags(cmd)
+	_ = cmd.Flags().MarkHidden("server-side")
+	_ = cmd.Flags().MarkHidden("force-conflicts")
+	_ = cmd.Flags().MarkHidden("field-manager")
 
 	return cmd
 }

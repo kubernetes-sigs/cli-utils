@@ -40,11 +40,15 @@ func NewCmdDestroy(f util.Factory, ioStreams genericclioptions.IOStreams) *cobra
 
 	cmdutil.CheckErr(destroyer.SetFlags(cmd))
 
+	// The following flags are added, but hidden because other code
+	// dependencies when parsing flags. These flags are hidden and unused.
 	cmdutil.AddValidateFlags(cmd)
 	_ = cmd.Flags().MarkHidden("validate")
-
-	cmd.Flags().BoolVar(&destroyer.DryRun, "dry-run", destroyer.DryRun, "If true, only print the objects that would be deleted, without performing it.")
-
+	// Server-side flags are hidden for now.
 	cmdutil.AddServerSideApplyFlags(cmd)
+	_ = cmd.Flags().MarkHidden("server-side")
+	_ = cmd.Flags().MarkHidden("force-conflicts")
+	_ = cmd.Flags().MarkHidden("field-manager")
+
 	return cmd
 }
