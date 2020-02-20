@@ -77,18 +77,36 @@ func (d *Destroyer) Run() <-chan event.Event {
 		// deleting everything. We can ignore the error, since the Prune
 		// will catch the same problems.
 		_ = prune.ClearGroupingObj(infos)
-		err := d.PruneOptions.Prune(infos, ch)
+
+		// Start the event transformer goroutine so we can transform
+		// the Prune events emitted from the Prune function to Delete
+		// Events. That we use Prune to implement destroy is an
+		// implementation detail and the events should not be Prune events.
+		tempChannel, completedChannel := runPruneEventTransformer(ch)
+		err := d.PruneOptions.Prune(infos, tempChannel)
+		// Close the tempChannel to signal to the event transformer that
+		// it should terminate.
+		close(tempChannel)
+		// Wait for the event transformer to complete processing all
+		// events and shut down before we continue.
+		<-completedChannel
 		if err != nil {
 			// If we see an error here we just report it on the channel and then
 			// give up. Eventually we might be able to determine which errors
 			// are fatal and which might allow us to continue.
 			ch <- event.Event{
-				Type: event.ErrorEventType,
+				Type: event.ErrorType,
 				ErrorEvent: event.ErrorEvent{
 					Err: errors.WrapPrefix(err, "error pruning resources", 1),
 				},
 			}
 			return
+		}
+		ch <- event.Event{
+			Type: event.DeleteType,
+			DeleteEvent: event.DeleteEvent{
+				Type: event.DeleteEventCompleted,
+			},
 		}
 	}()
 	return ch
@@ -114,4 +132,28 @@ func (d *Destroyer) SetFlags(cmd *cobra.Command) error {
 	_ = cmd.Flags().MarkHidden("wait")
 	d.ApplyOptions.Overwrite = true
 	return nil
+}
+
+// runPruneEventTransformer creates a channel for events and
+// starts a goroutine that will read from the channel until it
+// is closed. All events will be republished as Delete events
+// on the provided eventChannel. The function will also return
+// a channel that it will close once the goroutine is shutting
+// down.
+func runPruneEventTransformer(eventChannel chan event.Event) (chan event.Event, <-chan struct{}) {
+	completedChannel := make(chan struct{})
+	tempEventChannel := make(chan event.Event)
+	go func() {
+		defer close(completedChannel)
+		for msg := range tempEventChannel {
+			eventChannel <- event.Event{
+				Type: event.DeleteType,
+				DeleteEvent: event.DeleteEvent{
+					Type:   event.DeleteEventResourceUpdate,
+					Object: msg.PruneEvent.Object,
+				},
+			}
+		}
+	}()
+	return tempEventChannel, completedChannel
 }

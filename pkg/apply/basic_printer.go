@@ -30,30 +30,52 @@ type BasicPrinter struct {
 func (b *BasicPrinter) Print(ch <-chan event.Event) {
 	for e := range ch {
 		switch e.Type {
-		case event.ErrorEventType:
+		case event.ErrorType:
 			cmdutil.CheckErr(e.ErrorEvent.Err)
-		case event.ApplyEventType:
-			obj := e.ApplyEvent.Object
-			gvk := obj.GetObjectKind().GroupVersionKind()
-			name := getName(obj)
-			fmt.Fprintf(b.IOStreams.Out, "%s %s\n", resourceIDToString(gvk.GroupKind(), name), e.ApplyEvent.Operation)
-		case event.StatusEventType:
+		case event.ApplyType:
+			ae := e.ApplyEvent
+			if ae.Type == event.ApplyEventCompleted {
+				fmt.Fprintf(b.IOStreams.Out, "all resources have been applied\n")
+			} else {
+				obj := ae.Object
+				gvk := obj.GetObjectKind().GroupVersionKind()
+				name := getName(obj)
+				fmt.Fprintf(b.IOStreams.Out, "%s %s\n", resourceIDToString(gvk.GroupKind(), name),
+					strings.ToLower(ae.Operation.String()))
+			}
+		case event.StatusType:
 			statusEvent := e.StatusEvent
 			switch statusEvent.Type {
 			case wait.ResourceUpdate:
 				id := statusEvent.EventResource.ResourceIdentifier
 				gk := id.GroupKind
-				fmt.Fprintf(b.IOStreams.Out, "%s is %s: %s\n", resourceIDToString(gk, id.Name), statusEvent.EventResource.Status.String(), statusEvent.EventResource.Message)
+				fmt.Fprintf(b.IOStreams.Out, "%s is %s: %s\n", resourceIDToString(gk, id.Name),
+					statusEvent.EventResource.Status.String(), statusEvent.EventResource.Message)
 			case wait.Completed:
 				fmt.Fprint(b.IOStreams.Out, "all resources has reached the Current status\n")
 			case wait.Aborted:
 				fmt.Fprintf(b.IOStreams.Out, "resources failed to the reached Current status\n")
 			}
-		case event.PruneEventType:
-			obj := e.PruneEvent.Object
-			gvk := obj.GetObjectKind().GroupVersionKind()
-			name := getName(obj)
-			fmt.Fprintf(b.IOStreams.Out, "%s %s\n", resourceIDToString(gvk.GroupKind(), name), "pruned")
+		case event.PruneType:
+			pe := e.PruneEvent
+			if pe.Type == event.PruneEventCompleted {
+				fmt.Fprintf(b.IOStreams.Out, "prune completed\n")
+			} else {
+				obj := e.PruneEvent.Object
+				gvk := obj.GetObjectKind().GroupVersionKind()
+				name := getName(obj)
+				fmt.Fprintf(b.IOStreams.Out, "%s %s\n", resourceIDToString(gvk.GroupKind(), name), "pruned")
+			}
+		case event.DeleteType:
+			de := e.DeleteEvent
+			if de.Type == event.DeleteEventCompleted {
+				fmt.Fprintf(b.IOStreams.Out, "destroy completed\n")
+			} else {
+				obj := de.Object
+				gvk := obj.GetObjectKind().GroupVersionKind()
+				name := getName(obj)
+				fmt.Fprintf(b.IOStreams.Out, "%s %s\n", resourceIDToString(gvk.GroupKind(), name), "deleted")
+			}
 		}
 	}
 }

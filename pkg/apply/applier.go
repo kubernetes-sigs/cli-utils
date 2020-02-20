@@ -165,21 +165,30 @@ func (a *Applier) Run(ctx context.Context) <-chan event.Event {
 			// give up. Eventually we might be able to determine which errors
 			// are fatal and which might allow us to continue.
 			ch <- event.Event{
-				Type: event.ErrorEventType,
+				Type: event.ErrorType,
 				ErrorEvent: event.ErrorEvent{
 					Err: errors.WrapPrefix(err, "error applying resources", 1),
 				},
 			}
 			return
 		}
+		// If we get there, then all resources have been successfully applied.
+		ch <- event.Event{
+			Type: event.ApplyType,
+			ApplyEvent: event.ApplyEvent{
+				Type: event.ApplyEventCompleted,
+			},
+		}
 
 		if a.StatusOptions.wait {
 			statusChannel := a.resolver.WaitForStatusOfObjects(ctx, infosToObjects(infos))
 			// As long as the statusChannel remains open, we take every statusEvent,
 			// wrap it in an Event and send it on the channel.
+			// TODO: What should we do if waiting for status times out? We currently proceed with
+			// prune, but that doesn't seem right.
 			for statusEvent := range statusChannel {
 				ch <- event.Event{
-					Type:        event.StatusEventType,
+					Type:        event.StatusType,
 					StatusEvent: statusEvent,
 				}
 			}
@@ -192,12 +201,18 @@ func (a *Applier) Run(ctx context.Context) <-chan event.Event {
 				// give up. Eventually we might be able to determine which errors
 				// are fatal and which might allow us to continue.
 				ch <- event.Event{
-					Type: event.ErrorEventType,
+					Type: event.ErrorType,
 					ErrorEvent: event.ErrorEvent{
 						Err: errors.WrapPrefix(err, "error pruning resources", 1),
 					},
 				}
 				return
+			}
+			ch <- event.Event{
+				Type: event.PruneType,
+				PruneEvent: event.PruneEvent{
+					Type: event.PruneEventCompleted,
+				},
 			}
 		}
 	}()

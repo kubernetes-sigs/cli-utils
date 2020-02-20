@@ -16,7 +16,7 @@ import (
 func TestKubectlPrinterAdapter(t *testing.T) {
 	ch := make(chan event.Event)
 	buffer := bytes.Buffer{}
-	operation := "operation"
+	operation := "serverside-applied"
 
 	adapter := KubectlPrinterAdapter{
 		ch: ch,
@@ -45,6 +45,6 @@ func TestKubectlPrinterAdapter(t *testing.T) {
 	msg := <-ch
 
 	assert.NoError(t, err)
-	assert.Equal(t, operation, msg.ApplyEvent.Operation)
+	assert.Equal(t, event.ServersideApplied, msg.ApplyEvent.Operation)
 	assert.Equal(t, &deployment, msg.ApplyEvent.Object)
 }

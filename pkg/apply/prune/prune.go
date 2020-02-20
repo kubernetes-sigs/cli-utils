@@ -243,8 +243,9 @@ func (po *PruneOptions) Prune(currentObjects []*resource.Info, eventChannel chan
 			}
 		}
 		eventChannel <- event.Event{
-			Type: event.PruneEventType,
+			Type: event.PruneType,
 			PruneEvent: event.PruneEvent{
+				Type:   event.PruneEventResourceUpdate,
 				Object: obj,
 			},
 		}
@@ -260,8 +261,9 @@ func (po *PruneOptions) Prune(currentObjects []*resource.Info, eventChannel chan
 			}
 		}
 		eventChannel <- event.Event{
-			Type: event.PruneEventType,
+			Type: event.PruneType,
 			PruneEvent: event.PruneEvent{
+				Type:   event.PruneEventResourceUpdate,
 				Object: pastGroupInfo.Object,
 			},
 		}

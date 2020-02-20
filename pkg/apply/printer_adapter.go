@@ -4,6 +4,7 @@
 package apply
 
 import (
+	"fmt"
 	"io"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -23,17 +24,18 @@ type KubectlPrinterAdapter struct {
 // resourcePrinterImpl implements the ResourcePrinter interface. But
 // instead of printing, it emits information on the provided channel.
 type resourcePrinterImpl struct {
-	operation string
-	ch        chan<- event.Event
+	applyOperation event.ApplyEventOperation
+	ch             chan<- event.Event
 }
 
 // PrintObj takes the provided object and operation and emits
 // it on the channel.
 func (r *resourcePrinterImpl) PrintObj(obj runtime.Object, _ io.Writer) error {
 	r.ch <- event.Event{
-		Type: event.ApplyEventType,
+		Type: event.ApplyType,
 		ApplyEvent: event.ApplyEvent{
-			Operation: r.operation,
+			Type:      event.ApplyEventResourceUpdate,
+			Operation: r.applyOperation,
 			Object:    obj,
 		},
 	}
@@ -46,9 +48,25 @@ type toPrinterFunc func(string) (printers.ResourcePrinter, error)
 // is the type required by the ApplyOptions.
 func (p *KubectlPrinterAdapter) toPrinterFunc() toPrinterFunc {
 	return func(operation string) (printers.ResourcePrinter, error) {
+		applyOperation, err := operationToApplyOperationConst(operation)
 		return &resourcePrinterImpl{
-			ch:        p.ch,
-			operation: operation,
-		}, nil
+			ch:             p.ch,
+			applyOperation: applyOperation,
+		}, err
+	}
+}
+
+func operationToApplyOperationConst(operation string) (event.ApplyEventOperation, error) {
+	switch operation {
+	case "serverside-applied":
+		return event.ServersideApplied, nil
+	case "created":
+		return event.Created, nil
+	case "unchanged":
+		return event.Unchanged, nil
+	case "configured":
+		return event.Configured, nil
+	default:
+		return event.ApplyEventOperation(0), fmt.Errorf("unknown operation %s", operation)
 	}
 }

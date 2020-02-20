@@ -9,13 +9,15 @@ import (
 )
 
 // Type determines the type of events that are available.
-type Type string
+//go:generate stringer -type=Type
+type Type int
 
 const (
-	ErrorEventType  Type = "error"
-	ApplyEventType  Type = "apply"
-	StatusEventType Type = "status"
-	PruneEventType  Type = "prune"
+	ErrorType Type = iota
+	ApplyType
+	StatusType
+	PruneType
+	DeleteType
 )
 
 // Event is the type of the objects that will be returned through
@@ -40,17 +42,62 @@ type Event struct {
 	// PruneEvent contains information about objects that have been
 	// pruned.
 	PruneEvent PruneEvent
+
+	// DeleteEvent contains information about object that have been
+	// deleted.
+	DeleteEvent DeleteEvent
 }
 
 type ErrorEvent struct {
 	Err error
 }
 
+//go:generate stringer -type=ApplyEventType
+type ApplyEventType int
+
+const (
+	ApplyEventResourceUpdate ApplyEventType = iota
+	ApplyEventCompleted
+)
+
+//go:generate stringer -type=ApplyEventOperation
+type ApplyEventOperation int
+
+const (
+	ServersideApplied ApplyEventOperation = iota
+	Created
+	Unchanged
+	Configured
+)
+
 type ApplyEvent struct {
-	Operation string
+	Type      ApplyEventType
+	Operation ApplyEventOperation
 	Object    runtime.Object
 }
 
+//go:generate stringer -type=PruneEventType
+type PruneEventType int
+
+const (
+	PruneEventResourceUpdate PruneEventType = iota
+	PruneEventCompleted
+)
+
 type PruneEvent struct {
+	Type   PruneEventType
+	Object runtime.Object
+}
+
+//go:generate stringer -type=DeleteEventType
+type DeleteEventType int
+
+const (
+	DeleteEventResourceUpdate DeleteEventType = iota
+	DeleteEventCompleted
+)
+
+type DeleteEvent struct {
+	Type   DeleteEventType
 	Object runtime.Object
 }
