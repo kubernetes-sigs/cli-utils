@@ -42,6 +42,8 @@ func NewCmdDestroy(f util.Factory, ioStreams genericclioptions.IOStreams) *cobra
 
 	// The following flags are added, but hidden because other code
 	// dependencies when parsing flags. These flags are hidden and unused.
+	var unusedBool bool
+	cmd.Flags().BoolVar(&unusedBool, "dry-run", unusedBool, "NOT USED")
 	cmdutil.AddValidateFlags(cmd)
 	_ = cmd.Flags().MarkHidden("validate")
 	// Server-side flags are hidden for now.
