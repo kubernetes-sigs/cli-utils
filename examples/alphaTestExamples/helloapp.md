@@ -167,7 +167,7 @@ kind create cluster
 Use the `kapply` binary in `MYGOBIN` to apply a deployment and verify it is successful.
 <!-- @runHelloApp @testE2EAgainstLatestRelease -->
 ```
-kapply apply $BASE --status > $OUTPUT/status;
+kapply apply $BASE --wait-for-reconcile > $OUTPUT/status;
 
 expectedOutputLine "namespace/hellospace is Current: Resource is current"
 
@@ -198,7 +198,7 @@ EOF
 
 rm $BASE/configMap.yaml
 
-kapply apply $BASE --status > $OUTPUT/status;
+kapply apply $BASE --wait-for-reconcile > $OUTPUT/status;
 
 expectedOutputLine "deployment.apps/the-deployment is Current: Deployment is available. Replicas: 3"
 
