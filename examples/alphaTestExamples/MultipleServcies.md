@@ -90,7 +90,7 @@ kind create cluster
 Let's apply the wordpress and mysql services.
 <!-- @RunWordpressAndMysql @testE2EAgainstLatestRelease -->
 ```
-kapply apply $BASE/mysql --status > $OUTPUT/status;
+kapply apply $BASE/mysql --wait-for-reconcile > $OUTPUT/status;
 
 expectedOutputLine "deployment.apps/mysql is Current: Deployment is available. Replicas: 1"
 
@@ -100,7 +100,7 @@ expectedOutputLine "configmap/inventory-map-mysql-57005c71 is Current: Resource 
 
 expectedOutputLine "service/mysql is Current: Service is ready"
 
-kapply apply $BASE/wordpress --status > $OUTPUT/status;
+kapply apply $BASE/wordpress --wait-for-reconcile > $OUTPUT/status;
 
 expectedOutputLine "configmap/inventory-map-wordpress-2fbd5b91 is Current: Resource is always ready"
 

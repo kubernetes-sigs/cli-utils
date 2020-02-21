@@ -24,7 +24,7 @@ type StatusOptions struct {
 }
 
 func (s *StatusOptions) AddFlags(c *cobra.Command) {
-	c.Flags().BoolVar(&s.wait, "status", s.wait, "Wait for all applied resources to reach the Current status.")
-	c.Flags().DurationVar(&s.period, "status-period", s.period, "Polling period for resource statuses.")
-	c.Flags().DurationVar(&s.Timeout, "status-timeout", s.Timeout, "Timeout threshold for waiting for all resources to reach the Current status.")
+	c.Flags().BoolVar(&s.wait, "wait-for-reconcile", s.wait, "Wait for all applied resources to reach the Current status.")
+	c.Flags().DurationVar(&s.period, "wait-polling-period", s.period, "Polling period for resource statuses.")
+	c.Flags().DurationVar(&s.Timeout, "wait-timeout", s.Timeout, "Timeout threshold for waiting for all resources to reach the Current status.")
 }
