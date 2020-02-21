@@ -1,3 +1,6 @@
+// Copyright 2020 The Kubernetes Authors.
+// SPDX-License-Identifier: Apache-2.0
+
 package observers
 
 import (
@@ -11,8 +14,8 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/kstatus/wait"
 )
 
-func NewDefaultObserver(reader observer.ClusterReader, mapper meta.RESTMapper) observer.ResourceObserver {
-	return &DefaultObserver{
+func NewGenericObserver(reader observer.ClusterReader, mapper meta.RESTMapper) observer.ResourceObserver {
+	return &genericObserver{
 		BaseObserver: BaseObserver{
 			Reader:            reader,
 			Mapper:            mapper,
@@ -21,17 +24,19 @@ func NewDefaultObserver(reader observer.ClusterReader, mapper meta.RESTMapper) o
 	}
 }
 
-// DefaultObserver is an observer that will be used for any resource that
+// genericObserver is an observer that will be used for any resource that
 // doesn't have a specific observer. It will just delegate computation of
 // status to the status library.
 // This should work pretty well for resources that doesn't have any
 // generated resources and where status can be computed only based on the
 // resource itself.
-type DefaultObserver struct {
+type genericObserver struct {
 	BaseObserver
 }
 
-func (d *DefaultObserver) Observe(ctx context.Context, identifier wait.ResourceIdentifier) *event.ObservedResource {
+var _ observer.ResourceObserver = &genericObserver{}
+
+func (d *genericObserver) Observe(ctx context.Context, identifier wait.ResourceIdentifier) *event.ObservedResource {
 	u, err := d.LookupResource(ctx, identifier)
 	if err != nil {
 		return d.handleObservedResourceError(identifier, err)
@@ -39,7 +44,7 @@ func (d *DefaultObserver) Observe(ctx context.Context, identifier wait.ResourceI
 	return d.ObserveObject(ctx, u)
 }
 
-func (d *DefaultObserver) ObserveObject(_ context.Context, resource *unstructured.Unstructured) *event.ObservedResource {
+func (d *genericObserver) ObserveObject(_ context.Context, resource *unstructured.Unstructured) *event.ObservedResource {
 	identifier := toIdentifier(resource)
 
 	res, err := d.computeStatusFunc(resource)

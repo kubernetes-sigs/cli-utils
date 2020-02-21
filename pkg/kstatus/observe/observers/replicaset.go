@@ -1,3 +1,6 @@
+// Copyright 2020 The Kubernetes Authors.
+// SPDX-License-Identifier: Apache-2.0
+
 package observers
 
 import (
@@ -31,6 +34,8 @@ type replicaSetObserver struct {
 
 	PodObserver observer.ResourceObserver
 }
+
+var _ observer.ResourceObserver = &replicaSetObserver{}
 
 func (r *replicaSetObserver) Observe(ctx context.Context, identifier wait.ResourceIdentifier) *event.ObservedResource {
 	rs, err := r.LookupResource(ctx, identifier)

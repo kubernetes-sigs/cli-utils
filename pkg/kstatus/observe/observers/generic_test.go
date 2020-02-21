@@ -1,3 +1,6 @@
+// Copyright 2020 The Kubernetes Authors.
+// SPDX-License-Identifier: Apache-2.0
+
 package observers
 
 import (
@@ -23,7 +26,7 @@ var (
 	namespace = "default"
 )
 
-func TestDefaultObserver(t *testing.T) {
+func TestGenericObserver(t *testing.T) {
 	testCases := map[string]struct {
 		result             *status.Result
 		err                error
@@ -57,7 +60,7 @@ func TestDefaultObserver(t *testing.T) {
 		t.Run(tn, func(t *testing.T) {
 			fakeReader := testutil.NewNoopObserverReader()
 			fakeMapper := testutil.NewFakeRESTMapper()
-			observer := NewDefaultObserver(fakeReader, fakeMapper)
+			observer := NewGenericObserver(fakeReader, fakeMapper)
 			observer.SetComputeStatusFunc(func(u *unstructured.Unstructured) (*status.Result, error) {
 				return tc.result, tc.err
 			})

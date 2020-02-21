@@ -1,3 +1,6 @@
+// Copyright 2020 The Kubernetes Authors.
+// SPDX-License-Identifier: Apache-2.0
+
 package observers
 
 import (
@@ -13,7 +16,7 @@ import (
 )
 
 func NewStatefulSetObserver(reader observer.ClusterReader, mapper meta.RESTMapper, podObserver observer.ResourceObserver) observer.ResourceObserver {
-	return &StatefulSetObserver{
+	return &statefulSetObserver{
 		BaseObserver: BaseObserver{
 			Reader:            reader,
 			Mapper:            mapper,
@@ -26,13 +29,15 @@ func NewStatefulSetObserver(reader observer.ClusterReader, mapper meta.RESTMappe
 // StatefulObserver is an observer that can fetch StatefulSet resources
 // from the cluster, knows how to find any Pods belonging to the
 // StatefulSet, and compute status for the StatefulSet.
-type StatefulSetObserver struct {
+type statefulSetObserver struct {
 	BaseObserver
 
 	PodObserver observer.ResourceObserver
 }
 
-func (s *StatefulSetObserver) Observe(ctx context.Context, identifier wait.ResourceIdentifier) *event.ObservedResource {
+var _ observer.ResourceObserver = &statefulSetObserver{}
+
+func (s *statefulSetObserver) Observe(ctx context.Context, identifier wait.ResourceIdentifier) *event.ObservedResource {
 	statefulSet, err := s.LookupResource(ctx, identifier)
 	if err != nil {
 		return s.handleObservedResourceError(identifier, err)
@@ -40,7 +45,7 @@ func (s *StatefulSetObserver) Observe(ctx context.Context, identifier wait.Resou
 	return s.ObserveObject(ctx, statefulSet)
 }
 
-func (s *StatefulSetObserver) ObserveObject(ctx context.Context, statefulSet *unstructured.Unstructured) *event.ObservedResource {
+func (s *statefulSetObserver) ObserveObject(ctx context.Context, statefulSet *unstructured.Unstructured) *event.ObservedResource {
 	identifier := toIdentifier(statefulSet)
 
 	observedPods, err := s.ObserveGeneratedResources(ctx, s.PodObserver, statefulSet,

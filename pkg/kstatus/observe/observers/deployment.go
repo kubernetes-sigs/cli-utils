@@ -1,3 +1,6 @@
+// Copyright 2020 The Kubernetes Authors.
+// SPDX-License-Identifier: Apache-2.0
+
 package observers
 
 import (
@@ -13,7 +16,7 @@ import (
 )
 
 func NewDeploymentObserver(reader observer.ClusterReader, mapper meta.RESTMapper, rsObserver observer.ResourceObserver) observer.ResourceObserver {
-	return &DeploymentObserver{
+	return &deploymentObserver{
 		BaseObserver: BaseObserver{
 			Reader:            reader,
 			Mapper:            mapper,
@@ -23,16 +26,18 @@ func NewDeploymentObserver(reader observer.ClusterReader, mapper meta.RESTMapper
 	}
 }
 
-// DeploymentObserver is an observer that can fetch Deployment resources
+// deploymentObserver is an observer that can fetch Deployment resources
 // from the cluster, knows how to find any ReplicaSets belonging to the
 // Deployment, and compute status for the deployment.
-type DeploymentObserver struct {
+type deploymentObserver struct {
 	BaseObserver
 
 	RsObserver observer.ResourceObserver
 }
 
-func (d *DeploymentObserver) Observe(ctx context.Context, identifier wait.ResourceIdentifier) *event.ObservedResource {
+var _ observer.ResourceObserver = &deploymentObserver{}
+
+func (d *deploymentObserver) Observe(ctx context.Context, identifier wait.ResourceIdentifier) *event.ObservedResource {
 	deployment, err := d.LookupResource(ctx, identifier)
 	if err != nil {
 		return d.handleObservedResourceError(identifier, err)
@@ -40,7 +45,7 @@ func (d *DeploymentObserver) Observe(ctx context.Context, identifier wait.Resour
 	return d.ObserveObject(ctx, deployment)
 }
 
-func (d *DeploymentObserver) ObserveObject(ctx context.Context, deployment *unstructured.Unstructured) *event.ObservedResource {
+func (d *deploymentObserver) ObserveObject(ctx context.Context, deployment *unstructured.Unstructured) *event.ObservedResource {
 	identifier := toIdentifier(deployment)
 
 	observedReplicaSets, err := d.ObserveGeneratedResources(ctx, d.RsObserver, deployment,
