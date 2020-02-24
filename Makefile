@@ -14,7 +14,7 @@ all: generate license fix vet fmt test lint tidy
 # https://github.com/kubernetes/test-infra/tree/master/config/jobs/kubernetes-sigs/cli-utils
 .PHONY: prow-presubmit-check
 prow-presubmit-check: \
-	test
+	test lint
 
 fix:
 	go fix ./...
