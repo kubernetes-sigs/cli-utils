@@ -109,6 +109,41 @@ status:
       reason: PodCompleted
 `
 
+var podUnschedulable = `
+apiVersion: v1
+kind: Pod
+metadata:
+   generation: 1
+   name: test
+   namespace: qual
+status:
+   phase: Pending
+   conditions:
+    - type: PodScheduled 
+      status: "False"
+      reason: Unschedulable
+`
+
+var podCrashLooping = `
+apiVersion: v1
+kind: Pod
+metadata:
+   generation: 1
+   name: test
+   namespace: qual
+status:
+   phase: Running
+   conditions:
+    - type: PodScheduled 
+      status: "False"
+      reason: Unschedulable
+   containerStatuses:
+    - name: nginx
+      state:
+         waiting:
+            reason: CrashLoopBackOff
+`
+
 // Test coverage using GetConditions
 func TestPodStatus(t *testing.T) {
 	testCases := map[string]testSpec{
@@ -118,7 +153,7 @@ func TestPodStatus(t *testing.T) {
 			expectedConditions: []Condition{{
 				Type:   ConditionInProgress,
 				Status: corev1.ConditionTrue,
-				Reason: "PodNotReady",
+				Reason: "PodNotObserved",
 			}},
 			absentConditionTypes: []ConditionType{
 				ConditionFailed,
@@ -143,13 +178,38 @@ func TestPodStatus(t *testing.T) {
 			},
 		},
 		"podCompletedFailed": {
-			spec:           podCompletedFail,
+			spec:               podCompletedFail,
+			expectedStatus:     CurrentStatus,
+			expectedConditions: []Condition{},
+			absentConditionTypes: []ConditionType{
+				ConditionInProgress,
+				ConditionFailed,
+			},
+		},
+		"podUnschedulable": {
+			spec:           podUnschedulable,
 			expectedStatus: FailedStatus,
-			expectedConditions: []Condition{{
-				Type:   ConditionFailed,
-				Status: corev1.ConditionTrue,
-				Reason: "PodFailed",
-			}},
+			expectedConditions: []Condition{
+				{
+					Type:   ConditionFailed,
+					Status: corev1.ConditionTrue,
+					Reason: "PodUnschedulable",
+				},
+			},
+			absentConditionTypes: []ConditionType{
+				ConditionInProgress,
+			},
+		},
+		"podCrashLooping": {
+			spec:           podCrashLooping,
+			expectedStatus: FailedStatus,
+			expectedConditions: []Condition{
+				{
+					Type:   ConditionFailed,
+					Status: corev1.ConditionTrue,
+					Reason: "ContainerCrashLooping",
+				},
+			},
 			absentConditionTypes: []ConditionType{
 				ConditionInProgress,
 			},
