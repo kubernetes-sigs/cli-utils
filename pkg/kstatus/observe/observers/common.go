@@ -40,9 +40,8 @@ func (b *BaseObserver) SetComputeStatusFunc(statusFunc observer.ComputeStatusFun
 
 // LookupResource looks up a resource with the given identifier. It will use the rest mapper to resolve
 // the version of the GroupKind given in the identifier.
-// If the resource is found, it will be returned and the observedResource will be nil. If there is an error
-// or the resource is not found, the observedResource will be returned containing information about the resource
-// and the problem.
+// If the resource is found, it is returned. If it is not found or something
+// went wrong, the function will return an error.
 func (b *BaseObserver) LookupResource(ctx context.Context, identifier wait.ResourceIdentifier) (*unstructured.Unstructured, error) {
 	GVK, err := b.GVK(identifier.GroupKind)
 	if err != nil {
