@@ -115,15 +115,11 @@ Destroy one service and make sure that only that service is destroyed and clean-
 ```
 kapply destroy $BASE/wordpress > $OUTPUT/status;
 
-expectedOutputLine "service/wordpress pruned"
+expectedOutputLine "service/wordpress deleted"
 
-expectedOutputLine "deployment.apps/wordpress pruned"
+expectedOutputLine "deployment.apps/wordpress deleted"
 
-expectedOutputLine "configmap/inventory-map-wordpress-2fbd5b91 pruned"
-
-test 3 == \
-  $(grep "" $OUTPUT/status | wc -l); \
-  echo $?
+expectedOutputLine "configmap/inventory-map-wordpress-2fbd5b91 deleted"
 
 kind delete cluster;
 ```
