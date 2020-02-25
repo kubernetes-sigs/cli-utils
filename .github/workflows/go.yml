@@ -1,7 +1,6 @@
 name: Go
 on: [push]
 jobs:
-
   build:
     name: CI
     runs-on: ubuntu-latest
@@ -22,8 +21,8 @@ jobs:
         go install golang.org/x/tools/cmd/stringer
         go get github.com/golangci/golangci-lint/cmd/golangci-lint@v1.19.1
         go install github.com/golangci/golangci-lint/cmd/golangci-lint
-        go get get github.com/google/addlicense
-        go install get github.com/google/addlicense
+        go get github.com/google/addlicense
+        go install github.com/google/addlicense
 
     - name: Run tests
       run: |
