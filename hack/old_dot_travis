@@ -1,6 +1,11 @@
 # Copyright 2020 The Kubernetes Authors.
 # SPDX-License-Identifier: Apache-2.0
 
+
+# The file formerly known as top level .travis,
+# moved down here for short term reference.
+# We now do presubmit testing on prow.
+
 language: go
 
 os:
