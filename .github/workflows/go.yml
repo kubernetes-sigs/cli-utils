@@ -16,10 +16,14 @@ jobs:
     - name: Check out code into the Go module directory
       uses: actions/checkout@v2
 
-    - name: Fetch deps
+    - name: Install deps
       run: |
         go get golang.org/x/tools/cmd/stringer
         go install golang.org/x/tools/cmd/stringer
+        go get github.com/golangci/golangci-lint/cmd/golangci-lint@v1.19.1
+        go install go get github.com/golangci/golangci-lint/cmd/golangci-lint
+        go get get github.com/google/addlicense
+        go install get github.com/google/addlicense
 
     - name: Run tests
       run: |
