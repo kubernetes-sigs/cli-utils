@@ -23,7 +23,6 @@ func NewCmdDestroy(f util.Factory, ioStreams genericclioptions.IOStreams) *cobra
 		Use:                   "destroy (FILENAME... | DIRECTORY)",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Destroy all the resources related to configuration"),
-		Args:                  cobra.MaximumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			paths := args
 			cmdutil.CheckErr(destroyer.Initialize(cmd, paths))
