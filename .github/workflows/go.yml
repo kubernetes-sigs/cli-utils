@@ -16,6 +16,11 @@ jobs:
     - name: Check out code into the Go module directory
       uses: actions/checkout@v2
 
+    - name: Fetch deps
+      run: |
+        go get golang.org/x/tools/cmd/stringer
+        go install golang.org/x/tools/cmd/stringer
+
     - name: Run tests
       run: |
         make
