@@ -14,7 +14,7 @@ all: generate license fix vet fmt test lint tidy
 # https://github.com/kubernetes/test-infra/tree/master/config/jobs/kubernetes-sigs/cli-utils
 .PHONY: prow-presubmit-check
 prow-presubmit-check: \
-	test lint
+	test lint verify-license
 
 fix:
 	go fix ./...
@@ -28,6 +28,10 @@ generate:
 license:
 	(which $(GOPATH)/bin/addlicense || go get github.com/google/addlicense)
 	$(GOPATH)/bin/addlicense  -y 2020 -c "The Kubernetes Authors." -f LICENSE_TEMPLATE .
+
+verify-license:
+	(which $(GOPATH)/bin/addlicense || go get github.com/google/addlicense)
+	$(GOPATH)/bin/addlicense  -check .
 
 tidy:
 	go mod tidy
