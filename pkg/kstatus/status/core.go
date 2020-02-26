@@ -6,6 +6,7 @@ package status
 import (
 	"fmt"
 	"math"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -356,43 +357,94 @@ func podConditions(u *unstructured.Unstructured) (*Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	phase := GetStringField(obj, ".status.phase", "unknown")
+	phase := GetStringField(obj, ".status.phase", "")
 
-	if phase == "Succeeded" {
+	switch phase {
+	case "Succeeded":
 		return &Result{
 			Status:     CurrentStatus,
 			Message:    "Pod has completed successfully",
 			Conditions: []Condition{},
 		}, nil
-	}
+	case "Failed":
+		return &Result{
+			Status:     CurrentStatus,
+			Message:    "Pod has completed, but not successfully",
+			Conditions: []Condition{},
+		}, nil
+	case "Running":
+		if hasConditionWithStatus(objc.Status.Conditions, "Ready", corev1.ConditionTrue) {
+			return &Result{
+				Status:     CurrentStatus,
+				Message:    "Pod is Ready",
+				Conditions: []Condition{},
+			}, nil
+		}
 
-	for _, c := range objc.Status.Conditions {
-		if c.Type == "Ready" {
-			if c.Status == corev1.ConditionTrue {
-				return &Result{
-					Status:     CurrentStatus,
-					Message:    "Pod has reached the ready state",
-					Conditions: []Condition{},
-				}, nil
-			}
-			if c.Status == corev1.ConditionFalse && c.Reason == "PodCompleted" && phase != "Succeeded" {
-				message := "Pod has completed, but not successfully."
-				return &Result{
-					Status:  FailedStatus,
-					Message: message,
-					Conditions: []Condition{{
-						Type:    ConditionFailed,
-						Status:  corev1.ConditionTrue,
-						Reason:  "PodFailed",
-						Message: fmt.Sprintf("Pod has completed, but not succeesfully."),
-					}},
-				}, nil
-			}
+		containerNames, isCrashLooping, err := getCrashLoopingContainers(obj)
+		if err != nil {
+			return nil, err
+		}
+		if isCrashLooping {
+			return newFailedStatus("ContainerCrashLooping",
+				fmt.Sprintf("Containers in CrashLoop state: %s", strings.Join(containerNames, ","))), nil
+		}
+
+		return newInProgressStatus("PodRunningNotReady", "Pod is running but is not Ready"), nil
+	case "Pending":
+		c, found := getConditionWithStatus(objc.Status.Conditions, "PodScheduled", corev1.ConditionFalse)
+		if found && c.Reason == "Unschedulable" {
+			return newFailedStatus("PodUnschedulable", "Pod could not be scheduled"), nil
+		}
+		return newInProgressStatus("PodPending", "Pod is in the Pending phase"), nil
+	default:
+		// If the controller hasn't observed the pod yet, there is no phase. We consider this as it
+		// still being in progress.
+		if phase == "" {
+			return newInProgressStatus("PodNotObserved", "Pod phase not available"), nil
+		}
+		return nil, fmt.Errorf("unknown phase %s", phase)
+	}
+}
+
+func getCrashLoopingContainers(obj map[string]interface{}) ([]string, bool, error) {
+	var containerNames []string
+	css, found, err := unstructured.NestedSlice(obj, "status", "containerStatuses")
+	if !found || err != nil {
+		return containerNames, found, err
+	}
+	for _, item := range css {
+		cs := item.(map[string]interface{})
+		n, found := cs["name"]
+		if !found {
+			continue
+		}
+		name := n.(string)
+		s, found := cs["state"]
+		if !found {
+			continue
+		}
+		state := s.(map[string]interface{})
+
+		ws, found := state["waiting"]
+		if !found {
+			continue
+		}
+		waitingState := ws.(map[string]interface{})
+
+		r, found := waitingState["reason"]
+		if !found {
+			continue
+		}
+		reason := r.(string)
+		if reason == "CrashLoopBackOff" {
+			containerNames = append(containerNames, name)
 		}
 	}
-
-	message := "Pod has not become ready"
-	return newInProgressStatus("PodNotReady", message), nil
+	if len(containerNames) > 0 {
+		return containerNames, true, nil
+	}
+	return containerNames, false, nil
 }
 
 // pdbConditions computes the status for PodDisruptionBudgets. A PDB
@@ -405,7 +457,7 @@ func podConditions(u *unstructured.Unstructured) (*Result, error) {
 // computing the AllowedDisruptions fails (and there are many ways
 // it can fail), but there is PR against OSS Kubernetes to address
 // this: https://github.com/kubernetes/kubernetes/pull/86929
-func pdbConditions(u *unstructured.Unstructured) (*Result, error) {
+func pdbConditions(_ *unstructured.Unstructured) (*Result, error) {
 	// All ok
 	return &Result{
 		Status:     CurrentStatus,
@@ -448,17 +500,8 @@ func jobConditions(u *unstructured.Unstructured) (*Result, error) {
 			}
 		case "Failed":
 			if c.Status == corev1.ConditionTrue {
-				message := fmt.Sprintf("Job Failed. failed: %d/%d", failed, completions)
-				return &Result{
-					Status:  FailedStatus,
-					Message: message,
-					Conditions: []Condition{{
-						ConditionFailed,
-						corev1.ConditionTrue,
-						"JobFailed",
-						fmt.Sprintf("Job Failed. failed: %d/%d", failed, completions),
-					}},
-				}, nil
+				return newFailedStatus("JobFailed",
+					fmt.Sprintf("Job Failed. failed: %d/%d", failed, completions)), nil
 			}
 		}
 	}

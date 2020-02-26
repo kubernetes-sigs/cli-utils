@@ -22,6 +22,15 @@ func newInProgressCondition(reason, message string) Condition {
 	}
 }
 
+func newFailedCondition(reason, message string) Condition {
+	return Condition{
+		Type:    ConditionFailed,
+		Status:  corev1.ConditionTrue,
+		Reason:  reason,
+		Message: message,
+	}
+}
+
 // newInProgressStatus creates a status Result with the InProgress status
 // and an InProgress condition.
 func newInProgressStatus(reason, message string) *Result {
@@ -29,6 +38,14 @@ func newInProgressStatus(reason, message string) *Result {
 		Status:     InProgressStatus,
 		Message:    message,
 		Conditions: []Condition{newInProgressCondition(reason, message)},
+	}
+}
+
+func newFailedStatus(reason, message string) *Result {
+	return &Result{
+		Status:     FailedStatus,
+		Message:    message,
+		Conditions: []Condition{newFailedCondition(reason, message)},
 	}
 }
 
@@ -66,6 +83,20 @@ func GetObjectWithConditions(in map[string]interface{}) (*ObjWithConditions, err
 		return nil, err
 	}
 	return out, nil
+}
+
+func hasConditionWithStatus(conditions []BasicCondition, conditionType string, status corev1.ConditionStatus) bool {
+	_, found := getConditionWithStatus(conditions, conditionType, status)
+	return found
+}
+
+func getConditionWithStatus(conditions []BasicCondition, conditionType string, status corev1.ConditionStatus) (BasicCondition, bool) {
+	for _, c := range conditions {
+		if c.Type == conditionType && c.Status == status {
+			return c, true
+		}
+	}
+	return BasicCondition{}, false
 }
 
 // GetStringField return field as string defaulting to value if not found

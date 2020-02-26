@@ -58,7 +58,7 @@ func TestAugmentConditions(t *testing.T) {
 				{
 					Type:   ConditionInProgress,
 					Status: corev1.ConditionTrue,
-					Reason: "PodNotReady",
+					Reason: "PodRunningNotReady",
 				},
 			},
 		},
@@ -77,7 +77,7 @@ func TestAugmentConditions(t *testing.T) {
 				{
 					Type:   ConditionInProgress,
 					Status: corev1.ConditionTrue,
-					Reason: "PodNotReady",
+					Reason: "PodRunningNotReady",
 				},
 				{
 					Type:   "Ready",
