@@ -70,6 +70,7 @@ func (a *Applier) Initialize(cmd *cobra.Command, paths []string) error {
 		return errors.WrapPrefix(err, "error setting up ApplyOptions", 1)
 	}
 	a.ApplyOptions.PreProcessorFn = prune.PrependGroupingObject(a.ApplyOptions)
+	a.ApplyOptions.PostProcessorFn = nil // Turn off the default kubectl pruning
 	err = a.PruneOptions.Initialize(a.factory, a.ApplyOptions.Namespace)
 	if err != nil {
 		return errors.WrapPrefix(err, "error setting up PruneOptions", 1)
