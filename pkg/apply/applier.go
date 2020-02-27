@@ -153,14 +153,23 @@ func (a *Applier) Run(ctx context.Context) <-chan event.Event {
 		a.ApplyOptions.ToPrinter = adapter.toPrinterFunc()
 		// This provides us with a slice of all the objects that will be
 		// applied to the cluster.
-		infos, _ := a.ApplyOptions.GetObjects()
+		infos, err := a.ApplyOptions.GetObjects()
+		if err != nil {
+			ch <- event.Event{
+				Type: event.ErrorType,
+				ErrorEvent: event.ErrorEvent{
+					Err: errors.WrapPrefix(err, "error reading resource manifests", 1),
+				},
+			}
+			return
+		}
 
 		// sort the info objects starting from independent to dependent objects, and set them back
 		// ordering precedence can be found in gvk.go
 		sort.Sort(ResourceInfos(infos))
 		a.ApplyOptions.SetObjects(infos)
 
-		err := a.ApplyOptions.Run()
+		err = a.ApplyOptions.Run()
 		if err != nil {
 			// If we see an error here we just report it on the channel and then
 			// give up. Eventually we might be able to determine which errors
