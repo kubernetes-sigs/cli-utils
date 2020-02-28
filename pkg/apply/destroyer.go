@@ -57,10 +57,6 @@ func (d *Destroyer) Initialize(cmd *cobra.Command, paths []string) error {
 	// Propagate dry-run flags.
 	d.ApplyOptions.DryRun = d.DryRun
 	d.PruneOptions.DryRun = d.DryRun
-
-	if err != nil {
-		return errors.WrapPrefix(err, "error creating resolver", 1)
-	}
 	return nil
 }
 
@@ -71,7 +67,16 @@ func (d *Destroyer) Run() <-chan event.Event {
 
 	go func() {
 		defer close(ch)
-		infos, _ := d.ApplyOptions.GetObjects()
+		infos, err := d.ApplyOptions.GetObjects()
+		if err != nil {
+			ch <- event.Event{
+				Type: event.ErrorType,
+				ErrorEvent: event.ErrorEvent{
+					Err: errors.WrapPrefix(err, "error reading resource manifests", 1),
+				},
+			}
+			return
+		}
 		// Clear the data/inventory section of the grouping object configmap,
 		// so the prune will calculate the prune set as all the objects,
 		// deleting everything. We can ignore the error, since the Prune
@@ -83,7 +88,7 @@ func (d *Destroyer) Run() <-chan event.Event {
 		// Events. That we use Prune to implement destroy is an
 		// implementation detail and the events should not be Prune events.
 		tempChannel, completedChannel := runPruneEventTransformer(ch)
-		err := d.PruneOptions.Prune(infos, tempChannel)
+		err = d.PruneOptions.Prune(infos, tempChannel)
 		// Close the tempChannel to signal to the event transformer that
 		// it should terminate.
 		close(tempChannel)
