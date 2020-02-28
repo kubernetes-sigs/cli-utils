@@ -104,7 +104,11 @@ func TestStatusPollerRunner(t *testing.T) {
 
 			identifiers := tc.identifiers
 
-			engine := PollerEngine{
+			engine := PollerEngine{}
+
+			options := Options{
+				PollInterval:       2 * time.Second,
+				PollUntilCancelled: false,
 				AggregatorFactoryFunc: func(identifiers []wait.ResourceIdentifier) StatusAggregator {
 					return newFakeAggregator(identifiers)
 				},
@@ -118,7 +122,7 @@ func TestStatusPollerRunner(t *testing.T) {
 				},
 			}
 
-			eventChannel := engine.Poll(ctx, identifiers, 2*time.Second, false)
+			eventChannel := engine.Poll(ctx, identifiers, options)
 
 			var eventTypes []event.EventType
 			for ch := range eventChannel {
@@ -138,10 +142,13 @@ func TestNewStatusPollerRunnerCancellation(t *testing.T) {
 
 	timer := time.NewTimer(5 * time.Second)
 
-	engine := PollerEngine{
+	engine := PollerEngine{}
+
+	options := Options{
+		PollInterval:       2 * time.Second,
+		PollUntilCancelled: true,
 		AggregatorFactoryFunc: func(identifiers []wait.ResourceIdentifier) StatusAggregator {
 			return newFakeAggregator(identifiers)
-			//return aggregator.NewAllCurrentOrNotFoundStatusAggregator(identifiers)
 		},
 		ClusterReaderFactoryFunc: func(_ client.Reader, _ meta.RESTMapper, _ []wait.ResourceIdentifier) (
 			ClusterReader, error) {
@@ -153,7 +160,7 @@ func TestNewStatusPollerRunnerCancellation(t *testing.T) {
 		},
 	}
 
-	eventChannel := engine.Poll(ctx, identifiers, 2*time.Second, true)
+	eventChannel := engine.Poll(ctx, identifiers, options)
 
 	var lastEvent event.Event
 	for {

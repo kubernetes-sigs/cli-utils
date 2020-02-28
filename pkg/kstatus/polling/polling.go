@@ -5,6 +5,7 @@ package polling
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -15,21 +16,18 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/engine"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/statusreaders"
+	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/wait"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // NewStatusPoller creates a new StatusPoller using the given clusterreader and mapper. The StatusPoller
 // will use the client for all calls to the cluster.
-func NewStatusPoller(reader client.Reader, mapper meta.RESTMapper, useCache bool) *StatusPoller {
+func NewStatusPoller(reader client.Reader, mapper meta.RESTMapper) *StatusPoller {
 	return &StatusPoller{
 		engine: &engine.PollerEngine{
 			Reader: reader,
 			Mapper: mapper,
-
-			StatusReadersFactoryFunc: createStatusReaders,
-			ClusterReaderFactoryFunc: clusterReaderFactoryFunc(useCache),
-			AggregatorFactoryFunc:    aggregatorFactoryFunc(),
 		},
 	}
 }
@@ -42,27 +40,62 @@ type StatusPoller struct {
 // Poll will create a new statusPollerRunner that will poll all the resources provided and report their status
 // back on the event channel returned. The statusPollerRunner can be cancelled at any time by cancelling the
 // context passed in.
-// If stopOnCompleted is set to true, then the runner will stop polling the resources when the StatusAggregator
-// determines that all resources has been fully reconciled. If this is set to false, the engine will keep running
-// until cancelled.
-// If useCache is set to true, the engine will fetch all resources needed using LIST calls before each polling
-// cycle. The statusreaders responsible for computing status will rely on the cached data. This can dramatically reduce
-// the number of calls against the API server.
 func (s *StatusPoller) Poll(ctx context.Context, identifiers []wait.ResourceIdentifier, options Options) <-chan event.Event {
-	return s.engine.Poll(ctx, identifiers, options.PollInterval, options.StopOnCompleted)
+	err := s.validate(options)
+	// If validation fail, we still need to return the error through the
+	// eventChannel the client expects. So we need to create one just for
+	// passing the error back.
+	if err != nil {
+		eventChannel := make(chan event.Event)
+		go func() {
+			eventChannel <- event.Event{
+				EventType: event.ErrorEvent,
+				Error:     err,
+			}
+		}()
+		return eventChannel
+	}
+
+	return s.engine.Poll(ctx, identifiers, engine.Options{
+		PollUntilCancelled:       options.PollUntilCancelled,
+		PollInterval:             options.PollInterval,
+		AggregatorFactoryFunc:    aggregatorFactoryFunc(options.DesiredStatus),
+		ClusterReaderFactoryFunc: clusterReaderFactoryFunc(options.UseCache),
+		StatusReadersFactoryFunc: createStatusReaders,
+	})
 }
 
-// Options contains the different parameters that can be used to adjust the
-// behavior of the StatusPoller.
+// validate checks that the passed in options contains valid values.
+func (s *StatusPoller) validate(options Options) error {
+	desiredStatus := options.DesiredStatus
+	if desiredStatus != status.NotFoundStatus && desiredStatus != status.CurrentStatus {
+		return fmt.Errorf("illegal desired status %s", desiredStatus.String())
+	}
+	return nil
+}
+
+// Options defines the levers available for tuning the behavior of the
+// StatusPoller.
 type Options struct {
-	// StopOnCompleted defines whether the engine should stop polling and close the
+	// PollUntilCancelled defines whether the engine should stop polling and close the
 	// event channel when the Aggregator implementation considers all resources to have reached
 	// the desired status.
-	StopOnCompleted bool
+	PollUntilCancelled bool
 
 	// PollInterval defines how often the PollerEngine should poll the cluster for the latest
 	// state of the resources.
 	PollInterval time.Duration
+
+	// UseCache defines whether the ClusterReader should use LIST calls to fetch
+	// all needed resources before each polling cycle. If this is set to false,
+	// then each resource will be fetched when needed with GET calls.
+	UseCache bool
+
+	// DesiredStatus defines which status we want all resources to reach. This
+	// is used by the aggregator to determine the aggregate status. If
+	// PollUntilCancelled is false, then it is also used to determine when
+	// we should stop polling.
+	DesiredStatus status.Status
 }
 
 // createStatusReaders creates an instance of all the statusreaders. This includes a set of statusreaders for
@@ -102,8 +135,11 @@ func clusterReaderFactoryFunc(useCache bool) engine.ClusterReaderFactoryFunc {
 
 // aggregatorFactoryFunc returns a factory function for creating an instance of the
 // StatusAggregator interface. Currently there is only one implementation.
-func aggregatorFactoryFunc() engine.AggregatorFactoryFunc {
+func aggregatorFactoryFunc(desiredStatus status.Status) engine.AggregatorFactoryFunc {
 	return func(identifiers []wait.ResourceIdentifier) engine.StatusAggregator {
-		return aggregator.NewAllCurrentOrNotFoundStatusAggregator(identifiers)
+		if desiredStatus == status.NotFoundStatus {
+			return aggregator.NewAllNotFoundAggregator(identifiers)
+		}
+		return aggregator.NewAllCurrentAggregator(identifiers)
 	}
 }

@@ -5,6 +5,7 @@ package engine
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/go-errors/errors"
@@ -33,6 +34,84 @@ type StatusReadersFactoryFunc func(reader ClusterReader, mapper meta.RESTMapper)
 type PollerEngine struct {
 	Reader client.Reader
 	Mapper meta.RESTMapper
+}
+
+// Poll will create a new statusPollerRunner that will poll all the resources provided and report their status
+// back on the event channel returned. The statusPollerRunner can be cancelled at any time by cancelling the
+// context passed in.
+// The context can be used to stop the polling process by using timeout, deadline or
+// cancellation.
+func (s *PollerEngine) Poll(ctx context.Context, identifiers []wait.ResourceIdentifier, options Options) <-chan event.Event {
+	eventChannel := make(chan event.Event)
+
+	go func() {
+		defer close(eventChannel)
+
+		err := s.validate(options)
+		if err != nil {
+			eventChannel <- event.Event{
+				EventType: event.ErrorEvent,
+				Error:     err,
+			}
+			return
+		}
+
+		clusterReader, err := options.ClusterReaderFactoryFunc(s.Reader, s.Mapper, identifiers)
+		if err != nil {
+			eventChannel <- event.Event{
+				EventType: event.ErrorEvent,
+				Error:     errors.WrapPrefix(err, "error creating new ClusterReader", 1),
+			}
+			return
+		}
+		statusReaders, defaultStatusReader := options.StatusReadersFactoryFunc(clusterReader, s.Mapper)
+		aggregator := options.AggregatorFactoryFunc(identifiers)
+
+		runner := &statusPollerRunner{
+			ctx:                      ctx,
+			clusterReader:            clusterReader,
+			statusReaders:            statusReaders,
+			defaultStatusReader:      defaultStatusReader,
+			identifiers:              identifiers,
+			previousResourceStatuses: make(map[wait.ResourceIdentifier]*event.ResourceStatus),
+			eventChannel:             eventChannel,
+			statusAggregator:         aggregator,
+			pollUntilCancelled:       options.PollUntilCancelled,
+			pollingInterval:          options.PollInterval,
+		}
+		runner.Run()
+	}()
+
+	return eventChannel
+}
+
+// validate checks that the passed in options contains valid values.
+func (s *PollerEngine) validate(options Options) error {
+	if options.ClusterReaderFactoryFunc == nil {
+		return fmt.Errorf("clusterReaderFactoryFunc must be specified")
+	}
+	if options.AggregatorFactoryFunc == nil {
+		return fmt.Errorf("aggregatorFactoryFunc must be specified")
+	}
+	if options.StatusReadersFactoryFunc == nil {
+		return fmt.Errorf("statusReadersFactoryFunc must be specified")
+	}
+	return nil
+}
+
+// Options contains the different parameters that can be used to adjust the
+// behavior of the PollerEngine.
+// Timeout is not one of the options here as this should be accomplished by
+// setting a timeout on the context: https://golang.org/pkg/context/
+type Options struct {
+	// PollUntilCancelled defines whether the engine should stop polling and close the
+	// event channel when the Aggregator implementation considers all resources to have reached
+	// the desired status.
+	PollUntilCancelled bool
+
+	// PollInterval defines how often the PollerEngine should poll the cluster for the latest
+	// state of the resources.
+	PollInterval time.Duration
 
 	// AggregatorFunc provides the PollerEngine with a way to create a new aggregator. This will
 	// happen for every call to Poll since each statusPollerRunner keeps its own
@@ -48,50 +127,6 @@ type PollerEngine struct {
 	// clusterReader. Each statusPollerRunner has a separate set of statusReaders, so this will be called
 	// for every call to Poll.
 	StatusReadersFactoryFunc StatusReadersFactoryFunc
-}
-
-// Poll will create a new statusPollerRunner that will poll all the resources provided and report their status
-// back on the event channel returned. The statusPollerRunner can be cancelled at any time by cancelling the
-// context passed in.
-// If pollUntilCancelled is set to false, then the runner will stop polling the resources when the StatusAggregator
-// determines that all resources has been fully reconciled. If this is set to true, the engine will keep running
-// until cancelled. This can be useful if the goal is to just monitor a set of resources rather than waiting for
-// all to reach a specific status.
-// The pollInterval specifies how often the engine should poll the cluster for the latest state of the resources.
-func (s *PollerEngine) Poll(ctx context.Context, identifiers []wait.ResourceIdentifier, pollInterval time.Duration,
-	pollUntilCancelled bool) <-chan event.Event {
-	eventChannel := make(chan event.Event)
-
-	go func() {
-		defer close(eventChannel)
-
-		clusterReader, err := s.ClusterReaderFactoryFunc(s.Reader, s.Mapper, identifiers)
-		if err != nil {
-			eventChannel <- event.Event{
-				EventType: event.ErrorEvent,
-				Error:     errors.WrapPrefix(err, "error creating new ClusterReader", 1),
-			}
-			return
-		}
-		statusReaders, defaultStatusReader := s.StatusReadersFactoryFunc(clusterReader, s.Mapper)
-		aggregator := s.AggregatorFactoryFunc(identifiers)
-
-		runner := &statusPollerRunner{
-			ctx:                      ctx,
-			clusterReader:            clusterReader,
-			statusReaders:            statusReaders,
-			defaultStatusReader:      defaultStatusReader,
-			identifiers:              identifiers,
-			previousResourceStatuses: make(map[wait.ResourceIdentifier]*event.ResourceStatus),
-			eventChannel:             eventChannel,
-			statusAggregator:         aggregator,
-			pollUntilCancelled:       pollUntilCancelled,
-			pollingInterval:          pollInterval,
-		}
-		runner.Run()
-	}()
-
-	return eventChannel
 }
 
 // statusPollerRunner is responsible for polling of a set of resources. Each call to Poll will create
