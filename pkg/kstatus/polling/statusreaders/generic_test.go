@@ -11,9 +11,9 @@ import (
 	"gotest.tools/assert"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"sigs.k8s.io/cli-utils/pkg/apply/prune"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/testutil"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
-	"sigs.k8s.io/cli-utils/pkg/kstatus/wait"
 )
 
 var (
@@ -30,7 +30,7 @@ func TestGenericStatusReader(t *testing.T) {
 	testCases := map[string]struct {
 		result             *status.Result
 		err                error
-		expectedIdentifier wait.ResourceIdentifier
+		expectedIdentifier prune.ObjMetadata
 		expectedStatus     status.Status
 	}{
 		"successfully computes status": {
@@ -38,7 +38,7 @@ func TestGenericStatusReader(t *testing.T) {
 				Status:  status.InProgressStatus,
 				Message: "this is a test",
 			},
-			expectedIdentifier: wait.ResourceIdentifier{
+			expectedIdentifier: prune.ObjMetadata{
 				GroupKind: customGVK.GroupKind(),
 				Name:      name,
 				Namespace: namespace,
@@ -47,7 +47,7 @@ func TestGenericStatusReader(t *testing.T) {
 		},
 		"computing status fails": {
 			err: fmt.Errorf("this error is a test"),
-			expectedIdentifier: wait.ResourceIdentifier{
+			expectedIdentifier: prune.ObjMetadata{
 				GroupKind: customGVK.GroupKind(),
 				Name:      name,
 				Namespace: namespace,

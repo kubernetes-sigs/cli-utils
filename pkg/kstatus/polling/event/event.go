@@ -5,8 +5,8 @@ package event
 
 import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"sigs.k8s.io/cli-utils/pkg/apply/prune"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
-	"sigs.k8s.io/cli-utils/pkg/kstatus/wait"
 )
 
 // EventType is the type that describes the type of an Event that is passed back to the caller
@@ -53,7 +53,7 @@ type Event struct {
 type ResourceStatus struct {
 	// Identifier contains the information necessary to locate the
 	// resource within a cluster.
-	Identifier wait.ResourceIdentifier
+	Identifier prune.ObjMetadata
 
 	// Status is the computed status for this resource.
 	Status status.Status

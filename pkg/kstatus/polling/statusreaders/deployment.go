@@ -9,10 +9,10 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"sigs.k8s.io/cli-utils/pkg/apply/prune"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/engine"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
-	"sigs.k8s.io/cli-utils/pkg/kstatus/wait"
 )
 
 func NewDeploymentResourceReader(reader engine.ClusterReader, mapper meta.RESTMapper, rsStatusReader engine.StatusReader) engine.StatusReader {
@@ -37,7 +37,7 @@ type deploymentResourceReader struct {
 
 var _ engine.StatusReader = &deploymentResourceReader{}
 
-func (d *deploymentResourceReader) ReadStatus(ctx context.Context, identifier wait.ResourceIdentifier) *event.ResourceStatus {
+func (d *deploymentResourceReader) ReadStatus(ctx context.Context, identifier prune.ObjMetadata) *event.ResourceStatus {
 	deployment, err := d.LookupResource(ctx, identifier)
 	if err != nil {
 		return d.handleResourceStatusError(identifier, err)

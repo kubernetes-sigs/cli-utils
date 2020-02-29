@@ -22,7 +22,7 @@
 //     "sigs.k8s.io/cli-utils/pkg/kstatus/polling"
 //   )
 //
-//   identifiers := []wait.ResourceIdentifier{
+//   identifiers := []prune.ObjMetadata{
 //     {
 //       GroupKind: schema.GroupKind{
 //         Group: "apps",
