@@ -23,11 +23,40 @@ type BasicPrinter struct {
 	IOStreams genericclioptions.IOStreams
 }
 
+type applyStats struct {
+	serversideApplied int
+	created           int
+	unchanged         int
+	configured        int
+}
+
+func (a *applyStats) inc(op event.ApplyEventOperation) {
+	switch op {
+	case event.ServersideApplied:
+		a.serversideApplied++
+	case event.Created:
+		a.created++
+	case event.Unchanged:
+		a.unchanged++
+	case event.Configured:
+		a.configured++
+	default:
+		panic(fmt.Errorf("unknown apply operation %s", op.String()))
+	}
+}
+
+func (a *applyStats) sum() int {
+	return a.serversideApplied + a.configured + a.unchanged + a.created
+}
+
 // Print outputs the events from the provided channel in a simple
 // format on StdOut. As we support other printer implementations
 // this should probably be an interface.
 // This function will block until the channel is closed.
 func (b *BasicPrinter) Print(ch <-chan event.Event) {
+	applyStats := &applyStats{}
+	pruneCount := 0
+	deleteCount := 0
 	for e := range ch {
 		switch e.Type {
 		case event.ErrorType:
@@ -35,11 +64,19 @@ func (b *BasicPrinter) Print(ch <-chan event.Event) {
 		case event.ApplyType:
 			ae := e.ApplyEvent
 			if ae.Type == event.ApplyEventCompleted {
-				fmt.Fprintf(b.IOStreams.Out, "all resources have been applied\n")
+				output := fmt.Sprintf("%d resource(s) applied. %d created, %d unchanged, %d configured",
+					applyStats.sum(), applyStats.created, applyStats.unchanged, applyStats.configured)
+				// Only print information about serverside apply if some of the
+				// resources actually were applied serverside.
+				if applyStats.serversideApplied > 0 {
+					output += fmt.Sprintf(", %d serverside applied", applyStats.serversideApplied)
+				}
+				fmt.Fprint(b.IOStreams.Out, output+"\n")
 			} else {
 				obj := ae.Object
 				gvk := obj.GetObjectKind().GroupVersionKind()
 				name := getName(obj)
+				applyStats.inc(ae.Operation)
 				fmt.Fprintf(b.IOStreams.Out, "%s %s\n", resourceIDToString(gvk.GroupKind(), name),
 					strings.ToLower(ae.Operation.String()))
 			}
@@ -59,21 +96,23 @@ func (b *BasicPrinter) Print(ch <-chan event.Event) {
 		case event.PruneType:
 			pe := e.PruneEvent
 			if pe.Type == event.PruneEventCompleted {
-				fmt.Fprintf(b.IOStreams.Out, "prune completed\n")
+				fmt.Fprintf(b.IOStreams.Out, "%d resource(s) pruned\n", pruneCount)
 			} else {
 				obj := e.PruneEvent.Object
 				gvk := obj.GetObjectKind().GroupVersionKind()
 				name := getName(obj)
+				pruneCount++
 				fmt.Fprintf(b.IOStreams.Out, "%s %s\n", resourceIDToString(gvk.GroupKind(), name), "pruned")
 			}
 		case event.DeleteType:
 			de := e.DeleteEvent
 			if de.Type == event.DeleteEventCompleted {
-				fmt.Fprintf(b.IOStreams.Out, "destroy completed\n")
+				fmt.Fprintf(b.IOStreams.Out, "%d resource(s) deleted\n", deleteCount)
 			} else {
 				obj := de.Object
 				gvk := obj.GetObjectKind().GroupVersionKind()
 				name := getName(obj)
+				deleteCount++
 				fmt.Fprintf(b.IOStreams.Out, "%s %s\n", resourceIDToString(gvk.GroupKind(), name), "deleted")
 			}
 		}
