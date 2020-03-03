@@ -11,20 +11,20 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-// newInProgressCondition creates an inProgress condition with the given
+// newReconcilingCondition creates an reconciling condition with the given
 // reason and message.
-func newInProgressCondition(reason, message string) Condition {
+func newReconcilingCondition(reason, message string) Condition {
 	return Condition{
-		Type:    ConditionInProgress,
+		Type:    ConditionReconciling,
 		Status:  corev1.ConditionTrue,
 		Reason:  reason,
 		Message: message,
 	}
 }
 
-func newFailedCondition(reason, message string) Condition {
+func newStalledCondition(reason, message string) Condition {
 	return Condition{
-		Type:    ConditionFailed,
+		Type:    ConditionStalled,
 		Status:  corev1.ConditionTrue,
 		Reason:  reason,
 		Message: message,
@@ -37,7 +37,7 @@ func newInProgressStatus(reason, message string) *Result {
 	return &Result{
 		Status:     InProgressStatus,
 		Message:    message,
-		Conditions: []Condition{newInProgressCondition(reason, message)},
+		Conditions: []Condition{newReconcilingCondition(reason, message)},
 	}
 }
 
@@ -45,7 +45,7 @@ func newFailedStatus(reason, message string) *Result {
 	return &Result{
 		Status:     FailedStatus,
 		Message:    message,
-		Conditions: []Condition{newFailedCondition(reason, message)},
+		Conditions: []Condition{newStalledCondition(reason, message)},
 	}
 }
 

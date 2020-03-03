@@ -49,16 +49,16 @@ func checkGenericProperties(u *unstructured.Unstructured) (*Result, error) {
 	}
 
 	for _, cond := range objWithConditions.Status.Conditions {
-		if cond.Type == string(ConditionInProgress) && cond.Status == corev1.ConditionTrue {
+		if cond.Type == string(ConditionReconciling) && cond.Status == corev1.ConditionTrue {
 			return newInProgressStatus(cond.Reason, cond.Message), nil
 		}
-		if cond.Type == string(ConditionFailed) && cond.Status == corev1.ConditionTrue {
+		if cond.Type == string(ConditionStalled) && cond.Status == corev1.ConditionTrue {
 			return &Result{
 				Status:  FailedStatus,
 				Message: cond.Message,
 				Conditions: []Condition{
 					{
-						Type:    ConditionFailed,
+						Type:    ConditionStalled,
 						Status:  corev1.ConditionTrue,
 						Reason:  cond.Reason,
 						Message: cond.Message,
@@ -92,7 +92,7 @@ func checkGeneration(u *unstructured.Unstructured) (*Result, error) {
 			return &Result{
 				Status:     InProgressStatus,
 				Message:    message,
-				Conditions: []Condition{newInProgressCondition("LatestGenerationNotObserved", message)},
+				Conditions: []Condition{newReconcilingCondition("LatestGenerationNotObserved", message)},
 			}, nil
 		}
 	}
