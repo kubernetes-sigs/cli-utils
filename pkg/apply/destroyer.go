@@ -43,9 +43,12 @@ type Destroyer struct {
 // a cluster. This involves validating command line inputs and configuring
 // clients for communicating with the cluster.
 func (d *Destroyer) Initialize(cmd *cobra.Command, paths []string) error {
-	fileNameFlags := processPaths(paths)
+	fileNameFlags, err := demandOneDirectory(paths)
+	if err != nil {
+		return err
+	}
 	d.ApplyOptions.DeleteFlags.FileNameFlags = &fileNameFlags
-	err := d.ApplyOptions.Complete(d.factory, cmd)
+	err = d.ApplyOptions.Complete(d.factory, cmd)
 	if err != nil {
 		return errors.WrapPrefix(err, "error setting up ApplyOptions", 1)
 	}
