@@ -22,7 +22,7 @@ func NewCmdApply(f util.Factory, ioStreams genericclioptions.IOStreams) *cobra.C
 	}
 
 	cmd := &cobra.Command{
-		Use:                   "apply (FILENAME... | DIRECTORY)",
+		Use:                   "apply (DIRECTORY)",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Apply a configuration to a resource by filename or stdin"),
 		Run: func(cmd *cobra.Command, args []string) {
