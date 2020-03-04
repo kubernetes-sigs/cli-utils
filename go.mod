@@ -5,6 +5,7 @@ go 1.13
 require (
 	github.com/ghodss/yaml v1.0.0
 	github.com/go-errors/errors v1.0.1
+	github.com/golangci/golangci-lint v1.19.1 // indirect
 	github.com/pkg/errors v0.9.1
 	github.com/spf13/cobra v0.0.5
 	github.com/stretchr/testify v1.4.0

@@ -63,9 +63,12 @@ type Applier struct {
 // a cluster. This involves validating command line inputs and configuring
 // clients for communicating with the cluster.
 func (a *Applier) Initialize(cmd *cobra.Command, paths []string) error {
-	fileNameFlags := processPaths(paths)
+	fileNameFlags, err := demandOneDirectory(paths)
+	if err != nil {
+		return err
+	}
 	a.ApplyOptions.DeleteFlags.FileNameFlags = &fileNameFlags
-	err := a.ApplyOptions.Complete(a.factory, cmd)
+	err = a.ApplyOptions.Complete(a.factory, cmd)
 	if err != nil {
 		return errors.WrapPrefix(err, "error setting up ApplyOptions", 1)
 	}

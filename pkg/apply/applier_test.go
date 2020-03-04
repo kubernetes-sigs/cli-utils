@@ -194,7 +194,7 @@ func TestApplier(t *testing.T) {
 
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
-			filePaths, cleanup, err := writeResourceManifests(tc.resources)
+			dirPath, cleanup, err := writeResourceManifests(tc.resources)
 			if !assert.NoError(t, err) {
 				return
 			}
@@ -217,7 +217,7 @@ func TestApplier(t *testing.T) {
 			cmd.Flags().BoolVar(&applier.DryRun, "dry-run", applier.DryRun, "")
 			cmdutil.AddValidateFlags(cmd)
 			cmdutil.AddServerSideApplyFlags(cmd)
-			err = applier.Initialize(cmd, filePaths)
+			err = applier.Initialize(cmd, []string{dirPath})
 			if !assert.NoError(t, err) {
 				return
 			}
@@ -308,24 +308,22 @@ func toIdentifier(t *testing.T, resourceInfo resourceInfo, namespace string) wai
 	}
 }
 
-func writeResourceManifests(resources []resourceInfo) ([]string, func(), error) {
+func writeResourceManifests(resources []resourceInfo) (string, func(), error) {
 	d, err := ioutil.TempDir("", "kustomize-apply-test")
 	cleanup := func() { _ = os.RemoveAll(d) }
-	var filePaths []string
 	if err != nil {
 		cleanup()
-		return filePaths, cleanup, err
+		return d, cleanup, err
 	}
 	for _, r := range resources {
 		p := filepath.Join(d, r.fileName)
-		filePaths = append(filePaths, p)
 		err = ioutil.WriteFile(p, []byte(r.manifest), 0600)
 		if err != nil {
 			cleanup()
-			return filePaths, cleanup, err
+			return d, cleanup, err
 		}
 	}
-	return filePaths, cleanup, nil
+	return d, cleanup, nil
 }
 
 // The handler interface allows different testcases to provide
