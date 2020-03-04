@@ -219,13 +219,13 @@ Clean-up the cluster
 ```
 kapply preview $BASE --destroy > $OUTPUT/status;
 
-expectedOutputLine "deployment.apps/the-deployment deleted"
+expectedOutputLine "deployment.apps/the-deployment deleted (preview)"
 
-expectedOutputLine "configmap/the-map2 deleted"
+expectedOutputLine "configmap/the-map2 deleted (preview)"
 
-expectedOutputLine "service/the-service deleted"
+expectedOutputLine "service/the-service deleted (preview)"
 
-expectedOutputLine "configmap/inventory-map-7e38956e deleted"
+expectedOutputLine "configmap/inventory-map-7e38956e deleted (preview)"
 
 kapply destroy $BASE > $OUTPUT/status;
 

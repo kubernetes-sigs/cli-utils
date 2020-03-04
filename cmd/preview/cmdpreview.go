@@ -53,7 +53,7 @@ func NewCmdPreview(f util.Factory, ioStreams genericclioptions.IOStreams) *cobra
 
 			// The printer will print updates from the channel. It will block
 			// until the channel is closed.
-			printer.Print(ch)
+			printer.Print(ch, true)
 		},
 	}
 
