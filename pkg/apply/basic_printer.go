@@ -53,7 +53,8 @@ func (a *applyStats) sum() int {
 // format on StdOut. As we support other printer implementations
 // this should probably be an interface.
 // This function will block until the channel is closed.
-func (b *BasicPrinter) Print(ch <-chan event.Event) {
+func (b *BasicPrinter) Print(ch <-chan event.Event, preview bool) {
+	printFunc := b.getPrintFunc(preview)
 	applyStats := &applyStats{}
 	pruneCount := 0
 	deleteCount := 0
@@ -71,13 +72,13 @@ func (b *BasicPrinter) Print(ch <-chan event.Event) {
 				if applyStats.serversideApplied > 0 {
 					output += fmt.Sprintf(", %d serverside applied", applyStats.serversideApplied)
 				}
-				fmt.Fprint(b.IOStreams.Out, output+"\n")
+				printFunc(output)
 			} else {
 				obj := ae.Object
 				gvk := obj.GetObjectKind().GroupVersionKind()
 				name := getName(obj)
 				applyStats.inc(ae.Operation)
-				fmt.Fprintf(b.IOStreams.Out, "%s %s\n", resourceIDToString(gvk.GroupKind(), name),
+				printFunc("%s %s", resourceIDToString(gvk.GroupKind(), name),
 					strings.ToLower(ae.Operation.String()))
 			}
 		case event.StatusType:
@@ -86,34 +87,34 @@ func (b *BasicPrinter) Print(ch <-chan event.Event) {
 			case wait.ResourceUpdate:
 				id := statusEvent.EventResource.ResourceIdentifier
 				gk := id.GroupKind
-				fmt.Fprintf(b.IOStreams.Out, "%s is %s: %s\n", resourceIDToString(gk, id.Name),
+				printFunc("%s is %s: %s", resourceIDToString(gk, id.Name),
 					statusEvent.EventResource.Status.String(), statusEvent.EventResource.Message)
 			case wait.Completed:
-				fmt.Fprint(b.IOStreams.Out, "all resources has reached the Current status\n")
+				printFunc("all resources has reached the Current status")
 			case wait.Aborted:
-				fmt.Fprintf(b.IOStreams.Out, "resources failed to the reached Current status\n")
+				printFunc("resources failed to the reached Current status")
 			}
 		case event.PruneType:
 			pe := e.PruneEvent
 			if pe.Type == event.PruneEventCompleted {
-				fmt.Fprintf(b.IOStreams.Out, "%d resource(s) pruned\n", pruneCount)
+				printFunc("%d resource(s) pruned", pruneCount)
 			} else {
 				obj := e.PruneEvent.Object
 				gvk := obj.GetObjectKind().GroupVersionKind()
 				name := getName(obj)
 				pruneCount++
-				fmt.Fprintf(b.IOStreams.Out, "%s %s\n", resourceIDToString(gvk.GroupKind(), name), "pruned")
+				printFunc("%s %s", resourceIDToString(gvk.GroupKind(), name), "pruned")
 			}
 		case event.DeleteType:
 			de := e.DeleteEvent
 			if de.Type == event.DeleteEventCompleted {
-				fmt.Fprintf(b.IOStreams.Out, "%d resource(s) deleted\n", deleteCount)
+				printFunc("%d resource(s) deleted", deleteCount)
 			} else {
 				obj := de.Object
 				gvk := obj.GetObjectKind().GroupVersionKind()
 				name := getName(obj)
 				deleteCount++
-				fmt.Fprintf(b.IOStreams.Out, "%s %s\n", resourceIDToString(gvk.GroupKind(), name), "deleted")
+				printFunc("%s %s", resourceIDToString(gvk.GroupKind(), name), "deleted")
 			}
 		}
 	}
@@ -131,4 +132,13 @@ func getName(obj runtime.Object) string {
 // resourceIDToString returns the string representation of a GroupKind and a resource name.
 func resourceIDToString(gk schema.GroupKind, name string) string {
 	return fmt.Sprintf("%s/%s", strings.ToLower(gk.String()), name)
+}
+
+func (b *BasicPrinter) getPrintFunc(preview bool) func(format string, a ...interface{}) {
+	return func(format string, a ...interface{}) {
+		if preview {
+			format += " (preview)"
+		}
+		fmt.Fprintf(b.IOStreams.Out, format+"\n", a...)
+	}
 }
