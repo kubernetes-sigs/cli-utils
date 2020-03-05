@@ -257,6 +257,91 @@ func TestApplier(t *testing.T) {
 	}
 }
 
+var namespace = "test-namespace"
+
+var obj1Info = &resource.Info{
+	Namespace: namespace,
+	Name:      "foo",
+}
+
+var obj2Info = &resource.Info{
+	Namespace: namespace,
+	Name:      "bar",
+}
+
+var obj3Info = &resource.Info{
+	Namespace: namespace,
+	Name:      "baz",
+}
+
+var obj4Info = &resource.Info{
+	Namespace: "wrong",
+	Name:      "diff",
+}
+
+var obj5Info = &resource.Info{
+	Namespace: "",
+	Name:      "diff",
+}
+
+var obj6Info = &resource.Info{
+	Namespace: "default",
+	Name:      "diff",
+}
+
+func TestValidateNamespace(t *testing.T) {
+	tests := map[string]struct {
+		objects []*resource.Info
+		isValid bool
+	}{
+		"No resources is valid": {
+			objects: []*resource.Info{},
+			isValid: true,
+		},
+		"One resource is valid": {
+			objects: []*resource.Info{obj1Info},
+			isValid: true,
+		},
+		"Two resources with same namespace is valid": {
+			objects: []*resource.Info{obj1Info, obj2Info},
+			isValid: true,
+		},
+		"Three resources with same namespace is valid": {
+			objects: []*resource.Info{obj1Info, obj2Info, obj3Info},
+			isValid: true,
+		},
+		"Empty namespace is equal to default namespace": {
+			objects: []*resource.Info{obj5Info, obj6Info},
+			isValid: true,
+		},
+		"Two resources with differing namespaces is not valid": {
+			objects: []*resource.Info{obj1Info, obj4Info},
+			isValid: false,
+		},
+		"Three resources, one with differing namespace is not valid": {
+			objects: []*resource.Info{obj1Info, obj4Info, obj3Info},
+			isValid: false,
+		},
+		"Empty namespace not equal to other namespaces": {
+			objects: []*resource.Info{obj5Info, obj3Info},
+			isValid: false,
+		},
+		"Default namespace not equal to other namespaces": {
+			objects: []*resource.Info{obj6Info, obj3Info},
+			isValid: false,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			actualValid := validateNamespace(tc.objects)
+			if tc.isValid != actualValid {
+				t.Errorf("Expected valid namespace (%t), got (%t)", tc.isValid, actualValid)
+			}
+		})
+	}
+}
+
 func toJSONBytes(t *testing.T, obj runtime.Object) []byte {
 	objBytes, err := runtime.Encode(unstructured.NewJSONFallbackEncoder(codec), obj)
 	if !assert.NoError(t, err) {
