@@ -5,6 +5,7 @@ package apply
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"time"
 
@@ -167,8 +168,20 @@ func (a *Applier) Run(ctx context.Context) <-chan event.Event {
 			return
 		}
 
-		// sort the info objects starting from independent to dependent objects, and set them back
-		// ordering precedence can be found in gvk.go
+		// Validate the objects are in the same namespace.
+		if !validateNamespace(infos) {
+			err := fmt.Errorf("currently, applied objects must be in the same namespace")
+			ch <- event.Event{
+				Type: event.ErrorType,
+				ErrorEvent: event.ErrorEvent{
+					Err: errors.WrapPrefix(err, "objects have differing namespaces", 1),
+				},
+			}
+			return
+		}
+
+		// sort the info objects starting from independent to dependent objects,
+		// and set them back ordering precedence can be found in resource_infos.go
 		sort.Sort(ResourceInfos(infos))
 		a.ApplyOptions.SetObjects(infos)
 
@@ -239,4 +252,28 @@ func infosToObjects(infos []*resource.Info) []wait.KubernetesObject {
 		objects = append(objects, u)
 	}
 	return objects
+}
+
+const defaultNamespace = "default"
+
+// validateNamespace returns true if all the objects in the passed
+// infos parameter have the same namespace; false otherwise.
+func validateNamespace(infos []*resource.Info) bool {
+	for i := range infos {
+		if i > 0 {
+			prev := infos[i-1].Namespace
+			curr := infos[i].Namespace
+			// Empty namespace equals default namespace
+			if len(prev) == 0 {
+				prev = defaultNamespace
+			}
+			if len(curr) == 0 {
+				curr = defaultNamespace
+			}
+			if prev != curr {
+				return false
+			}
+		}
+	}
+	return true
 }
