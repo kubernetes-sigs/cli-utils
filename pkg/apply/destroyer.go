@@ -52,7 +52,7 @@ func (d *Destroyer) Initialize(cmd *cobra.Command, paths []string) error {
 	if err != nil {
 		return errors.WrapPrefix(err, "error setting up ApplyOptions", 1)
 	}
-	err = d.PruneOptions.Initialize(d.factory, d.ApplyOptions.Namespace)
+	err = d.PruneOptions.Initialize(d.factory)
 	if err != nil {
 		return errors.WrapPrefix(err, "error setting up PruneOptions", 1)
 	}
