@@ -14,6 +14,7 @@ import (
 	"sigs.k8s.io/cli-utils/cmd/apply"
 	"sigs.k8s.io/cli-utils/cmd/destroy"
 	"sigs.k8s.io/cli-utils/cmd/diff"
+	"sigs.k8s.io/cli-utils/cmd/initcmd"
 	"sigs.k8s.io/cli-utils/cmd/preview"
 
 	// This is here rather than in the libraries because of
@@ -43,7 +44,9 @@ func main() {
 		ErrOut: os.Stderr,
 	}
 
-	names := []string{"apply", "preview", "diff", "destroy"}
+	names := []string{"init", "apply", "preview", "diff", "destroy"}
+	initCmd := initcmd.NewCmdInit(ioStreams)
+	updateHelp(names, initCmd)
 	applyCmd := apply.NewCmdApply(f, ioStreams)
 	updateHelp(names, applyCmd)
 	previewCmd := preview.NewCmdPreview(f, ioStreams)
@@ -51,7 +54,9 @@ func main() {
 	diffCmd := diff.NewCmdDiff(f, ioStreams)
 	updateHelp(names, diffCmd)
 	destroyCmd := destroy.NewCmdDestroy(f, ioStreams)
-	cmd.AddCommand(applyCmd, diffCmd, destroyCmd, previewCmd)
+	updateHelp(names, destroyCmd)
+
+	cmd.AddCommand(initCmd, applyCmd, diffCmd, destroyCmd, previewCmd)
 
 	if err := cmd.Execute(); err != nil {
 		os.Exit(1)
