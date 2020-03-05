@@ -27,10 +27,9 @@ import (
 // PruneOptions encapsulates the necessary information to
 // implement the prune functionality.
 type PruneOptions struct {
-	client    dynamic.Interface
-	builder   *resource.Builder
-	mapper    meta.RESTMapper
-	namespace string
+	client  dynamic.Interface
+	builder *resource.Builder
+	mapper  meta.RESTMapper
 	// The currently applied objects (as Infos), including the
 	// current grouping object. These objects are used to
 	// calculate the prune set after retreiving the previous
@@ -57,10 +56,8 @@ func NewPruneOptions() *PruneOptions {
 	return po
 }
 
-func (po *PruneOptions) Initialize(factory util.Factory, namespace string) error {
+func (po *PruneOptions) Initialize(factory util.Factory) error {
 	var err error
-	// Fields copied from ApplyOptions.
-	po.namespace = namespace
 	// Client/Builder fields from the Factory.
 	po.client, err = factory.DynamicClient()
 	if err != nil {
@@ -83,17 +80,17 @@ func (po *PruneOptions) Initialize(factory util.Factory, namespace string) error
 // the current grouping object from this set. Returns an error
 // if there is a problem retrieving the grouping objects.
 func (po *PruneOptions) getPreviousGroupingObjects() ([]*resource.Info, error) {
-	// Ensures the "pastGroupingObjects" is set.
-	if !po.retrievedGroupingObjects {
-		if err := po.retrievePreviousGroupingObjects(); err != nil {
-			return nil, err
-		}
-	}
-	// Remove the current grouping info from the previous grouping infos.
 	current, err := infoToObjMetadata(po.currentGroupingObject)
 	if err != nil {
 		return nil, err
 	}
+	// Ensures the "pastGroupingObjects" is set.
+	if !po.retrievedGroupingObjects {
+		if err := po.retrievePreviousGroupingObjects(current.Namespace); err != nil {
+			return nil, err
+		}
+	}
+	// Remove the current grouping info from the previous grouping infos.
 	pastGroupInfos := []*resource.Info{}
 	for _, pastInfo := range po.pastGroupingObjects {
 		past, err := infoToObjMetadata(pastInfo)
@@ -112,7 +109,7 @@ func (po *PruneOptions) getPreviousGroupingObjects() ([]*resource.Info, error) {
 // the field "pastGroupingObjects". Returns an error if the grouping
 // label doesn't exist for the current currentGroupingObject does not
 // exist or if the call to retrieve the past grouping objects fails.
-func (po *PruneOptions) retrievePreviousGroupingObjects() error {
+func (po *PruneOptions) retrievePreviousGroupingObjects(namespace string) error {
 	// Get the grouping label for this grouping object, and create
 	// a label selector from it.
 	if po.currentGroupingObject == nil || po.currentGroupingObject.Object == nil {
@@ -128,7 +125,7 @@ func (po *PruneOptions) retrievePreviousGroupingObjects() error {
 		// TODO: Check if this validator is necessary.
 		Schema(po.validator).
 		ContinueOnError().
-		NamespaceParam(po.namespace).DefaultNamespace().
+		NamespaceParam(namespace).DefaultNamespace().
 		ResourceTypes("configmap").
 		LabelSelectorParam(labelSelector).
 		Flatten().
