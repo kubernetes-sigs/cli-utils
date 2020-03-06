@@ -82,23 +82,6 @@ func TestAggregator(t *testing.T) {
 			},
 			aggregateStatus: status.UnknownStatus,
 		},
-		"multiple resources with all current or not found": {
-			identifiers: []wait.ResourceIdentifier{
-				resourceIdentifiers["deployment"],
-				resourceIdentifiers["statefulset"],
-			},
-			resourceStatuses: []event.ResourceStatus{
-				{
-					Identifier: resourceIdentifiers["deployment"],
-					Status:     status.NotFoundStatus,
-				},
-				{
-					Identifier: resourceIdentifiers["statefulset"],
-					Status:     status.CurrentStatus,
-				},
-			},
-			aggregateStatus: status.CurrentStatus,
-		},
 		"multiple resources with one failed": {
 			identifiers: []wait.ResourceIdentifier{
 				resourceIdentifiers["deployment"],
@@ -125,7 +108,7 @@ func TestAggregator(t *testing.T) {
 
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
-			aggregator := NewAllCurrentOrNotFoundStatusAggregator(tc.identifiers)
+			aggregator := newGenericAggregator(tc.identifiers, status.CurrentStatus)
 
 			for _, rs := range tc.resourceStatuses {
 				resourceStatus := rs
