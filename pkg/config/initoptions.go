@@ -18,7 +18,7 @@ import (
 
 const manifestFilename = "grouping-object-template.yaml"
 
-const configMapTemplate = `# NOTE: auto-generated
+const configMapTemplate = `# NOTE: auto-generated. Some fields should NOT be modified.
 # Date: <DATETIME>
 #
 # Contains the "grouping object" template ConfigMap.
@@ -27,7 +27,13 @@ const configMapTemplate = `# NOTE: auto-generated
 # This object and its stored inventory is subsequently
 # used to calculate the set of objects to automatically
 # delete (prune), when an object is omitted from further
-# applies.
+# applies. When applied, this "grouping object" is also
+# used to identify the entire set of objects to delete.
+#
+# NOTE: The name of this grouping object template file
+# (e.g. ` + manifestFilename + `) does NOT have any
+# impact on group-related functionality such as deletion
+# or pruning.
 #
 apiVersion: v1
 kind: ConfigMap
@@ -37,6 +43,9 @@ metadata:
   # with previously applied grouped objects. Set deletion
   # and pruning functionality will be impaired.
   namespace: <NAMESPACE>
+  # NOTE: The name of the grouping object does NOT have
+  # any impact on group-related functionality such as
+  # deletion or pruning.
   name: grouping-object
   labels:
     # DANGER: Do not change the value of this label.
