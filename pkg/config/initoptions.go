@@ -32,10 +32,17 @@ const configMapTemplate = `# NOTE: auto-generated
 apiVersion: v1
 kind: ConfigMap
 metadata:
+  # DANGER: Do not change the grouping object namespace.
+  # Changing the namespace will cause a loss of continuity
+  # with previously applied grouped objects. Set deletion
+  # and pruning functionality will be impaired.
   namespace: <NAMESPACE>
   name: grouping-object
   labels:
-    # This label defines the ConfigMap as a grouping object template
+    # DANGER: Do not change the value of this label.
+    # Changing this value will cause a loss of continuity
+    # with previously applied grouped objects. Set deletion
+    # and pruning functionality will be impaired.
     cli-utils.sigs.k8s.io/inventory-id: <GROUPNAME>
 `
 
