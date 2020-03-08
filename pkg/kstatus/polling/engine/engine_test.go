@@ -207,8 +207,6 @@ func (f *fakeStatusReader) ReadStatusForObject(_ context.Context, _ *unstructure
 	return nil
 }
 
-func (f *fakeStatusReader) SetComputeStatusFunc(_ ComputeStatusFunc) {}
-
 func newFakeAggregator(identifiers []object.ObjMetadata) *fakeAggregator {
 	statuses := make(map[object.ObjMetadata]status.Status)
 	for _, id := range identifiers {

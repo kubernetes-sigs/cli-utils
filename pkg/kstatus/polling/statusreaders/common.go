@@ -23,27 +23,57 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
-// BaseStatusReader provides some basic functionality needed by the statusreaders.
-type BaseStatusReader struct {
-	Reader engine.ClusterReader
+// baseStatusReader is the implementation of the StatusReader interface defined
+// in the engine package. It contains the basic logic needed for every resource.
+// In order to handle resource specific logic, it must include an implementation
+// of the resourceTypeStatusReader interface.
+// In practice we will create many instances of baseStatusReader, each with a different
+// implementation of the resourceTypeStatusReader interface and therefore each
+// of the instances will be able to handle different resource types.
+type baseStatusReader struct {
+	// reader is an implementation of the ClusterReader interface. It provides a
+	// way for the StatusReader to fetch resources from the cluster.
+	reader engine.ClusterReader
 
-	Mapper meta.RESTMapper
+	// mapper provides a way to look up the resource types that are available
+	// in the cluster.
+	mapper meta.RESTMapper
 
-	computeStatusFunc engine.ComputeStatusFunc
+	// resourceStatusReader is an resource-type specific implementation
+	// of the resourceTypeStatusReader interface. While the baseStatusReader
+	// contains the logic shared between all resource types, this implementation
+	// will contain the resource specific info.
+	resourceStatusReader resourceTypeStatusReader
 }
 
-// SetComputeStatusFunc allows for setting the function used by the engine for computing status. The default
-// value here is to use the status package. This is provided for testing purposes.
-func (b *BaseStatusReader) SetComputeStatusFunc(statusFunc engine.ComputeStatusFunc) {
-	b.computeStatusFunc = statusFunc
+// resourceTypeStatusReader is an interface that can be implemented differently
+// for each resource type.
+type resourceTypeStatusReader interface {
+	ReadStatusForObject(ctx context.Context, object *unstructured.Unstructured) *event.ResourceStatus
 }
 
-// LookupResource looks up a resource with the given identifier. It will use the rest mapper to resolve
+// ReadStatus reads the object identified by the passed-in identifier and computes it's status. It reads
+// the resource here, but computing status is delegated to the ReadStatusForObject function.
+func (b *baseStatusReader) ReadStatus(ctx context.Context, identifier object.ObjMetadata) *event.ResourceStatus {
+	object, err := b.lookupResource(ctx, identifier)
+	if err != nil {
+		return handleResourceStatusError(identifier, err)
+	}
+	return b.resourceStatusReader.ReadStatusForObject(ctx, object)
+}
+
+// ReadStatusForObject computes the status for the passed-in object. Since this is specific for each
+// resource type, the actual work is delegated to the implementation of the resourceTypeStatusReader interface.
+func (b *baseStatusReader) ReadStatusForObject(ctx context.Context, object *unstructured.Unstructured) *event.ResourceStatus {
+	return b.resourceStatusReader.ReadStatusForObject(ctx, object)
+}
+
+// lookupResource looks up a resource with the given identifier. It will use the rest mapper to resolve
 // the version of the GroupKind given in the identifier.
 // If the resource is found, it is returned. If it is not found or something
 // went wrong, the function will return an error.
-func (b *BaseStatusReader) LookupResource(ctx context.Context, identifier object.ObjMetadata) (*unstructured.Unstructured, error) {
-	GVK, err := b.GVK(identifier.GroupKind)
+func (b *baseStatusReader) lookupResource(ctx context.Context, identifier object.ObjMetadata) (*unstructured.Unstructured, error) {
+	GVK, err := gvk(identifier.GroupKind, b.mapper)
 	if err != nil {
 		return nil, err
 	}
@@ -51,7 +81,7 @@ func (b *BaseStatusReader) LookupResource(ctx context.Context, identifier object
 	var u unstructured.Unstructured
 	u.SetGroupVersionKind(GVK)
 	key := keyForNamespacedResource(identifier)
-	err = b.Reader.Get(ctx, key, &u)
+	err = b.reader.Get(ctx, key, &u)
 	if err != nil {
 		return nil, err
 	}
@@ -59,11 +89,17 @@ func (b *BaseStatusReader) LookupResource(ctx context.Context, identifier object
 	return &u, nil
 }
 
-// StatusForGeneratedResources provides a way to fetch the statuses for all resources of a given GroupKind
+// statusForGenResourcesFunc defines the function type used by the statusForGeneratedResource function.
+// TODO: Find a better solution for this. Maybe put the logic for looking up generated resources
+// into a separate type.
+type statusForGenResourcesFunc func(ctx context.Context, mapper meta.RESTMapper, reader engine.ClusterReader, statusReader resourceTypeStatusReader,
+	object *unstructured.Unstructured, gk schema.GroupKind, selectorPath ...string) (event.ResourceStatuses, error)
+
+// statusForGeneratedResources provides a way to fetch the statuses for all resources of a given GroupKind
 // that match the selector in the provided resource. Typically, this is used to fetch the status of generated
 // resources.
-func (b *BaseStatusReader) StatusForGeneratedResources(ctx context.Context, statusReader engine.StatusReader, object *unstructured.Unstructured,
-	gk schema.GroupKind, selectorPath ...string) (event.ResourceStatuses, error) {
+func statusForGeneratedResources(ctx context.Context, mapper meta.RESTMapper, reader engine.ClusterReader, statusReader resourceTypeStatusReader,
+	object *unstructured.Unstructured, gk schema.GroupKind, selectorPath ...string) (event.ResourceStatuses, error) {
 	namespace := getNamespaceForNamespacedResource(object)
 	selector, err := toSelector(object, selectorPath...)
 	if err != nil {
@@ -71,12 +107,12 @@ func (b *BaseStatusReader) StatusForGeneratedResources(ctx context.Context, stat
 	}
 
 	var objectList unstructured.UnstructuredList
-	gvk, err := b.GVK(gk)
+	gvk, err := gvk(gk, mapper)
 	if err != nil {
 		return event.ResourceStatuses{}, err
 	}
 	objectList.SetGroupVersionKind(gvk)
-	err = b.Reader.ListNamespaceScoped(ctx, &objectList, namespace, selector)
+	err = reader.ListNamespaceScoped(ctx, &objectList, namespace, selector)
 	if err != nil {
 		return event.ResourceStatuses{}, err
 	}
@@ -93,7 +129,7 @@ func (b *BaseStatusReader) StatusForGeneratedResources(ctx context.Context, stat
 
 // handleResourceStatusError construct the appropriate ResourceStatus
 // object based on the type of error.
-func (b *BaseStatusReader) handleResourceStatusError(identifier object.ObjMetadata, err error) *event.ResourceStatus {
+func handleResourceStatusError(identifier object.ObjMetadata, err error) *event.ResourceStatus {
 	if errors.IsNotFound(err) {
 		return &event.ResourceStatus{
 			Identifier: identifier,
@@ -108,9 +144,9 @@ func (b *BaseStatusReader) handleResourceStatusError(identifier object.ObjMetada
 	}
 }
 
-// GVK looks up the GVK from a GroupKind using the rest mapper.
-func (b *BaseStatusReader) GVK(gk schema.GroupKind) (schema.GroupVersionKind, error) {
-	mapping, err := b.Mapper.RESTMapping(gk)
+// gvk looks up the GVK from a GroupKind using the rest mapper.
+func gvk(gk schema.GroupKind, mapper meta.RESTMapper) (schema.GroupVersionKind, error) {
+	mapping, err := mapper.RESTMapping(gk)
 	if err != nil {
 		return schema.GroupVersionKind{}, err
 	}
