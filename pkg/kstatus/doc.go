@@ -4,16 +4,17 @@
 // Package kstatus contains libraries for computing status of kubernetes
 // resources.
 //
-// Status
+// status
 // Get status and/or conditions for resources based on resources already
 // read from a cluster, i.e. it will not fetch resources from
 // a cluster.
 //
-// Wait
-// Get status and/or conditions for resources by fetching them
-// from a cluster. This supports specifying a set of resources as
-// an Inventory or as a list of manifests/unstructureds. This also
-// supports polling the state of resources until they all reach a
-// specific status. A common use case for this can be to wait for
-// a set of resources to all finish reconciling after an apply.
+// polling
+// Poll the cluster for the state of the specified resources
+// and compute the status for each as well as the aggregate
+// status. The polling will go on until either all resources
+// have reached the desired status or the polling is cancelled
+// by the caller.
+// A common use case for this would to be poll until all resources
+// finish reconciling after apply.
 package kstatus
