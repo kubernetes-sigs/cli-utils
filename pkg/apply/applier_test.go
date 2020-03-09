@@ -31,8 +31,10 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
+	"sigs.k8s.io/cli-utils/pkg/kstatus/polling"
+	pollevent "sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
-	"sigs.k8s.io/cli-utils/pkg/kstatus/wait"
+	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
 var (
@@ -80,7 +82,7 @@ type expectedEvent struct {
 	eventType event.Type
 
 	applyEventType  event.ApplyEventType
-	statusEventType wait.EventType
+	statusEventType pollevent.EventType
 	pruneEventType  event.PruneEventType
 	deleteEventType event.DeleteEventType
 }
@@ -92,7 +94,7 @@ func TestApplier(t *testing.T) {
 		handlers           []handler
 		status             bool
 		prune              bool
-		statusEvents       []wait.Event
+		statusEvents       []pollevent.Event
 		expectedEventTypes []expectedEvent
 	}{
 		"apply without status or prune": {
@@ -141,25 +143,25 @@ func TestApplier(t *testing.T) {
 				},
 			},
 			status: true,
-			statusEvents: []wait.Event{
+			statusEvents: []pollevent.Event{
 				{
-					Type:            wait.ResourceUpdate,
+					EventType:       pollevent.ResourceUpdateEvent,
 					AggregateStatus: status.InProgressStatus,
-					EventResource: &wait.EventResource{
-						ResourceIdentifier: toIdentifier(t, resources["deployment"], "apply-test"),
-						Status:             status.InProgressStatus,
+					Resource: &pollevent.ResourceStatus{
+						Identifier: toIdentifier(t, resources["deployment"], "apply-test"),
+						Status:     status.InProgressStatus,
 					},
 				},
 				{
-					Type:            wait.ResourceUpdate,
+					EventType:       pollevent.ResourceUpdateEvent,
 					AggregateStatus: status.CurrentStatus,
-					EventResource: &wait.EventResource{
-						ResourceIdentifier: toIdentifier(t, resources["deployment"], "apply-test"),
-						Status:             status.CurrentStatus,
+					Resource: &pollevent.ResourceStatus{
+						Identifier: toIdentifier(t, resources["deployment"], "apply-test"),
+						Status:     status.CurrentStatus,
 					},
 				},
 				{
-					Type:            wait.Completed,
+					EventType:       pollevent.CompletedEvent,
 					AggregateStatus: status.CurrentStatus,
 				},
 			},
@@ -178,15 +180,15 @@ func TestApplier(t *testing.T) {
 				},
 				{
 					eventType:       event.StatusType,
-					statusEventType: wait.ResourceUpdate,
+					statusEventType: pollevent.ResourceUpdateEvent,
 				},
 				{
 					eventType:       event.StatusType,
-					statusEventType: wait.ResourceUpdate,
+					statusEventType: pollevent.ResourceUpdateEvent,
 				},
 				{
 					eventType:       event.StatusType,
-					statusEventType: wait.Completed,
+					statusEventType: pollevent.CompletedEvent,
 				},
 			},
 		},
@@ -222,7 +224,7 @@ func TestApplier(t *testing.T) {
 				return
 			}
 
-			applier.resolver = &fakeResolver{
+			applier.statusPoller = &fakePoller{
 				events: tc.statusEvents,
 			}
 
@@ -244,7 +246,7 @@ func TestApplier(t *testing.T) {
 				case event.ApplyType:
 					assert.Equal(t, expected.applyEventType, e.ApplyEvent.Type)
 				case event.StatusType:
-					assert.Equal(t, expected.statusEventType, e.StatusEvent.Type)
+					assert.Equal(t, expected.statusEventType, e.StatusEvent.EventType)
 				case event.PruneType:
 					assert.Equal(t, expected.pruneEventType, e.PruneEvent.Type)
 				case event.DeleteType:
@@ -375,7 +377,7 @@ func newFakeRESTClient(t *testing.T, handlers []handler) *fake.RESTClient {
 	}
 }
 
-func toIdentifier(t *testing.T, resourceInfo resourceInfo, namespace string) wait.ResourceIdentifier {
+func toIdentifier(t *testing.T, resourceInfo resourceInfo, namespace string) object.ObjMetadata {
 	obj := resourceInfo.factoryFunc()
 	err := runtime.DecodeInto(codec, []byte(resourceInfo.manifest), obj)
 	if err != nil {
@@ -386,7 +388,7 @@ func toIdentifier(t *testing.T, resourceInfo resourceInfo, namespace string) wai
 	if err != nil {
 		t.Fatal(err)
 	}
-	return wait.ResourceIdentifier{
+	return object.ObjMetadata{
 		GroupKind: obj.GetObjectKind().GroupVersionKind().GroupKind(),
 		Name:      accessor.GetName(),
 		Namespace: namespace,
@@ -539,12 +541,12 @@ func (n *nsHandler) handle(t *testing.T, req *http.Request) (*http.Response, boo
 	return nil, false, nil
 }
 
-type fakeResolver struct {
-	events []wait.Event
+type fakePoller struct {
+	events []pollevent.Event
 }
 
-func (f *fakeResolver) WaitForStatusOfObjects(_ context.Context, _ []wait.KubernetesObject) <-chan wait.Event {
-	eventChannel := make(chan wait.Event)
+func (f *fakePoller) Poll(_ context.Context, _ []object.ObjMetadata, _ polling.Options) <-chan pollevent.Event {
+	eventChannel := make(chan pollevent.Event)
 	go func() {
 		defer close(eventChannel)
 		for _, f := range f.events {

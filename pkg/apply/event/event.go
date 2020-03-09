@@ -5,7 +5,7 @@ package event
 
 import (
 	"k8s.io/apimachinery/pkg/runtime"
-	"sigs.k8s.io/cli-utils/pkg/kstatus/wait"
+	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 )
 
 // Type determines the type of events that are available.
@@ -37,7 +37,7 @@ type Event struct {
 
 	// StatusEvents contains information about the status of one of
 	// the applied resources.
-	StatusEvent wait.Event
+	StatusEvent event.Event
 
 	// PruneEvent contains information about objects that have been
 	// pruned.
