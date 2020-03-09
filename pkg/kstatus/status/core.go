@@ -173,7 +173,7 @@ func deploymentConditions(u *unstructured.Unstructured) (*Result, error) {
 				return &Result{
 					Status:     FailedStatus,
 					Message:    "Progress deadline exceeded",
-					Conditions: []Condition{{ConditionFailed, corev1.ConditionTrue, c.Reason, c.Message}},
+					Conditions: []Condition{{ConditionStalled, corev1.ConditionTrue, c.Reason, c.Message}},
 				}, nil
 			}
 			if c.Status == corev1.ConditionTrue && c.Reason == "NewReplicaSetAvailable" {

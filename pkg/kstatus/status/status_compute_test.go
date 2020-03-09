@@ -151,12 +151,12 @@ func TestPodStatus(t *testing.T) {
 			spec:           podNoStatus,
 			expectedStatus: InProgressStatus,
 			expectedConditions: []Condition{{
-				Type:   ConditionInProgress,
+				Type:   ConditionReconciling,
 				Status: corev1.ConditionTrue,
 				Reason: "PodNotObserved",
 			}},
 			absentConditionTypes: []ConditionType{
-				ConditionFailed,
+				ConditionStalled,
 			},
 		},
 		"podReady": {
@@ -164,8 +164,8 @@ func TestPodStatus(t *testing.T) {
 			expectedStatus:     CurrentStatus,
 			expectedConditions: []Condition{},
 			absentConditionTypes: []ConditionType{
-				ConditionInProgress,
-				ConditionFailed,
+				ConditionReconciling,
+				ConditionStalled,
 			},
 		},
 		"podCompletedSuccessfully": {
@@ -173,8 +173,8 @@ func TestPodStatus(t *testing.T) {
 			expectedStatus:     CurrentStatus,
 			expectedConditions: []Condition{},
 			absentConditionTypes: []ConditionType{
-				ConditionInProgress,
-				ConditionFailed,
+				ConditionReconciling,
+				ConditionStalled,
 			},
 		},
 		"podCompletedFailed": {
@@ -182,8 +182,8 @@ func TestPodStatus(t *testing.T) {
 			expectedStatus:     CurrentStatus,
 			expectedConditions: []Condition{},
 			absentConditionTypes: []ConditionType{
-				ConditionInProgress,
-				ConditionFailed,
+				ConditionReconciling,
+				ConditionStalled,
 			},
 		},
 		"podUnschedulable": {
@@ -191,13 +191,13 @@ func TestPodStatus(t *testing.T) {
 			expectedStatus: FailedStatus,
 			expectedConditions: []Condition{
 				{
-					Type:   ConditionFailed,
+					Type:   ConditionStalled,
 					Status: corev1.ConditionTrue,
 					Reason: "PodUnschedulable",
 				},
 			},
 			absentConditionTypes: []ConditionType{
-				ConditionInProgress,
+				ConditionReconciling,
 			},
 		},
 		"podCrashLooping": {
@@ -205,13 +205,13 @@ func TestPodStatus(t *testing.T) {
 			expectedStatus: FailedStatus,
 			expectedConditions: []Condition{
 				{
-					Type:   ConditionFailed,
+					Type:   ConditionStalled,
 					Status: corev1.ConditionTrue,
 					Reason: "ContainerCrashLooping",
 				},
 			},
 			absentConditionTypes: []ConditionType{
-				ConditionInProgress,
+				ConditionReconciling,
 			},
 		},
 	}
@@ -248,12 +248,12 @@ func TestPVCStatus(t *testing.T) {
 			spec:           pvcNoStatus,
 			expectedStatus: InProgressStatus,
 			expectedConditions: []Condition{{
-				Type:   ConditionInProgress,
+				Type:   ConditionReconciling,
 				Status: corev1.ConditionTrue,
 				Reason: "NotBound",
 			}},
 			absentConditionTypes: []ConditionType{
-				ConditionFailed,
+				ConditionStalled,
 			},
 		},
 		"pvcBound": {
@@ -261,8 +261,8 @@ func TestPVCStatus(t *testing.T) {
 			expectedStatus:     CurrentStatus,
 			expectedConditions: []Condition{},
 			absentConditionTypes: []ConditionType{
-				ConditionFailed,
-				ConditionInProgress,
+				ConditionStalled,
+				ConditionReconciling,
 			},
 		},
 	}
@@ -347,24 +347,24 @@ func TestStsStatus(t *testing.T) {
 			spec:           stsNoStatus,
 			expectedStatus: InProgressStatus,
 			expectedConditions: []Condition{{
-				Type:   ConditionInProgress,
+				Type:   ConditionReconciling,
 				Status: corev1.ConditionTrue,
 				Reason: "LessReplicas",
 			}},
 			absentConditionTypes: []ConditionType{
-				ConditionFailed,
+				ConditionStalled,
 			},
 		},
 		"stsBadStatus": {
 			spec:           stsBadStatus,
 			expectedStatus: InProgressStatus,
 			expectedConditions: []Condition{{
-				Type:   ConditionInProgress,
+				Type:   ConditionReconciling,
 				Status: corev1.ConditionTrue,
 				Reason: "LessReplicas",
 			}},
 			absentConditionTypes: []ConditionType{
-				ConditionFailed,
+				ConditionStalled,
 			},
 		},
 		"stsOK": {
@@ -372,32 +372,32 @@ func TestStsStatus(t *testing.T) {
 			expectedStatus:     CurrentStatus,
 			expectedConditions: []Condition{},
 			absentConditionTypes: []ConditionType{
-				ConditionFailed,
-				ConditionInProgress,
+				ConditionStalled,
+				ConditionReconciling,
 			},
 		},
 		"stsLessReady": {
 			spec:           stsLessReady,
 			expectedStatus: InProgressStatus,
 			expectedConditions: []Condition{{
-				Type:   ConditionInProgress,
+				Type:   ConditionReconciling,
 				Status: corev1.ConditionTrue,
 				Reason: "LessReady",
 			}},
 			absentConditionTypes: []ConditionType{
-				ConditionFailed,
+				ConditionStalled,
 			},
 		},
 		"stsLessCurrent": {
 			spec:           stsLessCurrent,
 			expectedStatus: InProgressStatus,
 			expectedConditions: []Condition{{
-				Type:   ConditionInProgress,
+				Type:   ConditionReconciling,
 				Status: corev1.ConditionTrue,
 				Reason: "LessCurrent",
 			}},
 			absentConditionTypes: []ConditionType{
-				ConditionFailed,
+				ConditionStalled,
 			},
 		},
 	}
@@ -482,24 +482,24 @@ func TestDaemonsetStatus(t *testing.T) {
 			spec:           dsNoStatus,
 			expectedStatus: InProgressStatus,
 			expectedConditions: []Condition{{
-				Type:   ConditionInProgress,
+				Type:   ConditionReconciling,
 				Status: corev1.ConditionTrue,
 				Reason: "NoDesiredNumber",
 			}},
 			absentConditionTypes: []ConditionType{
-				ConditionFailed,
+				ConditionStalled,
 			},
 		},
 		"dsBadStatus": {
 			spec:           dsBadStatus,
 			expectedStatus: InProgressStatus,
 			expectedConditions: []Condition{{
-				Type:   ConditionInProgress,
+				Type:   ConditionReconciling,
 				Status: corev1.ConditionTrue,
 				Reason: "NoDesiredNumber",
 			}},
 			absentConditionTypes: []ConditionType{
-				ConditionFailed,
+				ConditionStalled,
 			},
 		},
 		"dsOK": {
@@ -507,32 +507,32 @@ func TestDaemonsetStatus(t *testing.T) {
 			expectedStatus:     CurrentStatus,
 			expectedConditions: []Condition{},
 			absentConditionTypes: []ConditionType{
-				ConditionFailed,
-				ConditionInProgress,
+				ConditionStalled,
+				ConditionReconciling,
 			},
 		},
 		"dsLessReady": {
 			spec:           dsLessReady,
 			expectedStatus: InProgressStatus,
 			expectedConditions: []Condition{{
-				Type:   ConditionInProgress,
+				Type:   ConditionReconciling,
 				Status: corev1.ConditionTrue,
 				Reason: "LessReady",
 			}},
 			absentConditionTypes: []ConditionType{
-				ConditionFailed,
+				ConditionStalled,
 			},
 		},
 		"dsLessAvailable": {
 			spec:           dsLessAvailable,
 			expectedStatus: InProgressStatus,
 			expectedConditions: []Condition{{
-				Type:   ConditionInProgress,
+				Type:   ConditionReconciling,
 				Status: corev1.ConditionTrue,
 				Reason: "LessAvailable",
 			}},
 			absentConditionTypes: []ConditionType{
-				ConditionFailed,
+				ConditionStalled,
 			},
 		},
 	}
@@ -645,12 +645,12 @@ func TestDeploymentStatus(t *testing.T) {
 			spec:           depNoStatus,
 			expectedStatus: InProgressStatus,
 			expectedConditions: []Condition{{
-				Type:   ConditionInProgress,
+				Type:   ConditionReconciling,
 				Status: corev1.ConditionTrue,
 				Reason: "LessReplicas",
 			}},
 			absentConditionTypes: []ConditionType{
-				ConditionFailed,
+				ConditionStalled,
 			},
 		},
 		"depOK": {
@@ -658,20 +658,20 @@ func TestDeploymentStatus(t *testing.T) {
 			expectedStatus:     CurrentStatus,
 			expectedConditions: []Condition{},
 			absentConditionTypes: []ConditionType{
-				ConditionFailed,
-				ConditionInProgress,
+				ConditionStalled,
+				ConditionReconciling,
 			},
 		},
 		"depNotProgressing": {
 			spec:           depNotProgressing,
 			expectedStatus: InProgressStatus,
 			expectedConditions: []Condition{{
-				Type:   ConditionInProgress,
+				Type:   ConditionReconciling,
 				Status: corev1.ConditionTrue,
 				Reason: "ReplicaSetNotAvailable",
 			}},
 			absentConditionTypes: []ConditionType{
-				ConditionFailed,
+				ConditionStalled,
 			},
 		},
 		"depNoProgressDeadlineSeconds": {
@@ -679,20 +679,20 @@ func TestDeploymentStatus(t *testing.T) {
 			expectedStatus:     CurrentStatus,
 			expectedConditions: []Condition{},
 			absentConditionTypes: []ConditionType{
-				ConditionFailed,
-				ConditionInProgress,
+				ConditionStalled,
+				ConditionReconciling,
 			},
 		},
 		"depNotAvailable": {
 			spec:           depNotAvailable,
 			expectedStatus: InProgressStatus,
 			expectedConditions: []Condition{{
-				Type:   ConditionInProgress,
+				Type:   ConditionReconciling,
 				Status: corev1.ConditionTrue,
 				Reason: "DeploymentNotAvailable",
 			}},
 			absentConditionTypes: []ConditionType{
-				ConditionFailed,
+				ConditionStalled,
 			},
 		},
 	}
@@ -810,12 +810,12 @@ func TestReplicasetStatus(t *testing.T) {
 			spec:           rsNoStatus,
 			expectedStatus: InProgressStatus,
 			expectedConditions: []Condition{{
-				Type:   ConditionInProgress,
+				Type:   ConditionReconciling,
 				Status: corev1.ConditionTrue,
 				Reason: "LessLabelled",
 			}},
 			absentConditionTypes: []ConditionType{
-				ConditionFailed,
+				ConditionStalled,
 			},
 		},
 		"rsOK1": {
@@ -823,8 +823,8 @@ func TestReplicasetStatus(t *testing.T) {
 			expectedStatus:     CurrentStatus,
 			expectedConditions: []Condition{},
 			absentConditionTypes: []ConditionType{
-				ConditionFailed,
-				ConditionInProgress,
+				ConditionStalled,
+				ConditionReconciling,
 			},
 		},
 		"rsOK2": {
@@ -832,44 +832,44 @@ func TestReplicasetStatus(t *testing.T) {
 			expectedStatus:     CurrentStatus,
 			expectedConditions: []Condition{},
 			absentConditionTypes: []ConditionType{
-				ConditionFailed,
-				ConditionInProgress,
+				ConditionStalled,
+				ConditionReconciling,
 			},
 		},
 		"rsLessAvailable": {
 			spec:           rsLessAvailable,
 			expectedStatus: InProgressStatus,
 			expectedConditions: []Condition{{
-				Type:   ConditionInProgress,
+				Type:   ConditionReconciling,
 				Status: corev1.ConditionTrue,
 				Reason: "LessAvailable",
 			}},
 			absentConditionTypes: []ConditionType{
-				ConditionFailed,
+				ConditionStalled,
 			},
 		},
 		"rsLessReady": {
 			spec:           rsLessReady,
 			expectedStatus: InProgressStatus,
 			expectedConditions: []Condition{{
-				Type:   ConditionInProgress,
+				Type:   ConditionReconciling,
 				Status: corev1.ConditionTrue,
 				Reason: "LessReady",
 			}},
 			absentConditionTypes: []ConditionType{
-				ConditionFailed,
+				ConditionStalled,
 			},
 		},
 		"rsReplicaFailure": {
 			spec:           rsReplicaFailure,
 			expectedStatus: InProgressStatus,
 			expectedConditions: []Condition{{
-				Type:   ConditionInProgress,
+				Type:   ConditionReconciling,
 				Status: corev1.ConditionTrue,
 				Reason: "ReplicaFailure",
 			}},
 			absentConditionTypes: []ConditionType{
-				ConditionFailed,
+				ConditionStalled,
 			},
 		},
 	}
@@ -910,12 +910,12 @@ func TestPDBStatus(t *testing.T) {
 			spec:           pdbNotObserved,
 			expectedStatus: InProgressStatus,
 			expectedConditions: []Condition{{
-				Type:   ConditionInProgress,
+				Type:   ConditionReconciling,
 				Status: corev1.ConditionTrue,
 				Reason: "LatestGenerationNotObserved",
 			}},
 			absentConditionTypes: []ConditionType{
-				ConditionFailed,
+				ConditionStalled,
 			},
 		},
 		"pdbObserved": {
@@ -923,8 +923,8 @@ func TestPDBStatus(t *testing.T) {
 			expectedStatus:     CurrentStatus,
 			expectedConditions: []Condition{},
 			absentConditionTypes: []ConditionType{
-				ConditionFailed,
-				ConditionInProgress,
+				ConditionStalled,
+				ConditionReconciling,
 			},
 		},
 	}
@@ -1006,8 +1006,8 @@ func TestCRDGenericStatus(t *testing.T) {
 			expectedStatus:     CurrentStatus,
 			expectedConditions: []Condition{},
 			absentConditionTypes: []ConditionType{
-				ConditionFailed,
-				ConditionInProgress,
+				ConditionStalled,
+				ConditionReconciling,
 			},
 		},
 		"crdReady": {
@@ -1015,8 +1015,8 @@ func TestCRDGenericStatus(t *testing.T) {
 			expectedStatus:     CurrentStatus,
 			expectedConditions: []Condition{},
 			absentConditionTypes: []ConditionType{
-				ConditionFailed,
-				ConditionInProgress,
+				ConditionStalled,
+				ConditionReconciling,
 			},
 		},
 		"crdNotReady": {
@@ -1024,8 +1024,8 @@ func TestCRDGenericStatus(t *testing.T) {
 			expectedStatus:     CurrentStatus,
 			expectedConditions: []Condition{},
 			absentConditionTypes: []ConditionType{
-				ConditionFailed,
-				ConditionInProgress,
+				ConditionStalled,
+				ConditionReconciling,
 			},
 		},
 		"crdNoCondition": {
@@ -1033,20 +1033,20 @@ func TestCRDGenericStatus(t *testing.T) {
 			expectedStatus:     CurrentStatus,
 			expectedConditions: []Condition{},
 			absentConditionTypes: []ConditionType{
-				ConditionFailed,
-				ConditionInProgress,
+				ConditionStalled,
+				ConditionReconciling,
 			},
 		},
 		"crdMismatchStatusGeneration": {
 			spec:           crdMismatchStatusGeneration,
 			expectedStatus: InProgressStatus,
 			expectedConditions: []Condition{{
-				Type:   ConditionInProgress,
+				Type:   ConditionReconciling,
 				Status: corev1.ConditionTrue,
 				Reason: "LatestGenerationNotObserved",
 			}},
 			absentConditionTypes: []ConditionType{
-				ConditionFailed,
+				ConditionStalled,
 			},
 		},
 	}
@@ -1129,12 +1129,12 @@ func TestJobStatus(t *testing.T) {
 			spec:           jobNoStatus,
 			expectedStatus: InProgressStatus,
 			expectedConditions: []Condition{{
-				Type:   ConditionInProgress,
+				Type:   ConditionReconciling,
 				Status: corev1.ConditionTrue,
 				Reason: "JobNotStarted",
 			}},
 			absentConditionTypes: []ConditionType{
-				ConditionFailed,
+				ConditionStalled,
 			},
 		},
 		"jobComplete": {
@@ -1142,20 +1142,20 @@ func TestJobStatus(t *testing.T) {
 			expectedStatus:     CurrentStatus,
 			expectedConditions: []Condition{},
 			absentConditionTypes: []ConditionType{
-				ConditionFailed,
-				ConditionInProgress,
+				ConditionStalled,
+				ConditionReconciling,
 			},
 		},
 		"jobFailed": {
 			spec:           jobFailed,
 			expectedStatus: FailedStatus,
 			expectedConditions: []Condition{{
-				Type:   ConditionFailed,
+				Type:   ConditionStalled,
 				Status: corev1.ConditionTrue,
 				Reason: "JobFailed",
 			}},
 			absentConditionTypes: []ConditionType{
-				ConditionInProgress,
+				ConditionReconciling,
 			},
 		},
 		"jobInProgress": {
@@ -1163,8 +1163,8 @@ func TestJobStatus(t *testing.T) {
 			expectedStatus:     CurrentStatus,
 			expectedConditions: []Condition{},
 			absentConditionTypes: []ConditionType{
-				ConditionInProgress,
-				ConditionFailed,
+				ConditionReconciling,
+				ConditionStalled,
 			},
 		},
 	}
@@ -1203,8 +1203,8 @@ func TestCronJobStatus(t *testing.T) {
 			expectedStatus:     CurrentStatus,
 			expectedConditions: []Condition{},
 			absentConditionTypes: []ConditionType{
-				ConditionFailed,
-				ConditionInProgress,
+				ConditionStalled,
+				ConditionReconciling,
 			},
 		},
 		"cronjobWithStatus": {
@@ -1212,8 +1212,8 @@ func TestCronJobStatus(t *testing.T) {
 			expectedStatus:     CurrentStatus,
 			expectedConditions: []Condition{},
 			absentConditionTypes: []ConditionType{
-				ConditionFailed,
-				ConditionInProgress,
+				ConditionStalled,
+				ConditionReconciling,
 			},
 		},
 	}
@@ -1275,8 +1275,8 @@ func TestServiceStatus(t *testing.T) {
 			expectedStatus:     CurrentStatus,
 			expectedConditions: []Condition{},
 			absentConditionTypes: []ConditionType{
-				ConditionFailed,
-				ConditionInProgress,
+				ConditionStalled,
+				ConditionReconciling,
 			},
 		},
 		"serviceNodePort": {
@@ -1284,20 +1284,20 @@ func TestServiceStatus(t *testing.T) {
 			expectedStatus:     CurrentStatus,
 			expectedConditions: []Condition{},
 			absentConditionTypes: []ConditionType{
-				ConditionFailed,
-				ConditionInProgress,
+				ConditionStalled,
+				ConditionReconciling,
 			},
 		},
 		"serviceLBnok": {
 			spec:           serviceLBnok,
 			expectedStatus: InProgressStatus,
 			expectedConditions: []Condition{{
-				Type:   ConditionInProgress,
+				Type:   ConditionReconciling,
 				Status: corev1.ConditionTrue,
 				Reason: "NoIPAssigned",
 			}},
 			absentConditionTypes: []ConditionType{
-				ConditionFailed,
+				ConditionStalled,
 			},
 		},
 		"serviceLBok": {
@@ -1305,8 +1305,8 @@ func TestServiceStatus(t *testing.T) {
 			expectedStatus:     CurrentStatus,
 			expectedConditions: []Condition{},
 			absentConditionTypes: []ConditionType{
-				ConditionFailed,
-				ConditionInProgress,
+				ConditionStalled,
+				ConditionReconciling,
 			},
 		},
 	}

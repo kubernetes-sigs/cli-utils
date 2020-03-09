@@ -56,7 +56,7 @@ func TestAugmentConditions(t *testing.T) {
 			withConditions: []map[string]interface{}{},
 			expectedConditions: []Condition{
 				{
-					Type:   ConditionInProgress,
+					Type:   ConditionReconciling,
 					Status: corev1.ConditionTrue,
 					Reason: "PodRunningNotReady",
 				},
@@ -75,7 +75,7 @@ func TestAugmentConditions(t *testing.T) {
 			},
 			expectedConditions: []Condition{
 				{
-					Type:   ConditionInProgress,
+					Type:   ConditionReconciling,
 					Status: corev1.ConditionTrue,
 					Reason: "PodRunningNotReady",
 				},
@@ -92,14 +92,14 @@ func TestAugmentConditions(t *testing.T) {
 				{
 					"lastTransitionTime": timestamp,
 					"lastUpdateTime":     timestamp,
-					"type":               ConditionInProgress.String(),
+					"type":               ConditionReconciling.String(),
 					"status":             "True",
 					"reason":             "PodIsAbsolutelyNotReady",
 				},
 			},
 			expectedConditions: []Condition{
 				{
-					Type:   ConditionInProgress,
+					Type:   ConditionReconciling,
 					Status: corev1.ConditionTrue,
 					Reason: "PodIsAbsolutelyNotReady",
 				},
@@ -111,14 +111,14 @@ func TestAugmentConditions(t *testing.T) {
 				{
 					"lastTransitionTime": timestamp,
 					"lastUpdateTime":     timestamp,
-					"type":               ConditionFailed.String(),
+					"type":               ConditionStalled.String(),
 					"status":             "True",
 					"reason":             "PodHasFailed",
 				},
 			},
 			expectedConditions: []Condition{
 				{
-					Type:   ConditionFailed,
+					Type:   ConditionStalled,
 					Status: corev1.ConditionTrue,
 					Reason: "PodHasFailed",
 				},

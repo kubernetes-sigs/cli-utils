@@ -16,8 +16,8 @@ const (
 	// The set of standard conditions defined in this package. These follow the "abnormality-true"
 	// convention where conditions should have a true value for abnormal/error situations and the absence
 	// of a condition should be interpreted as a false value, i.e. everything is normal.
-	ConditionFailed     ConditionType = "Failed"
-	ConditionInProgress ConditionType = "InProgress"
+	ConditionStalled     ConditionType = "Stalled"
+	ConditionReconciling ConditionType = "Reconciling"
 
 	// The set of status conditions which can be assigned to resources.
 	InProgressStatus  Status = "InProgress"
@@ -29,8 +29,7 @@ const (
 )
 
 var (
-	Statuses       = []Status{InProgressStatus, FailedStatus, CurrentStatus, TerminatingStatus, UnknownStatus}
-	ConditionTypes = []ConditionType{ConditionFailed, ConditionInProgress}
+	Statuses = []Status{InProgressStatus, FailedStatus, CurrentStatus, TerminatingStatus, UnknownStatus}
 )
 
 // ConditionType defines the set of condition types allowed inside a Condition struct.
