@@ -13,7 +13,7 @@
 // different resource. This metadata is used to identify
 // resources for pruning and teardown.
 
-package prune
+package object
 
 import (
 	"fmt"
@@ -36,10 +36,10 @@ type ObjMetadata struct {
 	GroupKind schema.GroupKind
 }
 
-// createObjMetadata returns a pointer to an ObjMetadata struct filled
+// CreateObjMetadata returns a pointer to an ObjMetadata struct filled
 // with the passed values. This function normalizes and validates the
 // passed fields and returns an error for bad parameters.
-func createObjMetadata(namespace string, name string, gk schema.GroupKind) (*ObjMetadata, error) {
+func CreateObjMetadata(namespace string, name string, gk schema.GroupKind) (*ObjMetadata, error) {
 	// Namespace can be empty, but name cannot.
 	name = strings.TrimSpace(name)
 	if name == "" {
@@ -56,7 +56,7 @@ func createObjMetadata(namespace string, name string, gk schema.GroupKind) (*Obj
 	}, nil
 }
 
-// parseObjMetadata takes a string, splits it into its five fields,
+// ParseObjMetadata takes a string, splits it into its five fields,
 // and returns a pointer to an ObjMetadata struct storing the
 // five fields. Example inventory string:
 //
@@ -64,25 +64,35 @@ func createObjMetadata(namespace string, name string, gk schema.GroupKind) (*Obj
 //
 // Returns an error if unable to parse and create the ObjMetadata
 // struct.
-func parseObjMetadata(inv string) (*ObjMetadata, error) {
+func ParseObjMetadata(inv string) (*ObjMetadata, error) {
 	parts := strings.Split(inv, fieldSeparator)
 	if len(parts) == 4 {
 		gk := schema.GroupKind{
 			Group: strings.TrimSpace(parts[2]),
 			Kind:  strings.TrimSpace(parts[3]),
 		}
-		return createObjMetadata(parts[0], parts[1], gk)
+		return CreateObjMetadata(parts[0], parts[1], gk)
 	}
 	return nil, fmt.Errorf("unable to decode inventory: %s", inv)
 }
 
-// Equals returns true if the ObjMetadata structs are identical;
-// false otherwise.
-func (o *ObjMetadata) Equals(other *ObjMetadata) bool {
+// EqualsWithNormalize returns true if the ObjMetadata structs are identical;
+// false otherwise. This will take into account normalizing resources in the
+// extensions group.
+func (o *ObjMetadata) EqualsWithNormalize(other *ObjMetadata) bool {
 	if other == nil {
 		return false
 	}
 	return o.String() == other.String()
+}
+
+// Equals compares two ObjMetadata and returns true if they are equal. This does
+// not contain any special treatment for the extensions API group.
+func (o *ObjMetadata) Equals(other *ObjMetadata) bool {
+	if other == nil {
+		return false
+	}
+	return *o == *other
 }
 
 // GroupKinds that must be normalized from the "extensions" group.

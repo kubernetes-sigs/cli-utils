@@ -11,7 +11,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/engine"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
-	"sigs.k8s.io/cli-utils/pkg/kstatus/wait"
+	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
 func NewGenericStatusReader(reader engine.ClusterReader, mapper meta.RESTMapper) engine.StatusReader {
@@ -36,7 +36,7 @@ type genericStatusReader struct {
 
 var _ engine.StatusReader = &genericStatusReader{}
 
-func (d *genericStatusReader) ReadStatus(ctx context.Context, identifier wait.ResourceIdentifier) *event.ResourceStatus {
+func (d *genericStatusReader) ReadStatus(ctx context.Context, identifier object.ObjMetadata) *event.ResourceStatus {
 	u, err := d.LookupResource(ctx, identifier)
 	if err != nil {
 		return d.handleResourceStatusError(identifier, err)

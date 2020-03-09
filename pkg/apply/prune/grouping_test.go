@@ -14,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/kubectl/pkg/cmd/apply"
+	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
 var testNamespace = "test-grouping-namespace"
@@ -317,7 +318,7 @@ func TestSortGroupingObject(t *testing.T) {
 func TestAddRetrieveInventoryToFromGroupingObject(t *testing.T) {
 	tests := []struct {
 		infos    []*resource.Info
-		expected []*ObjMetadata
+		expected []*object.ObjMetadata
 		isError  bool
 	}{
 		// No grouping object is an error.
@@ -341,25 +342,25 @@ func TestAddRetrieveInventoryToFromGroupingObject(t *testing.T) {
 		},
 		{
 			infos:    []*resource.Info{copyGroupingInfo()},
-			expected: []*ObjMetadata{},
+			expected: []*object.ObjMetadata{},
 			isError:  false,
 		},
 		// More than one grouping object is an error.
 		{
 			infos:    []*resource.Info{copyGroupingInfo(), copyGroupingInfo()},
-			expected: []*ObjMetadata{},
+			expected: []*object.ObjMetadata{},
 			isError:  true,
 		},
 		// More than one grouping object is an error.
 		{
 			infos:    []*resource.Info{copyGroupingInfo(), pod1Info, copyGroupingInfo()},
-			expected: []*ObjMetadata{},
+			expected: []*object.ObjMetadata{},
 			isError:  true,
 		},
 		// Basic test case: one grouping object, one pod.
 		{
 			infos: []*resource.Info{copyGroupingInfo(), pod1Info},
-			expected: []*ObjMetadata{
+			expected: []*object.ObjMetadata{
 				{
 					Namespace: testNamespace,
 					Name:      pod1Name,
@@ -373,7 +374,7 @@ func TestAddRetrieveInventoryToFromGroupingObject(t *testing.T) {
 		},
 		{
 			infos: []*resource.Info{pod1Info, copyGroupingInfo()},
-			expected: []*ObjMetadata{
+			expected: []*object.ObjMetadata{
 				{
 					Namespace: testNamespace,
 					Name:      pod1Name,
@@ -387,7 +388,7 @@ func TestAddRetrieveInventoryToFromGroupingObject(t *testing.T) {
 		},
 		{
 			infos: []*resource.Info{pod1Info, pod2Info, copyGroupingInfo(), pod3Info},
-			expected: []*ObjMetadata{
+			expected: []*object.ObjMetadata{
 				{
 					Namespace: testNamespace,
 					Name:      pod1Name,
@@ -417,7 +418,7 @@ func TestAddRetrieveInventoryToFromGroupingObject(t *testing.T) {
 		},
 		{
 			infos: []*resource.Info{pod1Info, pod2Info, pod3Info, copyGroupingInfo()},
-			expected: []*ObjMetadata{
+			expected: []*object.ObjMetadata{
 				{
 					Namespace: testNamespace,
 					Name:      pod1Name,
@@ -447,7 +448,7 @@ func TestAddRetrieveInventoryToFromGroupingObject(t *testing.T) {
 		},
 		{
 			infos: []*resource.Info{copyGroupingInfo(), pod1Info, pod2Info, pod3Info},
-			expected: []*ObjMetadata{
+			expected: []*object.ObjMetadata{
 				{
 					Namespace: testNamespace,
 					Name:      pod1Name,
@@ -497,7 +498,7 @@ func TestAddRetrieveInventoryToFromGroupingObject(t *testing.T) {
 			for _, expected := range test.expected {
 				found := false
 				for _, actual := range retrieved {
-					if expected.Equals(actual) {
+					if expected.EqualsWithNormalize(actual) {
 						found = true
 						continue
 					}

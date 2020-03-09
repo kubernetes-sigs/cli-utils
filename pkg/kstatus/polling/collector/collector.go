@@ -9,11 +9,11 @@ import (
 
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
-	"sigs.k8s.io/cli-utils/pkg/kstatus/wait"
+	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
-func NewResourceStatusCollector(identifiers []wait.ResourceIdentifier) *ResourceStatusCollector {
-	resourceStatuses := make(map[wait.ResourceIdentifier]*event.ResourceStatus)
+func NewResourceStatusCollector(identifiers []object.ObjMetadata) *ResourceStatusCollector {
+	resourceStatuses := make(map[object.ObjMetadata]*event.ResourceStatus)
 	for _, id := range identifiers {
 		resourceStatuses[id] = &event.ResourceStatus{
 			Identifier: id,
@@ -38,7 +38,7 @@ type ResourceStatusCollector struct {
 
 	aggregateStatus status.Status
 
-	resourceStatuses map[wait.ResourceIdentifier]*event.ResourceStatus
+	resourceStatuses map[object.ObjMetadata]*event.ResourceStatus
 
 	error error
 }

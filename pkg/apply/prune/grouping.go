@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/kubectl/pkg/cmd/apply"
+	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
 const (
@@ -146,7 +147,7 @@ func AddInventoryToGroupingObj(infos []*resource.Info) error {
 				return fmt.Errorf("creating inventory; object is nil")
 			}
 			gk := obj.GetObjectKind().GroupVersionKind().GroupKind()
-			objMetadata, err := createObjMetadata(info.Namespace, info.Name, gk)
+			objMetadata, err := object.CreateObjMetadata(info.Namespace, info.Name, gk)
 			if err != nil {
 				return err
 			}
@@ -198,8 +199,8 @@ func AddInventoryToGroupingObj(infos []*resource.Info) error {
 // structs, or if the grouping object is not in Unstructured format; nil
 // otherwise. If a grouping object does not exist, or it does not have a
 // "data" map, then returns an empty slice and no error.
-func RetrieveInventoryFromGroupingObj(infos []*resource.Info) ([]*ObjMetadata, error) {
-	inventory := []*ObjMetadata{}
+func RetrieveInventoryFromGroupingObj(infos []*resource.Info) ([]*object.ObjMetadata, error) {
+	inventory := []*object.ObjMetadata{}
 	groupingInfo, exists := FindGroupingObject(infos)
 	if exists {
 		groupingObj, ok := groupingInfo.Object.(*unstructured.Unstructured)
@@ -214,7 +215,7 @@ func RetrieveInventoryFromGroupingObj(infos []*resource.Info) ([]*ObjMetadata, e
 		}
 		if exists {
 			for invStr := range invMap {
-				inv, err := parseObjMetadata(invStr)
+				inv, err := object.ParseObjMetadata(invStr)
 				if err != nil {
 					return inventory, err
 				}

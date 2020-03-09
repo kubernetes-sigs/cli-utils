@@ -15,22 +15,22 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/testutil"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
-	"sigs.k8s.io/cli-utils/pkg/kstatus/wait"
+	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func TestStatusPollerRunner(t *testing.T) {
 	testCases := map[string]struct {
-		identifiers         []wait.ResourceIdentifier
+		identifiers         []object.ObjMetadata
 		defaultStatusReader StatusReader
 		expectedEventTypes  []event.EventType
 	}{
 		"no resources": {
-			identifiers:        []wait.ResourceIdentifier{},
+			identifiers:        []object.ObjMetadata{},
 			expectedEventTypes: []event.EventType{event.CompletedEvent},
 		},
 		"single resource": {
-			identifiers: []wait.ResourceIdentifier{
+			identifiers: []object.ObjMetadata{
 				{
 					GroupKind: schema.GroupKind{
 						Group: "apps",
@@ -56,7 +56,7 @@ func TestStatusPollerRunner(t *testing.T) {
 			},
 		},
 		"multiple resources": {
-			identifiers: []wait.ResourceIdentifier{
+			identifiers: []object.ObjMetadata{
 				{
 					GroupKind: schema.GroupKind{
 						Group: "apps",
@@ -109,10 +109,10 @@ func TestStatusPollerRunner(t *testing.T) {
 			options := Options{
 				PollInterval:       2 * time.Second,
 				PollUntilCancelled: false,
-				AggregatorFactoryFunc: func(identifiers []wait.ResourceIdentifier) StatusAggregator {
+				AggregatorFactoryFunc: func(identifiers []object.ObjMetadata) StatusAggregator {
 					return newFakeAggregator(identifiers)
 				},
-				ClusterReaderFactoryFunc: func(_ client.Reader, _ meta.RESTMapper, _ []wait.ResourceIdentifier) (
+				ClusterReaderFactoryFunc: func(_ client.Reader, _ meta.RESTMapper, _ []object.ObjMetadata) (
 					ClusterReader, error) {
 					return testutil.NewNoopClusterReader(), nil
 				},
@@ -135,7 +135,7 @@ func TestStatusPollerRunner(t *testing.T) {
 }
 
 func TestNewStatusPollerRunnerCancellation(t *testing.T) {
-	identifiers := make([]wait.ResourceIdentifier, 0)
+	identifiers := make([]object.ObjMetadata, 0)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
@@ -147,10 +147,10 @@ func TestNewStatusPollerRunnerCancellation(t *testing.T) {
 	options := Options{
 		PollInterval:       2 * time.Second,
 		PollUntilCancelled: true,
-		AggregatorFactoryFunc: func(identifiers []wait.ResourceIdentifier) StatusAggregator {
+		AggregatorFactoryFunc: func(identifiers []object.ObjMetadata) StatusAggregator {
 			return newFakeAggregator(identifiers)
 		},
-		ClusterReaderFactoryFunc: func(_ client.Reader, _ meta.RESTMapper, _ []wait.ResourceIdentifier) (
+		ClusterReaderFactoryFunc: func(_ client.Reader, _ meta.RESTMapper, _ []object.ObjMetadata) (
 			ClusterReader, error) {
 			return testutil.NewNoopClusterReader(), nil
 		},
@@ -187,7 +187,7 @@ type fakeStatusReader struct {
 	resourceStatusCount map[schema.GroupKind]int
 }
 
-func (f *fakeStatusReader) ReadStatus(_ context.Context, identifier wait.ResourceIdentifier) *event.ResourceStatus {
+func (f *fakeStatusReader) ReadStatus(_ context.Context, identifier object.ObjMetadata) *event.ResourceStatus {
 	count := f.resourceStatusCount[identifier.GroupKind]
 	resourceStatusSlice := f.resourceStatuses[identifier.GroupKind]
 	var resourceStatus status.Status
@@ -209,8 +209,8 @@ func (f *fakeStatusReader) ReadStatusForObject(_ context.Context, _ *unstructure
 
 func (f *fakeStatusReader) SetComputeStatusFunc(_ ComputeStatusFunc) {}
 
-func newFakeAggregator(identifiers []wait.ResourceIdentifier) *fakeAggregator {
-	statuses := make(map[wait.ResourceIdentifier]status.Status)
+func newFakeAggregator(identifiers []object.ObjMetadata) *fakeAggregator {
+	statuses := make(map[object.ObjMetadata]status.Status)
 	for _, id := range identifiers {
 		statuses[id] = status.UnknownStatus
 	}
@@ -220,7 +220,7 @@ func newFakeAggregator(identifiers []wait.ResourceIdentifier) *fakeAggregator {
 }
 
 type fakeAggregator struct {
-	statuses map[wait.ResourceIdentifier]status.Status
+	statuses map[object.ObjMetadata]status.Status
 }
 
 func (f *fakeAggregator) ResourceStatus(resource *event.ResourceStatus) {

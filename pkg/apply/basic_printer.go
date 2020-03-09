@@ -13,7 +13,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
-	"sigs.k8s.io/cli-utils/pkg/kstatus/wait"
+	pollevent "sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 )
 
 // BasicPrinter is a simple implementation that just prints the events
@@ -83,15 +83,20 @@ func (b *BasicPrinter) Print(ch <-chan event.Event, preview bool) {
 			}
 		case event.StatusType:
 			statusEvent := e.StatusEvent
-			switch statusEvent.Type {
-			case wait.ResourceUpdate:
-				id := statusEvent.EventResource.ResourceIdentifier
+			switch statusEvent.EventType {
+			case pollevent.ResourceUpdateEvent:
+				id := statusEvent.Resource.Identifier
 				gk := id.GroupKind
 				printFunc("%s is %s: %s", resourceIDToString(gk, id.Name),
-					statusEvent.EventResource.Status.String(), statusEvent.EventResource.Message)
-			case wait.Completed:
+					statusEvent.Resource.Status.String(), statusEvent.Resource.Message)
+			case pollevent.ErrorEvent:
+				id := statusEvent.Resource.Identifier
+				gk := id.GroupKind
+				printFunc("%s error: %s\n", resourceIDToString(gk, id.Name),
+					statusEvent.Error.Error())
+			case pollevent.CompletedEvent:
 				printFunc("all resources has reached the Current status")
-			case wait.Aborted:
+			case pollevent.AbortedEvent:
 				printFunc("resources failed to the reached Current status")
 			}
 		case event.PruneType:

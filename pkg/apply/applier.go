@@ -7,7 +7,6 @@ import (
 	"context"
 	"fmt"
 	"sort"
-	"time"
 
 	"github.com/go-errors/errors"
 	"github.com/spf13/cobra"
@@ -19,7 +18,10 @@ import (
 	"k8s.io/kubectl/pkg/scheme"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/prune"
-	"sigs.k8s.io/cli-utils/pkg/kstatus/wait"
+	"sigs.k8s.io/cli-utils/pkg/kstatus/polling"
+	pollevent "sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
+	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
+	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -39,9 +41,9 @@ func NewApplier(factory util.Factory, ioStreams genericclioptions.IOStreams) *Ap
 	}
 }
 
-// resolver defines the interface the applier needs to observe status for resources.
-type resolver interface {
-	WaitForStatusOfObjects(ctx context.Context, objects []wait.KubernetesObject) <-chan wait.Event
+// poller defines the interface the applier needs to poll for status of resources.
+type poller interface {
+	Poll(ctx context.Context, identifiers []object.ObjMetadata, options polling.Options) <-chan pollevent.Event
 }
 
 // Applier performs the step of applying a set of resources into a cluster,
@@ -54,7 +56,7 @@ type Applier struct {
 	ApplyOptions  *apply.ApplyOptions
 	StatusOptions *StatusOptions
 	PruneOptions  *prune.PruneOptions
-	resolver      resolver
+	statusPoller  poller
 
 	NoPrune bool
 	DryRun  bool
@@ -84,11 +86,11 @@ func (a *Applier) Initialize(cmd *cobra.Command, paths []string) error {
 	a.ApplyOptions.DryRun = a.DryRun
 	a.PruneOptions.DryRun = a.DryRun
 
-	resolver, err := a.newResolver(a.StatusOptions.period)
+	statusPoller, err := a.newStatusPoller()
 	if err != nil {
 		return errors.WrapPrefix(err, "error creating resolver", 1)
 	}
-	a.resolver = resolver
+	a.statusPoller = statusPoller
 	return nil
 }
 
@@ -115,9 +117,9 @@ func (a *Applier) SetFlags(cmd *cobra.Command) error {
 	return nil
 }
 
-// newResolver sets up a new Resolver for computing status. The configuration
-// needed for the resolver is taken from the Factory.
-func (a *Applier) newResolver(pollInterval time.Duration) (*wait.Resolver, error) {
+// newStatusPoller sets up a new StatusPoller for computing status. The configuration
+// needed for the poller is taken from the Factory.
+func (a *Applier) newStatusPoller() (poller, error) {
 	config, err := a.factory.ToRESTConfig()
 	if err != nil {
 		return nil, errors.WrapPrefix(err, "error getting RESTConfig", 1)
@@ -133,7 +135,7 @@ func (a *Applier) newResolver(pollInterval time.Duration) (*wait.Resolver, error
 		return nil, errors.WrapPrefix(err, "error creating client", 1)
 	}
 
-	return wait.NewResolver(c, mapper, pollInterval), nil
+	return polling.NewStatusPoller(c, mapper), nil
 }
 
 // Run performs the Apply step. This happens asynchronously with updates
@@ -207,7 +209,12 @@ func (a *Applier) Run(ctx context.Context) <-chan event.Event {
 		}
 
 		if a.StatusOptions.wait {
-			statusChannel := a.resolver.WaitForStatusOfObjects(ctx, infosToObjects(infos))
+			statusChannel := a.statusPoller.Poll(ctx, infosToObjMetas(infos), polling.Options{
+				PollUntilCancelled: true,
+				PollInterval:       a.StatusOptions.period,
+				UseCache:           true,
+				DesiredStatus:      status.CurrentStatus,
+			})
 			// As long as the statusChannel remains open, we take every statusEvent,
 			// wrap it in an Event and send it on the channel.
 			// TODO: What should we do if waiting for status times out? We currently proceed with
@@ -245,13 +252,17 @@ func (a *Applier) Run(ctx context.Context) <-chan event.Event {
 	return ch
 }
 
-func infosToObjects(infos []*resource.Info) []wait.KubernetesObject {
-	var objects []wait.KubernetesObject
+func infosToObjMetas(infos []*resource.Info) []object.ObjMetadata {
+	var objMetas []object.ObjMetadata
 	for _, info := range infos {
 		u := info.Object.(*unstructured.Unstructured)
-		objects = append(objects, u)
+		objMetas = append(objMetas, object.ObjMetadata{
+			GroupKind: u.GroupVersionKind().GroupKind(),
+			Name:      u.GetName(),
+			Namespace: u.GetNamespace(),
+		})
 	}
-	return objects
+	return objMetas
 }
 
 const defaultNamespace = "default"

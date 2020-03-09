@@ -13,7 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"sigs.k8s.io/cli-utils/pkg/kstatus/wait"
+	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -49,7 +49,7 @@ var genGroupKinds = map[schema.GroupKind][]schema.GroupKind{
 // identifiers is needed so the ClusterReader can figure out which GroupKind
 // and namespace combinations it needs to cache when the Sync function is called.
 // We only want to fetch the resources that are actually needed.
-func NewCachingClusterReader(reader client.Reader, mapper meta.RESTMapper, identifiers []wait.ResourceIdentifier) (*CachingClusterReader, error) {
+func NewCachingClusterReader(reader client.Reader, mapper meta.RESTMapper, identifiers []object.ObjMetadata) (*CachingClusterReader, error) {
 	gvkNamespaceSet := newGnSet()
 	for _, id := range identifiers {
 		// For every identifier, add the GroupVersionKind and namespace combination to the gvkNamespaceSet and

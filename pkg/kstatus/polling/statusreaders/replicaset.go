@@ -12,7 +12,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/engine"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
-	"sigs.k8s.io/cli-utils/pkg/kstatus/wait"
+	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
 func NewReplicaSetStatusReader(reader engine.ClusterReader, mapper meta.RESTMapper, podStatusReader engine.StatusReader) engine.StatusReader {
@@ -37,7 +37,7 @@ type replicaSetStatusReader struct {
 
 var _ engine.StatusReader = &replicaSetStatusReader{}
 
-func (r *replicaSetStatusReader) ReadStatus(ctx context.Context, identifier wait.ResourceIdentifier) *event.ResourceStatus {
+func (r *replicaSetStatusReader) ReadStatus(ctx context.Context, identifier object.ObjMetadata) *event.ResourceStatus {
 	rs, err := r.LookupResource(ctx, identifier)
 	if err != nil {
 		return r.handleResourceStatusError(identifier, err)

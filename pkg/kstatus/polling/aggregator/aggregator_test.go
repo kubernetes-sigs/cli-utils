@@ -10,10 +10,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
-	"sigs.k8s.io/cli-utils/pkg/kstatus/wait"
+	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
-var resourceIdentifiers = map[string]wait.ResourceIdentifier{
+var resourceIdentifiers = map[string]object.ObjMetadata{
 	"deployment": {
 		GroupKind: schema.GroupKind{
 			Group: "apps",
@@ -42,17 +42,17 @@ var resourceIdentifiers = map[string]wait.ResourceIdentifier{
 
 func TestAggregator(t *testing.T) {
 	testCases := map[string]struct {
-		identifiers      []wait.ResourceIdentifier
+		identifiers      []object.ObjMetadata
 		resourceStatuses []event.ResourceStatus
 		aggregateStatus  status.Status
 	}{
 		"no identifiers": {
-			identifiers:      []wait.ResourceIdentifier{},
+			identifiers:      []object.ObjMetadata{},
 			resourceStatuses: []event.ResourceStatus{},
 			aggregateStatus:  status.CurrentStatus,
 		},
 		"single identifier with multiple resourceStatuses": {
-			identifiers: []wait.ResourceIdentifier{resourceIdentifiers["deployment"]},
+			identifiers: []object.ObjMetadata{resourceIdentifiers["deployment"]},
 			resourceStatuses: []event.ResourceStatus{
 				{
 					Identifier: resourceIdentifiers["deployment"],
@@ -66,7 +66,7 @@ func TestAggregator(t *testing.T) {
 			aggregateStatus: status.InProgressStatus,
 		},
 		"multiple resources with one unknown status": {
-			identifiers: []wait.ResourceIdentifier{
+			identifiers: []object.ObjMetadata{
 				resourceIdentifiers["deployment"],
 				resourceIdentifiers["statefulset"],
 			},
@@ -83,7 +83,7 @@ func TestAggregator(t *testing.T) {
 			aggregateStatus: status.UnknownStatus,
 		},
 		"multiple resources with one failed": {
-			identifiers: []wait.ResourceIdentifier{
+			identifiers: []object.ObjMetadata{
 				resourceIdentifiers["deployment"],
 				resourceIdentifiers["statefulset"],
 				resourceIdentifiers["service"],

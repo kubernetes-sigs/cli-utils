@@ -17,7 +17,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/statusreaders"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
-	"sigs.k8s.io/cli-utils/pkg/kstatus/wait"
+	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -40,7 +40,7 @@ type StatusPoller struct {
 // Poll will create a new statusPollerRunner that will poll all the resources provided and report their status
 // back on the event channel returned. The statusPollerRunner can be cancelled at any time by cancelling the
 // context passed in.
-func (s *StatusPoller) Poll(ctx context.Context, identifiers []wait.ResourceIdentifier, options Options) <-chan event.Event {
+func (s *StatusPoller) Poll(ctx context.Context, identifiers []object.ObjMetadata, options Options) <-chan event.Event {
 	err := s.validate(options)
 	// If validation fail, we still need to return the error through the
 	// eventChannel the client expects. So we need to create one just for
@@ -125,7 +125,7 @@ func createStatusReaders(reader engine.ClusterReader, mapper meta.RESTMapper) (m
 // decided here rather than based on information passed in to the factory function. Thus, the decision
 // for which implementation is decided when the StatusPoller is created.
 func clusterReaderFactoryFunc(useCache bool) engine.ClusterReaderFactoryFunc {
-	return func(r client.Reader, mapper meta.RESTMapper, identifiers []wait.ResourceIdentifier) (engine.ClusterReader, error) {
+	return func(r client.Reader, mapper meta.RESTMapper, identifiers []object.ObjMetadata) (engine.ClusterReader, error) {
 		if useCache {
 			return clusterreader.NewCachingClusterReader(r, mapper, identifiers)
 		}
@@ -136,7 +136,7 @@ func clusterReaderFactoryFunc(useCache bool) engine.ClusterReaderFactoryFunc {
 // aggregatorFactoryFunc returns a factory function for creating an instance of the
 // StatusAggregator interface. Currently there is only one implementation.
 func aggregatorFactoryFunc(desiredStatus status.Status) engine.AggregatorFactoryFunc {
-	return func(identifiers []wait.ResourceIdentifier) engine.StatusAggregator {
+	return func(identifiers []object.ObjMetadata) engine.StatusAggregator {
 		if desiredStatus == status.NotFoundStatus {
 			return aggregator.NewAllNotFoundAggregator(identifiers)
 		}
