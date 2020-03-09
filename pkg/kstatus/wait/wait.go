@@ -39,7 +39,7 @@ type ResourceIdentifier struct {
 	GroupKind schema.GroupKind
 }
 
-// Equals compares two ResourceIdentifiers and returns true if they
+// EqualsWithNormalize compares two ResourceIdentifiers and returns true if they
 // refer to the same resource. Special handling is needed for namespace
 // since an empty namespace for a namespace-scoped resource is defaulted
 // to the "default" namespace.

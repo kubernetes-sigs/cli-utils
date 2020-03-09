@@ -9,10 +9,10 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"sigs.k8s.io/cli-utils/pkg/apply/prune"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/engine"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
+	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
 func NewStatefulSetResourceReader(reader engine.ClusterReader, mapper meta.RESTMapper, podResourceReader engine.StatusReader) engine.StatusReader {
@@ -37,7 +37,7 @@ type statefulSetResourceReader struct {
 
 var _ engine.StatusReader = &statefulSetResourceReader{}
 
-func (s *statefulSetResourceReader) ReadStatus(ctx context.Context, identifier prune.ObjMetadata) *event.ResourceStatus {
+func (s *statefulSetResourceReader) ReadStatus(ctx context.Context, identifier object.ObjMetadata) *event.ResourceStatus {
 	statefulSet, err := s.LookupResource(ctx, identifier)
 	if err != nil {
 		return s.handleResourceStatusError(identifier, err)

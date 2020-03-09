@@ -14,8 +14,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"sigs.k8s.io/cli-utils/pkg/apply/prune"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/testutil"
+	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
 var (
@@ -26,20 +26,20 @@ var (
 )
 
 func TestLookupResource(t *testing.T) {
-	deploymentIdentifier := prune.ObjMetadata{
+	deploymentIdentifier := object.ObjMetadata{
 		GroupKind: deploymentGVK.GroupKind(),
 		Name:      "Foo",
 		Namespace: "Bar",
 	}
 
 	testCases := map[string]struct {
-		identifier         prune.ObjMetadata
+		identifier         object.ObjMetadata
 		readerErr          error
 		expectErr          bool
 		expectedErrMessage string
 	}{
 		"unknown GVK": {
-			identifier: prune.ObjMetadata{
+			identifier: object.ObjMetadata{
 				GroupKind: schema.GroupKind{
 					Group: "custom.io",
 					Kind:  "Custom",

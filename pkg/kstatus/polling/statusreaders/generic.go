@@ -8,10 +8,10 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"sigs.k8s.io/cli-utils/pkg/apply/prune"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/engine"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
+	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
 func NewGenericStatusReader(reader engine.ClusterReader, mapper meta.RESTMapper) engine.StatusReader {
@@ -36,7 +36,7 @@ type genericStatusReader struct {
 
 var _ engine.StatusReader = &genericStatusReader{}
 
-func (d *genericStatusReader) ReadStatus(ctx context.Context, identifier prune.ObjMetadata) *event.ResourceStatus {
+func (d *genericStatusReader) ReadStatus(ctx context.Context, identifier object.ObjMetadata) *event.ResourceStatus {
 	u, err := d.LookupResource(ctx, identifier)
 	if err != nil {
 		return d.handleResourceStatusError(identifier, err)

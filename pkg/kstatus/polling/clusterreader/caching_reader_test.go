@@ -12,8 +12,8 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"sigs.k8s.io/cli-utils/pkg/apply/prune"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/testutil"
+	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -25,14 +25,14 @@ var (
 
 func TestSync(t *testing.T) {
 	testCases := map[string]struct {
-		identifiers    []prune.ObjMetadata
+		identifiers    []object.ObjMetadata
 		expectedSynced []gvkNamespace
 	}{
 		"no identifiers": {
-			identifiers: []prune.ObjMetadata{},
+			identifiers: []object.ObjMetadata{},
 		},
 		"same GVK in multiple namespaces": {
-			identifiers: []prune.ObjMetadata{
+			identifiers: []object.ObjMetadata{
 				{
 					GroupKind: deploymentGVK.GroupKind(),
 					Name:      "deployment",

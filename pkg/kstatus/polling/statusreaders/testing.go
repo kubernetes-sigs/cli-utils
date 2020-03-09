@@ -14,11 +14,11 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"sigs.k8s.io/cli-utils/pkg/apply/prune"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/engine"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/testutil"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
+	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -127,7 +127,7 @@ func (f *fakeClusterReader) ListNamespaceScoped(_ context.Context, list *unstruc
 
 type fakeStatusReader struct{}
 
-func (f *fakeStatusReader) ReadStatus(_ context.Context, _ prune.ObjMetadata) *event.ResourceStatus {
+func (f *fakeStatusReader) ReadStatus(_ context.Context, _ object.ObjMetadata) *event.ResourceStatus {
 	return nil
 }
 

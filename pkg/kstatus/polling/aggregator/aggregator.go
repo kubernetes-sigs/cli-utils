@@ -4,20 +4,20 @@
 package aggregator
 
 import (
-	"sigs.k8s.io/cli-utils/pkg/apply/prune"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
+	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
 // NewAllCurrentAggregator returns a new aggregator that will consider
 // the set to be completed when all resources have reached the Current status.
-func NewAllCurrentAggregator(identifiers []prune.ObjMetadata) *genericAggregator {
+func NewAllCurrentAggregator(identifiers []object.ObjMetadata) *genericAggregator {
 	return newGenericAggregator(identifiers, status.CurrentStatus)
 }
 
 // NewAllNotFoundAggregator returns a new aggregator that will consider
 // the set to be completed when all resources have reached the NotFound status.
-func NewAllNotFoundAggregator(identifiers []prune.ObjMetadata) *genericAggregator {
+func NewAllNotFoundAggregator(identifiers []object.ObjMetadata) *genericAggregator {
 	return newGenericAggregator(identifiers, status.NotFoundStatus)
 }
 
@@ -25,7 +25,7 @@ func NewAllNotFoundAggregator(identifiers []prune.ObjMetadata) *genericAggregato
 // be customized by providing the desired status that all resources
 // should reach.
 type genericAggregator struct {
-	resourceCurrentStatus map[prune.ObjMetadata]status.Status
+	resourceCurrentStatus map[object.ObjMetadata]status.Status
 	desiredStatus         status.Status
 }
 
@@ -33,9 +33,9 @@ type genericAggregator struct {
 // resources identified by the slice of ResourceIdentifiers. It will consider
 // the change to be complete when all resources have reached the specified
 // desired status.
-func newGenericAggregator(identifiers []prune.ObjMetadata, desiredStatus status.Status) *genericAggregator {
+func newGenericAggregator(identifiers []object.ObjMetadata, desiredStatus status.Status) *genericAggregator {
 	aggregator := &genericAggregator{
-		resourceCurrentStatus: make(map[prune.ObjMetadata]status.Status),
+		resourceCurrentStatus: make(map[object.ObjMetadata]status.Status),
 		desiredStatus:         desiredStatus,
 	}
 	for _, id := range identifiers {

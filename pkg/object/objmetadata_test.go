@@ -1,7 +1,7 @@
 // Copyright 2020 The Kubernetes Authors.
 // SPDX-License-Identifier: Apache-2.0
 
-package prune
+package object
 
 import (
 	"testing"
@@ -59,7 +59,7 @@ func TestCreateObjMetadata(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		inv, err := createObjMetadata(test.namespace, test.name, test.gk)
+		inv, err := CreateObjMetadata(test.namespace, test.name, test.gk)
 		if !test.isError {
 			if err != nil {
 				t.Errorf("Error creating inventory when it should have worked.")
@@ -68,12 +68,12 @@ func TestCreateObjMetadata(t *testing.T) {
 			}
 		}
 		if test.isError && err == nil {
-			t.Errorf("Should have returned an error in createObjMetadata()")
+			t.Errorf("Should have returned an error in CreateObjMetadata()")
 		}
 	}
 }
 
-func TestObjMetadataEqual(t *testing.T) {
+func TestObjMetadataEqualsWithNormalize(t *testing.T) {
 	tests := []struct {
 		inventory1 *ObjMetadata
 		inventory2 *ObjMetadata
@@ -223,10 +223,94 @@ func TestObjMetadataEqual(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		actual := test.inventory1.Equals(test.inventory2)
+		actual := test.inventory1.EqualsWithNormalize(test.inventory2)
 		if test.isEqual && !actual {
 			t.Errorf("Expected inventories equal, but actual is not: (%s)/(%s)\n", test.inventory1, test.inventory2)
 		}
+	}
+}
+
+func TestObjMetadataEquals(t *testing.T) {
+	testCases := map[string]struct {
+		objMeta1     *ObjMetadata
+		objMeta2     *ObjMetadata
+		expectEquals bool
+	}{
+		"parameter is nil": {
+			objMeta1: &ObjMetadata{
+				GroupKind: schema.GroupKind{
+					Group: "apps",
+					Kind:  "Deployment",
+				},
+				Name:      "dep",
+				Namespace: "default",
+			},
+			objMeta2:     nil,
+			expectEquals: false,
+		},
+		"different groupKind": {
+			objMeta1: &ObjMetadata{
+				GroupKind: schema.GroupKind{
+					Group: "apps",
+					Kind:  "StatefulSet",
+				},
+				Name:      "dep",
+				Namespace: "default",
+			},
+			objMeta2: &ObjMetadata{
+				GroupKind: schema.GroupKind{
+					Group: "apps",
+					Kind:  "Deployment",
+				},
+				Name:      "dep",
+				Namespace: "default",
+			},
+			expectEquals: false,
+		},
+		"both are missing groupKind": {
+			objMeta1: &ObjMetadata{
+				Name:      "dep",
+				Namespace: "default",
+			},
+			objMeta2: &ObjMetadata{
+				Name:      "dep",
+				Namespace: "default",
+			},
+			expectEquals: true,
+		},
+		"they are equal": {
+			objMeta1: &ObjMetadata{
+				GroupKind: schema.GroupKind{
+					Group: "apps",
+					Kind:  "Deployment",
+				},
+				Name:      "dep",
+				Namespace: "default",
+			},
+			objMeta2: &ObjMetadata{
+				GroupKind: schema.GroupKind{
+					Group: "apps",
+					Kind:  "Deployment",
+				},
+				Name:      "dep",
+				Namespace: "default",
+			},
+			expectEquals: true,
+		},
+	}
+
+	for tn, tc := range testCases {
+		t.Run(tn, func(t *testing.T) {
+			equal := tc.objMeta1.Equals(tc.objMeta2)
+
+			if tc.expectEquals && !equal {
+				t.Error("Expected objMetas to be equal, but they weren't")
+			}
+
+			if !tc.expectEquals && equal {
+				t.Error("Expected objMetas not to be equal, but they were")
+			}
+		})
 	}
 }
 
@@ -268,16 +352,16 @@ func TestParseObjMetadata(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		actual, err := parseObjMetadata(test.invStr)
+		actual, err := ParseObjMetadata(test.invStr)
 		if !test.isError {
 			if err != nil {
 				t.Errorf("Error parsing inventory when it should have worked.")
-			} else if !test.inventory.Equals(actual) {
+			} else if !test.inventory.EqualsWithNormalize(actual) {
 				t.Errorf("Expected inventory (%s) != parsed inventory (%s)\n", test.inventory, actual)
 			}
 		}
 		if test.isError && err == nil {
-			t.Errorf("Should have returned an error in parseObjMetadata()")
+			t.Errorf("Should have returned an error in ParseObjMetadata()")
 		}
 	}
 }

@@ -7,13 +7,13 @@ import (
 	"sort"
 	"sync"
 
-	"sigs.k8s.io/cli-utils/pkg/apply/prune"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
+	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
-func NewResourceStatusCollector(identifiers []prune.ObjMetadata) *ResourceStatusCollector {
-	resourceStatuses := make(map[prune.ObjMetadata]*event.ResourceStatus)
+func NewResourceStatusCollector(identifiers []object.ObjMetadata) *ResourceStatusCollector {
+	resourceStatuses := make(map[object.ObjMetadata]*event.ResourceStatus)
 	for _, id := range identifiers {
 		resourceStatuses[id] = &event.ResourceStatus{
 			Identifier: id,
@@ -38,7 +38,7 @@ type ResourceStatusCollector struct {
 
 	aggregateStatus status.Status
 
-	resourceStatuses map[prune.ObjMetadata]*event.ResourceStatus
+	resourceStatuses map[object.ObjMetadata]*event.ResourceStatus
 
 	error error
 }

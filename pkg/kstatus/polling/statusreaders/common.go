@@ -17,10 +17,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/cli-utils/pkg/apply/prune"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/engine"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
+	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
 // BaseStatusReader provides some basic functionality needed by the statusreaders.
@@ -42,7 +42,7 @@ func (b *BaseStatusReader) SetComputeStatusFunc(statusFunc engine.ComputeStatusF
 // the version of the GroupKind given in the identifier.
 // If the resource is found, it is returned. If it is not found or something
 // went wrong, the function will return an error.
-func (b *BaseStatusReader) LookupResource(ctx context.Context, identifier prune.ObjMetadata) (*unstructured.Unstructured, error) {
+func (b *BaseStatusReader) LookupResource(ctx context.Context, identifier object.ObjMetadata) (*unstructured.Unstructured, error) {
 	GVK, err := b.GVK(identifier.GroupKind)
 	if err != nil {
 		return nil, err
@@ -93,7 +93,7 @@ func (b *BaseStatusReader) StatusForGeneratedResources(ctx context.Context, stat
 
 // handleResourceStatusError construct the appropriate ResourceStatus
 // object based on the type of error.
-func (b *BaseStatusReader) handleResourceStatusError(identifier prune.ObjMetadata, err error) *event.ResourceStatus {
+func (b *BaseStatusReader) handleResourceStatusError(identifier object.ObjMetadata, err error) *event.ResourceStatus {
 	if errors.IsNotFound(err) {
 		return &event.ResourceStatus{
 			Identifier: identifier,
@@ -137,8 +137,8 @@ func toSelector(resource *unstructured.Unstructured, path ...string) (labels.Sel
 	return metav1.LabelSelectorAsSelector(&s)
 }
 
-func toIdentifier(u *unstructured.Unstructured) prune.ObjMetadata {
-	return prune.ObjMetadata{
+func toIdentifier(u *unstructured.Unstructured) object.ObjMetadata {
+	return object.ObjMetadata{
 		GroupKind: u.GroupVersionKind().GroupKind(),
 		Name:      u.GetName(),
 		Namespace: u.GetNamespace(),
@@ -161,7 +161,7 @@ func getNamespaceForNamespacedResource(object runtime.Object) string {
 
 // keyForNamespacedResource returns the object key for the given identifier. It makes
 // sure to set the namespace to default if it is not provided.
-func keyForNamespacedResource(identifier prune.ObjMetadata) types.NamespacedName {
+func keyForNamespacedResource(identifier object.ObjMetadata) types.NamespacedName {
 	namespace := "default"
 	if identifier.Namespace != "" {
 		namespace = identifier.Namespace

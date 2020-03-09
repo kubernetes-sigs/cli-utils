@@ -7,9 +7,10 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
-var inventory1 = ObjMetadata{
+var inventory1 = object.ObjMetadata{
 	Namespace: "test-namespace",
 	Name:      "test-inv-1",
 	GroupKind: schema.GroupKind{
@@ -18,7 +19,7 @@ var inventory1 = ObjMetadata{
 	},
 }
 
-var inventory2 = ObjMetadata{
+var inventory2 = object.ObjMetadata{
 	Namespace: "test-namespace",
 	Name:      "test-inv-2",
 	GroupKind: schema.GroupKind{
@@ -27,7 +28,7 @@ var inventory2 = ObjMetadata{
 	},
 }
 
-var inventory3 = ObjMetadata{
+var inventory3 = object.ObjMetadata{
 	Namespace: "test-namespace",
 	Name:      "test-inv-3",
 	GroupKind: schema.GroupKind{
@@ -36,7 +37,7 @@ var inventory3 = ObjMetadata{
 	},
 }
 
-var inventory4 = ObjMetadata{
+var inventory4 = object.ObjMetadata{
 	Namespace: "test-namespace",
 	Name:      "test-inv-4",
 	GroupKind: schema.GroupKind{
@@ -47,22 +48,22 @@ var inventory4 = ObjMetadata{
 
 func TestNewInventory(t *testing.T) {
 	tests := []struct {
-		items        []*ObjMetadata
+		items        []*object.ObjMetadata
 		expectedStr  string
 		expectedSize int
 	}{
 		{
-			items:        []*ObjMetadata{},
+			items:        []*object.ObjMetadata{},
 			expectedStr:  "",
 			expectedSize: 0,
 		},
 		{
-			items:        []*ObjMetadata{&inventory1},
+			items:        []*object.ObjMetadata{&inventory1},
 			expectedStr:  "test-namespace_test-inv-1_apps_Deployment",
 			expectedSize: 1,
 		},
 		{
-			items:        []*ObjMetadata{&inventory1, &inventory2},
+			items:        []*object.ObjMetadata{&inventory1, &inventory2},
 			expectedStr:  "test-namespace_test-inv-1_apps_Deployment, test-namespace_test-inv-2__Pod",
 			expectedSize: 2,
 		},
@@ -87,38 +88,38 @@ func TestNewInventory(t *testing.T) {
 
 func TestInventoryAddItems(t *testing.T) {
 	tests := []struct {
-		initialItems  []*ObjMetadata
-		addItems      []*ObjMetadata
-		expectedItems []*ObjMetadata
+		initialItems  []*object.ObjMetadata
+		addItems      []*object.ObjMetadata
+		expectedItems []*object.ObjMetadata
 	}{
 		// Adding no items to empty inventory set.
 		{
-			initialItems:  []*ObjMetadata{},
-			addItems:      []*ObjMetadata{},
-			expectedItems: []*ObjMetadata{},
+			initialItems:  []*object.ObjMetadata{},
+			addItems:      []*object.ObjMetadata{},
+			expectedItems: []*object.ObjMetadata{},
 		},
 		// Adding item to empty inventory set.
 		{
-			initialItems:  []*ObjMetadata{},
-			addItems:      []*ObjMetadata{&inventory1},
-			expectedItems: []*ObjMetadata{&inventory1},
+			initialItems:  []*object.ObjMetadata{},
+			addItems:      []*object.ObjMetadata{&inventory1},
+			expectedItems: []*object.ObjMetadata{&inventory1},
 		},
 		// Adding no items does not change the inventory set
 		{
-			initialItems:  []*ObjMetadata{&inventory1},
-			addItems:      []*ObjMetadata{},
-			expectedItems: []*ObjMetadata{&inventory1},
+			initialItems:  []*object.ObjMetadata{&inventory1},
+			addItems:      []*object.ObjMetadata{},
+			expectedItems: []*object.ObjMetadata{&inventory1},
 		},
 		// Adding an item which alread exists does not increase size.
 		{
-			initialItems:  []*ObjMetadata{&inventory1, &inventory2},
-			addItems:      []*ObjMetadata{&inventory1},
-			expectedItems: []*ObjMetadata{&inventory1, &inventory2},
+			initialItems:  []*object.ObjMetadata{&inventory1, &inventory2},
+			addItems:      []*object.ObjMetadata{&inventory1},
+			expectedItems: []*object.ObjMetadata{&inventory1, &inventory2},
 		},
 		{
-			initialItems:  []*ObjMetadata{&inventory1, &inventory2},
-			addItems:      []*ObjMetadata{&inventory3, &inventory4},
-			expectedItems: []*ObjMetadata{&inventory1, &inventory2, &inventory3, &inventory4},
+			initialItems:  []*object.ObjMetadata{&inventory1, &inventory2},
+			addItems:      []*object.ObjMetadata{&inventory3, &inventory4},
+			expectedItems: []*object.ObjMetadata{&inventory1, &inventory2, &inventory3, &inventory4},
 		},
 	}
 
@@ -133,40 +134,40 @@ func TestInventoryAddItems(t *testing.T) {
 
 func TestInventoryDeleteItem(t *testing.T) {
 	tests := []struct {
-		initialItems  []*ObjMetadata
-		deleteItem    *ObjMetadata
+		initialItems  []*object.ObjMetadata
+		deleteItem    *object.ObjMetadata
 		expected      bool
-		expectedItems []*ObjMetadata
+		expectedItems []*object.ObjMetadata
 	}{
 		{
-			initialItems:  []*ObjMetadata{},
+			initialItems:  []*object.ObjMetadata{},
 			deleteItem:    nil,
 			expected:      false,
-			expectedItems: []*ObjMetadata{},
+			expectedItems: []*object.ObjMetadata{},
 		},
 		{
-			initialItems:  []*ObjMetadata{},
+			initialItems:  []*object.ObjMetadata{},
 			deleteItem:    &inventory1,
 			expected:      false,
-			expectedItems: []*ObjMetadata{},
+			expectedItems: []*object.ObjMetadata{},
 		},
 		{
-			initialItems:  []*ObjMetadata{&inventory2},
+			initialItems:  []*object.ObjMetadata{&inventory2},
 			deleteItem:    &inventory1,
 			expected:      false,
-			expectedItems: []*ObjMetadata{&inventory2},
+			expectedItems: []*object.ObjMetadata{&inventory2},
 		},
 		{
-			initialItems:  []*ObjMetadata{&inventory1},
+			initialItems:  []*object.ObjMetadata{&inventory1},
 			deleteItem:    &inventory1,
 			expected:      true,
-			expectedItems: []*ObjMetadata{},
+			expectedItems: []*object.ObjMetadata{},
 		},
 		{
-			initialItems:  []*ObjMetadata{&inventory1, &inventory2},
+			initialItems:  []*object.ObjMetadata{&inventory1, &inventory2},
 			deleteItem:    &inventory1,
 			expected:      true,
-			expectedItems: []*ObjMetadata{&inventory2},
+			expectedItems: []*object.ObjMetadata{&inventory2},
 		},
 	}
 
@@ -184,39 +185,39 @@ func TestInventoryDeleteItem(t *testing.T) {
 
 func TestInventoryMerge(t *testing.T) {
 	tests := []struct {
-		set1   []*ObjMetadata
-		set2   []*ObjMetadata
-		merged []*ObjMetadata
+		set1   []*object.ObjMetadata
+		set2   []*object.ObjMetadata
+		merged []*object.ObjMetadata
 	}{
 		{
-			set1:   []*ObjMetadata{},
-			set2:   []*ObjMetadata{},
-			merged: []*ObjMetadata{},
+			set1:   []*object.ObjMetadata{},
+			set2:   []*object.ObjMetadata{},
+			merged: []*object.ObjMetadata{},
 		},
 		{
-			set1:   []*ObjMetadata{},
-			set2:   []*ObjMetadata{&inventory1},
-			merged: []*ObjMetadata{&inventory1},
+			set1:   []*object.ObjMetadata{},
+			set2:   []*object.ObjMetadata{&inventory1},
+			merged: []*object.ObjMetadata{&inventory1},
 		},
 		{
-			set1:   []*ObjMetadata{&inventory1},
-			set2:   []*ObjMetadata{},
-			merged: []*ObjMetadata{&inventory1},
+			set1:   []*object.ObjMetadata{&inventory1},
+			set2:   []*object.ObjMetadata{},
+			merged: []*object.ObjMetadata{&inventory1},
 		},
 		{
-			set1:   []*ObjMetadata{&inventory1, &inventory2},
-			set2:   []*ObjMetadata{&inventory1},
-			merged: []*ObjMetadata{&inventory1, &inventory2},
+			set1:   []*object.ObjMetadata{&inventory1, &inventory2},
+			set2:   []*object.ObjMetadata{&inventory1},
+			merged: []*object.ObjMetadata{&inventory1, &inventory2},
 		},
 		{
-			set1:   []*ObjMetadata{&inventory1, &inventory2},
-			set2:   []*ObjMetadata{&inventory1, &inventory2},
-			merged: []*ObjMetadata{&inventory1, &inventory2},
+			set1:   []*object.ObjMetadata{&inventory1, &inventory2},
+			set2:   []*object.ObjMetadata{&inventory1, &inventory2},
+			merged: []*object.ObjMetadata{&inventory1, &inventory2},
 		},
 		{
-			set1:   []*ObjMetadata{&inventory1, &inventory2},
-			set2:   []*ObjMetadata{&inventory3, &inventory4},
-			merged: []*ObjMetadata{&inventory1, &inventory2, &inventory3, &inventory4},
+			set1:   []*object.ObjMetadata{&inventory1, &inventory2},
+			set2:   []*object.ObjMetadata{&inventory3, &inventory4},
+			merged: []*object.ObjMetadata{&inventory1, &inventory2, &inventory3, &inventory4},
 		},
 	}
 
@@ -233,39 +234,39 @@ func TestInventoryMerge(t *testing.T) {
 
 func TestInventorySubtract(t *testing.T) {
 	tests := []struct {
-		initialItems  []*ObjMetadata
-		subtractItems []*ObjMetadata
-		expected      []*ObjMetadata
+		initialItems  []*object.ObjMetadata
+		subtractItems []*object.ObjMetadata
+		expected      []*object.ObjMetadata
 	}{
 		{
-			initialItems:  []*ObjMetadata{},
-			subtractItems: []*ObjMetadata{},
-			expected:      []*ObjMetadata{},
+			initialItems:  []*object.ObjMetadata{},
+			subtractItems: []*object.ObjMetadata{},
+			expected:      []*object.ObjMetadata{},
 		},
 		{
-			initialItems:  []*ObjMetadata{},
-			subtractItems: []*ObjMetadata{&inventory1},
-			expected:      []*ObjMetadata{},
+			initialItems:  []*object.ObjMetadata{},
+			subtractItems: []*object.ObjMetadata{&inventory1},
+			expected:      []*object.ObjMetadata{},
 		},
 		{
-			initialItems:  []*ObjMetadata{&inventory1},
-			subtractItems: []*ObjMetadata{},
-			expected:      []*ObjMetadata{&inventory1},
+			initialItems:  []*object.ObjMetadata{&inventory1},
+			subtractItems: []*object.ObjMetadata{},
+			expected:      []*object.ObjMetadata{&inventory1},
 		},
 		{
-			initialItems:  []*ObjMetadata{&inventory1, &inventory2},
-			subtractItems: []*ObjMetadata{&inventory1},
-			expected:      []*ObjMetadata{&inventory2},
+			initialItems:  []*object.ObjMetadata{&inventory1, &inventory2},
+			subtractItems: []*object.ObjMetadata{&inventory1},
+			expected:      []*object.ObjMetadata{&inventory2},
 		},
 		{
-			initialItems:  []*ObjMetadata{&inventory1, &inventory2},
-			subtractItems: []*ObjMetadata{&inventory1, &inventory2},
-			expected:      []*ObjMetadata{},
+			initialItems:  []*object.ObjMetadata{&inventory1, &inventory2},
+			subtractItems: []*object.ObjMetadata{&inventory1, &inventory2},
+			expected:      []*object.ObjMetadata{},
 		},
 		{
-			initialItems:  []*ObjMetadata{&inventory1, &inventory2},
-			subtractItems: []*ObjMetadata{&inventory3, &inventory4},
-			expected:      []*ObjMetadata{&inventory1, &inventory2},
+			initialItems:  []*object.ObjMetadata{&inventory1, &inventory2},
+			subtractItems: []*object.ObjMetadata{&inventory3, &inventory4},
+			expected:      []*object.ObjMetadata{&inventory1, &inventory2},
 		},
 	}
 
@@ -282,45 +283,45 @@ func TestInventorySubtract(t *testing.T) {
 
 func TestInventoryEquals(t *testing.T) {
 	tests := []struct {
-		set1    []*ObjMetadata
-		set2    []*ObjMetadata
+		set1    []*object.ObjMetadata
+		set2    []*object.ObjMetadata
 		isEqual bool
 	}{
 		{
-			set1:    []*ObjMetadata{},
-			set2:    []*ObjMetadata{&inventory1},
+			set1:    []*object.ObjMetadata{},
+			set2:    []*object.ObjMetadata{&inventory1},
 			isEqual: false,
 		},
 		{
-			set1:    []*ObjMetadata{&inventory1},
-			set2:    []*ObjMetadata{},
+			set1:    []*object.ObjMetadata{&inventory1},
+			set2:    []*object.ObjMetadata{},
 			isEqual: false,
 		},
 		{
-			set1:    []*ObjMetadata{&inventory1, &inventory2},
-			set2:    []*ObjMetadata{&inventory1},
+			set1:    []*object.ObjMetadata{&inventory1, &inventory2},
+			set2:    []*object.ObjMetadata{&inventory1},
 			isEqual: false,
 		},
 		{
-			set1:    []*ObjMetadata{&inventory1, &inventory2},
-			set2:    []*ObjMetadata{&inventory3, &inventory4},
+			set1:    []*object.ObjMetadata{&inventory1, &inventory2},
+			set2:    []*object.ObjMetadata{&inventory3, &inventory4},
 			isEqual: false,
 		},
 		// Empty sets are equal.
 		{
-			set1:    []*ObjMetadata{},
-			set2:    []*ObjMetadata{},
+			set1:    []*object.ObjMetadata{},
+			set2:    []*object.ObjMetadata{},
 			isEqual: true,
 		},
 		{
-			set1:    []*ObjMetadata{&inventory1},
-			set2:    []*ObjMetadata{&inventory1},
+			set1:    []*object.ObjMetadata{&inventory1},
+			set2:    []*object.ObjMetadata{&inventory1},
 			isEqual: true,
 		},
 		// Ordering of the inventory items does not matter for equality.
 		{
-			set1:    []*ObjMetadata{&inventory1, &inventory2},
-			set2:    []*ObjMetadata{&inventory2, &inventory1},
+			set1:    []*object.ObjMetadata{&inventory1, &inventory2},
+			set2:    []*object.ObjMetadata{&inventory2, &inventory1},
 			isEqual: true,
 		},
 	}

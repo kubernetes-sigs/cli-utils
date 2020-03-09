@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+
+	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
 // Inventory encapsulates a grouping of unique Inventory
@@ -17,21 +19,21 @@ import (
 // which ensures there are no duplicates. Allows set
 // operations such as merging sets and subtracting sets.
 type Inventory struct {
-	set map[string]*ObjMetadata
+	set map[string]*object.ObjMetadata
 }
 
 // NewInventory returns a pointer to an Inventory
 // struct grouping the passed Inventory items.
-func NewInventory(items []*ObjMetadata) *Inventory {
-	inventory := Inventory{set: map[string]*ObjMetadata{}}
+func NewInventory(items []*object.ObjMetadata) *Inventory {
+	inventory := Inventory{set: map[string]*object.ObjMetadata{}}
 	inventory.AddItems(items)
 	return &inventory
 }
 
 // GetItems returns the set of pointers to ObjMetadata
 // structs.
-func (is *Inventory) GetItems() []*ObjMetadata {
-	items := []*ObjMetadata{}
+func (is *Inventory) GetItems() []*object.ObjMetadata {
+	items := []*object.ObjMetadata{}
 	for _, item := range is.set {
 		items = append(items, item)
 	}
@@ -40,7 +42,7 @@ func (is *Inventory) GetItems() []*ObjMetadata {
 
 // AddItems adds Inventory structs to the set which
 // are not already in the set.
-func (is *Inventory) AddItems(items []*ObjMetadata) {
+func (is *Inventory) AddItems(items []*object.ObjMetadata) {
 	for _, item := range items {
 		if item != nil {
 			is.set[item.String()] = item
@@ -52,7 +54,7 @@ func (is *Inventory) AddItems(items []*ObjMetadata) {
 // set if it exists in the set. Returns true if the
 // ObjMetadata item was deleted, false if it did not exist
 // in the set.
-func (is *Inventory) DeleteItem(item *ObjMetadata) bool {
+func (is *Inventory) DeleteItem(item *object.ObjMetadata) bool {
 	if item == nil {
 		return false
 	}

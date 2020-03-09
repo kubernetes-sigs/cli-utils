@@ -22,6 +22,7 @@ import (
 	"k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/validation"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
+	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
 // PruneOptions encapsulates the necessary information to
@@ -97,7 +98,7 @@ func (po *PruneOptions) getPreviousGroupingObjects() ([]*resource.Info, error) {
 		if err != nil {
 			return nil, err
 		}
-		if !current.Equals(past) {
+		if !current.EqualsWithNormalize(past) {
 			pastGroupInfos = append(pastGroupInfos, pastInfo)
 		}
 	}
@@ -142,13 +143,13 @@ func (po *PruneOptions) retrievePreviousGroupingObjects(namespace string) error 
 // infoToObjMetadata transforms the object represented by the passed "info"
 // into its Inventory representation. Returns error if the passed Info
 // is nil, or the Object in the Info is empty.
-func infoToObjMetadata(info *resource.Info) (*ObjMetadata, error) {
+func infoToObjMetadata(info *resource.Info) (*object.ObjMetadata, error) {
 	if info == nil || info.Object == nil {
 		return nil, fmt.Errorf("empty resource.Info can not calculate as inventory")
 	}
 	obj := info.Object
 	gk := obj.GetObjectKind().GroupVersionKind().GroupKind()
-	return createObjMetadata(info.Namespace, info.Name, gk)
+	return object.CreateObjMetadata(info.Namespace, info.Name, gk)
 }
 
 // unionPastInventory takes a set of grouping objects (infos), returning the
@@ -157,7 +158,7 @@ func infoToObjMetadata(info *resource.Info) (*ObjMetadata, error) {
 // grouping objects, or if unable to retrieve the inventory from any
 // grouping object.
 func unionPastInventory(infos []*resource.Info) (*Inventory, error) {
-	inventorySet := NewInventory([]*ObjMetadata{})
+	inventorySet := NewInventory([]*object.ObjMetadata{})
 	for _, info := range infos {
 		inv, err := RetrieveInventoryFromGroupingObj([]*resource.Info{info})
 		if err != nil {

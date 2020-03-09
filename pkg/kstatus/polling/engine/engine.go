@@ -11,19 +11,19 @@ import (
 	"github.com/go-errors/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"sigs.k8s.io/cli-utils/pkg/apply/prune"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
+	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // AggregatorFactoryFunc defines the signature for the function the PollerEngine will use to
 // create a new StatusAggregator for each statusPollerRunner.
-type AggregatorFactoryFunc func(identifiers []prune.ObjMetadata) StatusAggregator
+type AggregatorFactoryFunc func(identifiers []object.ObjMetadata) StatusAggregator
 
 // ClusterReaderFactoryFunc defines the signature for the function the PollerEngine will use to create
 // a new ClusterReader for each statusPollerRunner.
 type ClusterReaderFactoryFunc func(reader client.Reader, mapper meta.RESTMapper,
-	identifiers []prune.ObjMetadata) (ClusterReader, error)
+	identifiers []object.ObjMetadata) (ClusterReader, error)
 
 // StatusReadersFactoryFunc defines the signature for the function the PollerEngine will use to
 // create the resource statusReaders and the default engine for each statusPollerRunner.
@@ -41,7 +41,7 @@ type PollerEngine struct {
 // context passed in.
 // The context can be used to stop the polling process by using timeout, deadline or
 // cancellation.
-func (s *PollerEngine) Poll(ctx context.Context, identifiers []prune.ObjMetadata, options Options) <-chan event.Event {
+func (s *PollerEngine) Poll(ctx context.Context, identifiers []object.ObjMetadata, options Options) <-chan event.Event {
 	eventChannel := make(chan event.Event)
 
 	go func() {
@@ -73,7 +73,7 @@ func (s *PollerEngine) Poll(ctx context.Context, identifiers []prune.ObjMetadata
 			statusReaders:            statusReaders,
 			defaultStatusReader:      defaultStatusReader,
 			identifiers:              identifiers,
-			previousResourceStatuses: make(map[prune.ObjMetadata]*event.ResourceStatus),
+			previousResourceStatuses: make(map[object.ObjMetadata]*event.ResourceStatus),
 			eventChannel:             eventChannel,
 			statusAggregator:         aggregator,
 			pollUntilCancelled:       options.PollUntilCancelled,
@@ -156,12 +156,12 @@ type statusPollerRunner struct {
 
 	// identifiers contains the list of identifiers for the resources that should be polled.
 	// Each resource is identified by GroupKind, namespace and name.
-	identifiers []prune.ObjMetadata
+	identifiers []object.ObjMetadata
 
 	// previousResourceStatuses keeps track of the last event for each
 	// of the polled resources. This is used to make sure we only
 	// send events on the event channel when something has actually changed.
-	previousResourceStatuses map[prune.ObjMetadata]*event.ResourceStatus
+	previousResourceStatuses map[object.ObjMetadata]*event.ResourceStatus
 
 	// eventChannel is a channel where any updates to the status of resources
 	// will be sent. The caller of Poll will listen for updates.

@@ -7,9 +7,9 @@ import (
 	"context"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"sigs.k8s.io/cli-utils/pkg/apply/prune"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
+	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
 // ComputeStatusFunc is the function that the engine will delegate to for
@@ -28,7 +28,7 @@ type StatusReader interface {
 	// from the cluster and return an ResourceStatus that will contain
 	// information about the latest state of the resource, its computed status
 	// and information about any generated resources.
-	ReadStatus(ctx context.Context, resource prune.ObjMetadata) *event.ResourceStatus
+	ReadStatus(ctx context.Context, resource object.ObjMetadata) *event.ResourceStatus
 
 	// ReadStatusForObject is similar to Poll, but instead of looking up the
 	// resource based on an identifier, it will use the passed in resource.

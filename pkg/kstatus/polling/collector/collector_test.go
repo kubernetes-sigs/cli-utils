@@ -10,13 +10,13 @@ import (
 
 	"gotest.tools/assert"
 	appsv1 "k8s.io/api/apps/v1"
-	"sigs.k8s.io/cli-utils/pkg/apply/prune"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
+	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
 func TestCollectorStopsWhenEventChannelIsClosed(t *testing.T) {
-	var identifiers []prune.ObjMetadata
+	var identifiers []object.ObjMetadata
 
 	collector := NewResourceStatusCollector(identifiers)
 
@@ -38,7 +38,7 @@ func TestCollectorStopsWhenEventChannelIsClosed(t *testing.T) {
 }
 
 func TestCollectorStopWhenStopChannelIsClosed(t *testing.T) {
-	var identifiers []prune.ObjMetadata
+	var identifiers []object.ObjMetadata
 
 	collector := NewResourceStatusCollector(identifiers)
 
@@ -62,7 +62,7 @@ func TestCollectorStopWhenStopChannelIsClosed(t *testing.T) {
 var (
 	deploymentGVK       = appsv1.SchemeGroupVersion.WithKind("Deployment")
 	statefulSetGVK      = appsv1.SchemeGroupVersion.WithKind("StatefulSet")
-	resourceIdentifiers = map[string]prune.ObjMetadata{
+	resourceIdentifiers = map[string]object.ObjMetadata{
 		"deployment": {
 			GroupKind: deploymentGVK.GroupKind(),
 			Name:      "Foo",
@@ -78,12 +78,12 @@ var (
 
 func TestCollectorEventProcessing(t *testing.T) {
 	testCases := map[string]struct {
-		identifiers []prune.ObjMetadata
+		identifiers []object.ObjMetadata
 		events      []event.Event
 	}{
 		"no resources and no events": {},
 		"single resource and single event": {
-			identifiers: []prune.ObjMetadata{
+			identifiers: []object.ObjMetadata{
 				resourceIdentifiers["deployment"],
 			},
 			events: []event.Event{
@@ -97,7 +97,7 @@ func TestCollectorEventProcessing(t *testing.T) {
 			},
 		},
 		"multiple resources and multiple events": {
-			identifiers: []prune.ObjMetadata{
+			identifiers: []object.ObjMetadata{
 				resourceIdentifiers["deployment"],
 				resourceIdentifiers["statefulSet"],
 			},
@@ -145,7 +145,7 @@ func TestCollectorEventProcessing(t *testing.T) {
 			collector.Listen(eventCh, stopCh)
 
 			var latestEvent *event.Event
-			latestEventByIdentifier := make(map[prune.ObjMetadata]event.Event)
+			latestEventByIdentifier := make(map[object.ObjMetadata]event.Event)
 			for _, e := range tc.events {
 				if e.Resource != nil {
 					latestEventByIdentifier[e.Resource.Identifier] = e

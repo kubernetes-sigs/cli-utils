@@ -9,8 +9,8 @@ import (
 
 	"gotest.tools/assert"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"sigs.k8s.io/cli-utils/pkg/apply/prune"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
+	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
 func TestDeepEqual(t *testing.T) {
@@ -21,7 +21,7 @@ func TestDeepEqual(t *testing.T) {
 	}{
 		"same resource should be equal": {
 			actual: ResourceStatus{
-				Identifier: prune.ObjMetadata{
+				Identifier: object.ObjMetadata{
 					GroupKind: schema.GroupKind{
 						Group: "apps",
 						Kind:  "Deployment",
@@ -33,7 +33,7 @@ func TestDeepEqual(t *testing.T) {
 				Message: "Some message",
 			},
 			expected: ResourceStatus{
-				Identifier: prune.ObjMetadata{
+				Identifier: object.ObjMetadata{
 					GroupKind: schema.GroupKind{
 						Group: "apps",
 						Kind:  "Deployment",
@@ -48,7 +48,7 @@ func TestDeepEqual(t *testing.T) {
 		},
 		"different resources with only name different": {
 			actual: ResourceStatus{
-				Identifier: prune.ObjMetadata{
+				Identifier: object.ObjMetadata{
 					GroupKind: schema.GroupKind{
 						Group: "apps",
 						Kind:  "Deployment",
@@ -59,7 +59,7 @@ func TestDeepEqual(t *testing.T) {
 				Status: status.CurrentStatus,
 			},
 			expected: ResourceStatus{
-				Identifier: prune.ObjMetadata{
+				Identifier: object.ObjMetadata{
 					GroupKind: schema.GroupKind{
 						Group: "apps",
 						Kind:  "Deployment",
@@ -73,7 +73,7 @@ func TestDeepEqual(t *testing.T) {
 		},
 		"different GroupKind otherwise same": {
 			actual: ResourceStatus{
-				Identifier: prune.ObjMetadata{
+				Identifier: object.ObjMetadata{
 					GroupKind: schema.GroupKind{
 						Group: "apps",
 						Kind:  "Deployment",
@@ -84,7 +84,7 @@ func TestDeepEqual(t *testing.T) {
 				Status: status.CurrentStatus,
 			},
 			expected: ResourceStatus{
-				Identifier: prune.ObjMetadata{
+				Identifier: object.ObjMetadata{
 					GroupKind: schema.GroupKind{
 						Group: "custom.io",
 						Kind:  "Deployment",
@@ -98,7 +98,7 @@ func TestDeepEqual(t *testing.T) {
 		},
 		"same resource with same error": {
 			actual: ResourceStatus{
-				Identifier: prune.ObjMetadata{
+				Identifier: object.ObjMetadata{
 					GroupKind: schema.GroupKind{
 						Group: "apps",
 						Kind:  "Deployment",
@@ -110,7 +110,7 @@ func TestDeepEqual(t *testing.T) {
 				Error:  fmt.Errorf("this is a test"),
 			},
 			expected: ResourceStatus{
-				Identifier: prune.ObjMetadata{
+				Identifier: object.ObjMetadata{
 					GroupKind: schema.GroupKind{
 						Group: "apps",
 						Kind:  "Deployment",
@@ -125,7 +125,7 @@ func TestDeepEqual(t *testing.T) {
 		},
 		"same resource with different error": {
 			actual: ResourceStatus{
-				Identifier: prune.ObjMetadata{
+				Identifier: object.ObjMetadata{
 					GroupKind: schema.GroupKind{
 						Group: "apps",
 						Kind:  "Deployment",
@@ -137,7 +137,7 @@ func TestDeepEqual(t *testing.T) {
 				Error:  fmt.Errorf("this is a test"),
 			},
 			expected: ResourceStatus{
-				Identifier: prune.ObjMetadata{
+				Identifier: object.ObjMetadata{
 					GroupKind: schema.GroupKind{
 						Group: "apps",
 						Kind:  "Deployment",
@@ -152,7 +152,7 @@ func TestDeepEqual(t *testing.T) {
 		},
 		"same resource different status": {
 			actual: ResourceStatus{
-				Identifier: prune.ObjMetadata{
+				Identifier: object.ObjMetadata{
 					GroupKind: schema.GroupKind{
 						Group: "apps",
 						Kind:  "Deployment",
@@ -163,7 +163,7 @@ func TestDeepEqual(t *testing.T) {
 				Status: status.CurrentStatus,
 			},
 			expected: ResourceStatus{
-				Identifier: prune.ObjMetadata{
+				Identifier: object.ObjMetadata{
 					GroupKind: schema.GroupKind{
 						Group: "apps",
 						Kind:  "Deployment",
@@ -177,7 +177,7 @@ func TestDeepEqual(t *testing.T) {
 		},
 		"same resource with different number of generated resources": {
 			actual: ResourceStatus{
-				Identifier: prune.ObjMetadata{
+				Identifier: object.ObjMetadata{
 					GroupKind: schema.GroupKind{
 						Group: "apps",
 						Kind:  "Deployment",
@@ -188,7 +188,7 @@ func TestDeepEqual(t *testing.T) {
 				Status: status.InProgressStatus,
 				GeneratedResources: []*ResourceStatus{
 					{
-						Identifier: prune.ObjMetadata{
+						Identifier: object.ObjMetadata{
 							GroupKind: schema.GroupKind{
 								Group: "apps",
 								Kind:  "ReplicaSet",
@@ -201,7 +201,7 @@ func TestDeepEqual(t *testing.T) {
 				},
 			},
 			expected: ResourceStatus{
-				Identifier: prune.ObjMetadata{
+				Identifier: object.ObjMetadata{
 					GroupKind: schema.GroupKind{
 						Group: "apps",
 						Kind:  "Deployment",
@@ -215,7 +215,7 @@ func TestDeepEqual(t *testing.T) {
 		},
 		"same resource with different status on generated resources": {
 			actual: ResourceStatus{
-				Identifier: prune.ObjMetadata{
+				Identifier: object.ObjMetadata{
 					GroupKind: schema.GroupKind{
 						Group: "apps",
 						Kind:  "Deployment",
@@ -226,7 +226,7 @@ func TestDeepEqual(t *testing.T) {
 				Status: status.InProgressStatus,
 				GeneratedResources: []*ResourceStatus{
 					{
-						Identifier: prune.ObjMetadata{
+						Identifier: object.ObjMetadata{
 							GroupKind: schema.GroupKind{
 								Group: "apps",
 								Kind:  "ReplicaSet",
@@ -239,7 +239,7 @@ func TestDeepEqual(t *testing.T) {
 				},
 			},
 			expected: ResourceStatus{
-				Identifier: prune.ObjMetadata{
+				Identifier: object.ObjMetadata{
 					GroupKind: schema.GroupKind{
 						Group: "apps",
 						Kind:  "Deployment",
@@ -250,7 +250,7 @@ func TestDeepEqual(t *testing.T) {
 				Status: status.InProgressStatus,
 				GeneratedResources: []*ResourceStatus{
 					{
-						Identifier: prune.ObjMetadata{
+						Identifier: object.ObjMetadata{
 							GroupKind: schema.GroupKind{
 								Group: "apps",
 								Kind:  "ReplicaSet",
