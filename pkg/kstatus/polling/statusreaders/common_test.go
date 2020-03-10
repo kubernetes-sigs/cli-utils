@@ -74,12 +74,12 @@ func TestLookupResource(t *testing.T) {
 			}
 			fakeMapper := testutil.NewFakeRESTMapper(deploymentGVK)
 
-			statusReader := &BaseStatusReader{
-				Reader: fakeReader,
-				Mapper: fakeMapper,
+			statusReader := &baseStatusReader{
+				reader: fakeReader,
+				mapper: fakeMapper,
 			}
 
-			u, err := statusReader.LookupResource(context.Background(), tc.identifier)
+			u, err := statusReader.lookupResource(context.Background(), tc.identifier)
 
 			if tc.expectErr {
 				if err == nil {
@@ -202,12 +202,8 @@ spec:
 
 			object := testutil.YamlToUnstructured(t, tc.manifest)
 
-			statusReader := &BaseStatusReader{
-				Reader: fakeClusterReader,
-				Mapper: fakeMapper,
-			}
-
-			resourceStatuses, err := statusReader.StatusForGeneratedResources(context.Background(), fakeStatusReader, object, tc.gk, tc.path...)
+			resourceStatuses, err := statusForGeneratedResources(context.Background(), fakeMapper, fakeClusterReader,
+				fakeStatusReader, object, tc.gk, tc.path...)
 
 			if tc.expectError {
 				if err == nil {

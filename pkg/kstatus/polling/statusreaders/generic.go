@@ -11,43 +11,39 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/engine"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
-	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
 func NewGenericStatusReader(reader engine.ClusterReader, mapper meta.RESTMapper) engine.StatusReader {
-	return &genericStatusReader{
-		BaseStatusReader: BaseStatusReader{
-			Reader:            reader,
-			Mapper:            mapper,
-			computeStatusFunc: status.Compute,
+	return &baseStatusReader{
+		reader: reader,
+		mapper: mapper,
+		resourceStatusReader: &genericStatusReader{
+			reader:     reader,
+			mapper:     mapper,
+			statusFunc: status.Compute,
 		},
 	}
 }
 
-// genericStatusReader is an engine that will be used for any resource that
-// doesn't have a specific engine. It will just delegate computation of
-// status to the status library.
+// genericStatusReader is a resourceTypeStatusReader that will be used for
+// any resource that doesn't have a specific engine. It will just delegate
+// computation of status to the status library.
 // This should work pretty well for resources that doesn't have any
 // generated resources and where status can be computed only based on the
 // resource itself.
 type genericStatusReader struct {
-	BaseStatusReader
+	reader engine.ClusterReader
+	mapper meta.RESTMapper
+
+	statusFunc func(u *unstructured.Unstructured) (*status.Result, error)
 }
 
-var _ engine.StatusReader = &genericStatusReader{}
+var _ resourceTypeStatusReader = &genericStatusReader{}
 
-func (d *genericStatusReader) ReadStatus(ctx context.Context, identifier object.ObjMetadata) *event.ResourceStatus {
-	u, err := d.LookupResource(ctx, identifier)
-	if err != nil {
-		return d.handleResourceStatusError(identifier, err)
-	}
-	return d.ReadStatusForObject(ctx, u)
-}
-
-func (d *genericStatusReader) ReadStatusForObject(_ context.Context, resource *unstructured.Unstructured) *event.ResourceStatus {
+func (g *genericStatusReader) ReadStatusForObject(_ context.Context, resource *unstructured.Unstructured) *event.ResourceStatus {
 	identifier := toIdentifier(resource)
 
-	res, err := d.computeStatusFunc(resource)
+	res, err := g.statusFunc(resource)
 	if err != nil {
 		return &event.ResourceStatus{
 			Identifier: identifier,
