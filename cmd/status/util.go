@@ -5,6 +5,7 @@ package status
 
 import (
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/cli-utils/pkg/apply/prune"
 	"sigs.k8s.io/cli-utils/pkg/object"
@@ -44,8 +45,8 @@ func (f *CaptureIdentifiersFilter) Filter(slice []*yaml.RNode) ([]*yaml.RNode,
 		}
 		var namespace string
 		if mapping.Scope.Name() == meta.RESTScopeNameNamespace &&
-			id.Namespace == "" {
-			namespace = "default"
+			id.Namespace == metav1.NamespaceNone {
+			namespace = metav1.NamespaceDefault
 		} else {
 			namespace = id.Namespace
 		}
