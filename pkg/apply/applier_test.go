@@ -263,32 +263,48 @@ var namespace = "test-namespace"
 
 var obj1Info = &resource.Info{
 	Namespace: namespace,
-	Name:      "foo",
+	Name:      "obj1",
+	Mapping: &meta.RESTMapping{
+		Scope: meta.RESTScopeNamespace,
+	},
 }
 
 var obj2Info = &resource.Info{
 	Namespace: namespace,
-	Name:      "bar",
+	Name:      "obj2",
+	Mapping: &meta.RESTMapping{
+		Scope: meta.RESTScopeNamespace,
+	},
 }
 
 var obj3Info = &resource.Info{
-	Namespace: namespace,
-	Name:      "baz",
+	Namespace: "different-namespace",
+	Name:      "obj3",
+	Mapping: &meta.RESTMapping{
+		Scope: meta.RESTScopeNamespace,
+	},
 }
 
-var obj4Info = &resource.Info{
-	Namespace: "wrong",
-	Name:      "diff",
+var defaultObjInfo = &resource.Info{
+	Namespace: metav1.NamespaceDefault,
+	Name:      "default-obj",
+	Mapping: &meta.RESTMapping{
+		Scope: meta.RESTScopeNamespace,
+	},
 }
 
-var obj5Info = &resource.Info{
-	Namespace: "",
-	Name:      "diff",
+var clusterScopedObjInfo = &resource.Info{
+	Name: "cluster-scoped-1",
+	Mapping: &meta.RESTMapping{
+		Scope: meta.RESTScopeRoot,
+	},
 }
 
-var obj6Info = &resource.Info{
-	Namespace: "default",
-	Name:      "diff",
+var clusterScopedObj2Info = &resource.Info{
+	Name: "cluster-scoped-2",
+	Mapping: &meta.RESTMapping{
+		Scope: meta.RESTScopeRoot,
+	},
 }
 
 func TestValidateNamespace(t *testing.T) {
@@ -308,28 +324,32 @@ func TestValidateNamespace(t *testing.T) {
 			objects: []*resource.Info{obj1Info, obj2Info},
 			isValid: true,
 		},
-		"Three resources with same namespace is valid": {
-			objects: []*resource.Info{obj1Info, obj2Info, obj3Info},
+		"Two resources with same namespace and cluster-scoped obj is valid": {
+			objects: []*resource.Info{obj1Info, clusterScopedObjInfo, obj2Info},
 			isValid: true,
 		},
-		"Empty namespace is equal to default namespace": {
-			objects: []*resource.Info{obj5Info, obj6Info},
+		"Single cluster-scoped obj is valid": {
+			objects: []*resource.Info{clusterScopedObjInfo},
+			isValid: true,
+		},
+		"Multiple cluster-scoped objs is valid": {
+			objects: []*resource.Info{clusterScopedObjInfo, clusterScopedObj2Info},
 			isValid: true,
 		},
 		"Two resources with differing namespaces is not valid": {
-			objects: []*resource.Info{obj1Info, obj4Info},
+			objects: []*resource.Info{obj1Info, obj3Info},
+			isValid: false,
+		},
+		"Two resources with differing namespaces and cluster-scoped obj is not valid": {
+			objects: []*resource.Info{clusterScopedObjInfo, obj1Info, obj3Info},
 			isValid: false,
 		},
 		"Three resources, one with differing namespace is not valid": {
-			objects: []*resource.Info{obj1Info, obj4Info, obj3Info},
-			isValid: false,
-		},
-		"Empty namespace not equal to other namespaces": {
-			objects: []*resource.Info{obj5Info, obj3Info},
+			objects: []*resource.Info{obj1Info, obj2Info, obj3Info},
 			isValid: false,
 		},
 		"Default namespace not equal to other namespaces": {
-			objects: []*resource.Info{obj6Info, obj3Info},
+			objects: []*resource.Info{obj3Info, defaultObjInfo},
 			isValid: false,
 		},
 	}
