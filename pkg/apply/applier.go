@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-errors/errors"
 	"github.com/spf13/cobra"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
@@ -265,23 +266,19 @@ func infosToObjMetas(infos []*resource.Info) []object.ObjMetadata {
 	return objMetas
 }
 
-const defaultNamespace = "default"
-
 // validateNamespace returns true if all the objects in the passed
-// infos parameter have the same namespace; false otherwise.
+// infos parameter have the same namespace; false otherwise. Ignores
+// cluster-scoped resources.
 func validateNamespace(infos []*resource.Info) bool {
-	for i := range infos {
-		if i > 0 {
-			prev := infos[i-1].Namespace
-			curr := infos[i].Namespace
-			// Empty namespace equals default namespace
-			if len(prev) == 0 {
-				prev = defaultNamespace
+	currentNamespace := metav1.NamespaceNone
+	for _, info := range infos {
+		// Ignore cluster-scoped resources.
+		if info.Namespaced() {
+			// If the current namespace has not been set--then set it.
+			if currentNamespace == metav1.NamespaceNone {
+				currentNamespace = info.Namespace
 			}
-			if len(curr) == 0 {
-				curr = defaultNamespace
-			}
-			if prev != curr {
+			if currentNamespace != info.Namespace {
 				return false
 			}
 		}
