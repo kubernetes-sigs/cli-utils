@@ -189,8 +189,8 @@ func getNamespaceForNamespacedResource(object runtime.Object) string {
 		panic(err)
 	}
 	ns := acc.GetNamespace()
-	if ns == "" {
-		return "default"
+	if ns == metav1.NamespaceNone {
+		return metav1.NamespaceDefault
 	}
 	return ns
 }
@@ -198,8 +198,8 @@ func getNamespaceForNamespacedResource(object runtime.Object) string {
 // keyForNamespacedResource returns the object key for the given identifier. It makes
 // sure to set the namespace to default if it is not provided.
 func keyForNamespacedResource(identifier object.ObjMetadata) types.NamespacedName {
-	namespace := "default"
-	if identifier.Namespace != "" {
+	namespace := metav1.NamespaceDefault
+	if identifier.Namespace != metav1.NamespaceNone {
 		namespace = identifier.Namespace
 	}
 	return types.NamespacedName{

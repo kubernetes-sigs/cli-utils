@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"sigs.k8s.io/kustomize/kyaml/kio"
 )
@@ -122,7 +123,7 @@ func packageNamespace(packageDir string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	namespace := "default"
+	namespace := metav1.NamespaceDefault
 	for _, node := range nodes {
 		rm, err := node.GetMeta()
 		if err != nil {
