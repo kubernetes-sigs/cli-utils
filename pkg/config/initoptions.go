@@ -145,7 +145,10 @@ func (i *InitOptions) defaultGroupName() string {
 	return fmt.Sprintf("%s-%06d", filepath.Base(i.Dir), r)
 }
 
-const groupNameRegexp = `^[a-zA-Z0-9-_\.]+$`
+// Must begin and end with an alphanumeric character ([a-z0-9A-Z])
+// with dashes (-), underscores (_), dots (.), and alphanumerics
+// between.
+const groupNameRegexp = `^[a-zA-Z0-9][a-zA-Z0-9\-\_\.]+[a-zA-Z0-9]$`
 
 // validateGroupName returns true of the passed group name is a
 // valid label value; false otherwise. The valid label values
