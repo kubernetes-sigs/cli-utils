@@ -211,7 +211,7 @@ func (a *Applier) Run(ctx context.Context) <-chan event.Event {
 
 		if a.StatusOptions.wait {
 			statusChannel := a.statusPoller.Poll(ctx, infosToObjMetas(infos), polling.Options{
-				PollUntilCancelled: true,
+				PollUntilCancelled: false,
 				PollInterval:       a.StatusOptions.period,
 				UseCache:           true,
 				DesiredStatus:      status.CurrentStatus,
