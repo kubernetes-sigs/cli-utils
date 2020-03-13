@@ -41,19 +41,7 @@ function expectedOutputLine() {
 }
 ```
 
-Let's create a namespace config in `base`
-
-<!-- @createNamespaceYaml @testE2EAgainstLatestRelease-->
-```
-cat <<EOF >$BASE/namespace.yaml
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: hellospace
-EOF
-```
-
-Now let's add a simple config map resource to the `base`
+Let's add a simple config map resource in `base`
 
 <!-- @createConfigMapYaml @testE2EAgainstLatestRelease-->
 ```
@@ -148,6 +136,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: inventory-map
+  namespace: hellospace
   labels:
     cli-utils.sigs.k8s.io/inventory-id: hello-app
 EOF
@@ -164,18 +153,22 @@ kind delete cluster
 kind create cluster
 ```
 
+Create the `hellospace` namespace where we will install the resources.
+<!-- @createNamespace @testE2EAgainstLatestRelease -->
+```
+kubectl create namespace hellospace
+```
+
 Use the `kapply` binary in `MYGOBIN` to apply a deployment and verify it is successful.
 <!-- @runHelloApp @testE2EAgainstLatestRelease -->
 ```
 kapply apply $BASE --wait-for-reconcile > $OUTPUT/status;
 
-expectedOutputLine "namespace/hellospace is Current: Resource is current"
-
 expectedOutputLine "deployment.apps/the-deployment is Current: Deployment is available. Replicas: 3"
 
 expectedOutputLine "service/the-service is Current: Service is ready"
 
-expectedOutputLine "configmap/inventory-map-78829196 is Current: Resource is always ready"
+expectedOutputLine "configmap/inventory-map-cb5a8e is Current: Resource is always ready"
 
 expectedOutputLine "configmap/the-map is Current: Resource is always ready"
 
@@ -204,13 +197,13 @@ expectedOutputLine "deployment.apps/the-deployment is Current: Deployment is ava
 
 expectedOutputLine "service/the-service is Current: Service is ready"
 
-expectedOutputLine "configmap/inventory-map-7e38956e is Current: Resource is always ready"
+expectedOutputLine "configmap/inventory-map-db36ed56 is Current: Resource is always ready"
 
 expectedOutputLine "configmap/the-map2 is Current: Resource is always ready"
 
 expectedOutputLine "configmap/the-map pruned"
 
-expectedOutputLine "configmap/inventory-map-78829196 pruned"
+expectedOutputLine "configmap/inventory-map-cb5a8e pruned"
 
 ```
 
@@ -225,7 +218,7 @@ expectedOutputLine "configmap/the-map2 deleted (preview)"
 
 expectedOutputLine "service/the-service deleted (preview)"
 
-expectedOutputLine "configmap/inventory-map-7e38956e deleted (preview)"
+expectedOutputLine "configmap/inventory-map-db36ed56 deleted (preview)"
 
 kapply destroy $BASE > $OUTPUT/status;
 
@@ -235,7 +228,7 @@ expectedOutputLine "configmap/the-map2 deleted"
 
 expectedOutputLine "service/the-service deleted"
 
-expectedOutputLine "configmap/inventory-map-7e38956e deleted"
+expectedOutputLine "configmap/inventory-map-db36ed56 deleted"
 
 kind delete cluster;
 ```
