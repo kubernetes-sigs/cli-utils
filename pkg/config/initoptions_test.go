@@ -88,7 +88,7 @@ func TestValidateGroupName(t *testing.T) {
 			groupName: "",
 			isValid:   false,
 		},
-		"Too large Groupname fails": {
+		"Groupname greater than sixty-three chars fails": {
 			groupName: "88888888888888888888888888888888888888888888888888888888888888888",
 			isValid:   false,
 		},
@@ -96,8 +96,36 @@ func TestValidateGroupName(t *testing.T) {
 			groupName: "&foo",
 			isValid:   false,
 		},
-		"Allowed characters succeeds": {
+		"Initial dot fails": {
+			groupName: ".foo",
+			isValid:   false,
+		},
+		"Initial dash fails": {
+			groupName: "-foo",
+			isValid:   false,
+		},
+		"Initial underscore fails": {
+			groupName: "_foo",
+			isValid:   false,
+		},
+		"Trailing dot fails": {
+			groupName: "foo.",
+			isValid:   false,
+		},
+		"Trailing dash fails": {
+			groupName: "foo-",
+			isValid:   false,
+		},
+		"Trailing underscore fails": {
+			groupName: "foo_",
+			isValid:   false,
+		},
+		"Initial digit succeeds": {
 			groupName: "90-foo.bar_test",
+			isValid:   true,
+		},
+		"Allowed characters succeed": {
+			groupName: "f_oo90bar-t.est90",
 			isValid:   true,
 		},
 	}
