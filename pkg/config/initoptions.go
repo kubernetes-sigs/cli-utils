@@ -60,11 +60,11 @@ metadata:
 // grouping object template ConfigMap.
 type InitOptions struct {
 	ioStreams genericclioptions.IOStreams
-	// Package directory argument
+	// Package directory argument; must be valid directory.
 	Dir string
-	// Namespace for grouping object
+	// Namespace for grouping object; can not be empty.
 	Namespace string
-	// Grouping object label value
+	// Grouping object label value; must be a valid k8s label value.
 	GroupName string
 	// Random seed
 	Seed int64
@@ -89,7 +89,8 @@ func (i *InitOptions) Complete(args []string) error {
 		return fmt.Errorf("invalid directory argument: %s", i.Dir)
 	}
 	if len(i.Namespace) == 0 {
-		namespace, err := packageNamespace(i.Dir)
+		// Returns default namespace if no namespace found.
+		namespace, err := calcPackageNamespace(i.Dir)
 		if err != nil {
 			return err
 		}
@@ -115,34 +116,37 @@ func isDirectory(path string) bool {
 	return false
 }
 
-// packageNamespace returns the namespace of the package
-// config files.
-func packageNamespace(packageDir string) (string, error) {
+// calcPackageNamespace returns the namespace of the package
+// config files. Assumes all namespaced resources are in the
+// same namespace. Returns the default namespace if none of the
+// config files has a namespace.
+func calcPackageNamespace(packageDir string) (string, error) {
 	r := kio.LocalPackageReader{PackagePath: packageDir}
 	nodes, err := r.Read()
 	if err != nil {
 		return "", err
 	}
-	namespace := metav1.NamespaceDefault
+	// Return the first non-empty namespace found. Cluster-scoped
+	// resources do not have namespace set.
 	for _, node := range nodes {
 		rm, err := node.GetMeta()
 		if err != nil {
 			continue
 		}
 		if len(rm.ObjectMeta.Namespace) > 0 {
-			namespace = rm.ObjectMeta.Namespace
+			return rm.ObjectMeta.Namespace, nil
 		}
-		break
 	}
-	return namespace, nil
+	// Return the default namespace if none found.
+	return metav1.NamespaceDefault, nil
 }
 
 // defaultGroupName returns a string of the package name (directory)
 // with a random number suffix.
 func (i *InitOptions) defaultGroupName() string {
 	rand.Seed(i.Seed)
-	r := rand.Intn(1000000)
-	return fmt.Sprintf("%s-%06d", filepath.Base(i.Dir), r)
+	r := rand.Intn(1000000000)
+	return fmt.Sprintf("%s-%09d", filepath.Base(i.Dir), r)
 }
 
 const groupNameRegexp = `^[a-zA-Z0-9-_\.]+$`
