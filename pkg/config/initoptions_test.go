@@ -52,17 +52,17 @@ func TestDefaultGroupName(t *testing.T) {
 		"Basic Seed/Dir": {
 			seed:     31,
 			dir:      "bar",
-			expected: "bar-851636",
+			expected: "bar-720851636",
 		},
 		"Hierarchical directory": {
 			seed:     31,
 			dir:      "foo/bar",
-			expected: "bar-851636",
+			expected: "bar-720851636",
 		},
 		"Absolute directory": {
 			seed:     31,
 			dir:      "/tmp/foo/bar",
-			expected: "bar-851636",
+			expected: "bar-720851636",
 		},
 	}
 
