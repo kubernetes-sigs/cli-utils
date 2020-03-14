@@ -16,6 +16,10 @@ all: generate license fix vet fmt test lint tidy
 prow-presubmit-check: \
 	test lint verify-license
 
+.PHONY: prow-presubmit-check-e2e
+prow-presubmit-check-e2e: \
+    verify-kapply-e2e
+
 fix:
 	go fix ./...
 
