@@ -84,10 +84,11 @@ func (i *InitOptions) Complete(args []string) error {
 	if len(args) != 1 {
 		return fmt.Errorf("need one 'directory' arg; have %d", len(args))
 	}
-	i.Dir = args[0]
-	if !isDirectory(i.Dir) {
-		return fmt.Errorf("invalid directory argument: %s", i.Dir)
+	dir, err := normalizeDir(args[0])
+	if err != nil {
+		return err
 	}
+	i.Dir = dir
 	if len(i.Namespace) == 0 {
 		// Returns default namespace if no namespace found.
 		namespace, err := calcPackageNamespace(i.Dir)
@@ -103,6 +104,18 @@ func (i *InitOptions) Complete(args []string) error {
 		return fmt.Errorf("invalid group name: %s", i.GroupName)
 	}
 	return nil
+}
+
+// normalizeDir returns full absolute directory path of the
+// passed directory or an error. This function cleans up paths
+// such as current directory (.), relative directories (..), or
+// multiple separators.
+//
+func normalizeDir(dirPath string) (string, error) {
+	if !isDirectory(dirPath) {
+		return "", fmt.Errorf("invalid directory argument: %s", dirPath)
+	}
+	return filepath.Abs(dirPath)
 }
 
 // isDirectory returns true if the passed path is a directory;
