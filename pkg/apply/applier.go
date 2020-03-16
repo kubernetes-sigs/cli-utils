@@ -76,7 +76,6 @@ func (a *Applier) Initialize(cmd *cobra.Command, paths []string) error {
 	if err != nil {
 		return errors.WrapPrefix(err, "error setting up ApplyOptions", 1)
 	}
-	a.ApplyOptions.PreProcessorFn = prune.PrependGroupingObject(a.ApplyOptions)
 	a.ApplyOptions.PostProcessorFn = nil // Turn off the default kubectl pruning
 	err = a.PruneOptions.Initialize(a.factory)
 	if err != nil {
@@ -139,6 +138,56 @@ func (a *Applier) newStatusPoller() (poller, error) {
 	return polling.NewStatusPoller(c, mapper), nil
 }
 
+// readAndPrepareObjects reads the resources that should be applied,
+// handles ordering of resources and sets up the grouping object
+// based on the provided grouping object template.
+func (a *Applier) readAndPrepareObjects() ([]*resource.Info, error) {
+	infos, err := a.ApplyOptions.GetObjects()
+	if err != nil {
+		return nil, err
+	}
+	resources, gots := splitInfos(infos)
+
+	if len(gots) == 0 {
+		return nil, prune.NoGroupingObjError{}
+	}
+	if len(gots) > 1 {
+		return nil, prune.MultipleGroupingObjError{
+			GroupingObjectTemplates: gots,
+		}
+	}
+
+	groupingObject, err := prune.CreateGroupingObj(gots[0], resources)
+	if err != nil {
+		return nil, err
+	}
+
+	sort.Sort(ResourceInfos(resources))
+
+	if !validateNamespace(resources) {
+		return nil, fmt.Errorf("objects have differing namespaces")
+	}
+
+	return append([]*resource.Info{groupingObject}, resources...), nil
+}
+
+// splitInfos takes a slice of resource.Info objects and splits it
+// into one slice that contains the grouping object templates and
+// another one that contains the remaining resources.
+func splitInfos(infos []*resource.Info) ([]*resource.Info, []*resource.Info) {
+	groupingObjectTemplates := make([]*resource.Info, 0)
+	resources := make([]*resource.Info, 0)
+
+	for _, info := range infos {
+		if prune.IsGroupingObject(info.Object) {
+			groupingObjectTemplates = append(groupingObjectTemplates, info)
+		} else {
+			resources = append(resources, info)
+		}
+	}
+	return resources, groupingObjectTemplates
+}
+
 // Run performs the Apply step. This happens asynchronously with updates
 // on progress and any errors are reported back on the event channel.
 // Cancelling the operation or setting timeout on how long to wait
@@ -158,36 +207,22 @@ func (a *Applier) Run(ctx context.Context) <-chan event.Event {
 		// The adapter is used to intercept what is meant to be printing
 		// in the ApplyOptions, and instead turn those into events.
 		a.ApplyOptions.ToPrinter = adapter.toPrinterFunc()
+
 		// This provides us with a slice of all the objects that will be
-		// applied to the cluster.
-		infos, err := a.ApplyOptions.GetObjects()
+		// applied to the cluster. This takes care of ordering resources
+		// and handling the grouping object.
+		infos, err := a.readAndPrepareObjects()
 		if err != nil {
 			ch <- event.Event{
 				Type: event.ErrorType,
 				ErrorEvent: event.ErrorEvent{
-					Err: errors.WrapPrefix(err, "error reading resource manifests", 1),
+					Err: errors.WrapPrefix(err, "error reading resources", 1),
 				},
 			}
 			return
 		}
 
-		// Validate the objects are in the same namespace.
-		if !validateNamespace(infos) {
-			err := fmt.Errorf("currently, applied objects must be in the same namespace")
-			ch <- event.Event{
-				Type: event.ErrorType,
-				ErrorEvent: event.ErrorEvent{
-					Err: errors.WrapPrefix(err, "objects have differing namespaces", 1),
-				},
-			}
-			return
-		}
-
-		// sort the info objects starting from independent to dependent objects,
-		// and set them back ordering precedence can be found in resource_infos.go
-		sort.Sort(ResourceInfos(infos))
 		a.ApplyOptions.SetObjects(infos)
-
 		err = a.ApplyOptions.Run()
 		if err != nil {
 			// If we see an error here we just report it on the channel and then

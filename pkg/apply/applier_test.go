@@ -31,6 +31,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
+	"sigs.k8s.io/cli-utils/pkg/apply/prune"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling"
 	pollevent "sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
@@ -261,11 +262,39 @@ func TestApplier(t *testing.T) {
 
 var namespace = "test-namespace"
 
+var groupingObjInfo = &resource.Info{
+	Namespace: namespace,
+	Name:      "test-grouping-obj",
+	Object: &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "v1",
+			"kind":       "ConfigMap",
+			"metadata": map[string]interface{}{
+				"name":      "test-grouping-obj",
+				"namespace": namespace,
+				"labels": map[string]interface{}{
+					prune.GroupingLabel: "test-app-label",
+				},
+			},
+		},
+	},
+}
+
 var obj1Info = &resource.Info{
 	Namespace: namespace,
 	Name:      "obj1",
 	Mapping: &meta.RESTMapping{
 		Scope: meta.RESTScopeNamespace,
+	},
+	Object: &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "v1",
+			"kind":       "Pod",
+			"metadata": map[string]interface{}{
+				"name":      "obj1",
+				"namespace": namespace,
+			},
+		},
 	},
 }
 
@@ -275,6 +304,16 @@ var obj2Info = &resource.Info{
 	Mapping: &meta.RESTMapping{
 		Scope: meta.RESTScopeNamespace,
 	},
+	Object: &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "batch/v1",
+			"kind":       "Job",
+			"metadata": map[string]interface{}{
+				"name":      "obj2",
+				"namespace": namespace,
+			},
+		},
+	},
 }
 
 var obj3Info = &resource.Info{
@@ -282,6 +321,16 @@ var obj3Info = &resource.Info{
 	Name:      "obj3",
 	Mapping: &meta.RESTMapping{
 		Scope: meta.RESTScopeNamespace,
+	},
+	Object: &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "apps/v1",
+			"kind":       "Deployment",
+			"metadata": map[string]interface{}{
+				"name":      "obj3",
+				"namespace": "different-namespace",
+			},
+		},
 	},
 }
 
@@ -291,6 +340,16 @@ var defaultObjInfo = &resource.Info{
 	Mapping: &meta.RESTMapping{
 		Scope: meta.RESTScopeNamespace,
 	},
+	Object: &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "v1",
+			"kind":       "Pod",
+			"metadata": map[string]interface{}{
+				"name":      "default-obj",
+				"namespace": metav1.NamespaceDefault,
+			},
+		},
+	},
 }
 
 var clusterScopedObjInfo = &resource.Info{
@@ -298,12 +357,30 @@ var clusterScopedObjInfo = &resource.Info{
 	Mapping: &meta.RESTMapping{
 		Scope: meta.RESTScopeRoot,
 	},
+	Object: &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "rbac.authorization.k8s.io/v1",
+			"kind":       "ClusterRole",
+			"metadata": map[string]interface{}{
+				"name": "cluster-scoped-1",
+			},
+		},
+	},
 }
 
 var clusterScopedObj2Info = &resource.Info{
 	Name: "cluster-scoped-2",
 	Mapping: &meta.RESTMapping{
 		Scope: meta.RESTScopeRoot,
+	},
+	Object: &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "rbac.authorization.k8s.io/v1",
+			"kind":       "ClusterRoleBinding",
+			"metadata": map[string]interface{}{
+				"name": "cluster-scoped-2",
+			},
+		},
 	},
 }
 
@@ -359,6 +436,83 @@ func TestValidateNamespace(t *testing.T) {
 			actualValid := validateNamespace(tc.objects)
 			if tc.isValid != actualValid {
 				t.Errorf("Expected valid namespace (%t), got (%t)", tc.isValid, actualValid)
+			}
+		})
+	}
+}
+
+func TestReadAndPrepareObjects(t *testing.T) {
+	testCases := map[string]struct {
+		resources     []*resource.Info
+		expectedError bool
+	}{
+		"no grouping object": {
+			resources:     []*resource.Info{obj1Info},
+			expectedError: true,
+		},
+		"multiple grouping objects": {
+			resources:     []*resource.Info{groupingObjInfo, groupingObjInfo},
+			expectedError: true,
+		},
+		"only grouping object": {
+			resources:     []*resource.Info{groupingObjInfo},
+			expectedError: false,
+		},
+		"grouping object already at the beginning": {
+			resources: []*resource.Info{groupingObjInfo, obj1Info,
+				clusterScopedObjInfo},
+			expectedError: false,
+		},
+		"grouping object not at the beginning": {
+			resources: []*resource.Info{obj1Info, obj2Info, groupingObjInfo,
+				clusterScopedObjInfo},
+			expectedError: false,
+		},
+		"objects can not be in different namespaces": {
+			resources: []*resource.Info{obj1Info, obj2Info,
+				groupingObjInfo, obj3Info},
+			expectedError: true,
+		},
+	}
+
+	for tn, tc := range testCases {
+		t.Run(tn, func(t *testing.T) {
+			tf := cmdtesting.NewTestFactory().WithNamespace("namespace")
+			defer tf.Cleanup()
+
+			ioStreams, _, _, _ := genericclioptions.NewTestIOStreams() //nolint:dogsled
+			applier := NewApplier(tf, ioStreams)
+
+			applier.ApplyOptions.SetObjects(tc.resources)
+
+			objects, err := applier.readAndPrepareObjects()
+
+			if tc.expectedError {
+				if err == nil {
+					t.Errorf("expected error, but didn't get one")
+				}
+				return
+			}
+
+			if !tc.expectedError && err != nil {
+				t.Errorf("didn't expect error, but got %v", err)
+				return
+			}
+
+			groupingObj := objects[0]
+			if !prune.IsGroupingObject(groupingObj.Object) {
+				t.Errorf(
+					"expected first item to be grouping object, but it wasn't")
+			}
+
+			inventory, err := prune.RetrieveInventoryFromGroupingObj(
+				[]*resource.Info{groupingObj})
+			if err != nil {
+				t.Error(err)
+			}
+
+			if want, got := len(tc.resources)-1, len(inventory); want != got {
+				t.Errorf("expected %d resources in inventory, got %d", want, got)
 			}
 		})
 	}
