@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-errors/errors"
 	"github.com/spf13/cobra"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -138,6 +139,8 @@ func (a *Applier) newStatusPoller() (poller, error) {
 	return polling.NewStatusPoller(c, mapper), nil
 }
 
+var namespaceGroupKind = corev1.SchemeGroupVersion.WithKind("Namespace").GroupKind()
+
 // readAndPrepareObjects reads the resources that should be applied,
 // handles ordering of resources and sets up the grouping object
 // based on the provided grouping object template.
@@ -160,6 +163,18 @@ func (a *Applier) readAndPrepareObjects() ([]*resource.Info, error) {
 	groupingObject, err := prune.CreateGroupingObj(gots[0], resources)
 	if err != nil {
 		return nil, err
+	}
+
+	// Check if we're trying to apply the namespace that the grouping
+	// object (and other objects) belong in.
+	for _, obj := range resources {
+		objGroupKind := obj.Object.GetObjectKind().GroupVersionKind().GroupKind()
+		if objGroupKind == namespaceGroupKind &&
+			obj.Name == groupingObject.Namespace {
+			return nil, prune.GroupingObjNamespaceError{
+				Namespace: obj.Name,
+			}
+		}
 	}
 
 	sort.Sort(ResourceInfos(resources))
