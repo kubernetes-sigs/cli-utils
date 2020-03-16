@@ -8,12 +8,12 @@ import (
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/resource"
-	"k8s.io/kubectl/pkg/cmd/apply"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
@@ -203,6 +203,122 @@ func TestIsGroupingObject(t *testing.T) {
 	}
 }
 
+func TestCreateGroupingObject(t *testing.T) {
+	testCases := map[string]struct {
+		groupingObjectTemplate *resource.Info
+		resources              []*resource.Info
+
+		expectedError     bool
+		expectedInventory []*object.ObjMetadata
+	}{
+		"grouping object template has nil object": {
+			groupingObjectTemplate: nilInfo,
+			expectedError:          true,
+		},
+		"grouping object template is not unstructured": {
+			groupingObjectTemplate: nonUnstructuredGroupingInfo,
+			expectedError:          true,
+		},
+		"no resources": {
+			groupingObjectTemplate: copyGroupingInfo(),
+			resources:              []*resource.Info{},
+			expectedInventory:      []*object.ObjMetadata{},
+		},
+		"single resource": {
+			groupingObjectTemplate: copyGroupingInfo(),
+			resources:              []*resource.Info{pod1Info},
+			expectedInventory: []*object.ObjMetadata{
+				{
+					Namespace: testNamespace,
+					Name:      pod1Name,
+					GroupKind: schema.GroupKind{
+						Group: "",
+						Kind:  "Pod",
+					},
+				},
+			},
+		},
+		"multiple resources": {
+			groupingObjectTemplate: copyGroupingInfo(),
+			resources: []*resource.Info{pod1Info, pod2Info,
+				pod3Info},
+			expectedInventory: []*object.ObjMetadata{
+				{
+					Namespace: testNamespace,
+					Name:      pod1Name,
+					GroupKind: schema.GroupKind{
+						Group: "",
+						Kind:  "Pod",
+					},
+				},
+				{
+					Namespace: testNamespace,
+					Name:      pod2Name,
+					GroupKind: schema.GroupKind{
+						Group: "",
+						Kind:  "Pod",
+					},
+				},
+				{
+					Namespace: testNamespace,
+					Name:      pod3Name,
+					GroupKind: schema.GroupKind{
+						Group: "",
+						Kind:  "Pod",
+					},
+				},
+			},
+		},
+		"resource has nil object": {
+			groupingObjectTemplate: copyGroupingInfo(),
+			resources:              []*resource.Info{nilInfo},
+			expectedError:          true,
+		},
+	}
+
+	for tn, tc := range testCases {
+		t.Run(tn, func(t *testing.T) {
+			groupingObj, err := CreateGroupingObj(tc.groupingObjectTemplate,
+				tc.resources)
+
+			if tc.expectedError {
+				if err == nil {
+					t.Errorf("expected error, but didn't get one")
+				}
+				return
+			}
+
+			if !tc.expectedError && err != nil {
+				t.Errorf("didn't expect error, but got %v", err)
+				return
+			}
+
+			accessor, err := meta.Accessor(groupingObj.Object)
+			if err != nil {
+				t.Error(err)
+			}
+
+			if accessor.GetName() != groupingObj.Name {
+				t.Errorf("expected info and unstructured to have the same name, but they didn't")
+			}
+			if accessor.GetNamespace() != groupingObj.Namespace {
+				t.Errorf("expected info and unstructured to have the same namespace, but they didn't")
+			}
+
+			inv, err := RetrieveInventoryFromGroupingObj(
+				[]*resource.Info{groupingObj})
+			if err != nil {
+				t.Error(err)
+			}
+
+			if want, got := len(tc.resources), len(inv); want != got {
+				t.Errorf("expected %d resources in inventory, but got %d",
+					want, got)
+			}
+		})
+	}
+}
+
 func TestFindGroupingObject(t *testing.T) {
 	tests := []struct {
 		infos  []*resource.Info
@@ -251,66 +367,6 @@ func TestFindGroupingObject(t *testing.T) {
 		}
 		if test.exists && found && test.name != groupingObj.Name {
 			t.Errorf("Grouping object name does not match: %s/%s", test.name, groupingObj.Name)
-		}
-	}
-}
-
-func TestSortGroupingObject(t *testing.T) {
-	tests := []struct {
-		infos  []*resource.Info
-		sorted bool
-	}{
-		{
-			infos:  []*resource.Info{},
-			sorted: false,
-		},
-		{
-			infos:  []*resource.Info{copyGroupingInfo()},
-			sorted: true,
-		},
-		{
-			infos:  []*resource.Info{pod1Info},
-			sorted: false,
-		},
-		{
-			infos:  []*resource.Info{pod1Info, pod2Info},
-			sorted: false,
-		},
-		{
-			infos:  []*resource.Info{copyGroupingInfo(), pod1Info},
-			sorted: true,
-		},
-		{
-			infos:  []*resource.Info{pod1Info, copyGroupingInfo()},
-			sorted: true,
-		},
-		{
-			infos:  []*resource.Info{pod1Info, pod2Info, copyGroupingInfo(), pod3Info},
-			sorted: true,
-		},
-		{
-			infos:  []*resource.Info{pod1Info, pod2Info, pod3Info, copyGroupingInfo()},
-			sorted: true,
-		},
-		{
-			infos:  []*resource.Info{copyGroupingInfo(), pod1Info, pod2Info, pod3Info},
-			sorted: true,
-		},
-	}
-
-	for _, test := range tests {
-		wasSorted := SortGroupingObject(test.infos)
-		if wasSorted && !test.sorted {
-			t.Errorf("Grouping object was sorted, but it shouldn't have been")
-		}
-		if !wasSorted && test.sorted {
-			t.Errorf("Grouping object was NOT sorted, but it should have been")
-		}
-		if wasSorted {
-			first := test.infos[0]
-			if !IsGroupingObject(first.Object) {
-				t.Errorf("Grouping object was not sorted into first position")
-			}
 		}
 	}
 }
@@ -639,70 +695,6 @@ func TestClearGroupingObject(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestPrependGroupingObject(t *testing.T) {
-	tests := map[string]struct {
-		infos       []*resource.Info
-		expectError bool
-	}{
-		"grouping object is the only resource": {
-			infos: []*resource.Info{copyGroupingInfo()},
-		},
-		"grouping object is the last resource": {
-			infos: []*resource.Info{pod1Info, pod3Info, copyGroupingInfo()},
-		},
-		"grouping object is in the middle of the list of resources": {
-			infos: []*resource.Info{pod1Info, pod2Info, copyGroupingInfo(), pod3Info},
-		},
-		"grouping object is already first": {
-			infos: []*resource.Info{copyGroupingInfo(), pod1Info, pod2Info, pod3Info},
-		},
-		"no grouping object among the resources": {
-			infos:       []*resource.Info{pod1Info, pod2Info, pod3Info},
-			expectError: true,
-		},
-	}
-
-	for tn, tc := range tests {
-		t.Run(tn, func(t *testing.T) {
-			applyOptions := createApplyOptions(tc.infos)
-			f := PrependGroupingObject(applyOptions)
-			err := f()
-
-			if tc.expectError {
-				if err == nil {
-					t.Errorf("Expected error, but didn't get one")
-				}
-				return
-			}
-
-			if err != nil {
-				t.Errorf("Error running pre-processor callback: %s", err)
-			}
-
-			infos, _ := applyOptions.GetObjects()
-			if len(tc.infos) != len(infos) {
-				t.Fatalf("Wrong number of objects after prepending grouping object")
-			}
-			groupingInfo := infos[0]
-			if !IsGroupingObject(groupingInfo.Object) {
-				t.Fatalf("First object is not the grouping object")
-			}
-			inventory, _ := RetrieveInventoryFromGroupingObj(infos)
-			if len(inventory) != (len(infos) - 1) {
-				t.Errorf("Wrong number of inventory items stored in grouping object")
-			}
-		})
-	}
-}
-
-// createApplyOptions is a helper function to assemble the ApplyOptions
-// with the passed objects (infos).
-func createApplyOptions(infos []*resource.Info) *apply.ApplyOptions {
-	applyOptions := &apply.ApplyOptions{}
-	applyOptions.SetObjects(infos)
-	return applyOptions
 }
 
 func getObjectName(obj runtime.Object) (string, error) {

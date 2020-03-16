@@ -22,7 +22,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/resource"
-	"k8s.io/kubectl/pkg/cmd/apply"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
@@ -74,48 +73,6 @@ func FindGroupingObject(infos []*resource.Info) (*resource.Info, bool) {
 		}
 	}
 	return nil, false
-}
-
-// SortGroupingObject reorders the infos slice to place the grouping
-// object in the first position. Returns true if grouping object found,
-// false otherwise.
-func SortGroupingObject(infos []*resource.Info) bool {
-	for i, info := range infos {
-		if info != nil && IsGroupingObject(info.Object) {
-			// If the grouping object is not already in the first position,
-			// swap the grouping object with the first object.
-			if i > 0 {
-				infos[0], infos[i] = infos[i], infos[0]
-			}
-			return true
-		}
-	}
-	return false
-}
-
-// PrependGroupingObject orders the objects to apply so the "grouping"
-// object stores the inventory, and it is first to be applied.
-func PrependGroupingObject(o *apply.ApplyOptions) func() error {
-	return func() error {
-		if o == nil {
-			return fmt.Errorf("ApplyOptions are nil")
-		}
-		infos, err := o.GetObjects()
-		if err != nil {
-			return err
-		}
-		_, exists := FindGroupingObject(infos)
-		if !exists {
-			return NoGroupingObjError{}
-		}
-		if err := AddInventoryToGroupingObj(infos); err != nil {
-			return err
-		}
-		if !SortGroupingObject(infos) {
-			return err
-		}
-		return nil
-	}
 }
 
 // Adds the inventory of all objects (passed as infos) to the
@@ -190,6 +147,93 @@ func AddInventoryToGroupingObj(infos []*resource.Info) error {
 		groupingObj.SetAnnotations(annotations)
 	}
 	return nil
+}
+
+// CreateGroupingObj creates a grouping object based on a grouping object
+// template and the set of resources that will be in the inventory.
+func CreateGroupingObj(groupingObjectTemplate *resource.Info,
+	resources []*resource.Info) (*resource.Info, error) {
+	// Verify that the provided groupingObjectTemplate represents an
+	// actual resource in the Unstructured format.
+	obj := groupingObjectTemplate.Object
+	if obj == nil {
+		return nil, fmt.Errorf("grouping object template has nil Object")
+	}
+	got, ok := obj.(*unstructured.Unstructured)
+	if !ok {
+		return nil, fmt.Errorf(
+			"grouping object template is not an Unstructured: %s",
+			groupingObjectTemplate.Source)
+	}
+
+	// Create the inventoryMap of all the resources.
+	inventoryMap, err := buildInventoryMap(resources)
+	if err != nil {
+		return nil, err
+	}
+
+	invHashStr, err := computeInventoryHash(inventoryMap)
+	if err != nil {
+		return nil, err
+	}
+	name := fmt.Sprintf("%s-%s", got.GetName(), invHashStr)
+
+	// Create the grouping object by copying the template.
+	groupingObj := got.DeepCopy()
+	groupingObj.SetName(name)
+	// Adds the inventory map to the ConfigMap "data" section.
+	err = unstructured.SetNestedStringMap(groupingObj.UnstructuredContent(),
+		inventoryMap, "data")
+	if err != nil {
+		return nil, err
+	}
+	annotations := groupingObj.GetAnnotations()
+	if annotations == nil {
+		annotations = map[string]string{}
+	}
+	annotations[GroupingHash] = invHashStr
+	groupingObj.SetAnnotations(annotations)
+
+	// Creates a new Info for the newly created grouping object.
+	return &resource.Info{
+		Client:    groupingObjectTemplate.Client,
+		Mapping:   groupingObjectTemplate.Mapping,
+		Source:    "generated",
+		Name:      groupingObj.GetName(),
+		Namespace: groupingObj.GetNamespace(),
+		Object:    groupingObj,
+	}, nil
+}
+
+func buildInventoryMap(resources []*resource.Info) (map[string]string, error) {
+	inventoryMap := map[string]string{}
+	for _, res := range resources {
+		if res.Object == nil {
+			return nil, fmt.Errorf("creating inventory; object is nil")
+		}
+		obj := res.Object
+		gk := obj.GetObjectKind().GroupVersionKind().GroupKind()
+		objMetadata, err := object.CreateObjMetadata(res.Namespace,
+			res.Name, gk)
+		if err != nil {
+			return nil, err
+		}
+		inventoryMap[objMetadata.String()] = ""
+	}
+	return inventoryMap, nil
+}
+
+func computeInventoryHash(inventoryMap map[string]string) (string, error) {
+	inventoryList := mapKeysToSlice(inventoryMap)
+	sort.Strings(inventoryList)
+	invHash, err := calcInventoryHash(inventoryList)
+	if err != nil {
+		return "", err
+	}
+	// Compute the name of the grouping object. It is the name of the
+	// grouping object template that it is based on with an additional
+	// suffix which is based on the hash of the inventory.
+	return strconv.FormatUint(uint64(invHash), 16), nil
 }
 
 // RetrieveInventoryFromGroupingObj returns a slice of pointers to the
