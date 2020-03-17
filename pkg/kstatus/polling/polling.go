@@ -48,6 +48,7 @@ func (s *StatusPoller) Poll(ctx context.Context, identifiers []object.ObjMetadat
 	if err != nil {
 		eventChannel := make(chan event.Event)
 		go func() {
+			defer close(eventChannel)
 			eventChannel <- event.Event{
 				EventType: event.ErrorEvent,
 				Error:     err,
