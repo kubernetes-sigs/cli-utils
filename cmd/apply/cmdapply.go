@@ -59,12 +59,9 @@ type ApplyRunner struct {
 func (r *ApplyRunner) Run(cmd *cobra.Command, args []string) {
 	cmdutil.CheckErr(r.applier.Initialize(cmd, args))
 
-	// Create a context with the provided timout from the cobra parameter.
-	ctx, cancel := context.WithTimeout(context.Background(), r.applier.StatusOptions.Timeout)
-	defer cancel()
 	// Run the applier. It will return a channel where we can receive updates
 	// to keep track of progress and any issues.
-	ch := r.applier.Run(ctx)
+	ch := r.applier.Run(context.Background())
 
 	// The printer will print updates from the channel. It will block
 	// until the channel is closed.

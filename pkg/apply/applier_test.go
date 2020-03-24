@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/rest/fake"
@@ -68,7 +69,7 @@ var (
 	}
 )
 
-// resourceInfo contains information about a specific resource, such
+// resourceStatus contains information about a specific resource, such
 // as the manifest yaml and the URL path for this resource in the
 // client. It also contains a factory function for creating a new
 // resource of the given type.
@@ -149,6 +150,21 @@ func TestApplier(t *testing.T) {
 					EventType:       pollevent.ResourceUpdateEvent,
 					AggregateStatus: status.InProgressStatus,
 					Resource: &pollevent.ResourceStatus{
+						Identifier: object.ObjMetadata{
+							Name:      "foo-91afd0fc",
+							Namespace: "apply-test",
+							GroupKind: schema.GroupKind{
+								Group: "",
+								Kind:  "ConfigMap",
+							},
+						},
+						Status: status.CurrentStatus,
+					},
+				},
+				{
+					EventType:       pollevent.ResourceUpdateEvent,
+					AggregateStatus: status.InProgressStatus,
+					Resource: &pollevent.ResourceStatus{
 						Identifier: toIdentifier(t, resources["deployment"], "apply-test"),
 						Status:     status.InProgressStatus,
 					},
@@ -160,10 +176,6 @@ func TestApplier(t *testing.T) {
 						Identifier: toIdentifier(t, resources["deployment"], "apply-test"),
 						Status:     status.CurrentStatus,
 					},
-				},
-				{
-					EventType:       pollevent.CompletedEvent,
-					AggregateStatus: status.CurrentStatus,
 				},
 			},
 			expectedEventTypes: []expectedEvent{
@@ -178,6 +190,10 @@ func TestApplier(t *testing.T) {
 				{
 					eventType:      event.ApplyType,
 					applyEventType: event.ApplyEventCompleted,
+				},
+				{
+					eventType:       event.StatusType,
+					statusEventType: pollevent.ResourceUpdateEvent,
 				},
 				{
 					eventType:       event.StatusType,
@@ -225,15 +241,20 @@ func TestApplier(t *testing.T) {
 				return
 			}
 
-			applier.statusPoller = &fakePoller{
+			poller := &fakePoller{
 				events: tc.statusEvents,
+				start:  make(chan struct{}),
 			}
+			applier.statusPoller = poller
 
 			ctx := context.Background()
 			eventChannel := applier.Run(ctx)
 
 			var events []event.Event
 			for e := range eventChannel {
+				if e.Type == event.ApplyType && e.ApplyEvent.Type == event.ApplyEventCompleted {
+					close(poller.start)
+				}
 				events = append(events, e)
 			}
 
@@ -241,17 +262,17 @@ func TestApplier(t *testing.T) {
 
 			for i, e := range events {
 				expected := tc.expectedEventTypes[i]
-				assert.Equal(t, expected.eventType, e.Type)
+				assert.Equal(t, expected.eventType.String(), e.Type.String())
 
 				switch expected.eventType {
 				case event.ApplyType:
-					assert.Equal(t, expected.applyEventType, e.ApplyEvent.Type)
+					assert.Equal(t, expected.applyEventType.String(), e.ApplyEvent.Type.String())
 				case event.StatusType:
-					assert.Equal(t, expected.statusEventType, e.StatusEvent.EventType)
+					assert.Equal(t, expected.statusEventType.String(), e.StatusEvent.EventType.String())
 				case event.PruneType:
-					assert.Equal(t, expected.pruneEventType, e.PruneEvent.Type)
+					assert.Equal(t, expected.pruneEventType.String(), e.PruneEvent.Type.String())
 				case event.DeleteType:
-					assert.Equal(t, expected.deleteEventType, e.DeleteEvent.Type)
+					assert.Equal(t, expected.deleteEventType.String(), e.DeleteEvent.Type.String())
 				default:
 					assert.Fail(t, "unexpected event type %s", expected.eventType.String())
 				}
@@ -716,16 +737,19 @@ func (n *nsHandler) handle(t *testing.T, req *http.Request) (*http.Response, boo
 }
 
 type fakePoller struct {
+	start  chan struct{}
 	events []pollevent.Event
 }
 
-func (f *fakePoller) Poll(_ context.Context, _ []object.ObjMetadata, _ polling.Options) <-chan pollevent.Event {
+func (f *fakePoller) Poll(ctx context.Context, _ []object.ObjMetadata, _ polling.Options) <-chan pollevent.Event {
 	eventChannel := make(chan pollevent.Event)
 	go func() {
 		defer close(eventChannel)
+		<-f.start
 		for _, f := range f.events {
 			eventChannel <- f
 		}
+		<-ctx.Done()
 	}()
 	return eventChannel
 }

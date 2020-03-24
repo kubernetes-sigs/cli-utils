@@ -18,10 +18,12 @@ import (
 	"k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
+	"sigs.k8s.io/cli-utils/pkg/apply/poller"
 	"sigs.k8s.io/cli-utils/pkg/apply/prune"
+	"sigs.k8s.io/cli-utils/pkg/apply/task"
+	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling"
 	pollevent "sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
-	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -42,14 +44,16 @@ func NewApplier(factory util.Factory, ioStreams genericclioptions.IOStreams) *Ap
 	}
 }
 
-// poller defines the interface the applier needs to poll for status of resources.
-type poller interface {
-	Poll(ctx context.Context, identifiers []object.ObjMetadata, options polling.Options) <-chan pollevent.Event
-}
-
 // Applier performs the step of applying a set of resources into a cluster,
 // conditionally waits for all of them to be fully reconciled and finally
 // performs prune to clean up any resources that has been deleted.
+// The applier performs its function by executing a list queue of tasks,
+// each of which is one of the steps in the process of applying a set
+// of resources to the cluster. The actual execution of these tasks are
+// handled by a StatusRunner. So the taskqueue is effectively a
+// specification that is executed by the StatusRunner. Based on input
+// parameters and/or the set of resources that needs to be applied to the
+// cluster, different sets of tasks might be needed.
 type Applier struct {
 	factory   util.Factory
 	ioStreams genericclioptions.IOStreams
@@ -57,7 +61,7 @@ type Applier struct {
 	ApplyOptions  *apply.ApplyOptions
 	StatusOptions *StatusOptions
 	PruneOptions  *prune.PruneOptions
-	statusPoller  poller
+	statusPoller  poller.Poller
 
 	NoPrune bool
 	DryRun  bool
@@ -119,7 +123,7 @@ func (a *Applier) SetFlags(cmd *cobra.Command) error {
 
 // newStatusPoller sets up a new StatusPoller for computing status. The configuration
 // needed for the poller is taken from the Factory.
-func (a *Applier) newStatusPoller() (poller, error) {
+func (a *Applier) newStatusPoller() (poller.Poller, error) {
 	config, err := a.factory.ToRESTConfig()
 	if err != nil {
 		return nil, errors.WrapPrefix(err, "error getting RESTConfig", 1)
@@ -188,6 +192,80 @@ func splitInfos(infos []*resource.Info) ([]*resource.Info, []*resource.Info) {
 	return resources, groupingObjectTemplates
 }
 
+// buildTaskQueue takes the slice of infos and object identifiers, and
+// builds a queue of tasks that needs to be executed.
+func (a *Applier) buildTaskQueue(infos []*resource.Info, identifiers []object.ObjMetadata,
+	eventChannel chan event.Event) chan taskrunner.Task {
+	tasks := []taskrunner.Task{
+		// This taks is responsible for applying all the resources
+		// in the infos slice.
+		&task.ApplyTask{
+			Objects:      infos,
+			ApplyOptions: a.ApplyOptions,
+		},
+		// When all resources have been applied, we need to send
+		// an event that notifies the client that the apply phase
+		// is complete.
+		&task.SendEventTask{
+			Event: event.Event{
+				Type: event.ApplyType,
+				ApplyEvent: event.ApplyEvent{
+					Type: event.ApplyEventCompleted,
+				},
+			},
+			EventChannel: eventChannel,
+		},
+	}
+
+	if a.StatusOptions.wait {
+		tasks = append(tasks,
+			// The wait task declares that after applying the resources,
+			// we should wait for all of them to reach the Current status
+			// before continuing.
+			taskrunner.NewWaitTask(identifiers, taskrunner.AllCurrent,
+				a.StatusOptions.Timeout),
+			// When all resources have reached the desired status, we
+			// send an event to notify the client.
+			&task.SendEventTask{
+				Event: event.Event{
+					Type: event.StatusType,
+					StatusEvent: pollevent.Event{
+						EventType: pollevent.CompletedEvent,
+					},
+				},
+				EventChannel: eventChannel,
+			})
+	}
+
+	if !a.NoPrune {
+		tasks = append(tasks,
+			// The prune task is responsible for doing the pruning
+			// of any deleted resources.
+			&task.PruneTask{
+				Objects:      infos,
+				PruneOptions: a.PruneOptions,
+				EventChannel: eventChannel,
+			},
+			// Once prune is completed, we send an event to notify
+			// the client.
+			&task.SendEventTask{
+				Event: event.Event{
+					Type: event.PruneType,
+					PruneEvent: event.PruneEvent{
+						Type: event.PruneEventCompleted,
+					},
+				},
+				EventChannel: eventChannel,
+			})
+	}
+
+	taskQueue := make(chan taskrunner.Task, len(tasks))
+	for _, t := range tasks {
+		taskQueue <- t
+	}
+	return taskQueue
+}
+
 // Run performs the Apply step. This happens asynchronously with updates
 // on progress and any errors are reported back on the event channel.
 // Cancelling the operation or setting timeout on how long to wait
@@ -197,12 +275,12 @@ func splitInfos(infos []*resource.Info) ([]*resource.Info, []*resource.Info) {
 // cancellation or timeout will only affect how long we wait for the
 // resources to become current.
 func (a *Applier) Run(ctx context.Context) <-chan event.Event {
-	ch := make(chan event.Event)
+	eventChannel := make(chan event.Event)
 
 	go func() {
-		defer close(ch)
+		defer close(eventChannel)
 		adapter := &KubectlPrinterAdapter{
-			ch: ch,
+			ch: eventChannel,
 		}
 		// The adapter is used to intercept what is meant to be printing
 		// in the ApplyOptions, and instead turn those into events.
@@ -213,7 +291,7 @@ func (a *Applier) Run(ctx context.Context) <-chan event.Event {
 		// and handling the grouping object.
 		infos, err := a.readAndPrepareObjects()
 		if err != nil {
-			ch <- event.Event{
+			eventChannel <- event.Event{
 				Type: event.ErrorType,
 				ErrorEvent: event.ErrorEvent{
 					Err: errors.WrapPrefix(err, "error reading resources", 1),
@@ -222,72 +300,37 @@ func (a *Applier) Run(ctx context.Context) <-chan event.Event {
 			return
 		}
 
-		a.ApplyOptions.SetObjects(infos)
-		err = a.ApplyOptions.Run()
+		// Extract the object metadata needed to identify each
+		// of the resources. This is just a lightweight representation
+		// of the resources in the infos struct. The status library
+		// relies on identifiers rather than infos, so we need to use
+		// both.
+		identifiers := infosToObjMetas(infos)
+
+		// Fetch the queue (channel) of tasks that should be executed.
+		taskQueue := a.buildTaskQueue(infos, identifiers, eventChannel)
+
+		// Create a new TaskStatusRunner to execute the taskQueue.
+		runner := taskrunner.NewTaskStatusRunner(identifiers, a.statusPoller)
+		err = runner.Run(ctx, taskQueue, eventChannel, taskrunner.PollingOptions{
+			PollInterval: a.StatusOptions.period,
+			UseCache:     true,
+		})
 		if err != nil {
-			// If we see an error here we just report it on the channel and then
-			// give up. Eventually we might be able to determine which errors
-			// are fatal and which might allow us to continue.
-			ch <- event.Event{
+			eventChannel <- event.Event{
 				Type: event.ErrorType,
 				ErrorEvent: event.ErrorEvent{
-					Err: errors.WrapPrefix(err, "error applying resources", 1),
-				},
-			}
-			return
-		}
-		// If we get there, then all resources have been successfully applied.
-		ch <- event.Event{
-			Type: event.ApplyType,
-			ApplyEvent: event.ApplyEvent{
-				Type: event.ApplyEventCompleted,
-			},
-		}
-
-		if a.StatusOptions.wait {
-			statusChannel := a.statusPoller.Poll(ctx, infosToObjMetas(infos), polling.Options{
-				PollUntilCancelled: false,
-				PollInterval:       a.StatusOptions.period,
-				UseCache:           true,
-				DesiredStatus:      status.CurrentStatus,
-			})
-			// As long as the statusChannel remains open, we take every statusEvent,
-			// wrap it in an Event and send it on the channel.
-			// TODO: What should we do if waiting for status times out? We currently proceed with
-			// prune, but that doesn't seem right.
-			for statusEvent := range statusChannel {
-				ch <- event.Event{
-					Type:        event.StatusType,
-					StatusEvent: statusEvent,
-				}
-			}
-		}
-
-		if !a.NoPrune {
-			err = a.PruneOptions.Prune(infos, ch)
-			if err != nil {
-				// If we see an error here we just report it on the channel and then
-				// give up. Eventually we might be able to determine which errors
-				// are fatal and which might allow us to continue.
-				ch <- event.Event{
-					Type: event.ErrorType,
-					ErrorEvent: event.ErrorEvent{
-						Err: errors.WrapPrefix(err, "error pruning resources", 1),
-					},
-				}
-				return
-			}
-			ch <- event.Event{
-				Type: event.PruneType,
-				PruneEvent: event.PruneEvent{
-					Type: event.PruneEventCompleted,
+					Err: err,
 				},
 			}
 		}
 	}()
-	return ch
+	return eventChannel
 }
 
+// infosToObjMetas takes a slice of infos and extract the
+// GroupKind, name and namespace for each resource and returns
+// it as a slice of ObjMetadata.
 func infosToObjMetas(infos []*resource.Info) []object.ObjMetadata {
 	var objMetas []object.ObjMetadata
 	for _, info := range infos {
