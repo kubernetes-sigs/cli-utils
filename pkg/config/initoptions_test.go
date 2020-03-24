@@ -5,6 +5,7 @@ package config
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -44,38 +45,16 @@ func TestComplete(t *testing.T) {
 }
 
 func TestDefaultGroupName(t *testing.T) {
-	tests := map[string]struct {
-		seed     int64
-		dir      string
-		expected string
-	}{
-		"Basic Seed/Dir": {
-			seed:     31,
-			dir:      "bar",
-			expected: "bar-720851636",
-		},
-		"Hierarchical directory": {
-			seed:     31,
-			dir:      "foo/bar",
-			expected: "bar-720851636",
-		},
-		"Absolute directory": {
-			seed:     31,
-			dir:      "/tmp/foo/bar",
-			expected: "bar-720851636",
-		},
+	io := NewInitOptions(ioStreams)
+	actual, err := io.defaultGroupName()
+	if err != nil {
+		t.Errorf("Unxpected error during UUID generation: %v", err)
 	}
-
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			io := NewInitOptions(ioStreams)
-			io.Seed = tc.seed
-			io.Dir = tc.dir
-			actual := io.defaultGroupName()
-			if tc.expected != actual {
-				t.Errorf("Expected group name (%s), got (%s)", tc.expected, actual)
-			}
-		})
+	// Example UUID: dd647113-a354-48fa-9b93-cc1b7a85aadb
+	var uuidRegexp = `^[a-z0-9]{8}\-[a-z0-9]{4}\-[a-z0-9]{4}\-[a-z0-9]{4}\-[a-z0-9]{12}$`
+	re := regexp.MustCompile(uuidRegexp)
+	if !re.MatchString(actual) {
+		t.Errorf("Expected UUID; got (%s)", actual)
 	}
 }
 

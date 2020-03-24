@@ -5,7 +5,6 @@ package config
 
 import (
 	"fmt"
-	"math/rand"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -15,6 +14,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"sigs.k8s.io/kustomize/kyaml/kio"
+
+	"github.com/google/uuid"
 )
 
 const manifestFilename = "grouping-object-template.yaml"
@@ -66,8 +67,6 @@ type InitOptions struct {
 	Namespace string
 	// Grouping object label value; must be a valid k8s label value.
 	GroupName string
-	// Random seed
-	Seed int64
 }
 
 func NewInitOptions(ioStreams genericclioptions.IOStreams) *InitOptions {
@@ -80,7 +79,6 @@ func NewInitOptions(ioStreams genericclioptions.IOStreams) *InitOptions {
 // TODO(seans3): Look into changing this kubectl-inspired way of organizing
 // the InitOptions (e.g. Complete and Run methods).
 func (i *InitOptions) Complete(args []string) error {
-	i.Seed = time.Now().UnixNano()
 	if len(args) != 1 {
 		return fmt.Errorf("need one 'directory' arg; have %d", len(args))
 	}
@@ -97,8 +95,13 @@ func (i *InitOptions) Complete(args []string) error {
 		}
 		i.Namespace = namespace
 	}
+	// Set the default grouping label if one does not exist.
 	if len(i.GroupName) == 0 {
-		i.GroupName = i.defaultGroupName()
+		groupName, err := i.defaultGroupName()
+		if err != nil {
+			return err
+		}
+		i.GroupName = groupName
 	}
 	if !validateGroupName(i.GroupName) {
 		return fmt.Errorf("invalid group name: %s", i.GroupName)
@@ -154,12 +157,14 @@ func calcPackageNamespace(packageDir string) (string, error) {
 	return metav1.NamespaceDefault, nil
 }
 
-// defaultGroupName returns a string of the package name (directory)
-// with a random number suffix.
-func (i *InitOptions) defaultGroupName() string {
-	rand.Seed(i.Seed)
-	r := rand.Intn(1000000000)
-	return fmt.Sprintf("%s-%09d", filepath.Base(i.Dir), r)
+// defaultGroupName returns a UUID string as a default unique
+// identifier for a grouping object label.
+func (i *InitOptions) defaultGroupName() (string, error) {
+	u, err := uuid.NewRandom()
+	if err != nil {
+		return "", err
+	}
+	return u.String(), nil
 }
 
 // Must begin and end with an alphanumeric character ([a-z0-9A-Z])
