@@ -117,6 +117,9 @@ func TestApplier(t *testing.T) {
 			prune:  false,
 			expectedEventTypes: []expectedEvent{
 				{
+					eventType: event.InitType,
+				},
+				{
 					eventType:      event.ApplyType,
 					applyEventType: event.ApplyEventResourceUpdate,
 				},
@@ -179,6 +182,9 @@ func TestApplier(t *testing.T) {
 				},
 			},
 			expectedEventTypes: []expectedEvent{
+				{
+					eventType: event.InitType,
+				},
 				{
 					eventType:      event.ApplyType,
 					applyEventType: event.ApplyEventResourceUpdate,
@@ -265,6 +271,7 @@ func TestApplier(t *testing.T) {
 				assert.Equal(t, expected.eventType.String(), e.Type.String())
 
 				switch expected.eventType {
+				case event.InitType:
 				case event.ApplyType:
 					assert.Equal(t, expected.applyEventType.String(), e.ApplyEvent.Type.String())
 				case event.StatusType:

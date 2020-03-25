@@ -310,6 +310,20 @@ func (a *Applier) Run(ctx context.Context) <-chan event.Event {
 		// Fetch the queue (channel) of tasks that should be executed.
 		taskQueue := a.buildTaskQueue(infos, identifiers, eventChannel)
 
+		// Send event to inform the caller about the resources that
+		// will be applied/pruned.
+		eventChannel <- event.Event{
+			Type: event.InitType,
+			InitEvent: event.InitEvent{
+				ResourceGroups: []event.ResourceGroup{
+					{
+						Action:      event.ApplyAction,
+						Identifiers: identifiers,
+					},
+				},
+			},
+		}
+
 		// Create a new TaskStatusRunner to execute the taskQueue.
 		runner := taskrunner.NewTaskStatusRunner(identifiers, a.statusPoller)
 		err = runner.Run(ctx, taskQueue, eventChannel, taskrunner.PollingOptions{
