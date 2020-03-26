@@ -54,6 +54,7 @@ func TestWaitTask_SingleTaskResult(t *testing.T) {
 	task := NewWaitTask([]object.ObjMetadata{}, AllCurrent, 2*time.Second)
 
 	taskChannel := make(chan TaskResult, 10)
+	defer close(taskChannel)
 
 	var completeWg sync.WaitGroup
 
@@ -65,13 +66,15 @@ func TestWaitTask_SingleTaskResult(t *testing.T) {
 		}()
 	}
 	completeWg.Wait()
-	close(taskChannel)
 
-	resultCount := 0
-	for range taskChannel {
-		resultCount++
-	}
-	if resultCount != 1 {
-		t.Errorf("expected 1 result, but got %d", resultCount)
+	<-taskChannel
+
+	timer := time.NewTimer(4 * time.Second)
+
+	select {
+	case <-taskChannel:
+		t.Errorf("expected only one result on taskChannel, but got more")
+	case <-timer.C:
+		return
 	}
 }

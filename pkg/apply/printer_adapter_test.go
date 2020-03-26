@@ -5,6 +5,7 @@ package apply
 
 import (
 	"bytes"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -39,10 +40,14 @@ func TestKubectlPrinterAdapter(t *testing.T) {
 
 	// Need to run this in a separate gorutine since go channels
 	// are blocking.
+	var wg sync.WaitGroup
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		err = resourcePrinter.PrintObj(&deployment, &buffer)
 	}()
 	msg := <-ch
+	wg.Wait()
 
 	assert.NoError(t, err)
 	assert.Equal(t, event.ServersideApplied, msg.ApplyEvent.Operation)

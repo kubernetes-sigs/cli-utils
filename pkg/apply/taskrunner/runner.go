@@ -250,7 +250,7 @@ func (b *baseRunner) nextTask(taskQueue chan Task,
 		// met. Without this check, a task might end up waiting for
 		// status events when the condition is in fact already met.
 		if b.collector.conditionMet(st.Identifiers, st.Condition) {
-			st.complete(taskChannel)
+			st.startAndComplete(taskChannel)
 		} else {
 			tsk.Start(taskChannel)
 		}
