@@ -6,6 +6,7 @@ package event
 import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
+	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
 // Type determines the type of events that are available.
@@ -13,7 +14,8 @@ import (
 type Type int
 
 const (
-	ErrorType Type = iota
+	InitType Type = iota
+	ErrorType
 	ApplyType
 	StatusType
 	PruneType
@@ -27,6 +29,10 @@ const (
 type Event struct {
 	// Type is the type of event.
 	Type Type
+
+	// InitEvent contains information about which resources will
+	// be applied/pruned.
+	InitEvent InitEvent
 
 	// ErrorEvent contains information about any errors encountered.
 	ErrorEvent ErrorEvent
@@ -46,6 +52,23 @@ type Event struct {
 	// DeleteEvent contains information about object that have been
 	// deleted.
 	DeleteEvent DeleteEvent
+}
+
+type InitEvent struct {
+	ResourceGroups []ResourceGroup
+}
+
+//go:generate stringer -type=ResourceAction
+type ResourceAction int
+
+const (
+	ApplyAction ResourceAction = iota
+	PruneAction
+)
+
+type ResourceGroup struct {
+	Action      ResourceAction
+	Identifiers []object.ObjMetadata
 }
 
 type ErrorEvent struct {
