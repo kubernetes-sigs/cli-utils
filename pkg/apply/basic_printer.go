@@ -95,7 +95,7 @@ func (b *BasicPrinter) Print(ch <-chan event.Event, preview bool) {
 				printFunc("%s error: %s\n", resourceIDToString(gk, id.Name),
 					statusEvent.Error.Error())
 			case pollevent.CompletedEvent:
-				printFunc("all resources has reached the Current status")
+				printFunc("all resources has reached the Testing status")
 			case pollevent.AbortedEvent:
 				printFunc("resources failed to the reached Current status")
 			}
