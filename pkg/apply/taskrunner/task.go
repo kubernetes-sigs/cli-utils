@@ -90,6 +90,15 @@ func (w *WaitTask) Start(taskChannel chan TaskResult) {
 	}
 }
 
+// startAndComplete is invoked when the condition is already
+// met when the task should be started. In this case there is no
+// need to start a timer. So it just sets the cancelFunc and then
+// completes the task.
+func (w *WaitTask) startAndComplete(taskChannel chan TaskResult) {
+	w.cancelFunc = func() {}
+	w.complete(taskChannel)
+}
+
 // complete is invoked by the taskrunner when all the conditions
 // for the task has been met, or something has failed so the task
 // need to be stopped.
