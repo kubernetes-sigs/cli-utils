@@ -189,6 +189,11 @@ func (r *statusPollerRunner) Run() {
 		ticker.Stop()
 	}()
 
+	shouldExit := r.syncAndPoll()
+	if shouldExit {
+		return
+	}
+
 	for {
 		select {
 		case <-r.ctx.Done():
@@ -202,32 +207,41 @@ func (r *statusPollerRunner) Run() {
 			}
 			return
 		case <-ticker.C:
-			// First trigger a sync of the ClusterReader. This may or may not actually
-			// result in calls to the cluster, depending on the implementation.
-			// If this call fails, there is no clean way to recover, so we just return an ErrorEvent
-			// and shut down.
-			err := r.clusterReader.Sync(r.ctx)
-			if err != nil {
-				r.eventChannel <- event.Event{
-					EventType: event.ErrorEvent,
-					Error:     err,
-				}
-				return
-			}
-			// Poll all resources and compute status. If the polling of resources has completed (based
-			// on information from the StatusAggregator and the value of pollUntilCancelled), we send
-			// a CompletedEvent and return.
-			completed := r.pollStatusForAllResources()
-			if completed {
-				aggregatedStatus := r.statusAggregator.AggregateStatus()
-				r.eventChannel <- event.Event{
-					EventType:       event.CompletedEvent,
-					AggregateStatus: aggregatedStatus,
-				}
+			// First sync and then compute status for all resources.
+			shouldExit := r.syncAndPoll()
+			if shouldExit {
 				return
 			}
 		}
 	}
+}
+
+func (r *statusPollerRunner) syncAndPoll() bool {
+	// First trigger a sync of the ClusterReader. This may or may not actually
+	// result in calls to the cluster, depending on the implementation.
+	// If this call fails, there is no clean way to recover, so we just return an ErrorEvent
+	// and shut down.
+	err := r.clusterReader.Sync(r.ctx)
+	if err != nil {
+		r.eventChannel <- event.Event{
+			EventType: event.ErrorEvent,
+			Error:     err,
+		}
+		return true
+	}
+	// Poll all resources and compute status. If the polling of resources has completed (based
+	// on information from the StatusAggregator and the value of pollUntilCancelled), we send
+	// a CompletedEvent and return.
+	completed := r.pollStatusForAllResources()
+	if completed {
+		aggregatedStatus := r.statusAggregator.AggregateStatus()
+		r.eventChannel <- event.Event{
+			EventType:       event.CompletedEvent,
+			AggregateStatus: aggregatedStatus,
+		}
+		return true
+	}
+	return false
 }
 
 // pollStatusForAllResources iterates over all the resources in the set and delegates
