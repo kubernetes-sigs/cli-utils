@@ -14,6 +14,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	pollevent "sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
+	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
 // BasicPrinter is a simple implementation that just prints the events
@@ -49,6 +50,31 @@ func (a *applyStats) sum() int {
 	return a.serversideApplied + a.configured + a.unchanged + a.created
 }
 
+type pruneStats struct {
+	count int
+}
+
+func (p *pruneStats) inc() {
+	p.count++
+}
+
+type deleteStats struct {
+	count int
+}
+
+func (d *deleteStats) inc() {
+	d.count++
+}
+
+type statusCollector struct {
+	latestStatus map[object.ObjMetadata]pollevent.Event
+	printStatus  bool
+}
+
+func (sc *statusCollector) updateStatus(id object.ObjMetadata, se pollevent.Event) {
+	sc.latestStatus[id] = se
+}
+
 // Print outputs the events from the provided channel in a simple
 // format on StdOut. As we support other printer implementations
 // this should probably be an interface.
@@ -56,72 +82,104 @@ func (a *applyStats) sum() int {
 func (b *BasicPrinter) Print(ch <-chan event.Event, preview bool) {
 	printFunc := b.getPrintFunc(preview)
 	applyStats := &applyStats{}
-	pruneCount := 0
-	deleteCount := 0
+	statusCollector := &statusCollector{
+		latestStatus: make(map[object.ObjMetadata]pollevent.Event),
+		printStatus:  false,
+	}
+	pruneStats := &pruneStats{}
+	deleteStats := &deleteStats{}
 	for e := range ch {
 		switch e.Type {
 		case event.ErrorType:
 			cmdutil.CheckErr(e.ErrorEvent.Err)
 		case event.ApplyType:
-			ae := e.ApplyEvent
-			if ae.Type == event.ApplyEventCompleted {
-				output := fmt.Sprintf("%d resource(s) applied. %d created, %d unchanged, %d configured",
-					applyStats.sum(), applyStats.created, applyStats.unchanged, applyStats.configured)
-				// Only print information about serverside apply if some of the
-				// resources actually were applied serverside.
-				if applyStats.serversideApplied > 0 {
-					output += fmt.Sprintf(", %d serverside applied", applyStats.serversideApplied)
-				}
-				printFunc(output)
-			} else {
-				obj := ae.Object
-				gvk := obj.GetObjectKind().GroupVersionKind()
-				name := getName(obj)
-				applyStats.inc(ae.Operation)
-				printFunc("%s %s", resourceIDToString(gvk.GroupKind(), name),
-					strings.ToLower(ae.Operation.String()))
-			}
+			b.processApplyEvent(e.ApplyEvent, applyStats, statusCollector, printFunc)
 		case event.StatusType:
-			statusEvent := e.StatusEvent
-			switch statusEvent.EventType {
-			case pollevent.ResourceUpdateEvent:
-				id := statusEvent.Resource.Identifier
-				gk := id.GroupKind
-				printFunc("%s is %s: %s", resourceIDToString(gk, id.Name),
-					statusEvent.Resource.Status.String(), statusEvent.Resource.Message)
-			case pollevent.ErrorEvent:
-				id := statusEvent.Resource.Identifier
-				gk := id.GroupKind
-				printFunc("%s error: %s\n", resourceIDToString(gk, id.Name),
-					statusEvent.Error.Error())
-			case pollevent.CompletedEvent:
-				printFunc("all resources has reached the Current status")
-			case pollevent.AbortedEvent:
-				printFunc("resources failed to the reached Current status")
-			}
+			b.processStatusEvent(e.StatusEvent, statusCollector, printFunc)
 		case event.PruneType:
-			pe := e.PruneEvent
-			if pe.Type == event.PruneEventCompleted {
-				printFunc("%d resource(s) pruned", pruneCount)
-			} else {
-				obj := e.PruneEvent.Object
-				gvk := obj.GetObjectKind().GroupVersionKind()
-				name := getName(obj)
-				pruneCount++
-				printFunc("%s %s", resourceIDToString(gvk.GroupKind(), name), "pruned")
-			}
+			b.processPruneEvent(e.PruneEvent, pruneStats, printFunc)
 		case event.DeleteType:
-			de := e.DeleteEvent
-			if de.Type == event.DeleteEventCompleted {
-				printFunc("%d resource(s) deleted", deleteCount)
-			} else {
-				obj := de.Object
-				gvk := obj.GetObjectKind().GroupVersionKind()
-				name := getName(obj)
-				deleteCount++
-				printFunc("%s %s", resourceIDToString(gvk.GroupKind(), name), "deleted")
-			}
+			b.processDeleteEvent(e.DeleteEvent, deleteStats, printFunc)
 		}
+	}
+}
+
+func (b *BasicPrinter) processApplyEvent(ae event.ApplyEvent, as *applyStats,
+	c *statusCollector, p printFunc) {
+	switch ae.Type {
+	case event.ApplyEventCompleted:
+		output := fmt.Sprintf("%d resource(s) applied. %d created, %d unchanged, %d configured",
+			as.sum(), as.created, as.unchanged, as.configured)
+		// Only print information about serverside apply if some of the
+		// resources actually were applied serverside.
+		if as.serversideApplied > 0 {
+			output += fmt.Sprintf(", %d serverside applied", as.serversideApplied)
+		}
+		p(output)
+		c.printStatus = true
+		for id, se := range c.latestStatus {
+			printResourceStatus(id, se, p)
+		}
+	case event.ApplyEventResourceUpdate:
+		obj := ae.Object
+		gvk := obj.GetObjectKind().GroupVersionKind()
+		name := getName(obj)
+		as.inc(ae.Operation)
+		p("%s %s", resourceIDToString(gvk.GroupKind(), name),
+			strings.ToLower(ae.Operation.String()))
+	}
+}
+
+func (b *BasicPrinter) processStatusEvent(se pollevent.Event, sc *statusCollector, p printFunc) {
+	switch se.EventType {
+	case pollevent.ResourceUpdateEvent:
+		id := se.Resource.Identifier
+		sc.updateStatus(id, se)
+		if sc.printStatus {
+			printResourceStatus(id, se, p)
+		}
+	case pollevent.ErrorEvent:
+		id := se.Resource.Identifier
+		gk := id.GroupKind
+		p("%s error: %s\n", resourceIDToString(gk, id.Name),
+			se.Error.Error())
+	case pollevent.CompletedEvent:
+		sc.printStatus = false
+		p("all resources has reached the Current status")
+	case pollevent.AbortedEvent:
+		sc.printStatus = false
+		p("resources failed to the reached Current status")
+	}
+}
+
+func printResourceStatus(id object.ObjMetadata, se pollevent.Event, p printFunc) {
+	p("%s is %s: %s", resourceIDToString(id.GroupKind, id.Name),
+		se.Resource.Status.String(), se.Resource.Message)
+}
+
+func (b *BasicPrinter) processPruneEvent(pe event.PruneEvent, ps *pruneStats, p printFunc) {
+	switch pe.Type {
+	case event.PruneEventCompleted:
+		p("%d resource(s) pruned", ps.count)
+	case event.PruneEventResourceUpdate:
+		obj := pe.Object
+		gvk := obj.GetObjectKind().GroupVersionKind()
+		name := getName(obj)
+		ps.inc()
+		p("%s %s", resourceIDToString(gvk.GroupKind(), name), "pruned")
+	}
+}
+
+func (b *BasicPrinter) processDeleteEvent(de event.DeleteEvent, ds *deleteStats, p printFunc) {
+	switch de.Type {
+	case event.DeleteEventCompleted:
+		p("%d resource(s) deleted", ds.count)
+	case event.DeleteEventResourceUpdate:
+		obj := de.Object
+		gvk := obj.GetObjectKind().GroupVersionKind()
+		name := getName(obj)
+		ds.inc()
+		p("%s %s", resourceIDToString(gvk.GroupKind(), name), "deleted")
 	}
 }
 
@@ -139,7 +197,9 @@ func resourceIDToString(gk schema.GroupKind, name string) string {
 	return fmt.Sprintf("%s/%s", strings.ToLower(gk.String()), name)
 }
 
-func (b *BasicPrinter) getPrintFunc(preview bool) func(format string, a ...interface{}) {
+type printFunc func(format string, a ...interface{})
+
+func (b *BasicPrinter) getPrintFunc(preview bool) printFunc {
 	return func(format string, a ...interface{}) {
 		if preview {
 			format += " (preview)"
