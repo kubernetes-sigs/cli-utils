@@ -554,7 +554,7 @@ func TestAddRetrieveInventoryToFromGroupingObject(t *testing.T) {
 			for _, expected := range test.expected {
 				found := false
 				for _, actual := range retrieved {
-					if expected.EqualsWithNormalize(actual) {
+					if expected.Equals(actual) {
 						found = true
 						continue
 					}

@@ -85,7 +85,7 @@ func TestInfoToObjMetadata(t *testing.T) {
 				if err != nil {
 					t.Errorf("Receieved unexpected error: %s\n", err)
 				}
-				if !tc.expected.EqualsWithNormalize(actual) {
+				if !tc.expected.Equals(actual) {
 					t.Errorf("Expected ObjMetadata (%s), got (%s)\n", tc.expected, actual)
 				}
 			}
@@ -156,88 +156,6 @@ func TestUnionPastInventory(t *testing.T) {
 			}
 			if !expected.Equals(actual) {
 				t.Errorf("Expected inventory (%s), got (%s)\n", expected, actual)
-			}
-		})
-	}
-}
-
-func TestCalcPruneSet(t *testing.T) {
-	tests := map[string]struct {
-		past     []*resource.Info
-		current  *resource.Info
-		expected []*object.ObjMetadata
-		isError  bool
-	}{
-		"Object not unstructured--error": {
-			past:     []*resource.Info{nonUnstructuredGroupingInfo},
-			current:  &resource.Info{},
-			expected: []*object.ObjMetadata{},
-			isError:  true,
-		},
-		"No past group objects--no prune set": {
-
-			past:     []*resource.Info{},
-			current:  createGroupingInfo("test-1"),
-			expected: []*object.ObjMetadata{},
-			isError:  false,
-		},
-		"Empty past grouping object--no prune set": {
-			past:     []*resource.Info{createGroupingInfo("test-1")},
-			current:  createGroupingInfo("test-1"),
-			expected: []*object.ObjMetadata{},
-			isError:  false,
-		},
-		"Pod1 - Pod1 = empty set": {
-			past: []*resource.Info{
-				createGroupingInfo("test-1", pod1Info),
-			},
-			current:  createGroupingInfo("test-1", pod1Info),
-			expected: []*object.ObjMetadata{},
-			isError:  false,
-		},
-		"(Pod1, Pod2) - Pod1 = Pod2": {
-			past: []*resource.Info{
-				createGroupingInfo("test-1", pod1Info, pod2Info),
-			},
-			current:  createGroupingInfo("test-1", pod1Info),
-			expected: []*object.ObjMetadata{pod2Inv},
-			isError:  false,
-		},
-		"(Pod1, Pod2) - Pod2 = Pod1": {
-			past: []*resource.Info{
-				createGroupingInfo("test-1", pod1Info, pod2Info),
-			},
-			current:  createGroupingInfo("test-1", pod2Info),
-			expected: []*object.ObjMetadata{pod1Inv},
-			isError:  false,
-		},
-		"(Pod1, Pod2, Pod3) - Pod2 = Pod1, Pod3": {
-			past: []*resource.Info{
-				createGroupingInfo("test-1", pod1Info, pod2Info),
-				createGroupingInfo("test-1", pod2Info, pod3Info),
-			},
-			current:  createGroupingInfo("test-1", pod2Info),
-			expected: []*object.ObjMetadata{pod1Inv, pod3Inv},
-			isError:  false,
-		},
-	}
-
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			po := &PruneOptions{}
-			po.currentGroupingObject = tc.current
-			actual, err := po.calcPruneSet(tc.past)
-			expected := NewInventory(tc.expected)
-			if tc.isError && err == nil {
-				t.Errorf("Did not receive expected error.\n")
-			}
-			if !tc.isError {
-				if err != nil {
-					t.Errorf("Unexpected error received: %s\n", err)
-				}
-				if !expected.Equals(actual) {
-					t.Errorf("Expected prune set (%s), got (%s)\n", expected, actual)
-				}
 			}
 		})
 	}

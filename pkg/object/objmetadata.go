@@ -76,16 +76,6 @@ func ParseObjMetadata(inv string) (*ObjMetadata, error) {
 	return nil, fmt.Errorf("unable to decode inventory: %s", inv)
 }
 
-// EqualsWithNormalize returns true if the ObjMetadata structs are identical;
-// false otherwise. This will take into account normalizing resources in the
-// extensions group.
-func (o *ObjMetadata) EqualsWithNormalize(other *ObjMetadata) bool {
-	if other == nil {
-		return false
-	}
-	return o.String() == other.String()
-}
-
 // Equals compares two ObjMetadata and returns true if they are equal. This does
 // not contain any special treatment for the extensions API group.
 func (o *ObjMetadata) Equals(other *ObjMetadata) bool {
@@ -95,26 +85,11 @@ func (o *ObjMetadata) Equals(other *ObjMetadata) bool {
 	return *o == *other
 }
 
-// GroupKinds that must be normalized from the "extensions" group.
-var normalizeGK = map[schema.GroupKind]schema.GroupKind{
-	{Group: "extensions", Kind: "Deployment"}:        {Group: "apps", Kind: "Deployment"},
-	{Group: "extensions", Kind: "DaemonSet"}:         {Group: "apps", Kind: "DaemonSet"},
-	{Group: "extensions", Kind: "ReplicaSet"}:        {Group: "apps", Kind: "ReplicaSet"},
-	{Group: "extensions", Kind: "Ingress"}:           {Group: "networking", Kind: "Ingress"},
-	{Group: "extensions", Kind: "NetworkPolicy"}:     {Group: "networking", Kind: "NetworkPolicy"},
-	{Group: "extensions", Kind: "PodSecurityPolicy"}: {Group: "policy", Kind: "PodSecurityPolicy"},
-}
-
 // String create a string version of the ObjMetadata struct.
 func (o *ObjMetadata) String() string {
-	gk := o.GroupKind
-	normalized, exists := normalizeGK[o.GroupKind]
-	if exists {
-		gk = normalized
-	}
 	return fmt.Sprintf("%s%s%s%s%s%s%s",
 		o.Namespace, fieldSeparator,
 		o.Name, fieldSeparator,
-		gk.Group, fieldSeparator,
-		gk.Kind)
+		o.GroupKind.Group, fieldSeparator,
+		o.GroupKind.Kind)
 }
