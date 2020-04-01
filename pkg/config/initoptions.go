@@ -18,21 +18,21 @@ import (
 	"github.com/google/uuid"
 )
 
-const manifestFilename = "grouping-object-template.yaml"
+const manifestFilename = "inventory-template.yaml"
 
 const configMapTemplate = `# NOTE: auto-generated. Some fields should NOT be modified.
 # Date: <DATETIME>
 #
-# Contains the "grouping object" template ConfigMap.
+# Contains the "inventory object" template ConfigMap.
 # When this object is applied, it is handled specially,
 # storing the metadata of all the other objects applied.
 # This object and its stored inventory is subsequently
 # used to calculate the set of objects to automatically
 # delete (prune), when an object is omitted from further
-# applies. When applied, this "grouping object" is also
+# applies. When applied, this "inventory object" is also
 # used to identify the entire set of objects to delete.
 #
-# NOTE: The name of this grouping object template file
+# NOTE: The name of this inventory template file
 # (e.g. ` + manifestFilename + `) does NOT have any
 # impact on group-related functionality such as deletion
 # or pruning.
@@ -40,33 +40,33 @@ const configMapTemplate = `# NOTE: auto-generated. Some fields should NOT be mod
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  # DANGER: Do not change the grouping object namespace.
+  # DANGER: Do not change the inventory object namespace.
   # Changing the namespace will cause a loss of continuity
   # with previously applied grouped objects. Set deletion
   # and pruning functionality will be impaired.
   namespace: <NAMESPACE>
-  # NOTE: The name of the grouping object does NOT have
+  # NOTE: The name of the inventory object does NOT have
   # any impact on group-related functionality such as
   # deletion or pruning.
-  name: grouping-object
+  name: inventory
   labels:
     # DANGER: Do not change the value of this label.
     # Changing this value will cause a loss of continuity
     # with previously applied grouped objects. Set deletion
     # and pruning functionality will be impaired.
-    cli-utils.sigs.k8s.io/inventory-id: <GROUPNAME>
+    cli-utils.sigs.k8s.io/inventory-id: <INVENTORYID>
 `
 
 // InitOptions contains the fields necessary to generate a
-// grouping object template ConfigMap.
+// inventory object template ConfigMap.
 type InitOptions struct {
 	ioStreams genericclioptions.IOStreams
 	// Package directory argument; must be valid directory.
 	Dir string
-	// Namespace for grouping object; can not be empty.
+	// Namespace for inventory object; can not be empty.
 	Namespace string
-	// Grouping object label value; must be a valid k8s label value.
-	GroupName string
+	// Inventory object label value; must be a valid k8s label value.
+	InventoryID string
 }
 
 func NewInitOptions(ioStreams genericclioptions.IOStreams) *InitOptions {
@@ -95,16 +95,16 @@ func (i *InitOptions) Complete(args []string) error {
 		}
 		i.Namespace = namespace
 	}
-	// Set the default grouping label if one does not exist.
-	if len(i.GroupName) == 0 {
-		groupName, err := i.defaultGroupName()
+	// Set the default inventory label if one does not exist.
+	if len(i.InventoryID) == 0 {
+		inventoryID, err := i.defaultInventoryID()
 		if err != nil {
 			return err
 		}
-		i.GroupName = groupName
+		i.InventoryID = inventoryID
 	}
-	if !validateGroupName(i.GroupName) {
-		return fmt.Errorf("invalid group name: %s", i.GroupName)
+	if !validateInventoryID(i.InventoryID) {
+		return fmt.Errorf("invalid group name: %s", i.InventoryID)
 	}
 	return nil
 }
@@ -157,9 +157,9 @@ func calcPackageNamespace(packageDir string) (string, error) {
 	return metav1.NamespaceDefault, nil
 }
 
-// defaultGroupName returns a UUID string as a default unique
-// identifier for a grouping object label.
-func (i *InitOptions) defaultGroupName() (string, error) {
+// defaultInventoryID returns a UUID string as a default unique
+// identifier for a inventory object label.
+func (i *InitOptions) defaultInventoryID() (string, error) {
 	u, err := uuid.NewRandom()
 	if err != nil {
 		return "", err
@@ -170,18 +170,18 @@ func (i *InitOptions) defaultGroupName() (string, error) {
 // Must begin and end with an alphanumeric character ([a-z0-9A-Z])
 // with dashes (-), underscores (_), dots (.), and alphanumerics
 // between.
-const groupNameRegexp = `^[a-zA-Z0-9][a-zA-Z0-9\-\_\.]+[a-zA-Z0-9]$`
+const inventoryIDRegexp = `^[a-zA-Z0-9][a-zA-Z0-9\-\_\.]+[a-zA-Z0-9]$`
 
-// validateGroupName returns true of the passed group name is a
+// validateInventoryID returns true of the passed group name is a
 // valid label value; false otherwise. The valid label values
-// are [a-z0-9A-Z] "-", "_", and "." The groupName must not
+// are [a-z0-9A-Z] "-", "_", and "." The inventoryID must not
 // be empty, but it can not be more than 63 characters.
-func validateGroupName(groupName string) bool {
-	if len(groupName) == 0 || len(groupName) > 63 {
+func validateInventoryID(inventoryID string) bool {
+	if len(inventoryID) == 0 || len(inventoryID) > 63 {
 		return false
 	}
-	re := regexp.MustCompile(groupNameRegexp)
-	return re.MatchString(groupName)
+	re := regexp.MustCompile(inventoryIDRegexp)
+	return re.MatchString(inventoryID)
 }
 
 // fileExists returns true if a file at path already exists;
@@ -194,8 +194,8 @@ func fileExists(path string) bool {
 	return !f.IsDir()
 }
 
-// fillInValues returns a string of the grouping object template
-// ConfigMap with values filled in (eg. namespace, groupname).
+// fillInValues returns a string of the inventory object template
+// ConfigMap with values filled in (eg. namespace, inventoryID).
 // TODO(seans3): Look into text/template package.
 func (i *InitOptions) fillInValues() string {
 	now := time.Now()
@@ -203,23 +203,23 @@ func (i *InitOptions) fillInValues() string {
 	manifestStr := configMapTemplate
 	manifestStr = strings.ReplaceAll(manifestStr, "<DATETIME>", nowStr)
 	manifestStr = strings.ReplaceAll(manifestStr, "<NAMESPACE>", i.Namespace)
-	manifestStr = strings.ReplaceAll(manifestStr, "<GROUPNAME>", i.GroupName)
+	manifestStr = strings.ReplaceAll(manifestStr, "<INVENTORYID>", i.InventoryID)
 	return manifestStr
 }
 
 func (i *InitOptions) Run() error {
 	manifestFilePath := filepath.Join(i.Dir, manifestFilename)
 	if fileExists(manifestFilePath) {
-		return fmt.Errorf("grouping object template file already exists: %s", manifestFilePath)
+		return fmt.Errorf("inventory object template file already exists: %s", manifestFilePath)
 	}
 	f, err := os.Create(manifestFilePath)
 	if err != nil {
-		return fmt.Errorf("unable to create grouping object template file: %s", err)
+		return fmt.Errorf("unable to create inventory object template file: %s", err)
 	}
 	defer f.Close()
 	_, err = f.WriteString(i.fillInValues())
 	if err != nil {
-		return fmt.Errorf("unable to write grouping object template file: %s", manifestFilePath)
+		return fmt.Errorf("unable to write inventory object template file: %s", manifestFilePath)
 	}
 	fmt.Fprintf(i.ioStreams.Out, "Initialized: %s\n", manifestFilePath)
 	return nil

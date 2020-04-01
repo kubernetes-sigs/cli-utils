@@ -24,6 +24,6 @@ func NewCmdInit(ioStreams genericclioptions.IOStreams) *cobra.Command {
 			cmdutil.CheckErr(io.Run())
 		},
 	}
-	cmd.Flags().StringVarP(&io.GroupName, "group-name", "g", "", "Name to group applied resources. Must be composed of valid label characters.")
+	cmd.Flags().StringVarP(&io.InventoryID, "inventory-id", "i", "", "Identifier for group of applied resources. Must be composed of valid label characters.")
 	return cmd
 }
