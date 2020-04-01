@@ -22,12 +22,11 @@ import (
 // handled by a separate printer with the KubectlPrinterAdapter bridging
 // between the two.
 func NewDestroyer(factory util.Factory, ioStreams genericclioptions.IOStreams) *Destroyer {
-	// Create and maintain an empty set of UID's. This empty UID set is used
-	// during prune calculation to prune every object.
-	emptyUids := sets.NewString()
 	return &Destroyer{
 		ApplyOptions: apply.NewApplyOptions(ioStreams),
-		PruneOptions: prune.NewPruneOptions(&emptyUids),
+		// Create and maintain an empty set of UID's. This empty UID set
+		// is used during prune calculation to prune every object.
+		PruneOptions: prune.NewPruneOptions(sets.NewString()),
 		factory:      factory,
 		ioStreams:    ioStreams,
 	}

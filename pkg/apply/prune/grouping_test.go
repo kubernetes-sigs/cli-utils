@@ -46,6 +46,7 @@ var pod1 = unstructured.Unstructured{
 		"metadata": map[string]interface{}{
 			"name":      pod1Name,
 			"namespace": testNamespace,
+			"uid":       "uid1",
 		},
 	},
 }
@@ -63,6 +64,7 @@ var pod2 = unstructured.Unstructured{
 		"metadata": map[string]interface{}{
 			"name":      pod2Name,
 			"namespace": testNamespace,
+			"uid":       "uid2",
 		},
 	},
 }
@@ -80,6 +82,7 @@ var pod3 = unstructured.Unstructured{
 		"metadata": map[string]interface{}{
 			"name":      pod3Name,
 			"namespace": testNamespace,
+			"uid":       "uid3",
 		},
 	},
 }

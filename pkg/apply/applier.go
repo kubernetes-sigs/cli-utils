@@ -41,7 +41,7 @@ func NewApplier(factory util.Factory, ioStreams genericclioptions.IOStreams) *Ap
 		StatusOptions: NewStatusOptions(),
 		// VisitedUids keeps track of the unique identifiers for all
 		// currently applied objects. Used to calculate prune set.
-		PruneOptions: prune.NewPruneOptions(&applyOptions.VisitedUids),
+		PruneOptions: prune.NewPruneOptions(applyOptions.VisitedUids),
 		factory:      factory,
 		ioStreams:    ioStreams,
 	}

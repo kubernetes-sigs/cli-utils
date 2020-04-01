@@ -37,7 +37,11 @@ type PruneOptions struct {
 	// calculate the prune set after retrieving the previous
 	// grouping objects.
 	currentGroupingObject *resource.Info
-	currentUids           *sets.String
+	// Stores the UID for each of the currently applied objects.
+	// These UID's are written during the apply, and this data
+	// structure is shared. IMPORTANT: the apply task must
+	// always complete before this prune is run.
+	currentUids sets.String
 	// The set of retrieved grouping objects (as Infos) selected
 	// by the grouping label. This set should also include the
 	// current grouping object. Stored here to make testing
@@ -54,7 +58,7 @@ type PruneOptions struct {
 // NewPruneOptions returns a struct (PruneOptions) encapsulating the necessary
 // information to run the prune. Returns an error if an error occurs
 // gathering this information.
-func NewPruneOptions(currentUids *sets.String) *PruneOptions {
+func NewPruneOptions(currentUids sets.String) *PruneOptions {
 	po := &PruneOptions{currentUids: currentUids}
 	return po
 }
