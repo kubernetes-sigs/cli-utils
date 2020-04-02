@@ -13,7 +13,6 @@ require (
 	go.uber.org/atomic v1.4.0 // indirect
 	go.uber.org/zap v1.10.0 // indirect
 	golang.org/x/crypto v0.0.0-20191011191535-87dc89f01550 // indirect
-	golang.org/x/sys v0.0.0-20190911201528-7ad0cfa0b7b5 // indirect
 	golang.org/x/xerrors v0.0.0-20191011141410-1b5146add898 // indirect
 	gopkg.in/yaml.v3 v3.0.0-20200121175148-a6ecf24a6d71
 	gotest.tools v2.2.0+incompatible
@@ -24,6 +23,6 @@ require (
 	k8s.io/kubectl v0.0.0-20191219154910-1528d4eea6dd
 	k8s.io/utils v0.0.0-20191114184206-e782cd3c129f
 	sigs.k8s.io/controller-runtime v0.4.0
-	sigs.k8s.io/kustomize/kyaml v0.1.0
+	sigs.k8s.io/kustomize/kyaml v0.1.4
 	sigs.k8s.io/yaml v1.1.0
 )
