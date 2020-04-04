@@ -44,9 +44,9 @@ func TestComplete(t *testing.T) {
 	}
 }
 
-func TestDefaultGroupName(t *testing.T) {
+func TestDefaultInventoryID(t *testing.T) {
 	io := NewInitOptions(ioStreams)
-	actual, err := io.defaultGroupName()
+	actual, err := io.defaultInventoryID()
 	if err != nil {
 		t.Errorf("Unxpected error during UUID generation: %v", err)
 	}
@@ -58,62 +58,62 @@ func TestDefaultGroupName(t *testing.T) {
 	}
 }
 
-func TestValidateGroupName(t *testing.T) {
+func TestValidateInventoryID(t *testing.T) {
 	tests := map[string]struct {
-		groupName string
-		isValid   bool
+		inventoryID string
+		isValid     bool
 	}{
-		"Empty Groupname fails": {
-			groupName: "",
-			isValid:   false,
+		"Empty InventoryID fails": {
+			inventoryID: "",
+			isValid:     false,
 		},
-		"Groupname greater than sixty-three chars fails": {
-			groupName: "88888888888888888888888888888888888888888888888888888888888888888",
-			isValid:   false,
+		"InventoryID greater than sixty-three chars fails": {
+			inventoryID: "88888888888888888888888888888888888888888888888888888888888888888",
+			isValid:     false,
 		},
 		"Non-allowed characters fails": {
-			groupName: "&foo",
-			isValid:   false,
+			inventoryID: "&foo",
+			isValid:     false,
 		},
 		"Initial dot fails": {
-			groupName: ".foo",
-			isValid:   false,
+			inventoryID: ".foo",
+			isValid:     false,
 		},
 		"Initial dash fails": {
-			groupName: "-foo",
-			isValid:   false,
+			inventoryID: "-foo",
+			isValid:     false,
 		},
 		"Initial underscore fails": {
-			groupName: "_foo",
-			isValid:   false,
+			inventoryID: "_foo",
+			isValid:     false,
 		},
 		"Trailing dot fails": {
-			groupName: "foo.",
-			isValid:   false,
+			inventoryID: "foo.",
+			isValid:     false,
 		},
 		"Trailing dash fails": {
-			groupName: "foo-",
-			isValid:   false,
+			inventoryID: "foo-",
+			isValid:     false,
 		},
 		"Trailing underscore fails": {
-			groupName: "foo_",
-			isValid:   false,
+			inventoryID: "foo_",
+			isValid:     false,
 		},
 		"Initial digit succeeds": {
-			groupName: "90-foo.bar_test",
-			isValid:   true,
+			inventoryID: "90-foo.bar_test",
+			isValid:     true,
 		},
 		"Allowed characters succeed": {
-			groupName: "f_oo90bar-t.est90",
-			isValid:   true,
+			inventoryID: "f_oo90bar-t.est90",
+			isValid:     true,
 		},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			actualValid := validateGroupName(tc.groupName)
+			actualValid := validateInventoryID(tc.inventoryID)
 			if tc.isValid != actualValid {
-				t.Errorf("Groupname: %s. Expected valid (%t), got (%t)", tc.groupName, tc.isValid, actualValid)
+				t.Errorf("InventoryID: %s. Expected valid (%t), got (%t)", tc.inventoryID, tc.isValid, actualValid)
 			}
 		})
 	}
@@ -121,12 +121,12 @@ func TestValidateGroupName(t *testing.T) {
 
 func TestFillInValues(t *testing.T) {
 	tests := map[string]struct {
-		namespace string
-		groupname string
+		namespace   string
+		inventoryID string
 	}{
-		"Basic namespace/groupname": {
-			namespace: "foo",
-			groupname: "bar",
+		"Basic namespace/inventoryID": {
+			namespace:   "foo",
+			inventoryID: "bar",
 		},
 	}
 
@@ -134,18 +134,18 @@ func TestFillInValues(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			io := NewInitOptions(ioStreams)
 			io.Namespace = tc.namespace
-			io.GroupName = tc.groupname
+			io.InventoryID = tc.inventoryID
 			actual := io.fillInValues()
-			expectedLabel := fmt.Sprintf("cli-utils.sigs.k8s.io/inventory-id: %s", tc.groupname)
+			expectedLabel := fmt.Sprintf("cli-utils.sigs.k8s.io/inventory-id: %s", tc.inventoryID)
 			if !strings.Contains(actual, expectedLabel) {
-				t.Errorf("\nExpected label (%s) not found in grouping object: %s\n", expectedLabel, actual)
+				t.Errorf("\nExpected label (%s) not found in inventory object: %s\n", expectedLabel, actual)
 			}
 			expectedNamespace := fmt.Sprintf("namespace: %s", tc.namespace)
 			if !strings.Contains(actual, expectedNamespace) {
-				t.Errorf("\nExpected namespace (%s) not found in grouping object: %s\n", expectedNamespace, actual)
+				t.Errorf("\nExpected namespace (%s) not found in inventory object: %s\n", expectedNamespace, actual)
 			}
 			if !strings.Contains(actual, "kind: ConfigMap") {
-				t.Errorf("\nExpected `kind: ConfigMap` not found in grouping object: %s\n", actual)
+				t.Errorf("\nExpected `kind: ConfigMap` not found in inventory object: %s\n", actual)
 			}
 		})
 	}
