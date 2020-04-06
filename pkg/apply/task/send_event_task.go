@@ -12,17 +12,16 @@ import (
 // that will send the provided event on the eventChannel when
 // executed.
 type SendEventTask struct {
-	EventChannel chan event.Event
-	Event        event.Event
+	Event event.Event
 }
 
 // Start start a separate goroutine that will send the
 // event and then push a TaskResult on the taskChannel to
 // signal to the taskrunner that the task is completed.
-func (s *SendEventTask) Start(taskChannel chan taskrunner.TaskResult) {
+func (s *SendEventTask) Start(taskContext *taskrunner.TaskContext) {
 	go func() {
-		s.EventChannel <- s.Event
-		taskChannel <- taskrunner.TaskResult{}
+		taskContext.EventChannel() <- s.Event
+		taskContext.TaskChannel() <- taskrunner.TaskResult{}
 	}()
 }
 

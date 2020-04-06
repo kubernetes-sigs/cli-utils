@@ -20,11 +20,11 @@ type ApplyTask struct {
 // the Run function on the ApplyOptions to update
 // the cluster. It will push a TaskResult on the taskChannel
 // to signal to the taskrunner that the task has completed (or failed).
-func (a *ApplyTask) Start(taskChannel chan taskrunner.TaskResult) {
+func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 	go func() {
 		a.ApplyOptions.SetObjects(a.Objects)
 		err := a.ApplyOptions.Run()
-		taskChannel <- taskrunner.TaskResult{
+		taskContext.TaskChannel() <- taskrunner.TaskResult{
 			Err: err,
 		}
 	}()

@@ -198,8 +198,8 @@ func splitInfos(infos []*resource.Info) ([]*resource.Info, []*resource.Info) {
 
 // buildTaskQueue takes the slice of infos and object identifiers, and
 // builds a queue of tasks that needs to be executed.
-func (a *Applier) buildTaskQueue(infos []*resource.Info, identifiers []object.ObjMetadata,
-	eventChannel chan event.Event) chan taskrunner.Task {
+func (a *Applier) buildTaskQueue(infos []*resource.Info,
+	identifiers []object.ObjMetadata) chan taskrunner.Task {
 	tasks := []taskrunner.Task{
 		// This taks is responsible for applying all the resources
 		// in the infos slice.
@@ -217,7 +217,6 @@ func (a *Applier) buildTaskQueue(infos []*resource.Info, identifiers []object.Ob
 					Type: event.ApplyEventCompleted,
 				},
 			},
-			EventChannel: eventChannel,
 		},
 	}
 
@@ -237,7 +236,6 @@ func (a *Applier) buildTaskQueue(infos []*resource.Info, identifiers []object.Ob
 						EventType: pollevent.CompletedEvent,
 					},
 				},
-				EventChannel: eventChannel,
 			})
 	}
 
@@ -248,7 +246,6 @@ func (a *Applier) buildTaskQueue(infos []*resource.Info, identifiers []object.Ob
 			&task.PruneTask{
 				Objects:      infos,
 				PruneOptions: a.PruneOptions,
-				EventChannel: eventChannel,
 			},
 			// Once prune is completed, we send an event to notify
 			// the client.
@@ -259,7 +256,6 @@ func (a *Applier) buildTaskQueue(infos []*resource.Info, identifiers []object.Ob
 						Type: event.PruneEventCompleted,
 					},
 				},
-				EventChannel: eventChannel,
 			})
 	}
 
@@ -307,7 +303,7 @@ func (a *Applier) Run(ctx context.Context, options Options) <-chan event.Event {
 		identifiers := infosToObjMetas(infos)
 
 		// Fetch the queue (channel) of tasks that should be executed.
-		taskQueue := a.buildTaskQueue(infos, identifiers, eventChannel)
+		taskQueue := a.buildTaskQueue(infos, identifiers)
 
 		// Send event to inform the caller about the resources that
 		// will be applied/pruned.
