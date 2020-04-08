@@ -35,12 +35,15 @@ import (
 // handled by a separate printer with the KubectlPrinterAdapter bridging
 // between the two.
 func NewApplier(factory util.Factory, ioStreams genericclioptions.IOStreams) *Applier {
+	applyOptions := apply.NewApplyOptions(ioStreams)
 	return &Applier{
-		ApplyOptions:  apply.NewApplyOptions(ioStreams),
+		ApplyOptions:  applyOptions,
 		StatusOptions: NewStatusOptions(),
-		PruneOptions:  prune.NewPruneOptions(),
-		factory:       factory,
-		ioStreams:     ioStreams,
+		// VisitedUids keeps track of the unique identifiers for all
+		// currently applied objects. Used to calculate prune set.
+		PruneOptions: prune.NewPruneOptions(applyOptions.VisitedUids),
+		factory:      factory,
+		ioStreams:    ioStreams,
 	}
 }
 

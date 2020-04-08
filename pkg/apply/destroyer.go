@@ -6,6 +6,8 @@ package apply
 import (
 	"github.com/go-errors/errors"
 	"github.com/spf13/cobra"
+
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/kubectl/pkg/cmd/apply"
 	"k8s.io/kubectl/pkg/cmd/util"
@@ -22,7 +24,9 @@ import (
 func NewDestroyer(factory util.Factory, ioStreams genericclioptions.IOStreams) *Destroyer {
 	return &Destroyer{
 		ApplyOptions: apply.NewApplyOptions(ioStreams),
-		PruneOptions: prune.NewPruneOptions(),
+		// Create and maintain an empty set of UID's. This empty UID set
+		// is used during prune calculation to prune every object.
+		PruneOptions: prune.NewPruneOptions(sets.NewString()),
 		factory:      factory,
 		ioStreams:    ioStreams,
 	}

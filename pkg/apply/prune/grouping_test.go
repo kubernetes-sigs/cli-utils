@@ -46,6 +46,7 @@ var pod1 = unstructured.Unstructured{
 		"metadata": map[string]interface{}{
 			"name":      pod1Name,
 			"namespace": testNamespace,
+			"uid":       "uid1",
 		},
 	},
 }
@@ -63,6 +64,7 @@ var pod2 = unstructured.Unstructured{
 		"metadata": map[string]interface{}{
 			"name":      pod2Name,
 			"namespace": testNamespace,
+			"uid":       "uid2",
 		},
 	},
 }
@@ -80,6 +82,7 @@ var pod3 = unstructured.Unstructured{
 		"metadata": map[string]interface{}{
 			"name":      pod3Name,
 			"namespace": testNamespace,
+			"uid":       "uid3",
 		},
 	},
 }
@@ -554,7 +557,7 @@ func TestAddRetrieveInventoryToFromGroupingObject(t *testing.T) {
 			for _, expected := range test.expected {
 				found := false
 				for _, actual := range retrieved {
-					if expected.EqualsWithNormalize(actual) {
+					if expected.Equals(actual) {
 						found = true
 						continue
 					}
