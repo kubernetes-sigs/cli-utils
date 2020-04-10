@@ -80,12 +80,14 @@ func (b *baseStatusReader) lookupResource(ctx context.Context, identifier object
 
 	var u unstructured.Unstructured
 	u.SetGroupVersionKind(GVK)
-	key := keyForNamespacedResource(identifier)
+	key := types.NamespacedName{
+		Name:      identifier.Name,
+		Namespace: identifier.Namespace,
+	}
 	err = b.reader.Get(ctx, key, &u)
 	if err != nil {
 		return nil, err
 	}
-	u.SetNamespace(identifier.Namespace)
 	return &u, nil
 }
 
@@ -188,22 +190,5 @@ func getNamespaceForNamespacedResource(object runtime.Object) string {
 	if err != nil {
 		panic(err)
 	}
-	ns := acc.GetNamespace()
-	if ns == metav1.NamespaceNone {
-		return metav1.NamespaceDefault
-	}
-	return ns
-}
-
-// keyForNamespacedResource returns the object key for the given identifier. It makes
-// sure to set the namespace to default if it is not provided.
-func keyForNamespacedResource(identifier object.ObjMetadata) types.NamespacedName {
-	namespace := metav1.NamespaceDefault
-	if identifier.Namespace != metav1.NamespaceNone {
-		namespace = identifier.Namespace
-	}
-	return types.NamespacedName{
-		Name:      identifier.Name,
-		Namespace: namespace,
-	}
+	return acc.GetNamespace()
 }
