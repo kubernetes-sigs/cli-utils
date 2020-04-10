@@ -294,12 +294,7 @@ func (a *Applier) Run(ctx context.Context) <-chan event.Event {
 		// and handling the grouping object.
 		infos, err := a.readAndPrepareObjects()
 		if err != nil {
-			eventChannel <- event.Event{
-				Type: event.ErrorType,
-				ErrorEvent: event.ErrorEvent{
-					Err: errors.WrapPrefix(err, "error reading resources", 1),
-				},
-			}
+			handleError(eventChannel, err)
 			return
 		}
 
@@ -334,15 +329,19 @@ func (a *Applier) Run(ctx context.Context) <-chan event.Event {
 			UseCache:     true,
 		})
 		if err != nil {
-			eventChannel <- event.Event{
-				Type: event.ErrorType,
-				ErrorEvent: event.ErrorEvent{
-					Err: err,
-				},
-			}
+			handleError(eventChannel, err)
 		}
 	}()
 	return eventChannel
+}
+
+func handleError(eventChannel chan event.Event, err error) {
+	eventChannel <- event.Event{
+		Type: event.ErrorType,
+		ErrorEvent: event.ErrorEvent{
+			Err: err,
+		},
+	}
 }
 
 // infosToObjMetas takes a slice of infos and extract the

@@ -5,10 +5,13 @@ package engine
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
 	"gotest.tools/assert"
+	appsv1 "k8s.io/api/apps/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -104,7 +107,14 @@ func TestStatusPollerRunner(t *testing.T) {
 
 			identifiers := tc.identifiers
 
-			engine := PollerEngine{}
+			fakeMapper := testutil.NewFakeRESTMapper(
+				appsv1.SchemeGroupVersion.WithKind("Deployment"),
+				v1.SchemeGroupVersion.WithKind("Service"),
+			)
+
+			engine := PollerEngine{
+				Mapper: fakeMapper,
+			}
 
 			options := Options{
 				PollInterval:       2 * time.Second,
@@ -179,6 +189,55 @@ func TestNewStatusPollerRunnerCancellation(t *testing.T) {
 			t.Errorf("expected runner to time out, but it didn't")
 			return
 		}
+	}
+}
+
+func TestNewStatusPollerRunnerIdentifierValidation(t *testing.T) {
+	identifiers := []object.ObjMetadata{
+		{
+			GroupKind: schema.GroupKind{
+				Group: "apps",
+				Kind:  "Deployment",
+			},
+			Name: "foo",
+		},
+	}
+
+	engine := PollerEngine{
+		Mapper: testutil.NewFakeRESTMapper(
+			appsv1.SchemeGroupVersion.WithKind("Deployment"),
+		),
+	}
+
+	eventChannel := engine.Poll(context.Background(), identifiers, Options{
+		AggregatorFactoryFunc: func(identifiers []object.ObjMetadata) StatusAggregator {
+			return newFakeAggregator(identifiers)
+		},
+		ClusterReaderFactoryFunc: func(_ client.Reader, _ meta.RESTMapper, _ []object.ObjMetadata) (
+			ClusterReader, error) {
+			return testutil.NewNoopClusterReader(), nil
+		},
+		StatusReadersFactoryFunc: func(_ ClusterReader, _ meta.RESTMapper) (
+			statusReaders map[schema.GroupKind]StatusReader, defaultStatusReader StatusReader) {
+			return make(map[schema.GroupKind]StatusReader), nil
+		},
+	})
+
+	timer := time.NewTimer(3 * time.Second)
+	defer timer.Stop()
+	select {
+	case e := <-eventChannel:
+		if e.EventType != event.ErrorEvent {
+			t.Errorf("expected an error event, but got %s", e.EventType.String())
+			return
+		}
+		err := e.Error
+		if !strings.Contains(err.Error(), "namespace is not set") {
+			t.Errorf("expected error with namespace not set, but got %v", err)
+		}
+		return
+	case <-timer.C:
+		t.Errorf("expected an error event, but didn't get one")
 	}
 }
 

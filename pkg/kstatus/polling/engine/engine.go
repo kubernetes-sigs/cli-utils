@@ -49,19 +49,20 @@ func (s *PollerEngine) Poll(ctx context.Context, identifiers []object.ObjMetadat
 
 		err := s.validate(options)
 		if err != nil {
-			eventChannel <- event.Event{
-				EventType: event.ErrorEvent,
-				Error:     err,
-			}
+			handleError(eventChannel, err)
+			return
+		}
+
+		err = s.validateIdentifiers(identifiers)
+		if err != nil {
+			handleError(eventChannel, err)
 			return
 		}
 
 		clusterReader, err := options.ClusterReaderFactoryFunc(s.Reader, s.Mapper, identifiers)
 		if err != nil {
-			eventChannel <- event.Event{
-				EventType: event.ErrorEvent,
-				Error:     errors.WrapPrefix(err, "error creating new ClusterReader", 1),
-			}
+			handleError(eventChannel,
+				errors.WrapPrefix(err, "error creating new ClusterReader", 1))
 			return
 		}
 		statusReaders, defaultStatusReader := options.StatusReadersFactoryFunc(clusterReader, s.Mapper)
@@ -85,6 +86,13 @@ func (s *PollerEngine) Poll(ctx context.Context, identifiers []object.ObjMetadat
 	return eventChannel
 }
 
+func handleError(eventChannel chan event.Event, err error) {
+	eventChannel <- event.Event{
+		EventType: event.ErrorEvent,
+		Error:     err,
+	}
+}
+
 // validate checks that the passed in options contains valid values.
 func (s *PollerEngine) validate(options Options) error {
 	if options.ClusterReaderFactoryFunc == nil {
@@ -95,6 +103,22 @@ func (s *PollerEngine) validate(options Options) error {
 	}
 	if options.StatusReadersFactoryFunc == nil {
 		return fmt.Errorf("statusReadersFactoryFunc must be specified")
+	}
+	return nil
+}
+
+// validateIdentifiers makes sure that all namespaced resources
+// passed in
+func (s *PollerEngine) validateIdentifiers(identifiers []object.ObjMetadata) error {
+	for _, id := range identifiers {
+		mapping, err := s.Mapper.RESTMapping(id.GroupKind)
+		if err != nil {
+			return err
+		}
+		if mapping.Scope.Name() == meta.RESTScopeNameNamespace && id.Namespace == "" {
+			return fmt.Errorf("resource %s %s is namespace scoped, but namespace is not set",
+				id.GroupKind.String(), id.Name)
+		}
 	}
 	return nil
 }
