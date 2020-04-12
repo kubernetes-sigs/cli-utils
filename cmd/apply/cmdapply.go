@@ -5,12 +5,15 @@ package apply
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/kubectl/pkg/cmd/util"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/i18n"
+	"sigs.k8s.io/cli-utils/cmd/printers"
 	"sigs.k8s.io/cli-utils/pkg/apply"
 )
 
@@ -42,6 +45,9 @@ func GetApplyRunner(f util.Factory, ioStreams genericclioptions.IOStreams) *Appl
 	_ = cmd.Flags().MarkHidden("force-conflicts")
 	_ = cmd.Flags().MarkHidden("field-manager")
 
+	cmd.Flags().StringVar(&r.output, "output", printers.DefaultPrinter(),
+		fmt.Sprintf("Output format, must be one of %s", strings.Join(printers.SupportedPrinters(), ",")))
+
 	r.command = cmd
 	return r
 }
@@ -54,6 +60,8 @@ type ApplyRunner struct {
 	command   *cobra.Command
 	ioStreams genericclioptions.IOStreams
 	applier   *apply.Applier
+
+	output string
 }
 
 func (r *ApplyRunner) Run(cmd *cobra.Command, args []string) {
@@ -65,8 +73,6 @@ func (r *ApplyRunner) Run(cmd *cobra.Command, args []string) {
 
 	// The printer will print updates from the channel. It will block
 	// until the channel is closed.
-	printer := &apply.BasicPrinter{
-		IOStreams: r.ioStreams,
-	}
+	printer := printers.GetPrinter(r.output, r.ioStreams)
 	printer.Print(ch, false)
 }
