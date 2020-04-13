@@ -116,6 +116,16 @@ func Compute(u *unstructured.Unstructured) (*Result, error) {
 		return fn(u)
 	}
 
+	// If neither the generic properties of the resource-specific rules
+	// can determine status, we do one last check to see if the resource
+	// does expose a Ready condition. Ready conditions do not adhere
+	// to the Kubernetes design recommendations, but they are pretty widely
+	// used.
+	res, err = checkReadyCondition(u)
+	if res != nil || err != nil {
+		return res, err
+	}
+
 	// The resource is not one of the built-in types with specific
 	// rules and we were unable to make a decision based on the
 	// generic rules. In this case we assume that the absence of any known
@@ -125,6 +135,50 @@ func Compute(u *unstructured.Unstructured) (*Result, error) {
 		Message:    "Resource is current",
 		Conditions: []Condition{},
 	}, err
+}
+
+// checkReadyCondition checks if a resource has a Ready condition, and
+// if so, it will use the value of this condition to determine the
+// status.
+// There are a few challenges with this:
+// - If a resource doesn't set the Ready condition until it is True,
+// the library have no way of telling whether the resource is using the
+// Ready condition, so it will fall back to the strategy for unknown
+// resources, which is to assume they are always reconciled.
+// - If the library sees the resource before the controller has had
+// a chance to update the conditions, it also will not realize the
+// resource use the Ready condition.
+// - There is no way to determine if a resource with the Ready condition
+// set to False is making progress or is doomed.
+func checkReadyCondition(u *unstructured.Unstructured) (*Result, error) {
+	objWithConditions, err := GetObjectWithConditions(u.Object)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, cond := range objWithConditions.Status.Conditions {
+		if cond.Type != "Ready" {
+			continue
+		}
+		switch cond.Status {
+		case corev1.ConditionTrue:
+			return &Result{
+				Status:     CurrentStatus,
+				Message:    "Resource is Ready",
+				Conditions: []Condition{},
+			}, nil
+		case corev1.ConditionFalse:
+			return newInProgressStatus(cond.Reason, cond.Message), nil
+		case corev1.ConditionUnknown:
+			// For now we just treat an unknown condition value as
+			// InProgress. We should consider if there are better ways
+			// to handle it.
+			return newInProgressStatus(cond.Reason, cond.Message), nil
+		default:
+			// Do nothing in this case.
+		}
+	}
+	return nil, nil
 }
 
 // Augment takes a resource and augments the resource with the

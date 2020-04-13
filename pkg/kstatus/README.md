@@ -58,6 +58,25 @@ solution to this issue is to adopt the pattern used by several of the built-in t
 If the `generation` and the `observedGeneration` of a resource does not match, it means there are changes
 that the controller has not yet seen, and therefore not acted upon.
 
+#### The `Ready` Condition
+For resources that have not adopted the recommended conditions described above
+and we don't have a type-specific rule for the resource, the library
+will look for the `Ready` condition. If there is a `Ready` condition and it
+is `True`, the library will consider the resource to be fully reconciled. If
+there is a `Ready` condition and it is `False`, the library will consider the
+resource to be in the process of reconciling.
+
+There are a few corner cases here:
+ * If a resource doesn't set the Ready condition until it is True,
+the library have no way of telling whether the resource is using the
+Ready condition, so it will fall back to the strategy for unknown
+resources, which is to assume they are always reconciled.
+ * If the library sees the resource before the controller has had
+a chance to update the conditions, it also will not realize the
+resource use the Ready condition.
+ * There is no way to determine if a resource with the Ready condition
+set to False is making progress or is doomed.
+
 ## Features
 
 The library is currently separated into two packages, one that provides the basic functionality, and another that

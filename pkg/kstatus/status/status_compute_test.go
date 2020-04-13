@@ -984,6 +984,7 @@ status:
    conditions:
     - type: Ready 
       status: "False"
+      reason: NotReadyYet
 `
 
 var crdNoCondition = `
@@ -1020,12 +1021,17 @@ func TestCRDGenericStatus(t *testing.T) {
 			},
 		},
 		"crdNotReady": {
-			spec:               crdNotReady,
-			expectedStatus:     CurrentStatus,
-			expectedConditions: []Condition{},
+			spec:           crdNotReady,
+			expectedStatus: InProgressStatus,
+			expectedConditions: []Condition{
+				{
+					Type:   ConditionReconciling,
+					Status: corev1.ConditionTrue,
+					Reason: "NotReadyYet",
+				},
+			},
 			absentConditionTypes: []ConditionType{
 				ConditionStalled,
-				ConditionReconciling,
 			},
 		},
 		"crdNoCondition": {
