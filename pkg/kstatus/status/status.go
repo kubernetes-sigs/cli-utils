@@ -76,13 +76,13 @@ type Result struct {
 // most (maybe all) follows this structure.
 type Condition struct {
 	// Type condition type
-	Type ConditionType
+	Type ConditionType `json:"type,omitempty"`
 	// Status String that describes the condition status
-	Status corev1.ConditionStatus
+	Status corev1.ConditionStatus `json:"status,omitempty"`
 	// Reason one work CamelCase reason
-	Reason string
+	Reason string `json:"reason,omitempty"`
 	// Message Human readable reason string
-	Message string
+	Message string `json:"message,omitempty"`
 }
 
 // Compute finds the status of a given unstructured resource. It does not
