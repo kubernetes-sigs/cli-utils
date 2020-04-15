@@ -8,15 +8,14 @@ import (
 
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/kubectl/pkg/cmd/util"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"sigs.k8s.io/cli-utils/pkg/apply"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 )
 
-// NewCmdApply creates the `apply` command
-func NewCmdPreview(f util.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+// NewCmdPreview creates the `preview` command
+func NewCmdPreview(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	applier := apply.NewApplier(f, ioStreams)
 	destroyer := apply.NewDestroyer(f, ioStreams)
 

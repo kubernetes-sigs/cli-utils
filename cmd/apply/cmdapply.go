@@ -10,14 +10,13 @@ import (
 
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/kubectl/pkg/cmd/util"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"sigs.k8s.io/cli-utils/cmd/printers"
 	"sigs.k8s.io/cli-utils/pkg/apply"
 )
 
-func GetApplyRunner(f util.Factory, ioStreams genericclioptions.IOStreams) *ApplyRunner {
+func GetApplyRunner(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *ApplyRunner {
 	r := &ApplyRunner{
 		applier:   apply.NewApplier(f, ioStreams),
 		ioStreams: ioStreams,
@@ -52,7 +51,7 @@ func GetApplyRunner(f util.Factory, ioStreams genericclioptions.IOStreams) *Appl
 	return r
 }
 
-func ApplyCommand(f util.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+func ApplyCommand(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	return GetApplyRunner(f, ioStreams).command
 }
 
