@@ -13,6 +13,7 @@ import (
 	"k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/prune"
+	"sigs.k8s.io/cli-utils/pkg/common"
 )
 
 // NewDestroyer returns a new destroyer. It will set up the ApplyOptions and
@@ -47,7 +48,7 @@ type Destroyer struct {
 // a cluster. This involves validating command line inputs and configuring
 // clients for communicating with the cluster.
 func (d *Destroyer) Initialize(cmd *cobra.Command, paths []string) error {
-	fileNameFlags, err := demandOneDirectory(paths)
+	fileNameFlags, err := common.DemandOneDirectory(paths)
 	if err != nil {
 		return err
 	}

@@ -22,6 +22,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/apply/prune"
 	"sigs.k8s.io/cli-utils/pkg/apply/task"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
+	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling"
 	pollevent "sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/object"
@@ -74,7 +75,7 @@ type Applier struct {
 // a cluster. This involves validating command line inputs and configuring
 // clients for communicating with the cluster.
 func (a *Applier) Initialize(cmd *cobra.Command, paths []string) error {
-	fileNameFlags, err := demandOneDirectory(paths)
+	fileNameFlags, err := common.DemandOneDirectory(paths)
 	if err != nil {
 		return err
 	}
