@@ -1,7 +1,7 @@
 // Copyright 2020 The Kubernetes Authors.
 // SPDX-License-Identifier: Apache-2.0
 
-package apply
+package common
 
 import (
 	"testing"
@@ -54,7 +54,7 @@ func TestProcessPaths(t *testing.T) {
 			var err error
 			fileNameFlags := processPaths(tc.paths)
 			assert.DeepEqual(t, tc.expectedFileNameFlags, fileNameFlags)
-			fileNameFlags, err = demandOneDirectory(tc.paths)
+			fileNameFlags, err = DemandOneDirectory(tc.paths)
 			assert.DeepEqual(t, tc.expectedFileNameFlags, fileNameFlags)
 			if err != nil && err.Error() != tc.errFromDemandOneDirectory {
 				assert.Equal(t, err.Error(), tc.errFromDemandOneDirectory)

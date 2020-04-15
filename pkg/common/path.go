@@ -1,7 +1,7 @@
 // Copyright 2020 The Kubernetes Authors.
 // SPDX-License-Identifier: Apache-2.0
 
-package apply
+package common
 
 import (
 	"fmt"
@@ -25,7 +25,7 @@ func processPaths(paths []string) genericclioptions.FileNameFlags {
 	return fileNameFlags
 }
 
-func demandOneDirectory(paths []string) (genericclioptions.FileNameFlags, error) {
+func DemandOneDirectory(paths []string) (genericclioptions.FileNameFlags, error) {
 	result := processPaths(paths)
 	// alas, the things called file names should have been called paths.
 	if len(*result.Filenames) != 1 {
