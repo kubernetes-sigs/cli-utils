@@ -11,20 +11,20 @@ import (
 
 func NewStatusOptions() *StatusOptions {
 	return &StatusOptions{
-		wait:    false,
+		Wait:    false,
 		period:  2 * time.Second,
 		Timeout: time.Minute,
 	}
 }
 
 type StatusOptions struct {
-	wait    bool
+	Wait    bool
 	period  time.Duration
 	Timeout time.Duration
 }
 
 func (s *StatusOptions) AddFlags(c *cobra.Command) {
-	c.Flags().BoolVar(&s.wait, "wait-for-reconcile", s.wait, "Wait for all applied resources to reach the Current status.")
+	c.Flags().BoolVar(&s.Wait, "wait-for-reconcile", s.Wait, "Wait for all applied resources to reach the Current status.")
 	c.Flags().DurationVar(&s.period, "wait-polling-period", s.period, "Polling period for resource statuses.")
 	c.Flags().DurationVar(&s.Timeout, "wait-timeout", s.Timeout, "Timeout threshold for waiting for all resources to reach the Current status.")
 }

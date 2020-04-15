@@ -141,7 +141,7 @@ func (d *Destroyer) SetFlags(cmd *cobra.Command) error {
 	_ = cmd.Flags().MarkHidden("force")
 	_ = cmd.Flags().MarkHidden("grace-period")
 	_ = cmd.Flags().MarkHidden("timeout")
-	_ = cmd.Flags().MarkHidden("wait")
+	_ = cmd.Flags().MarkHidden("Wait")
 	d.ApplyOptions.Overwrite = true
 	return nil
 }

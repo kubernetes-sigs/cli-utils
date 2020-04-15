@@ -234,7 +234,7 @@ func TestApplier(t *testing.T) {
 			applier := NewApplier(tf, ioStreams)
 
 			applier.StatusOptions.period = 2 * time.Second
-			applier.StatusOptions.wait = tc.status
+			applier.StatusOptions.Wait = tc.status
 			applier.NoPrune = !tc.prune
 
 			cmd := &cobra.Command{}
@@ -254,7 +254,9 @@ func TestApplier(t *testing.T) {
 			applier.statusPoller = poller
 
 			ctx := context.Background()
-			eventChannel := applier.Run(ctx)
+			eventChannel := applier.Run(ctx, Options{
+				EmitStatusEvents: true,
+			})
 
 			var events []event.Event
 			for e := range eventChannel {

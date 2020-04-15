@@ -68,7 +68,11 @@ func (r *ApplyRunner) Run(cmd *cobra.Command, args []string) {
 
 	// Run the applier. It will return a channel where we can receive updates
 	// to keep track of progress and any issues.
-	ch := r.applier.Run(context.Background())
+	ch := r.applier.Run(context.Background(), apply.Options{
+		// If we are not waiting for status, tell the applier to not
+		// emit the events.
+		EmitStatusEvents: r.applier.StatusOptions.Wait,
+	})
 
 	// The printer will print updates from the channel. It will block
 	// until the channel is closed.

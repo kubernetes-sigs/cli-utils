@@ -45,7 +45,9 @@ func NewCmdPreview(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *co
 
 				// Run the applier. It will return a channel where we can receive updates
 				// to keep track of progress and any issues.
-				ch = applier.Run(ctx)
+				ch = applier.Run(ctx, apply.Options{
+					EmitStatusEvents: false,
+				})
 			} else {
 				ch = destroyer.Run()
 			}

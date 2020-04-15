@@ -162,7 +162,8 @@ func TestBaseRunner(t *testing.T) {
 				}
 			}()
 
-			err := runner.run(context.Background(), taskQueue, statusChannel, eventChannel)
+			err := runner.run(context.Background(), taskQueue, statusChannel,
+				eventChannel, baseOptions{emitStatusEvents: true})
 			close(statusChannel)
 			close(eventChannel)
 			wg.Wait()
@@ -319,7 +320,8 @@ func TestBaseRunnerCancellation(t *testing.T) {
 
 			ctx, cancel := context.WithTimeout(context.Background(), tc.contextTimeout)
 			defer cancel()
-			err := runner.run(ctx, taskQueue, statusChannel, eventChannel)
+			err := runner.run(ctx, taskQueue, statusChannel, eventChannel,
+				baseOptions{emitStatusEvents: false})
 			close(statusChannel)
 			close(eventChannel)
 			wg.Wait()
