@@ -119,7 +119,7 @@ func (a *Applier) SetFlags(cmd *cobra.Command) error {
 	_ = cmd.Flags().MarkHidden("force")
 	_ = cmd.Flags().MarkHidden("grace-period")
 	_ = cmd.Flags().MarkHidden("timeout")
-	_ = cmd.Flags().MarkHidden("wait")
+	_ = cmd.Flags().MarkHidden("Wait")
 	a.StatusOptions.AddFlags(cmd)
 	a.ApplyOptions.Overwrite = true
 	return nil
@@ -221,10 +221,10 @@ func (a *Applier) buildTaskQueue(infos []*resource.Info, identifiers []object.Ob
 		},
 	}
 
-	if a.StatusOptions.wait {
+	if a.StatusOptions.Wait {
 		tasks = append(tasks,
-			// The wait task declares that after applying the resources,
-			// we should wait for all of them to reach the Current status
+			// The Wait task declares that after applying the resources,
+			// we should Wait for all of them to reach the Current status
 			// before continuing.
 			taskrunner.NewWaitTask(identifiers, taskrunner.AllCurrent,
 				a.StatusOptions.Timeout),
@@ -272,13 +272,13 @@ func (a *Applier) buildTaskQueue(infos []*resource.Info, identifiers []object.Ob
 
 // Run performs the Apply step. This happens asynchronously with updates
 // on progress and any errors are reported back on the event channel.
-// Cancelling the operation or setting timeout on how long to wait
+// Cancelling the operation or setting timeout on how long to Wait
 // for it complete can be done with the passed in context.
 // Note: There sn't currently any way to interrupt the operation
 // before all the given resources have been applied to the cluster. Any
-// cancellation or timeout will only affect how long we wait for the
+// cancellation or timeout will only affect how long we Wait for the
 // resources to become current.
-func (a *Applier) Run(ctx context.Context) <-chan event.Event {
+func (a *Applier) Run(ctx context.Context, options Options) <-chan event.Event {
 	eventChannel := make(chan event.Event)
 
 	go func() {
@@ -325,15 +325,20 @@ func (a *Applier) Run(ctx context.Context) <-chan event.Event {
 
 		// Create a new TaskStatusRunner to execute the taskQueue.
 		runner := taskrunner.NewTaskStatusRunner(identifiers, a.statusPoller)
-		err = runner.Run(ctx, taskQueue, eventChannel, taskrunner.PollingOptions{
-			PollInterval: a.StatusOptions.period,
-			UseCache:     true,
+		err = runner.Run(ctx, taskQueue, eventChannel, taskrunner.Options{
+			PollInterval:     a.StatusOptions.period,
+			UseCache:         true,
+			EmitStatusEvents: options.EmitStatusEvents,
 		})
 		if err != nil {
 			handleError(eventChannel, err)
 		}
 	}()
 	return eventChannel
+}
+
+type Options struct {
+	EmitStatusEvents bool
 }
 
 func handleError(eventChannel chan event.Event, err error) {

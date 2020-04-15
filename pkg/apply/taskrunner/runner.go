@@ -36,23 +36,24 @@ type taskStatusRunner struct {
 	baseRunner *baseRunner
 }
 
-// PollingOptions defines properties that is passed along to
+// Options defines properties that is passed along to
 // the statusPoller.
-type PollingOptions struct {
-	PollInterval time.Duration
-	UseCache     bool
+type Options struct {
+	PollInterval     time.Duration
+	UseCache         bool
+	EmitStatusEvents bool
 }
 
 // Run starts the execution of the taskqueue. It will start the
 // statusPoller and then pass the statusChannel to the baseRunner
 // that does most of the work.
 func (tsr *taskStatusRunner) Run(ctx context.Context, taskQueue chan Task,
-	eventChannel chan event.Event, pollingOptions PollingOptions) error {
+	eventChannel chan event.Event, options Options) error {
 	statusCtx, cancelFunc := context.WithCancel(context.Background())
 	statusChannel := tsr.statusPoller.Poll(statusCtx, tsr.identifiers, polling.Options{
 		PollUntilCancelled: true,
-		PollInterval:       pollingOptions.PollInterval,
-		UseCache:           pollingOptions.UseCache,
+		PollInterval:       options.PollInterval,
+		UseCache:           options.UseCache,
 		// Not actually in use since we use a separate collector to keep
 		// track of the status for each resource.
 		//TODO(mortent): Remove the aggregator from the polling engine
@@ -60,7 +61,10 @@ func (tsr *taskStatusRunner) Run(ctx context.Context, taskQueue chan Task,
 		DesiredStatus: status.CurrentStatus,
 	})
 
-	err := tsr.baseRunner.run(ctx, taskQueue, statusChannel, eventChannel)
+	o := baseOptions{
+		emitStatusEvents: options.EmitStatusEvents,
+	}
+	err := tsr.baseRunner.run(ctx, taskQueue, statusChannel, eventChannel, o)
 	// cancel the statusPoller by cancelling the context.
 	cancelFunc()
 	// drain the statusChannel to make sure the lack of a consumer
@@ -92,7 +96,12 @@ type taskRunner struct {
 func (tr *taskRunner) Run(ctx context.Context, taskQueue chan Task,
 	eventChannel chan event.Event) error {
 	var nilStatusChannel chan pollevent.Event
-	return tr.baseRunner.run(ctx, taskQueue, nilStatusChannel, eventChannel)
+	o := baseOptions{
+		// The taskRunner doesn't poll for status, so there are not
+		// statusEvents to emit.
+		emitStatusEvents: false,
+	}
+	return tr.baseRunner.run(ctx, taskQueue, nilStatusChannel, eventChannel, o)
 }
 
 // newBaseRunner returns a new baseRunner using the given collector.
@@ -112,11 +121,16 @@ type baseRunner struct {
 	collector *resourceStatusCollector
 }
 
+type baseOptions struct {
+	emitStatusEvents bool
+}
+
 // run is the main function that implements the processing of
 // tasks in the taskqueue. It sets up a loop where a single goroutine
 // will process events from three different channels.
 func (b *baseRunner) run(ctx context.Context, taskQueue chan Task,
-	statusChannel <-chan pollevent.Event, eventChannel chan event.Event) error {
+	statusChannel <-chan pollevent.Event, eventChannel chan event.Event,
+	o baseOptions) error {
 	// taskChannel is used by tasks running in a separate goroutine
 	// to signal back to the main loop that the task is either finished
 	// or it has failed.
@@ -170,10 +184,12 @@ func (b *baseRunner) run(ctx context.Context, taskQueue chan Task,
 				continue
 			}
 
-			// Forward all normal events to the eventChannel
-			eventChannel <- event.Event{
-				Type:        event.StatusType,
-				StatusEvent: statusEvent,
+			if o.emitStatusEvents {
+				// Forward all normal events to the eventChannel
+				eventChannel <- event.Event{
+					Type:        event.StatusType,
+					StatusEvent: statusEvent,
+				}
 			}
 
 			// The collector needs to keep track of the latest status
