@@ -11,7 +11,6 @@ import (
 	"gotest.tools/assert"
 	appsv1 "k8s.io/api/apps/v1"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
-	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
@@ -24,33 +23,11 @@ func TestCollectorStopsWhenEventChannelIsClosed(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	completedCh := collector.Listen(eventCh, stopCh)
+	completedCh := collector.Listen(eventCh)
 
 	timer := time.NewTimer(3 * time.Second)
 
 	close(eventCh)
-	select {
-	case <-timer.C:
-		t.Errorf("expected collector to close the completedCh, but it didn't")
-	case <-completedCh:
-		timer.Stop()
-	}
-}
-
-func TestCollectorStopWhenStopChannelIsClosed(t *testing.T) {
-	var identifiers []object.ObjMetadata
-
-	collector := NewResourceStatusCollector(identifiers)
-
-	eventCh := make(chan event.Event)
-	defer close(eventCh)
-	stopCh := make(chan struct{})
-
-	completedCh := collector.Listen(eventCh, stopCh)
-
-	timer := time.NewTimer(3 * time.Second)
-
-	close(stopCh)
 	select {
 	case <-timer.C:
 		t.Errorf("expected collector to close the completedCh, but it didn't")
@@ -88,8 +65,7 @@ func TestCollectorEventProcessing(t *testing.T) {
 			},
 			events: []event.Event{
 				{
-					EventType:       event.ResourceUpdateEvent,
-					AggregateStatus: status.CurrentStatus,
+					EventType: event.ResourceUpdateEvent,
 					Resource: &event.ResourceStatus{
 						Identifier: resourceIdentifiers["deployment"],
 					},
@@ -103,29 +79,25 @@ func TestCollectorEventProcessing(t *testing.T) {
 			},
 			events: []event.Event{
 				{
-					EventType:       event.ResourceUpdateEvent,
-					AggregateStatus: status.UnknownStatus,
+					EventType: event.ResourceUpdateEvent,
 					Resource: &event.ResourceStatus{
 						Identifier: resourceIdentifiers["deployment"],
 					},
 				},
 				{
-					EventType:       event.ResourceUpdateEvent,
-					AggregateStatus: status.InProgressStatus,
+					EventType: event.ResourceUpdateEvent,
 					Resource: &event.ResourceStatus{
 						Identifier: resourceIdentifiers["statefulSet"],
 					},
 				},
 				{
-					EventType:       event.ResourceUpdateEvent,
-					AggregateStatus: status.CurrentStatus,
+					EventType: event.ResourceUpdateEvent,
 					Resource: &event.ResourceStatus{
 						Identifier: resourceIdentifiers["deployment"],
 					},
 				},
 				{
-					EventType:       event.ResourceUpdateEvent,
-					AggregateStatus: status.InProgressStatus,
+					EventType: event.ResourceUpdateEvent,
 					Resource: &event.ResourceStatus{
 						Identifier: resourceIdentifiers["statefulSet"],
 					},
@@ -140,9 +112,8 @@ func TestCollectorEventProcessing(t *testing.T) {
 
 			eventCh := make(chan event.Event)
 			defer close(eventCh)
-			stopCh := make(chan struct{})
 
-			collector.Listen(eventCh, stopCh)
+			collector.Listen(eventCh)
 
 			var latestEvent *event.Event
 			latestEventByIdentifier := make(map[object.ObjMetadata]event.Event)
@@ -162,13 +133,10 @@ func TestCollectorEventProcessing(t *testing.T) {
 			var expectedObservation *Observation
 			if latestEvent != nil {
 				expectedObservation = &Observation{
-					LastEventType:   latestEvent.EventType,
-					AggregateStatus: latestEvent.AggregateStatus,
+					LastEventType: latestEvent.EventType,
 				}
 			} else {
-				expectedObservation = &Observation{
-					AggregateStatus: status.UnknownStatus,
-				}
+				expectedObservation = &Observation{}
 			}
 
 			var resourceStatuses event.ResourceStatuses

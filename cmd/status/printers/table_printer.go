@@ -286,16 +286,6 @@ func (t *tablePrinter) printTable(data *collector.Observation,
 	}
 	linePrintCount := 0
 
-	color, setColor := colorForTableStatus(data.AggregateStatus)
-	var aggStatusText string
-	if setColor {
-		aggStatusText = sPrintWithColor(color, data.AggregateStatus.String())
-	} else {
-		aggStatusText = data.AggregateStatus.String()
-	}
-	t.printOrDie("Aggregate status: %s\n", aggStatusText)
-	linePrintCount++
-
 	for i, column := range columns {
 		format := fmt.Sprintf("%%-%ds", column.width)
 		t.printOrDie(format, column.header)

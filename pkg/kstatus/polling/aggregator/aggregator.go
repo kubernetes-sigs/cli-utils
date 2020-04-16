@@ -6,50 +6,7 @@ package aggregator
 import (
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
-	"sigs.k8s.io/cli-utils/pkg/object"
 )
-
-// NewAllCurrentAggregator returns a new aggregator that will consider
-// the set to be completed when all resources have reached the Current status.
-func NewAllCurrentAggregator(identifiers []object.ObjMetadata) *genericAggregator {
-	return newGenericAggregator(identifiers, status.CurrentStatus)
-}
-
-// NewAllNotFoundAggregator returns a new aggregator that will consider
-// the set to be completed when all resources have reached the NotFound status.
-func NewAllNotFoundAggregator(identifiers []object.ObjMetadata) *genericAggregator {
-	return newGenericAggregator(identifiers, status.NotFoundStatus)
-}
-
-// genericAggregator implements the StatusAggregator interface. It can
-// be customized by providing the desired status that all resources
-// should reach.
-type genericAggregator struct {
-	resourceCurrentStatus map[object.ObjMetadata]status.Status
-	desiredStatus         status.Status
-}
-
-// newGenericAggregator returns a new Aggregator that will track the
-// resources identified by the slice of ResourceIdentifiers. It will consider
-// the change to be complete when all resources have reached the specified
-// desired status.
-func newGenericAggregator(identifiers []object.ObjMetadata, desiredStatus status.Status) *genericAggregator {
-	aggregator := &genericAggregator{
-		resourceCurrentStatus: make(map[object.ObjMetadata]status.Status),
-		desiredStatus:         desiredStatus,
-	}
-	for _, id := range identifiers {
-		aggregator.resourceCurrentStatus[id] = status.UnknownStatus
-	}
-	return aggregator
-}
-
-// ResourceStatus is called whenever we have an observation of a resource. In this
-// case, we just keep the latest status so we can later compute the aggregate status
-// for all the resources.
-func (g *genericAggregator) ResourceStatus(r *event.ResourceStatus) {
-	g.resourceCurrentStatus[r.Identifier] = r.Status
-}
 
 // AggregateStatus computes the aggregate status for all the resources.
 // The rules are the following:
@@ -61,21 +18,22 @@ func (g *genericAggregator) ResourceStatus(r *event.ResourceStatus) {
 //   desired status.
 // - If none of the first three rules apply, the aggregate status is
 //   InProgressStatus
-func (g *genericAggregator) AggregateStatus() status.Status {
-	if len(g.resourceCurrentStatus) == 0 {
-		return g.desiredStatus
+func AggregateStatus(rss []*event.ResourceStatus, desired status.Status) status.Status {
+	if len(rss) == 0 {
+		return desired
 	}
 
 	allDesired := true
 	anyUnknown := false
-	for _, s := range g.resourceCurrentStatus {
+	for _, rs := range rss {
+		s := rs.Status
 		if s == status.FailedStatus {
 			return status.FailedStatus
 		}
 		if s == status.UnknownStatus {
 			anyUnknown = true
 		}
-		if s != g.desiredStatus {
+		if s != desired {
 			allDesired = false
 		}
 	}
@@ -83,14 +41,7 @@ func (g *genericAggregator) AggregateStatus() status.Status {
 		return status.UnknownStatus
 	}
 	if allDesired {
-		return g.desiredStatus
+		return desired
 	}
 	return status.InProgressStatus
-}
-
-// Completed is used by the framework to decide if the set of resources has
-// all reached the desired status, i.e. the aggregate status. This is used to determine
-// when to stop polling resources.
-func (g *genericAggregator) Completed() bool {
-	return g.AggregateStatus() == g.desiredStatus
 }

@@ -150,8 +150,7 @@ func TestApplier(t *testing.T) {
 			status: true,
 			statusEvents: []pollevent.Event{
 				{
-					EventType:       pollevent.ResourceUpdateEvent,
-					AggregateStatus: status.InProgressStatus,
+					EventType: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
 						Identifier: object.ObjMetadata{
 							Name:      "foo-91afd0fc",
@@ -165,16 +164,14 @@ func TestApplier(t *testing.T) {
 					},
 				},
 				{
-					EventType:       pollevent.ResourceUpdateEvent,
-					AggregateStatus: status.InProgressStatus,
+					EventType: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
 						Identifier: toIdentifier(t, resources["deployment"], "apply-test"),
 						Status:     status.InProgressStatus,
 					},
 				},
 				{
-					EventType:       pollevent.ResourceUpdateEvent,
-					AggregateStatus: status.CurrentStatus,
+					EventType: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
 						Identifier: toIdentifier(t, resources["deployment"], "apply-test"),
 						Status:     status.CurrentStatus,

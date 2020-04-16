@@ -16,10 +16,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// AggregatorFactoryFunc defines the signature for the function the PollerEngine will use to
-// create a new StatusAggregator for each statusPollerRunner.
-type AggregatorFactoryFunc func(identifiers []object.ObjMetadata) StatusAggregator
-
 // ClusterReaderFactoryFunc defines the signature for the function the PollerEngine will use to create
 // a new ClusterReader for each statusPollerRunner.
 type ClusterReaderFactoryFunc func(reader client.Reader, mapper meta.RESTMapper,
@@ -66,7 +62,6 @@ func (s *PollerEngine) Poll(ctx context.Context, identifiers []object.ObjMetadat
 			return
 		}
 		statusReaders, defaultStatusReader := options.StatusReadersFactoryFunc(clusterReader, s.Mapper)
-		aggregator := options.AggregatorFactoryFunc(identifiers)
 
 		runner := &statusPollerRunner{
 			ctx:                      ctx,
@@ -76,8 +71,6 @@ func (s *PollerEngine) Poll(ctx context.Context, identifiers []object.ObjMetadat
 			identifiers:              identifiers,
 			previousResourceStatuses: make(map[object.ObjMetadata]*event.ResourceStatus),
 			eventChannel:             eventChannel,
-			statusAggregator:         aggregator,
-			pollUntilCancelled:       options.PollUntilCancelled,
 			pollingInterval:          options.PollInterval,
 		}
 		runner.Run()
@@ -97,9 +90,6 @@ func handleError(eventChannel chan event.Event, err error) {
 func (s *PollerEngine) validate(options Options) error {
 	if options.ClusterReaderFactoryFunc == nil {
 		return fmt.Errorf("clusterReaderFactoryFunc must be specified")
-	}
-	if options.AggregatorFactoryFunc == nil {
-		return fmt.Errorf("aggregatorFactoryFunc must be specified")
 	}
 	if options.StatusReadersFactoryFunc == nil {
 		return fmt.Errorf("statusReadersFactoryFunc must be specified")
@@ -128,19 +118,10 @@ func (s *PollerEngine) validateIdentifiers(identifiers []object.ObjMetadata) err
 // Timeout is not one of the options here as this should be accomplished by
 // setting a timeout on the context: https://golang.org/pkg/context/
 type Options struct {
-	// PollUntilCancelled defines whether the engine should stop polling and close the
-	// event channel when the Aggregator implementation considers all resources to have reached
-	// the desired status.
-	PollUntilCancelled bool
 
 	// PollInterval defines how often the PollerEngine should poll the cluster for the latest
 	// state of the resources.
 	PollInterval time.Duration
-
-	// AggregatorFunc provides the PollerEngine with a way to create a new aggregator. This will
-	// happen for every call to Poll since each statusPollerRunner keeps its own
-	// status aggregator.
-	AggregatorFactoryFunc AggregatorFactoryFunc
 
 	// ClusterReaderFactoryFunc provides the PollerEngine with a factory function for creating new
 	// StatusReaders. Since these can be stateful, every call to Poll will create a new
@@ -191,15 +172,6 @@ type statusPollerRunner struct {
 	// will be sent. The caller of Poll will listen for updates.
 	eventChannel chan event.Event
 
-	// statusAggregator is responsible for keeping track of the status of
-	// all of the resources and to compute the aggregate status.
-	statusAggregator StatusAggregator
-
-	// pollUntilCancelled decides whether the runner should keep running
-	// even if the statusAggregator decides that all resources has reached the
-	// desired status.
-	pollUntilCancelled bool
-
 	// pollingInterval determines how often we should poll the cluster for
 	// the latest state of resources.
 	pollingInterval time.Duration
@@ -213,86 +185,70 @@ func (r *statusPollerRunner) Run() {
 		ticker.Stop()
 	}()
 
-	shouldExit := r.syncAndPoll()
-	if shouldExit {
+	err := r.syncAndPoll()
+	if err != nil {
+		r.eventChannel <- event.Event{
+			EventType: event.ErrorEvent,
+			Error:     err,
+		}
 		return
 	}
 
 	for {
 		select {
 		case <-r.ctx.Done():
-			// If the context has been cancelled, just send an AbortedEvent
-			// and pass along the most up-to-date aggregate status. Then return
-			// from this function, which will stop the ticker and close the event channel.
-			aggregatedStatus := r.statusAggregator.AggregateStatus()
+			// If the context has been cancelled, just send an CompletedEvent.
+			// Then return from this function, which will stop the ticker
+			// and close the event channel.
 			r.eventChannel <- event.Event{
-				EventType:       event.AbortedEvent,
-				AggregateStatus: aggregatedStatus,
+				EventType: event.CompletedEvent,
 			}
 			return
 		case <-ticker.C:
 			// First sync and then compute status for all resources.
-			shouldExit := r.syncAndPoll()
-			if shouldExit {
+			err := r.syncAndPoll()
+			if err != nil {
+				r.eventChannel <- event.Event{
+					EventType: event.ErrorEvent,
+					Error:     err,
+				}
 				return
 			}
 		}
 	}
 }
 
-func (r *statusPollerRunner) syncAndPoll() bool {
+func (r *statusPollerRunner) syncAndPoll() error {
 	// First trigger a sync of the ClusterReader. This may or may not actually
 	// result in calls to the cluster, depending on the implementation.
 	// If this call fails, there is no clean way to recover, so we just return an ErrorEvent
 	// and shut down.
 	err := r.clusterReader.Sync(r.ctx)
 	if err != nil {
-		r.eventChannel <- event.Event{
-			EventType: event.ErrorEvent,
-			Error:     err,
-		}
-		return true
+		return err
 	}
 	// Poll all resources and compute status. If the polling of resources has completed (based
 	// on information from the StatusAggregator and the value of pollUntilCancelled), we send
 	// a CompletedEvent and return.
-	completed := r.pollStatusForAllResources()
-	if completed {
-		aggregatedStatus := r.statusAggregator.AggregateStatus()
-		r.eventChannel <- event.Event{
-			EventType:       event.CompletedEvent,
-			AggregateStatus: aggregatedStatus,
-		}
-		return true
-	}
-	return false
+	r.pollStatusForAllResources()
+	return nil
 }
 
 // pollStatusForAllResources iterates over all the resources in the set and delegates
 // to the appropriate engine to compute the status.
-func (r *statusPollerRunner) pollStatusForAllResources() bool {
+func (r *statusPollerRunner) pollStatusForAllResources() {
 	for _, id := range r.identifiers {
 		gk := id.GroupKind
 		statusReader := r.statusReaderForGroupKind(gk)
 		resourceStatus := statusReader.ReadStatus(r.ctx, id)
-		r.statusAggregator.ResourceStatus(resourceStatus)
 		if r.isUpdatedResourceStatus(resourceStatus) {
 			r.previousResourceStatuses[id] = resourceStatus
-			aggregatedStatus := r.statusAggregator.AggregateStatus()
 			r.eventChannel <- event.Event{
-				EventType:       event.ResourceUpdateEvent,
-				AggregateStatus: aggregatedStatus,
-				Resource:        resourceStatus,
-			}
-			if r.statusAggregator.Completed() && !r.pollUntilCancelled {
-				return true
+				EventType: event.ResourceUpdateEvent,
+				Resource:  resourceStatus,
 			}
 		}
 	}
-	if r.statusAggregator.Completed() && !r.pollUntilCancelled {
-		return true
-	}
-	return false
 }
 
 func (r *statusPollerRunner) statusReaderForGroupKind(gk schema.GroupKind) StatusReader {

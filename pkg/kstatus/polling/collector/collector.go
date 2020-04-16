@@ -21,9 +21,26 @@ func NewResourceStatusCollector(identifiers []object.ObjMetadata) *ResourceStatu
 		}
 	}
 	return &ResourceStatusCollector{
-		aggregateStatus:  status.UnknownStatus,
-		resourceStatuses: resourceStatuses,
+		ResourceStatuses: resourceStatuses,
 	}
+}
+
+// Observer is an interface that can be implemented to have the
+// ResourceStatusCollector invoke the function on every event that
+// comes through the eventChannel.
+// The callback happens in the processing goroutine and while the
+// goroutine holds the lock, so any processing in the callback
+// must be done quickly.
+type Observer interface {
+	Notify(*ResourceStatusCollector)
+}
+
+// ObserverFunc is a function implementation of the Observer
+// interface.
+type ObserverFunc func(*ResourceStatusCollector)
+
+func (o ObserverFunc) Notify(rsc *ResourceStatusCollector) {
+	o(rsc)
 }
 
 // ResourceStatusCollector is for use by clients of the polling library and provides
@@ -34,32 +51,34 @@ func NewResourceStatusCollector(identifiers []object.ObjMetadata) *ResourceStatu
 type ResourceStatusCollector struct {
 	mux sync.RWMutex
 
-	lastEventType event.EventType
+	LastEventType event.EventType
 
-	aggregateStatus status.Status
+	ResourceStatuses map[object.ObjMetadata]*event.ResourceStatus
 
-	resourceStatuses map[object.ObjMetadata]*event.ResourceStatus
-
-	error error
+	Error error
 }
 
-// Listen kicks off the goroutine that will listen for the events on the eventChannel. It is also
-// provided a stop channel that can be used by the caller to stop the collector before the
-// eventChannel is closed. It returns a channel that will be closed the collector stops listening to
-// the eventChannel.
-func (o *ResourceStatusCollector) Listen(eventChannel <-chan event.Event, stop <-chan struct{}) <-chan struct{} {
+// Listen kicks off the goroutine that will listen for the events on the
+// eventChannel.  It returns a channel that will be closed the collector stops
+// listening to the eventChannel.
+func (o *ResourceStatusCollector) Listen(eventChannel <-chan event.Event) <-chan struct{} {
+	return o.ListenWithObserver(eventChannel, nil)
+}
+
+// Listen kicks off the goroutine that will listen for the events on the
+// eventChannel.  It returns a channel that will be closed the collector stops
+// listening to the eventChannel.
+// The provided observer will be invoked on every event, after the event
+// has been processed.
+func (o *ResourceStatusCollector) ListenWithObserver(eventChannel <-chan event.Event,
+	observer Observer) <-chan struct{} {
 	completed := make(chan struct{})
 	go func() {
 		defer close(completed)
-		for {
-			select {
-			case <-stop:
-				return
-			case event, more := <-eventChannel:
-				if !more {
-					return
-				}
-				o.processEvent(event)
+		for e := range eventChannel {
+			o.processEvent(e)
+			if observer != nil {
+				observer.Notify(o)
 			}
 		}
 	}()
@@ -69,15 +88,14 @@ func (o *ResourceStatusCollector) Listen(eventChannel <-chan event.Event, stop <
 func (o *ResourceStatusCollector) processEvent(e event.Event) {
 	o.mux.Lock()
 	defer o.mux.Unlock()
-	o.lastEventType = e.EventType
+	o.LastEventType = e.EventType
 	if e.EventType == event.ErrorEvent {
-		o.error = e.Error
+		o.Error = e.Error
 		return
 	}
-	o.aggregateStatus = e.AggregateStatus
 	if e.EventType == event.ResourceUpdateEvent {
 		resourceStatus := e.Resource
-		o.resourceStatuses[resourceStatus.Identifier] = resourceStatus
+		o.ResourceStatuses[resourceStatus.Identifier] = resourceStatus
 	}
 }
 
@@ -85,8 +103,6 @@ func (o *ResourceStatusCollector) processEvent(e event.Event) {
 // by a call to the LatestObservation function.
 type Observation struct {
 	LastEventType event.EventType
-
-	AggregateStatus status.Status
 
 	ResourceStatuses []*event.ResourceStatus
 
@@ -100,15 +116,14 @@ func (o *ResourceStatusCollector) LatestObservation() *Observation {
 	defer o.mux.RUnlock()
 
 	var resourceStatuses event.ResourceStatuses
-	for _, resourceStatus := range o.resourceStatuses {
+	for _, resourceStatus := range o.ResourceStatuses {
 		resourceStatuses = append(resourceStatuses, resourceStatus)
 	}
 	sort.Sort(resourceStatuses)
 
 	return &Observation{
-		LastEventType:    o.lastEventType,
-		AggregateStatus:  o.aggregateStatus,
+		LastEventType:    o.LastEventType,
 		ResourceStatuses: resourceStatuses,
-		Error:            o.error,
+		Error:            o.Error,
 	}
 }
