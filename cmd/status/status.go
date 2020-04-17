@@ -10,6 +10,7 @@ import (
 	"github.com/go-errors/errors"
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/cli-utils/cmd/status/printers"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling"
@@ -114,7 +115,12 @@ func (r *StatusRunner) runE(c *cobra.Command, args []string) error {
 
 	coll := collector.NewResourceStatusCollector(captureFilter.Identifiers)
 	stop := make(chan struct{})
-	printer, err := printers.CreatePrinter(r.Output, coll, c.OutOrStdout())
+	ioStreams := genericclioptions.IOStreams{
+		In:     c.InOrStdin(),
+		Out:    c.OutOrStdout(),
+		ErrOut: c.OutOrStderr(),
+	}
+	printer, err := printers.CreatePrinter(r.Output, coll, ioStreams)
 	if err != nil {
 		return errors.WrapPrefix(err, "error creating printer", 1)
 	}
