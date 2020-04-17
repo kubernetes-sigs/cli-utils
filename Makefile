@@ -45,13 +45,17 @@ lint:
 	$(GOPATH)/bin/golangci-lint run ./...
 
 test:
-	go test -cover ./...
+	go test -race -cover ./...
 
 vet:
 	go vet ./...
 
 build:
 	go build -o bin/kapply sigs.k8s.io/cli-utils/cmd;
+	mv bin/kapply $(MYGOBIN)
+
+build-with-race-detector:
+	go build -race -o bin/kapply sigs.k8s.io/cli-utils/cmd;
 	mv bin/kapply $(MYGOBIN)
 
 .PHONY: verify-kapply-e2e
@@ -67,7 +71,7 @@ test-examples-e2e-kapply: $(MYGOBIN)/mdrip $(MYGOBIN)/kind
 		/bin/rm -f bin/kapply; \
 		/bin/rm -f $(MYGOBIN)/kapply; \
 		echo "Installing kapply from ."; \
-		make build; \
+		make build-with-race-detector; \
 		./hack/testExamplesE2EAgainstKapply.sh .; \
 	)
 
