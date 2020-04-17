@@ -12,7 +12,6 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/apply/poller"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling"
 	pollevent "sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
-	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
@@ -51,14 +50,8 @@ func (tsr *taskStatusRunner) Run(ctx context.Context, taskQueue chan Task,
 	eventChannel chan event.Event, options Options) error {
 	statusCtx, cancelFunc := context.WithCancel(context.Background())
 	statusChannel := tsr.statusPoller.Poll(statusCtx, tsr.identifiers, polling.Options{
-		PollUntilCancelled: true,
-		PollInterval:       options.PollInterval,
-		UseCache:           options.UseCache,
-		// Not actually in use since we use a separate collector to keep
-		// track of the status for each resource.
-		//TODO(mortent): Remove the aggregator from the polling engine
-		// and implement it as a wrapper instead.
-		DesiredStatus: status.CurrentStatus,
+		PollInterval: options.PollInterval,
+		UseCache:     options.UseCache,
 	})
 
 	o := baseOptions{

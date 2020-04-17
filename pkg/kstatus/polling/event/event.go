@@ -23,7 +23,7 @@ const (
 	CompletedEvent
 	// AbortedEvent signals that the engine is shutting down because it has been cancelled. All resources might
 	// not have been reconciled. The event channel will be closed after this event.
-	AbortedEvent
+	AbortedEvent //TODO: Remove this event type.
 	// ErrorEvent signals that the engine has encountered an error that it can not recover from. The engine
 	// is shutting down and the event channel will be closed after this event.
 	ErrorEvent
@@ -34,10 +34,6 @@ const (
 type Event struct {
 	// EventType defines the type of event.
 	EventType EventType
-
-	// AggregateStatus is the collective status for all the resources. It is computed by the
-	// StatusAggregator
-	AggregateStatus status.Status
 
 	// Resource is only available for ResourceUpdateEvents. It includes information about the resource,
 	// including the resource status, any errors and the resource itself (as an unstructured).

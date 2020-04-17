@@ -28,10 +28,6 @@ func TestStatusPollerRunner(t *testing.T) {
 		defaultStatusReader StatusReader
 		expectedEventTypes  []event.EventType
 	}{
-		"no resources": {
-			identifiers:        []object.ObjMetadata{},
-			expectedEventTypes: []event.EventType{event.CompletedEvent},
-		},
 		"single resource": {
 			identifiers: []object.ObjMetadata{
 				{
@@ -103,7 +99,7 @@ func TestStatusPollerRunner(t *testing.T) {
 
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
-			ctx := context.Background()
+			ctx, cancel := context.WithCancel(context.Background()) //nolint:govet
 
 			identifiers := tc.identifiers
 
@@ -117,11 +113,7 @@ func TestStatusPollerRunner(t *testing.T) {
 			}
 
 			options := Options{
-				PollInterval:       2 * time.Second,
-				PollUntilCancelled: false,
-				AggregatorFactoryFunc: func(identifiers []object.ObjMetadata) StatusAggregator {
-					return newFakeAggregator(identifiers)
-				},
+				PollInterval: 2 * time.Second,
 				ClusterReaderFactoryFunc: func(_ client.Reader, _ meta.RESTMapper, _ []object.ObjMetadata) (
 					ClusterReader, error) {
 					return testutil.NewNoopClusterReader(), nil
@@ -137,10 +129,13 @@ func TestStatusPollerRunner(t *testing.T) {
 			var eventTypes []event.EventType
 			for ch := range eventChannel {
 				eventTypes = append(eventTypes, ch.EventType)
+				if len(eventTypes) == len(tc.expectedEventTypes)-1 {
+					cancel()
+				}
 			}
 
 			assert.DeepEqual(t, tc.expectedEventTypes, eventTypes)
-		})
+		}) //nolint:govet
 	}
 }
 
@@ -155,11 +150,7 @@ func TestNewStatusPollerRunnerCancellation(t *testing.T) {
 	engine := PollerEngine{}
 
 	options := Options{
-		PollInterval:       2 * time.Second,
-		PollUntilCancelled: true,
-		AggregatorFactoryFunc: func(identifiers []object.ObjMetadata) StatusAggregator {
-			return newFakeAggregator(identifiers)
-		},
+		PollInterval: 2 * time.Second,
 		ClusterReaderFactoryFunc: func(_ client.Reader, _ meta.RESTMapper, _ []object.ObjMetadata) (
 			ClusterReader, error) {
 			return testutil.NewNoopClusterReader(), nil
@@ -180,7 +171,7 @@ func TestNewStatusPollerRunnerCancellation(t *testing.T) {
 			if more {
 				lastEvent = e
 			} else {
-				if want, got := event.AbortedEvent, lastEvent.EventType; got != want {
+				if want, got := event.CompletedEvent, lastEvent.EventType; got != want {
 					t.Errorf("Expected e to have type %s, but got %s", want, got)
 				}
 				return
@@ -210,9 +201,6 @@ func TestNewStatusPollerRunnerIdentifierValidation(t *testing.T) {
 	}
 
 	eventChannel := engine.Poll(context.Background(), identifiers, Options{
-		AggregatorFactoryFunc: func(identifiers []object.ObjMetadata) StatusAggregator {
-			return newFakeAggregator(identifiers)
-		},
 		ClusterReaderFactoryFunc: func(_ client.Reader, _ meta.RESTMapper, _ []object.ObjMetadata) (
 			ClusterReader, error) {
 			return testutil.NewNoopClusterReader(), nil
@@ -264,35 +252,4 @@ func (f *fakeStatusReader) ReadStatus(_ context.Context, identifier object.ObjMe
 
 func (f *fakeStatusReader) ReadStatusForObject(_ context.Context, _ *unstructured.Unstructured) *event.ResourceStatus {
 	return nil
-}
-
-func newFakeAggregator(identifiers []object.ObjMetadata) *fakeAggregator {
-	statuses := make(map[object.ObjMetadata]status.Status)
-	for _, id := range identifiers {
-		statuses[id] = status.UnknownStatus
-	}
-	return &fakeAggregator{
-		statuses: statuses,
-	}
-}
-
-type fakeAggregator struct {
-	statuses map[object.ObjMetadata]status.Status
-}
-
-func (f *fakeAggregator) ResourceStatus(resource *event.ResourceStatus) {
-	f.statuses[resource.Identifier] = resource.Status
-}
-
-func (f *fakeAggregator) AggregateStatus() status.Status {
-	for _, s := range f.statuses {
-		if s != status.CurrentStatus {
-			return status.InProgressStatus
-		}
-	}
-	return status.CurrentStatus
-}
-
-func (f *fakeAggregator) Completed() bool {
-	return f.AggregateStatus() == status.CurrentStatus
 }

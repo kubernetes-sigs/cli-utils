@@ -42,35 +42,28 @@ var resourceIdentifiers = map[string]object.ObjMetadata{
 
 func TestAggregator(t *testing.T) {
 	testCases := map[string]struct {
-		identifiers      []object.ObjMetadata
-		resourceStatuses []event.ResourceStatus
+		desiredStatus    status.Status
+		resourceStatuses []*event.ResourceStatus
 		aggregateStatus  status.Status
 	}{
 		"no identifiers": {
-			identifiers:      []object.ObjMetadata{},
-			resourceStatuses: []event.ResourceStatus{},
+			desiredStatus:    status.CurrentStatus,
+			resourceStatuses: []*event.ResourceStatus{},
 			aggregateStatus:  status.CurrentStatus,
 		},
-		"single identifier with multiple resourceStatuses": {
-			identifiers: []object.ObjMetadata{resourceIdentifiers["deployment"]},
-			resourceStatuses: []event.ResourceStatus{
+		"single resource": {
+			desiredStatus: status.CurrentStatus,
+			resourceStatuses: []*event.ResourceStatus{
 				{
 					Identifier: resourceIdentifiers["deployment"],
-					Status:     status.UnknownStatus,
-				},
-				{
-					Identifier: resourceIdentifiers["deployment"],
-					Status:     status.InProgressStatus,
+					Status:     status.CurrentStatus,
 				},
 			},
-			aggregateStatus: status.InProgressStatus,
+			aggregateStatus: status.CurrentStatus,
 		},
 		"multiple resources with one unknown status": {
-			identifiers: []object.ObjMetadata{
-				resourceIdentifiers["deployment"],
-				resourceIdentifiers["statefulset"],
-			},
-			resourceStatuses: []event.ResourceStatus{
+			desiredStatus: status.CurrentStatus,
+			resourceStatuses: []*event.ResourceStatus{
 				{
 					Identifier: resourceIdentifiers["deployment"],
 					Status:     status.UnknownStatus,
@@ -83,12 +76,8 @@ func TestAggregator(t *testing.T) {
 			aggregateStatus: status.UnknownStatus,
 		},
 		"multiple resources with one failed": {
-			identifiers: []object.ObjMetadata{
-				resourceIdentifiers["deployment"],
-				resourceIdentifiers["statefulset"],
-				resourceIdentifiers["service"],
-			},
-			resourceStatuses: []event.ResourceStatus{
+			desiredStatus: status.CurrentStatus,
+			resourceStatuses: []*event.ResourceStatus{
 				{
 					Identifier: resourceIdentifiers["deployment"],
 					Status:     status.NotFoundStatus,
@@ -108,14 +97,7 @@ func TestAggregator(t *testing.T) {
 
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
-			aggregator := newGenericAggregator(tc.identifiers, status.CurrentStatus)
-
-			for _, rs := range tc.resourceStatuses {
-				resourceStatus := rs
-				aggregator.ResourceStatus(&resourceStatus)
-			}
-
-			aggStatus := aggregator.AggregateStatus()
+			aggStatus := AggregateStatus(tc.resourceStatuses, tc.desiredStatus)
 
 			assert.Equal(t, tc.aggregateStatus, aggStatus)
 		})
