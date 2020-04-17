@@ -131,7 +131,12 @@ type CachingClusterReader struct {
 	// cache contains the resources found in the cluster for the given combination
 	// of GVK and namespace. Before each polling cycle, the framework will call the
 	// Sync function, which is responsible for repopulating the cache.
-	cache map[gvkNamespace]unstructured.UnstructuredList
+	cache map[gvkNamespace]cacheEntry
+}
+
+type cacheEntry struct {
+	resources unstructured.UnstructuredList
+	err       error
 }
 
 // gvkNamespace contains information about a GroupVersionKind and a namespace.
@@ -154,11 +159,15 @@ func (c *CachingClusterReader) Get(_ context.Context, key client.ObjectKey, obj 
 		GVK:       gvk,
 		Namespace: key.Namespace,
 	}
-	cacheList, found := c.cache[gn]
+	cacheEntry, found := c.cache[gn]
 	if !found {
 		return fmt.Errorf("GVK %s and Namespace %s not found in cache", gvk.String(), gn.Namespace)
 	}
-	for _, u := range cacheList.Items {
+
+	if cacheEntry.err != nil {
+		return cacheEntry.err
+	}
+	for _, u := range cacheEntry.resources.Items {
 		if u.GetName() == key.Name {
 			obj.Object = u.Object
 			return nil
@@ -178,13 +187,17 @@ func (c *CachingClusterReader) ListNamespaceScoped(_ context.Context, list *unst
 		Namespace: namespace,
 	}
 
-	cacheList, found := c.cache[gn]
+	cacheEntry, found := c.cache[gn]
 	if !found {
 		return fmt.Errorf("GVK %s and Namespace %s not found in cache", gvk.String(), gn.Namespace)
 	}
 
+	if cacheEntry.err != nil {
+		return cacheEntry.err
+	}
+
 	var items []unstructured.Unstructured
-	for _, u := range cacheList.Items {
+	for _, u := range cacheEntry.resources.Items {
 		if selector.Matches(labels.Set(u.GetLabels())) {
 			items = append(items, u)
 		}
@@ -205,7 +218,7 @@ func (c *CachingClusterReader) ListClusterScoped(ctx context.Context, list *unst
 func (c *CachingClusterReader) Sync(ctx context.Context) error {
 	c.Lock()
 	defer c.Unlock()
-	cache := make(map[gvkNamespace]unstructured.UnstructuredList)
+	cache := make(map[gvkNamespace]cacheEntry)
 	for _, gn := range c.gns {
 		mapping, err := c.mapper.RESTMapping(gn.GVK.GroupKind())
 		if err != nil {
@@ -219,9 +232,21 @@ func (c *CachingClusterReader) Sync(ctx context.Context) error {
 		list.SetGroupVersionKind(gn.GVK)
 		err = c.reader.List(ctx, &list, listOptions...)
 		if err != nil {
+			// If we get an IsNotFound error here, it means the type
+			// we are listing doesn't exist on the server. This is ok,
+			// because it might be that a CRD is part of the set of
+			// resources that are being applied.
+			if errors.IsNotFound(err) {
+				cache[gn] = cacheEntry{
+					err: err,
+				}
+				continue
+			}
 			return err
 		}
-		cache[gn] = list
+		cache[gn] = cacheEntry{
+			resources: list,
+		}
 	}
 	c.cache = cache
 	return nil
