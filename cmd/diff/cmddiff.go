@@ -13,6 +13,9 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/common"
 )
 
+// NewCmdDiff returns cobra command to implement client-side diff of package
+// directory. For each local config file, get the resource in the cluster
+// and diff the local config resource against the resource in the cluster.
 func NewCmdDiff(f util.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	options := diff.NewDiffOptions(ioStreams)
 	cmd := &cobra.Command{
@@ -33,10 +36,14 @@ func NewCmdDiff(f util.Factory, ioStreams genericclioptions.IOStreams) *cobra.Co
 // Returns error if there is an error filling in the options or if there
 // is not one argument that is a directory.
 func Initialize(o *diff.DiffOptions, f util.Factory, args []string) error {
-	var err error
-
 	// Validate the only argument is a (package) directory path.
 	filenameFlags, err := common.DemandOneDirectory(args)
+	if err != nil {
+		return err
+	}
+	// We do not want to diff the inventory object. So we expand
+	// the config file paths, excluding the inventory object.
+	filenameFlags, err = common.ExpandPackageDir(filenameFlags)
 	if err != nil {
 		return err
 	}

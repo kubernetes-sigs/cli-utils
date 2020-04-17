@@ -62,3 +62,37 @@ func TestProcessPaths(t *testing.T) {
 		})
 	}
 }
+
+func TestExpandDirErrors(t *testing.T) {
+	trueVal := true
+	testCases := map[string]struct {
+		paths   []string
+		isError bool
+	}{
+		"empty path is error": {
+			paths:   []string{},
+			isError: true,
+		},
+		"more than one path is error": {
+			paths:   []string{"fakedir1", "fakedir2"},
+			isError: true,
+		},
+		"path that is not dir is error": {
+			paths:   []string{"fakedir1"},
+			isError: true,
+		},
+	}
+
+	for tn, tc := range testCases {
+		t.Run(tn, func(t *testing.T) {
+			filenameFlags := genericclioptions.FileNameFlags{
+				Filenames: &tc.paths,
+				Recursive: &trueVal,
+			}
+			_, err := ExpandPackageDir(filenameFlags)
+			if tc.isError && err == nil {
+				t.Fatalf("expected error but received none")
+			}
+		})
+	}
+}
