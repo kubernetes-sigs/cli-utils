@@ -5,7 +5,6 @@ package task
 
 import (
 	"k8s.io/cli-runtime/pkg/resource"
-	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/prune"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
 )
@@ -15,7 +14,6 @@ import (
 // set of resources that have just been applied.
 type PruneTask struct {
 	PruneOptions *prune.PruneOptions
-	EventChannel chan event.Event
 	Objects      []*resource.Info
 }
 
@@ -23,10 +21,10 @@ type PruneTask struct {
 // the Run function on the PruneOptions to update
 // the cluster. It will push a TaskResult on the taskChannel
 // to signal to the taskrunner that the task has completed (or failed).
-func (p *PruneTask) Start(taskChannel chan taskrunner.TaskResult) {
+func (p *PruneTask) Start(taskContext *taskrunner.TaskContext) {
 	go func() {
-		err := p.PruneOptions.Prune(p.Objects, p.EventChannel)
-		taskChannel <- taskrunner.TaskResult{
+		err := p.PruneOptions.Prune(p.Objects, taskContext.EventChannel())
+		taskContext.TaskChannel() <- taskrunner.TaskResult{
 			Err: err,
 		}
 	}()

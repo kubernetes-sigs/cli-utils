@@ -8,21 +8,23 @@ import (
 	"testing"
 	"time"
 
+	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
 func TestWaitTask_TimeoutTriggered(t *testing.T) {
 	task := NewWaitTask([]object.ObjMetadata{}, AllCurrent, 2*time.Second)
 
-	taskChannel := make(chan TaskResult)
-	defer close(taskChannel)
+	eventChannel := make(chan event.Event)
+	taskContext := NewTaskContext(eventChannel)
+	defer close(eventChannel)
 
-	task.Start(taskChannel)
+	task.Start(taskContext)
 
 	timer := time.NewTimer(3 * time.Second)
 
 	select {
-	case res := <-taskChannel:
+	case res := <-taskContext.TaskChannel():
 		if res.Err == nil || !IsTimeoutError(res.Err) {
 			t.Errorf("expected timeout error, but got %v", res.Err)
 		}
@@ -35,15 +37,16 @@ func TestWaitTask_TimeoutTriggered(t *testing.T) {
 func TestWaitTask_TimeoutCancelled(t *testing.T) {
 	task := NewWaitTask([]object.ObjMetadata{}, AllCurrent, 2*time.Second)
 
-	taskChannel := make(chan TaskResult)
-	defer close(taskChannel)
+	eventChannel := make(chan event.Event)
+	taskContext := NewTaskContext(eventChannel)
+	defer close(eventChannel)
 
-	task.Start(taskChannel)
+	task.Start(taskContext)
 	task.ClearTimeout()
 	timer := time.NewTimer(3 * time.Second)
 
 	select {
-	case res := <-taskChannel:
+	case res := <-taskContext.TaskChannel():
 		t.Errorf("didn't expect timeout error, but got %v", res.Err)
 	case <-timer.C:
 		return
@@ -53,8 +56,10 @@ func TestWaitTask_TimeoutCancelled(t *testing.T) {
 func TestWaitTask_SingleTaskResult(t *testing.T) {
 	task := NewWaitTask([]object.ObjMetadata{}, AllCurrent, 2*time.Second)
 
-	taskChannel := make(chan TaskResult, 10)
-	defer close(taskChannel)
+	eventChannel := make(chan event.Event)
+	taskContext := NewTaskContext(eventChannel)
+	taskContext.taskChannel = make(chan TaskResult, 10)
+	defer close(eventChannel)
 
 	var completeWg sync.WaitGroup
 
@@ -62,17 +67,17 @@ func TestWaitTask_SingleTaskResult(t *testing.T) {
 		completeWg.Add(1)
 		go func() {
 			defer completeWg.Done()
-			task.complete(taskChannel)
+			task.complete(taskContext)
 		}()
 	}
 	completeWg.Wait()
 
-	<-taskChannel
+	<-taskContext.TaskChannel()
 
 	timer := time.NewTimer(4 * time.Second)
 
 	select {
-	case <-taskChannel:
+	case <-taskContext.TaskChannel():
 		t.Errorf("expected only one result on taskChannel, but got more")
 	case <-timer.C:
 		return

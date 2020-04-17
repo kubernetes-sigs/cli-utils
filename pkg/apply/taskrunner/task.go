@@ -13,7 +13,7 @@ import (
 // Task is the interface that must be implemented by
 // all tasks that will be executed by the taskrunner.
 type Task interface {
-	Start(taskChannel chan TaskResult)
+	Start(taskContext *TaskContext)
 	ClearTimeout()
 }
 
@@ -64,7 +64,7 @@ type WaitTask struct {
 
 // Start kicks off the task. For the wait task, this just means
 // setting up the timeout timer.
-func (w *WaitTask) Start(taskChannel chan TaskResult) {
+func (w *WaitTask) Start(taskContext *TaskContext) {
 	timer := time.NewTimer(w.Timeout)
 	go func() {
 		//TODO(mortent): See if there is a better way to do this. This
@@ -75,7 +75,7 @@ func (w *WaitTask) Start(taskChannel chan TaskResult) {
 		// We only send the taskResult if no one has gotten
 		// to the token first.
 		case <-w.token:
-			taskChannel <- TaskResult{
+			taskContext.TaskChannel() <- TaskResult{
 				Err: timeoutError{
 					message: fmt.Sprintf("timeout after %.0f seconds waiting for %d resources to reach condition %s",
 						w.Timeout.Seconds(), len(w.Identifiers), w.Condition),
@@ -94,20 +94,20 @@ func (w *WaitTask) Start(taskChannel chan TaskResult) {
 // met when the task should be started. In this case there is no
 // need to start a timer. So it just sets the cancelFunc and then
 // completes the task.
-func (w *WaitTask) startAndComplete(taskChannel chan TaskResult) {
+func (w *WaitTask) startAndComplete(taskContext *TaskContext) {
 	w.cancelFunc = func() {}
-	w.complete(taskChannel)
+	w.complete(taskContext)
 }
 
 // complete is invoked by the taskrunner when all the conditions
 // for the task has been met, or something has failed so the task
 // need to be stopped.
-func (w *WaitTask) complete(taskChannel chan TaskResult) {
+func (w *WaitTask) complete(taskContext *TaskContext) {
 	select {
 	// Only do something if we can get the token.
 	case <-w.token:
 		go func() {
-			taskChannel <- TaskResult{}
+			taskContext.TaskChannel() <- TaskResult{}
 		}()
 	default:
 		return

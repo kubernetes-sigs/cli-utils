@@ -131,9 +131,6 @@ func TestBaseRunner(t *testing.T) {
 			eventChannel := make(chan event.Event)
 			taskQueue := make(chan Task, len(tc.tasks))
 			for _, tsk := range tc.tasks {
-				if bt, ok := tsk.(*busyTask); ok {
-					bt.eventChannel = eventChannel
-				}
 				taskQueue <- tsk
 			}
 
@@ -287,9 +284,6 @@ func TestBaseRunnerCancellation(t *testing.T) {
 
 			taskQueue := make(chan Task, len(tc.tasks))
 			for _, tsk := range tc.tasks {
-				if bt, ok := tsk.(*busyTask); ok {
-					bt.eventChannel = eventChannel
-				}
 				taskQueue <- tsk
 			}
 
@@ -349,17 +343,16 @@ func TestBaseRunnerCancellation(t *testing.T) {
 }
 
 type busyTask struct {
-	eventChannel chan event.Event
-	resultEvent  event.Event
-	duration     time.Duration
-	err          error
+	resultEvent event.Event
+	duration    time.Duration
+	err         error
 }
 
-func (b *busyTask) Start(taskChannel chan TaskResult) {
+func (b *busyTask) Start(taskContext *TaskContext) {
 	go func() {
 		<-time.NewTimer(b.duration).C
-		b.eventChannel <- b.resultEvent
-		taskChannel <- TaskResult{
+		taskContext.EventChannel() <- b.resultEvent
+		taskContext.TaskChannel() <- TaskResult{
 			Err: b.err,
 		}
 	}()

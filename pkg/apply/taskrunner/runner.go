@@ -124,13 +124,13 @@ type baseOptions struct {
 func (b *baseRunner) run(ctx context.Context, taskQueue chan Task,
 	statusChannel <-chan pollevent.Event, eventChannel chan event.Event,
 	o baseOptions) error {
-	// taskChannel is used by tasks running in a separate goroutine
-	// to signal back to the main loop that the task is either finished
-	// or it has failed.
-	taskChannel := make(chan TaskResult)
+	// taskContext is passed into all tasks when they are started. It
+	// provides access to the eventChannel and the taskChannel, and
+	// also provides a way to pass data between tasks.
+	taskContext := NewTaskContext(eventChannel)
 
 	// Find and start the first task in the queue.
-	currentTask, done := b.nextTask(taskQueue, taskChannel)
+	currentTask, done := b.nextTask(taskQueue, taskContext)
 	if done {
 		return nil
 	}
@@ -173,7 +173,7 @@ func (b *baseRunner) run(ctx context.Context, taskQueue chan Task,
 					statusEvent.Error)
 				// If the current task is a wait task, we just set it
 				// to complete so we can exit the loop as soon as possible.
-				completeIfWaitTask(currentTask, taskChannel)
+				completeIfWaitTask(currentTask, taskContext)
 				continue
 			}
 
@@ -194,7 +194,7 @@ func (b *baseRunner) run(ctx context.Context, taskQueue chan Task,
 			// the condition has been met. If so, we complete the task.
 			if wt, ok := currentTask.(*WaitTask); ok {
 				if b.collector.conditionMet(wt.Identifiers, wt.Condition) {
-					completeIfWaitTask(currentTask, taskChannel)
+					completeIfWaitTask(currentTask, taskContext)
 				}
 			}
 		// A message on the taskChannel means that the current task
@@ -203,7 +203,7 @@ func (b *baseRunner) run(ctx context.Context, taskQueue chan Task,
 		// else has gone wrong and we are waiting for the current task to
 		// finish, we exit.
 		// If everything is ok, we fetch and start the next task.
-		case msg := <-taskChannel:
+		case msg := <-taskContext.TaskChannel():
 			currentTask.ClearTimeout()
 			if msg.Err != nil {
 				return msg.Err
@@ -211,7 +211,7 @@ func (b *baseRunner) run(ctx context.Context, taskQueue chan Task,
 			if abort {
 				return abortReason
 			}
-			currentTask, done = b.nextTask(taskQueue, taskChannel)
+			currentTask, done = b.nextTask(taskQueue, taskContext)
 			// If there are no more tasks, we are done. So just
 			// return.
 			if done {
@@ -223,16 +223,16 @@ func (b *baseRunner) run(ctx context.Context, taskQueue chan Task,
 		case <-doneCh:
 			doneCh = nil // Set doneCh to nil so we don't enter a busy loop.
 			abort = true
-			completeIfWaitTask(currentTask, taskChannel)
+			completeIfWaitTask(currentTask, taskContext)
 		}
 	}
 }
 
 // completeIfWaitTask checks if the current task is a wait task. If so,
 // we invoke the complete function to complete it.
-func completeIfWaitTask(currentTask Task, taskChannel chan TaskResult) {
+func completeIfWaitTask(currentTask Task, taskContext *TaskContext) {
 	if wt, ok := currentTask.(*WaitTask); ok {
-		wt.complete(taskChannel)
+		wt.complete(taskContext)
 	}
 }
 
@@ -240,7 +240,7 @@ func completeIfWaitTask(currentTask Task, taskChannel chan TaskResult) {
 // starts it. If the taskQueue is empty, it the second
 // return value will be true.
 func (b *baseRunner) nextTask(taskQueue chan Task,
-	taskChannel chan TaskResult) (Task, bool) {
+	taskContext *TaskContext) (Task, bool) {
 	var tsk Task
 	select {
 	// If there is any tasks left in the queue, this
@@ -259,12 +259,12 @@ func (b *baseRunner) nextTask(taskQueue chan Task,
 		// met. Without this check, a task might end up waiting for
 		// status events when the condition is in fact already met.
 		if b.collector.conditionMet(st.Identifiers, st.Condition) {
-			st.startAndComplete(taskChannel)
+			st.startAndComplete(taskContext)
 		} else {
-			tsk.Start(taskChannel)
+			tsk.Start(taskContext)
 		}
 	default:
-		tsk.Start(taskChannel)
+		tsk.Start(taskContext)
 	}
 	return tsk, false
 }
