@@ -99,7 +99,8 @@ func TestStatusPollerRunner(t *testing.T) {
 
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background()) //nolint:govet
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 
 			identifiers := tc.identifiers
 
@@ -135,7 +136,7 @@ func TestStatusPollerRunner(t *testing.T) {
 			}
 
 			assert.DeepEqual(t, tc.expectedEventTypes, eventTypes)
-		}) //nolint:govet
+		})
 	}
 }
 
