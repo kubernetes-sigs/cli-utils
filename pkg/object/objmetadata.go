@@ -19,7 +19,9 @@ import (
 	"fmt"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/cli-runtime/pkg/resource"
 )
 
 // Separates inventory fields. This string is allowable as a
@@ -92,4 +94,15 @@ func (o *ObjMetadata) String() string {
 		o.Name, fieldSeparator,
 		o.GroupKind.Group, fieldSeparator,
 		o.GroupKind.Kind)
+}
+
+// InfoToObjMeta takes information from the provided info and
+// returns an ObjMetadata that identifies the resource.
+func InfoToObjMeta(info *resource.Info) ObjMetadata {
+	u := info.Object.(*unstructured.Unstructured)
+	return ObjMetadata{
+		GroupKind: u.GroupVersionKind().GroupKind(),
+		Name:      u.GetName(),
+		Namespace: u.GetNamespace(),
+	}
 }

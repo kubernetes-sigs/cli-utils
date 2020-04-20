@@ -65,6 +65,13 @@ type WaitTask struct {
 // Start kicks off the task. For the wait task, this just means
 // setting up the timeout timer.
 func (w *WaitTask) Start(taskContext *TaskContext) {
+	w.setTimer(taskContext)
+}
+
+// setTimer creates the timer with the timeout value taken from
+// the WaitTask struct. Once the timer expires, it will send
+// a message on the TaskChannel provided in the taskContext.
+func (w *WaitTask) setTimer(taskContext *TaskContext) {
 	timer := time.NewTimer(w.Timeout)
 	go func() {
 		//TODO(mortent): See if there is a better way to do this. This
@@ -88,6 +95,28 @@ func (w *WaitTask) Start(taskContext *TaskContext) {
 	w.cancelFunc = func() {
 		timer.Stop()
 	}
+}
+
+// checkCondition checks whether the condition set in the task
+// is currently met given the status of resources in the collector.
+func (w *WaitTask) checkCondition(taskContext *TaskContext, coll *resourceStatusCollector) bool {
+	rwd := w.computeResourceWaitData(taskContext)
+	return coll.conditionMet(rwd, w.Condition)
+}
+
+// computeResourceWaitData creates a slice of resourceWaitData for
+// the resources that is relevant to this wait task. The objective is
+// to match each resource with the generation seen after the resource
+// was applied.
+func (w *WaitTask) computeResourceWaitData(taskContext *TaskContext) []resourceWaitData {
+	var rwd []resourceWaitData
+	for _, id := range w.Identifiers {
+		rwd = append(rwd, resourceWaitData{
+			identifier: id,
+			generation: taskContext.ResourceGeneration(id),
+		})
+	}
+	return rwd
 }
 
 // startAndComplete is invoked when the condition is already
@@ -117,6 +146,11 @@ func (w *WaitTask) complete(taskContext *TaskContext) {
 // ClearTimeout cancels the timeout for the wait task.
 func (w *WaitTask) ClearTimeout() {
 	w.cancelFunc()
+}
+
+type resourceWaitData struct {
+	identifier object.ObjMetadata
+	generation int64
 }
 
 // Condition is a type that defines the types of conditions

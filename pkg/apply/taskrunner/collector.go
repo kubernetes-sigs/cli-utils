@@ -4,6 +4,7 @@
 package taskrunner
 
 import (
+	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
@@ -35,38 +36,52 @@ type resourceStatusCollector struct {
 type resourceStatus struct {
 	Identifier    object.ObjMetadata
 	CurrentStatus status.Status
+	Generation    int64
 }
 
 // resourceStatus updates the collector with the latest
 // seen status for the given resource.
-func (a *resourceStatusCollector) resourceStatus(identifier object.ObjMetadata, s status.Status) {
-	if ri, found := a.resourceMap[identifier]; found {
-		ri.CurrentStatus = s
-		a.resourceMap[identifier] = ri
+func (a *resourceStatusCollector) resourceStatus(r *event.ResourceStatus) {
+	if ri, found := a.resourceMap[r.Identifier]; found {
+		ri.CurrentStatus = r.Status
+		ri.Generation = getGeneration(r)
+		a.resourceMap[r.Identifier] = ri
 	}
+}
+
+// getGeneration looks up the value of the generation field in the
+// provided resource status. If the resource information is not available,
+// this will return 0.
+func getGeneration(r *event.ResourceStatus) int64 {
+	if r.Resource == nil {
+		return 0
+	}
+	return r.Resource.GetGeneration()
 }
 
 // conditionMet tests whether the provided Condition holds true for
 // all resources given by the list of Identifiers.
-func (a *resourceStatusCollector) conditionMet(identifiers []object.ObjMetadata, c condition) bool {
+func (a *resourceStatusCollector) conditionMet(rwd []resourceWaitData, c condition) bool {
 	switch c {
 	case AllCurrent:
-		return a.allMatchStatus(identifiers, status.CurrentStatus)
+		return a.allMatchStatus(rwd, status.CurrentStatus)
 	case AllNotFound:
-		return a.allMatchStatus(identifiers, status.NotFoundStatus)
+		return a.allMatchStatus(rwd, status.NotFoundStatus)
 	default:
-		return a.noneMatchStatus(identifiers, status.UnknownStatus)
+		return a.noneMatchStatus(rwd, status.UnknownStatus)
 	}
 }
 
 // allMatchStatus checks whether all resources given by the
 // Identifiers parameter has the provided status.
-func (a *resourceStatusCollector) allMatchStatus(identifiers []object.ObjMetadata, s status.Status) bool {
-	for id, ri := range a.resourceMap {
-		if contains(identifiers, id) {
-			if ri.CurrentStatus != s {
-				return false
-			}
+func (a *resourceStatusCollector) allMatchStatus(rwd []resourceWaitData, s status.Status) bool {
+	for _, wd := range rwd {
+		ri, found := a.resourceMap[wd.identifier]
+		if !found {
+			return false
+		}
+		if ri.Generation < wd.generation || ri.CurrentStatus != s {
+			return false
 		}
 	}
 	return true
@@ -74,24 +89,15 @@ func (a *resourceStatusCollector) allMatchStatus(identifiers []object.ObjMetadat
 
 // noneMatchStatus checks whether none of the resources given
 // by the Identifiers parameters has the provided status.
-func (a *resourceStatusCollector) noneMatchStatus(identifiers []object.ObjMetadata, s status.Status) bool {
-	for id, ri := range a.resourceMap {
-		if contains(identifiers, id) {
-			if ri.CurrentStatus == s {
-				return false
-			}
+func (a *resourceStatusCollector) noneMatchStatus(rwd []resourceWaitData, s status.Status) bool {
+	for _, wd := range rwd {
+		ri, found := a.resourceMap[wd.identifier]
+		if !found {
+			return false
+		}
+		if ri.Generation < wd.generation || ri.CurrentStatus == s {
+			return false
 		}
 	}
 	return true
-}
-
-// contains checks whether the given id exists in the given slice
-// of Identifiers.
-func contains(identifiers []object.ObjMetadata, id object.ObjMetadata) bool {
-	for _, identifier := range identifiers {
-		if identifier.Equals(&id) {
-			return true
-		}
-	}
-	return false
 }
