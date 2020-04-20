@@ -11,12 +11,12 @@ require (
 	github.com/spf13/cobra v0.0.5
 	github.com/stretchr/testify v1.4.0
 	go.uber.org/atomic v1.4.0 // indirect
-	go.uber.org/zap v1.10.0 // indirect
 	golang.org/x/crypto v0.0.0-20191011191535-87dc89f01550 // indirect
 	golang.org/x/xerrors v0.0.0-20191011141410-1b5146add898 // indirect
 	gopkg.in/yaml.v3 v3.0.0-20200121175148-a6ecf24a6d71
 	gotest.tools v2.2.0+incompatible
 	k8s.io/api v0.17.2
+	k8s.io/apiextensions-apiserver v0.17.2
 	k8s.io/apimachinery v0.17.2
 	k8s.io/cli-runtime v0.17.2
 	k8s.io/client-go v0.17.2
