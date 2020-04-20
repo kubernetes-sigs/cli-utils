@@ -264,5 +264,5 @@ func (r *statusPollerRunner) isUpdatedResourceStatus(resourceStatus *event.Resou
 	if !found {
 		return true
 	}
-	return !event.ResourceStatusChanged(resourceStatus, oldResourceStatus)
+	return !event.ResourceStatusEqual(resourceStatus, oldResourceStatus)
 }

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"gotest.tools/assert"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
 	"sigs.k8s.io/cli-utils/pkg/object"
@@ -29,6 +30,13 @@ func TestDeepEqual(t *testing.T) {
 					Namespace: "default",
 					Name:      "Foo",
 				},
+				Resource: &unstructured.Unstructured{
+					Object: map[string]interface{}{
+						"metadata": map[string]interface{}{
+							"generation": int64(1),
+						},
+					},
+				},
 				Status:  status.UnknownStatus,
 				Message: "Some message",
 			},
@@ -41,10 +49,17 @@ func TestDeepEqual(t *testing.T) {
 					Namespace: "default",
 					Name:      "Foo",
 				},
+				Resource: &unstructured.Unstructured{
+					Object: map[string]interface{}{
+						"metadata": map[string]interface{}{
+							"generation": int64(2),
+						},
+					},
+				},
 				Status:  status.UnknownStatus,
 				Message: "Some message",
 			},
-			equal: true,
+			equal: false,
 		},
 		"different resources with only name different": {
 			actual: ResourceStatus{
@@ -268,7 +283,7 @@ func TestDeepEqual(t *testing.T) {
 
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
-			res := ResourceStatusChanged(&tc.actual, &tc.expected)
+			res := ResourceStatusEqual(&tc.actual, &tc.expected)
 
 			assert.Equal(t, tc.equal, res)
 		})

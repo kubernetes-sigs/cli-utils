@@ -97,17 +97,24 @@ func (g ResourceStatuses) Swap(i, j int) {
 	g[i], g[j] = g[j], g[i]
 }
 
-// ResourceStatusChanged checks if two instances of ResourceStatus are the same.
+// ResourceStatusEqual checks if two instances of ResourceStatus are the same.
 // This is used to determine whether status has changed for a particular resource.
 // Important to note that this does not check all fields, but only the ones
 // that are considered part of the status for a resource. So if the status
 // or the message of an ResourceStatus (or any of its generated ResourceStatuses)
 // have changed, this will return true. Changes to the state of the resource
 // itself that doesn't impact status are not considered.
-func ResourceStatusChanged(or1, or2 *ResourceStatus) bool {
+func ResourceStatusEqual(or1, or2 *ResourceStatus) bool {
 	if or1.Identifier != or2.Identifier ||
 		or1.Status != or2.Status ||
 		or1.Message != or2.Message {
+		return false
+	}
+
+	// Check if generation has changed to make sure that even if
+	// an update to a resource doesn't affect the status, a status event
+	// will still be sent.
+	if getGeneration(or1) != getGeneration(or2) {
 		return false
 	}
 
@@ -123,9 +130,16 @@ func ResourceStatusChanged(or1, or2 *ResourceStatus) bool {
 	}
 
 	for i := range or1.GeneratedResources {
-		if !ResourceStatusChanged(or1.GeneratedResources[i], or2.GeneratedResources[i]) {
+		if !ResourceStatusEqual(or1.GeneratedResources[i], or2.GeneratedResources[i]) {
 			return false
 		}
 	}
 	return true
+}
+
+func getGeneration(r *ResourceStatus) int64 {
+	if r.Resource == nil {
+		return 0
+	}
+	return r.Resource.GetGeneration()
 }
