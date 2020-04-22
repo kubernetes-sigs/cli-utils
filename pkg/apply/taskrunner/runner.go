@@ -188,12 +188,11 @@ func (b *baseRunner) run(ctx context.Context, taskQueue chan Task,
 			// The collector needs to keep track of the latest status
 			// for all resources so we can check whether wait task conditions
 			// has been met.
-			b.collector.resourceStatus(statusEvent.Resource.Identifier,
-				statusEvent.Resource.Status)
+			b.collector.resourceStatus(statusEvent.Resource)
 			// If the current task is a wait task, we check whether
 			// the condition has been met. If so, we complete the task.
 			if wt, ok := currentTask.(*WaitTask); ok {
-				if b.collector.conditionMet(wt.Identifiers, wt.Condition) {
+				if wt.checkCondition(taskContext, b.collector) {
 					completeIfWaitTask(currentTask, taskContext)
 				}
 			}
@@ -258,10 +257,10 @@ func (b *baseRunner) nextTask(taskQueue chan Task,
 		// starting a new wait task, we check if the condition is already
 		// met. Without this check, a task might end up waiting for
 		// status events when the condition is in fact already met.
-		if b.collector.conditionMet(st.Identifiers, st.Condition) {
+		if st.checkCondition(taskContext, b.collector) {
 			st.startAndComplete(taskContext)
 		} else {
-			tsk.Start(taskContext)
+			st.Start(taskContext)
 		}
 	default:
 		tsk.Start(taskContext)
