@@ -106,3 +106,14 @@ func InfoToObjMeta(info *resource.Info) ObjMetadata {
 		Namespace: u.GetNamespace(),
 	}
 }
+
+// infosToObjMetas takes a slice of infos and extract the
+// GroupKind, name and namespace for each resource and returns
+// it as a slice of ObjMetadata.
+func InfosToObjMetas(infos []*resource.Info) []ObjMetadata {
+	var objMetas []ObjMetadata
+	for _, info := range infos {
+		objMetas = append(objMetas, InfoToObjMeta(info))
+	}
+	return objMetas
+}
