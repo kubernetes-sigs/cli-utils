@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -47,6 +48,13 @@ func GetApplyRunner(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *A
 	cmd.Flags().StringVar(&r.output, "output", printers.DefaultPrinter(),
 		fmt.Sprintf("Output format, must be one of %s", strings.Join(printers.SupportedPrinters(), ",")))
 
+	cmd.Flags().BoolVar(&r.wait, "wait-for-reconcile", false,
+		"Wait for all applied resources to reach the Current status.")
+	cmd.Flags().DurationVar(&r.period, "wait-polling-period", 2*time.Second,
+		"Polling period for resource statuses.")
+	cmd.Flags().DurationVar(&r.timeout, "wait-timeout", time.Minute,
+		"Timeout threshold for waiting for all resources to reach the Current status.")
+
 	r.command = cmd
 	return r
 }
@@ -60,7 +68,10 @@ type ApplyRunner struct {
 	ioStreams genericclioptions.IOStreams
 	applier   *apply.Applier
 
-	output string
+	output  string
+	wait    bool
+	period  time.Duration
+	timeout time.Duration
 }
 
 func (r *ApplyRunner) Run(cmd *cobra.Command, args []string) {
@@ -69,9 +80,12 @@ func (r *ApplyRunner) Run(cmd *cobra.Command, args []string) {
 	// Run the applier. It will return a channel where we can receive updates
 	// to keep track of progress and any issues.
 	ch := r.applier.Run(context.Background(), apply.Options{
+		WaitForReconcile: r.wait,
+		PollInterval:     r.period,
+		WaitTimeout:      r.timeout,
 		// If we are not waiting for status, tell the applier to not
 		// emit the events.
-		EmitStatusEvents: r.applier.StatusOptions.Wait,
+		EmitStatusEvents: r.wait,
 	})
 
 	// The printer will print updates from the channel. It will block

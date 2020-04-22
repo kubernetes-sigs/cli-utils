@@ -14,7 +14,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"testing"
-	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -229,9 +228,6 @@ func TestApplier(t *testing.T) {
 
 			ioStreams, _, _, _ := genericclioptions.NewTestIOStreams() //nolint:dogsled
 			applier := NewApplier(tf, ioStreams)
-
-			applier.StatusOptions.period = 2 * time.Second
-			applier.StatusOptions.Wait = tc.status
 			applier.NoPrune = !tc.prune
 
 			cmd := &cobra.Command{}
@@ -252,6 +248,7 @@ func TestApplier(t *testing.T) {
 
 			ctx := context.Background()
 			eventChannel := applier.Run(ctx, Options{
+				WaitForReconcile: tc.status,
 				EmitStatusEvents: true,
 			})
 
