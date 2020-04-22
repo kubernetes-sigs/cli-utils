@@ -11,7 +11,6 @@ import (
 	"github.com/go-errors/errors"
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/kubectl/pkg/cmd/apply"
@@ -20,11 +19,10 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/poller"
 	"sigs.k8s.io/cli-utils/pkg/apply/prune"
-	"sigs.k8s.io/cli-utils/pkg/apply/task"
+	"sigs.k8s.io/cli-utils/pkg/apply/solver"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling"
-	pollevent "sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -196,76 +194,6 @@ func splitInfos(infos []*resource.Info) ([]*resource.Info, []*resource.Info) {
 	return resources, groupingObjectTemplates
 }
 
-// buildTaskQueue takes the slice of infos and object identifiers, and
-// builds a queue of tasks that needs to be executed.
-func (a *Applier) buildTaskQueue(infos []*resource.Info,
-	identifiers []object.ObjMetadata) chan taskrunner.Task {
-	tasks := []taskrunner.Task{
-		// This taks is responsible for applying all the resources
-		// in the infos slice.
-		&task.ApplyTask{
-			Objects:      infos,
-			ApplyOptions: a.ApplyOptions,
-		},
-		// When all resources have been applied, we need to send
-		// an event that notifies the client that the apply phase
-		// is complete.
-		&task.SendEventTask{
-			Event: event.Event{
-				Type: event.ApplyType,
-				ApplyEvent: event.ApplyEvent{
-					Type: event.ApplyEventCompleted,
-				},
-			},
-		},
-	}
-
-	if a.StatusOptions.Wait {
-		tasks = append(tasks,
-			// The Wait task declares that after applying the resources,
-			// we should Wait for all of them to reach the Current status
-			// before continuing.
-			taskrunner.NewWaitTask(identifiers, taskrunner.AllCurrent,
-				a.StatusOptions.Timeout),
-			// When all resources have reached the desired status, we
-			// send an event to notify the client.
-			&task.SendEventTask{
-				Event: event.Event{
-					Type: event.StatusType,
-					StatusEvent: pollevent.Event{
-						EventType: pollevent.CompletedEvent,
-					},
-				},
-			})
-	}
-
-	if !a.NoPrune {
-		tasks = append(tasks,
-			// The prune task is responsible for doing the pruning
-			// of any deleted resources.
-			&task.PruneTask{
-				Objects:      infos,
-				PruneOptions: a.PruneOptions,
-			},
-			// Once prune is completed, we send an event to notify
-			// the client.
-			&task.SendEventTask{
-				Event: event.Event{
-					Type: event.PruneType,
-					PruneEvent: event.PruneEvent{
-						Type: event.PruneEventCompleted,
-					},
-				},
-			})
-	}
-
-	taskQueue := make(chan taskrunner.Task, len(tasks))
-	for _, t := range tasks {
-		taskQueue <- t
-	}
-	return taskQueue
-}
-
 // Run performs the Apply step. This happens asynchronously with updates
 // on progress and any errors are reported back on the event channel.
 // Cancelling the operation or setting timeout on how long to Wait
@@ -300,10 +228,17 @@ func (a *Applier) Run(ctx context.Context, options Options) <-chan event.Event {
 		// of the resources in the infos struct. The status library
 		// relies on identifiers rather than infos, so we need to use
 		// both.
-		identifiers := infosToObjMetas(infos)
+		identifiers := object.InfosToObjMetas(infos)
 
 		// Fetch the queue (channel) of tasks that should be executed.
-		taskQueue := a.buildTaskQueue(infos, identifiers)
+		taskQueue := (&solver.TaskQueueSolver{
+			ApplyOptions: a.ApplyOptions,
+			PruneOptions: a.PruneOptions,
+		}).BuildTaskQueue(infos, solver.Options{
+			WaitForReconcile:        a.StatusOptions.Wait,
+			WaitForReconcileTimeout: a.StatusOptions.Timeout,
+			Prune:                   !a.NoPrune,
+		})
 
 		// Send event to inform the caller about the resources that
 		// will be applied/pruned.
@@ -344,22 +279,6 @@ func handleError(eventChannel chan event.Event, err error) {
 			Err: err,
 		},
 	}
-}
-
-// infosToObjMetas takes a slice of infos and extract the
-// GroupKind, name and namespace for each resource and returns
-// it as a slice of ObjMetadata.
-func infosToObjMetas(infos []*resource.Info) []object.ObjMetadata {
-	var objMetas []object.ObjMetadata
-	for _, info := range infos {
-		u := info.Object.(*unstructured.Unstructured)
-		objMetas = append(objMetas, object.ObjMetadata{
-			GroupKind: u.GroupVersionKind().GroupKind(),
-			Name:      u.GetName(),
-			Namespace: u.GetNamespace(),
-		})
-	}
-	return objMetas
 }
 
 // validateNamespace returns true if all the objects in the passed
