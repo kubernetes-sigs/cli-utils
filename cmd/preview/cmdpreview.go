@@ -39,9 +39,8 @@ func NewCmdPreview(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *co
 				applier.DryRun = true
 				cmdutil.CheckErr(applier.Initialize(cmd, args))
 
-				// Create a context with the provided timout from the cobra parameter.
-				ctx, cancel := context.WithTimeout(context.Background(), applier.StatusOptions.Timeout)
-				defer cancel()
+				// Create a context
+				ctx := context.Background()
 
 				// Run the applier. It will return a channel where we can receive updates
 				// to keep track of progress and any issues.

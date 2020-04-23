@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"time"
 
 	"github.com/go-errors/errors"
 	"github.com/spf13/cobra"
@@ -36,8 +37,7 @@ import (
 func NewApplier(factory util.Factory, ioStreams genericclioptions.IOStreams) *Applier {
 	applyOptions := apply.NewApplyOptions(ioStreams)
 	return &Applier{
-		ApplyOptions:  applyOptions,
-		StatusOptions: NewStatusOptions(),
+		ApplyOptions: applyOptions,
 		// VisitedUids keeps track of the unique identifiers for all
 		// currently applied objects. Used to calculate prune set.
 		PruneOptions: prune.NewPruneOptions(applyOptions.VisitedUids),
@@ -60,10 +60,9 @@ type Applier struct {
 	factory   util.Factory
 	ioStreams genericclioptions.IOStreams
 
-	ApplyOptions  *apply.ApplyOptions
-	StatusOptions *StatusOptions
-	PruneOptions  *prune.PruneOptions
-	statusPoller  poller.Poller
+	ApplyOptions *apply.ApplyOptions
+	PruneOptions *prune.PruneOptions
+	statusPoller poller.Poller
 
 	NoPrune bool
 	DryRun  bool
@@ -118,7 +117,6 @@ func (a *Applier) SetFlags(cmd *cobra.Command) error {
 	_ = cmd.Flags().MarkHidden("grace-period")
 	_ = cmd.Flags().MarkHidden("timeout")
 	_ = cmd.Flags().MarkHidden("wait")
-	a.StatusOptions.AddFlags(cmd)
 	a.ApplyOptions.Overwrite = true
 	return nil
 }
@@ -204,6 +202,7 @@ func splitInfos(infos []*resource.Info) ([]*resource.Info, []*resource.Info) {
 // resources to become current.
 func (a *Applier) Run(ctx context.Context, options Options) <-chan event.Event {
 	eventChannel := make(chan event.Event)
+	setDefaults(&options)
 
 	go func() {
 		defer close(eventChannel)
@@ -235,8 +234,8 @@ func (a *Applier) Run(ctx context.Context, options Options) <-chan event.Event {
 			ApplyOptions: a.ApplyOptions,
 			PruneOptions: a.PruneOptions,
 		}).BuildTaskQueue(infos, solver.Options{
-			WaitForReconcile:        a.StatusOptions.Wait,
-			WaitForReconcileTimeout: a.StatusOptions.Timeout,
+			WaitForReconcile:        options.WaitForReconcile,
+			WaitForReconcileTimeout: options.WaitTimeout,
 			Prune:                   !a.NoPrune,
 		})
 
@@ -257,7 +256,7 @@ func (a *Applier) Run(ctx context.Context, options Options) <-chan event.Event {
 		// Create a new TaskStatusRunner to execute the taskQueue.
 		runner := taskrunner.NewTaskStatusRunner(identifiers, a.statusPoller)
 		err = runner.Run(ctx, taskQueue, eventChannel, taskrunner.Options{
-			PollInterval:     a.StatusOptions.period,
+			PollInterval:     options.PollInterval,
 			UseCache:         true,
 			EmitStatusEvents: options.EmitStatusEvents,
 		})
@@ -269,7 +268,33 @@ func (a *Applier) Run(ctx context.Context, options Options) <-chan event.Event {
 }
 
 type Options struct {
+	// WaitForReconcile defines whether the applier should wait
+	// until all applied resources have been reconciled before
+	// pruning and exiting.
+	WaitForReconcile bool
+
+	// PollInterval defines how often we should poll for the status
+	// of resources.
+	PollInterval time.Duration
+
+	// WaitTimeout defines how long we should wait for resources
+	// to be reconciled before giving up.
+	WaitTimeout time.Duration
+
+	// EmitStatusEvents defines whether status events should be
+	// emitted on the eventChannel to the caller.
 	EmitStatusEvents bool
+}
+
+// setDefaults set the options to the default values if they
+// have not been provided.
+func setDefaults(o *Options) {
+	if o.PollInterval == time.Duration(0) {
+		o.PollInterval = 2 * time.Second
+	}
+	if o.WaitTimeout == time.Duration(0) {
+		o.WaitTimeout = time.Minute
+	}
 }
 
 func handleError(eventChannel chan event.Event, err error) {
