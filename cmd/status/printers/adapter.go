@@ -41,10 +41,15 @@ func (r *ResourceInfo) SubResources() []table.Resource {
 
 type ResourceState struct {
 	resources []table.Resource
+	err       error
 }
 
 func (rss *ResourceState) Resources() []table.Resource {
 	return rss.resources
+}
+
+func (rss *ResourceState) Error() error {
+	return rss.err
 }
 
 func (ca *CollectorAdapter) LatestStatus() *ResourceState {
@@ -57,5 +62,6 @@ func (ca *CollectorAdapter) LatestStatus() *ResourceState {
 	}
 	return &ResourceState{
 		resources: resources,
+		err:       observation.Error,
 	}
 }

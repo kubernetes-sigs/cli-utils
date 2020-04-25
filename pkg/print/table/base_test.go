@@ -161,6 +161,10 @@ func (r *fakeResourceStates) Resources() []Resource {
 	return r.resources
 }
 
+func (r *fakeResourceStates) Error() error {
+	return nil
+}
+
 type fakeResource struct {
 	resourceStatus *pe.ResourceStatus
 }

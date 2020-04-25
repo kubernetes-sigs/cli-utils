@@ -48,6 +48,8 @@ type ResourceStateCollector struct {
 	// resource identifier to a ResourceInfo object that captures
 	// the latest state for the given resource.
 	resourceInfos map[object.ObjMetadata]*ResourceInfo
+
+	err error
 }
 
 // ResourceInfo captures the latest seen state of a single resource.
@@ -185,8 +187,7 @@ func (r *ResourceStateCollector) processApplyEvent(e event.ApplyEvent) {
 
 // processErrorEvent handles events for errors.
 func (r *ResourceStateCollector) processErrorEvent(err error) {
-	// TODO: Handle errors more gracefully than this.
-	panic(err)
+	r.err = err
 }
 
 // toIdentifier extracts the identifying information from an
@@ -202,17 +203,23 @@ func toIdentifier(o runtime.Object) object.ObjMetadata {
 
 // ResourceState contains the latest state for all the resources.
 type ResourceState struct {
-	ResourceInfos ResourceInfos
+	resourceInfos ResourceInfos
+
+	err error
 }
 
 // Resources returns a slice containing the latest state
 // for each individual resource.
 func (r *ResourceState) Resources() []table.Resource {
 	var resources []table.Resource
-	for _, res := range r.ResourceInfos {
+	for _, res := range r.resourceInfos {
 		resources = append(resources, res)
 	}
 	return resources
+}
+
+func (r *ResourceState) Error() error {
+	return r.err
 }
 
 // LatestState returns a ResourceState object that contains
@@ -233,7 +240,8 @@ func (r *ResourceStateCollector) LatestState() *ResourceState {
 	sort.Sort(resourceInfos)
 
 	return &ResourceState{
-		ResourceInfos: resourceInfos,
+		resourceInfos: resourceInfos,
+		err:           r.err,
 	}
 }
 

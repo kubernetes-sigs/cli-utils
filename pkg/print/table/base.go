@@ -28,6 +28,7 @@ type ColumnDefinition interface {
 // that should be printed.
 type ResourceStates interface {
 	Resources() []Resource
+	Error() error
 }
 
 // Resource defines the interface that each of the Resource
@@ -58,8 +59,12 @@ func (t *BaseTablePrinter) PrintTable(rs ResourceStates,
 		t.moveUp()
 		t.eraseCurrentLine()
 	}
-	linePrintCount := 0
 
+	if rs.Error() != nil {
+		return t.printError(rs.Error())
+	}
+
+	linePrintCount := 0
 	for i, column := range t.Columns {
 		format := fmt.Sprintf("%%-%ds", column.Width())
 		t.printOrDie(format, column.Header())
@@ -134,6 +139,11 @@ func (t *BaseTablePrinter) printSubTable(resources []Resource,
 		linePrintCount += t.printSubTable(resource.SubResources(), prefix)
 	}
 	return linePrintCount
+}
+
+func (t *BaseTablePrinter) printError(err error) int {
+	t.printOrDie("Fatal error: %v\n", err)
+	return 1 // This is the number of lines printed.
 }
 
 func (t *BaseTablePrinter) printOrDie(format string, a ...interface{}) {

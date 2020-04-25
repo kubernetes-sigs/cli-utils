@@ -30,7 +30,8 @@ func (t *Printer) Print(ch <-chan event.Event, _ bool) {
 		// Eventually we need a more graceful shutdown if
 		// this happens.
 		if e.Type == event.ErrorType {
-			panic(e.ErrorEvent.Err)
+			_, _ = fmt.Fprintf(t.IOStreams.Out, "Fatal error: %v\n", e.ErrorEvent.Err)
+			return
 		}
 	}
 	// Create a new collector and initialize it with the resources
