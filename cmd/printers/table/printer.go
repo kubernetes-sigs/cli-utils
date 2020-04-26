@@ -26,9 +26,8 @@ func (t *Printer) Print(ch <-chan event.Event, _ bool) {
 			initEvent = e.InitEvent
 			break
 		}
-		// If we get an error event, we just panic for now.
-		// Eventually we need a more graceful shutdown if
-		// this happens.
+		// If we get an error event, we just print it and
+		// exit. The error event signals a fatal error.
 		if e.Type == event.ErrorType {
 			_, _ = fmt.Fprintf(t.IOStreams.Out, "Fatal error: %v\n", e.ErrorEvent.Err)
 			return
@@ -64,10 +63,8 @@ func (t *Printer) Print(ch <-chan event.Event, _ bool) {
 // columns defines the columns we want to print
 //TODO: We should have the number of columns and their widths be
 // dependent on the space available.
-var columns = []table.ColumnDefinition{
-	table.MustColumn("namespace"),
-	table.MustColumn("resource"),
-	table.ColumnDef{
+var (
+	actionColumnDef = table.ColumnDef{
 		// Column containing the resource type and name. Currently it does not
 		// print group or version since those are rarely needed to uniquely
 		// distinguish two resources from each other. Just name and kind should
@@ -81,27 +78,40 @@ var columns = []table.ColumnDefinition{
 			switch res := r.(type) {
 			case *ResourceInfo:
 				resInfo = res
-			case *SubResourceInfo:
+			default:
 				return 0, nil
 			}
 
-			if resInfo.ResourceAction == event.ApplyAction &&
-				resInfo.ApplyOpResult != nil {
-				text := resInfo.ApplyOpResult.String()
-				if len(text) > width {
-					text = text[:width]
+			var text string
+			switch resInfo.ResourceAction {
+			case event.ApplyAction:
+				if resInfo.ApplyOpResult != nil {
+					text = resInfo.ApplyOpResult.String()
 				}
-				_, err := fmt.Fprint(w, text)
-				return len(text), err
+			case event.PruneAction:
+				if resInfo.Pruned {
+					text = "Pruned"
+				}
 			}
-			return 0, nil
+
+			if len(text) > width {
+				text = text[:width]
+			}
+			_, err := fmt.Fprint(w, text)
+			return len(text), err
 		},
-	},
-	table.MustColumn("status"),
-	table.MustColumn("conditions"),
-	table.MustColumn("age"),
-	table.MustColumn("message"),
-}
+	}
+
+	columns = []table.ColumnDefinition{
+		table.MustColumn("namespace"),
+		table.MustColumn("resource"),
+		actionColumnDef,
+		table.MustColumn("status"),
+		table.MustColumn("conditions"),
+		table.MustColumn("age"),
+		table.MustColumn("message"),
+	}
+)
 
 // runPrintLoop starts a new goroutine that will regularly fetch the
 // latest state from the collector and update the table.
