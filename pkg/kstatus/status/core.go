@@ -41,6 +41,7 @@ const (
 	tooFewAvailable = "LessAvailable"
 	tooFewUpdated   = "LessUpdated"
 	tooFewReplicas  = "LessReplicas"
+	extraPods       = "ExtraPods"
 
 	onDeleteUpdateStrategy = "OnDelete"
 )
@@ -102,6 +103,11 @@ func stsConditions(u *unstructured.Unstructured) (*Result, error) {
 	if specReplicas > readyReplicas {
 		message := fmt.Sprintf("Ready: %d/%d", readyReplicas, specReplicas)
 		return newInProgressStatus(tooFewReady, message), nil
+	}
+
+	if statusReplicas > specReplicas {
+		message := fmt.Sprintf("Pending termination: %d", statusReplicas-specReplicas)
+		return newInProgressStatus(extraPods, message), nil
 	}
 
 	// https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#partitions
@@ -205,9 +211,9 @@ func deploymentConditions(u *unstructured.Unstructured) (*Result, error) {
 		return newInProgressStatus(tooFewUpdated, message), nil
 	}
 
-	if statusReplicas > updatedReplicas {
-		message := fmt.Sprintf("Pending termination: %d", statusReplicas-updatedReplicas)
-		return newInProgressStatus("ExtraPods", message), nil
+	if statusReplicas > specReplicas {
+		message := fmt.Sprintf("Pending termination: %d", statusReplicas-specReplicas)
+		return newInProgressStatus(extraPods, message), nil
 	}
 
 	if updatedReplicas > availableReplicas {
@@ -277,9 +283,9 @@ func replicasetConditions(u *unstructured.Unstructured) (*Result, error) {
 		return newInProgressStatus(tooFewReady, message), nil
 	}
 
-	if specReplicas < statusReplicas {
-		message := fmt.Sprintf("replicas: %d/%d", statusReplicas, specReplicas)
-		return newInProgressStatus("ExtraPods", message), nil
+	if statusReplicas > specReplicas {
+		message := fmt.Sprintf("Pending termination: %d", statusReplicas-specReplicas)
+		return newInProgressStatus(extraPods, message), nil
 	}
 	// All ok
 	return &Result{

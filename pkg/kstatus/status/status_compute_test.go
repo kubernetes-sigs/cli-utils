@@ -340,6 +340,21 @@ status:
    readyReplicas: 4
    replicas: 4
 `
+var stsExtraPods = `
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+   generation: 1
+   name: test
+   namespace: qual
+spec:
+   replicas: 4
+status:
+   observedGeneration: 1
+   currentReplicas: 4
+   readyReplicas: 4
+   replicas: 8
+`
 
 func TestStsStatus(t *testing.T) {
 	testCases := map[string]testSpec{
@@ -395,6 +410,18 @@ func TestStsStatus(t *testing.T) {
 				Type:   ConditionReconciling,
 				Status: corev1.ConditionTrue,
 				Reason: "LessCurrent",
+			}},
+			absentConditionTypes: []ConditionType{
+				ConditionStalled,
+			},
+		},
+		"stsExtraPods": {
+			spec:           stsExtraPods,
+			expectedStatus: InProgressStatus,
+			expectedConditions: []Condition{{
+				Type:   ConditionReconciling,
+				Status: corev1.ConditionTrue,
+				Reason: "ExtraPods",
 			}},
 			absentConditionTypes: []ConditionType{
 				ConditionStalled,
