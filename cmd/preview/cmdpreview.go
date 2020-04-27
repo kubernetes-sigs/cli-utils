@@ -24,7 +24,7 @@ func NewCmdPreview(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *co
 	}
 
 	cmd := &cobra.Command{
-		Use:                   "preview DIRECTORY",
+		Use:                   "preview (DIRECTORY | STDIN)",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Preview the apply of a configuration"),
 		Args:                  cobra.MaximumNArgs(1),

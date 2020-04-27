@@ -13,57 +13,31 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/testutil"
 )
 
-func TestProcessPaths(t *testing.T) {
-	trueVal := true
-	testCases := map[string]struct {
-		paths                     []string
-		expectedFileNameFlags     genericclioptions.FileNameFlags
-		errFromDemandOneDirectory string
-	}{
-		"empty slice means reading from StdIn": {
-			paths: []string{},
-			expectedFileNameFlags: genericclioptions.FileNameFlags{
-				Filenames: &[]string{"-"},
-			},
-			errFromDemandOneDirectory: "argument '-' is not but must be a directory",
-		},
-		"single file in slice means reading from that path": {
-			paths: []string{"object.yaml"},
-			expectedFileNameFlags: genericclioptions.FileNameFlags{
-				Filenames: &[]string{"object.yaml"},
-				Recursive: &trueVal,
-			},
-			errFromDemandOneDirectory: "argument 'object.yaml' is not but must be a directory",
-		},
-		"single dir in slice": {
-			paths: []string{"/tmp"},
-			expectedFileNameFlags: genericclioptions.FileNameFlags{
-				Filenames: &[]string{"/tmp"},
-				Recursive: &trueVal,
-			},
-		},
-		"multiple elements in slice means reading from all files": {
-			paths: []string{"rs.yaml", "dep.yaml"},
-			expectedFileNameFlags: genericclioptions.FileNameFlags{
-				Filenames: &[]string{"rs.yaml", "dep.yaml"},
-				Recursive: &trueVal,
-			},
-			errFromDemandOneDirectory: "specify exactly one directory path argument; rejecting [rs.yaml dep.yaml]",
-		},
-	}
+const (
+	packageDir        = "test-pkg-dir"
+	inventoryFilename = "inventory.yaml"
+	podAFilename      = "pod-a.yaml"
+	podBFilename      = "pod-b.yaml"
+)
 
-	for tn, tc := range testCases {
-		t.Run(tn, func(t *testing.T) {
-			var err error
-			fileNameFlags := processPaths(tc.paths)
-			assert.DeepEqual(t, tc.expectedFileNameFlags, fileNameFlags)
-			fileNameFlags, err = DemandOneDirectory(tc.paths)
-			assert.DeepEqual(t, tc.expectedFileNameFlags, fileNameFlags)
-			if err != nil && err.Error() != tc.errFromDemandOneDirectory {
-				assert.Equal(t, err.Error(), tc.errFromDemandOneDirectory)
-			}
-		})
-	}
+var (
+	inventoryFilePath = filepath.Join(packageDir, inventoryFilename)
+	podAFilePath      = filepath.Join(packageDir, podAFilename)
+	podBFilePath      = filepath.Join(packageDir, podBFilename)
+)
+
+func setupTestFilesystem(t *testing.T) testutil.TestFilesystem {
+	// Create the test filesystem, and add package config files
+	// to it.
+	t.Log("Creating test filesystem")
+	tf := testutil.Setup(t, packageDir)
+	t.Logf("Adding File: %s", inventoryFilePath)
+	tf.WriteFile(t, inventoryFilePath, inventoryConfigMap)
+	t.Logf("Adding File: %s", podAFilePath)
+	tf.WriteFile(t, podAFilePath, podA)
+	t.Logf("Adding File: %s", podBFilePath)
+	tf.WriteFile(t, podBFilePath, podB)
+	return tf
 }
 
 var inventoryConfigMap = []byte(`
@@ -104,17 +78,62 @@ spec:
     image: k8s.gcr.io/pause:2.0
 `)
 
-func TestExpandDirErrors(t *testing.T) {
-	// Create the test filesystem, and add package config files
-	// to it.
-	packageDir := "test-pkg-dir"
-	tf := testutil.Setup(t, packageDir)
-	tf.WriteFile(t, filepath.Join(packageDir, "inventory.yaml"), inventoryConfigMap)
-	tf.WriteFile(t, filepath.Join(packageDir, "pod-a.yaml"), podA)
-	tf.WriteFile(t, filepath.Join(packageDir, "pod-b.yaml"), podB)
+func TestProcessPaths(t *testing.T) {
+	tf := setupTestFilesystem(t)
 	defer tf.Clean()
 
 	trueVal := true
+	testCases := map[string]struct {
+		paths                     []string
+		expectedFileNameFlags     genericclioptions.FileNameFlags
+		errFromDemandOneDirectory string
+	}{
+		"empty slice means reading from StdIn": {
+			paths: []string{},
+			expectedFileNameFlags: genericclioptions.FileNameFlags{
+				Filenames: &[]string{"-"},
+			},
+		},
+		"single file in slice is error; must be directory": {
+			paths: []string{podAFilePath},
+			expectedFileNameFlags: genericclioptions.FileNameFlags{
+				Filenames: nil,
+				Recursive: nil,
+			},
+			errFromDemandOneDirectory: "argument 'test-pkg-dir/pod-a.yaml' is not but must be a directory",
+		},
+		"single dir in slice": {
+			paths: []string{tf.GetRootDir()},
+			expectedFileNameFlags: genericclioptions.FileNameFlags{
+				Filenames: &[]string{tf.GetRootDir()},
+				Recursive: &trueVal,
+			},
+		},
+		"multiple arguments is an error": {
+			paths: []string{podAFilePath, podBFilePath},
+			expectedFileNameFlags: genericclioptions.FileNameFlags{
+				Filenames: nil,
+				Recursive: nil,
+			},
+			errFromDemandOneDirectory: "specify exactly one directory path argument; rejecting [test-pkg-dir/pod-a.yaml test-pkg-dir/pod-b.yaml]",
+		},
+	}
+
+	for tn, tc := range testCases {
+		t.Run(tn, func(t *testing.T) {
+			fileNameFlags, err := DemandOneDirectory(tc.paths)
+			assert.DeepEqual(t, tc.expectedFileNameFlags, fileNameFlags)
+			if err != nil && err.Error() != tc.errFromDemandOneDirectory {
+				assert.Equal(t, err.Error(), tc.errFromDemandOneDirectory)
+			}
+		})
+	}
+}
+
+func TestExpandDirErrors(t *testing.T) {
+	tf := setupTestFilesystem(t)
+	defer tf.Clean()
+
 	testCases := map[string]struct {
 		packageDirPath []string
 		expandedPaths  []string
@@ -144,6 +163,7 @@ func TestExpandDirErrors(t *testing.T) {
 
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
+			trueVal := true
 			filenameFlags := genericclioptions.FileNameFlags{
 				Filenames: &tc.packageDirPath,
 				Recursive: &trueVal,
