@@ -72,6 +72,10 @@ type ResourceInfo struct {
 	// ApplyOpResult contains the result after
 	// a resource has been applied to the cluster.
 	ApplyOpResult *event.ApplyEventOperation
+
+	// Pruned contains information about whether
+	// the resources has been pruned.
+	Pruned bool
 }
 
 // Identifier returns the identifier for the given resource.
@@ -157,6 +161,8 @@ func (r *ResourceStateCollector) processEvent(e event.Event) {
 		r.processStatusEvent(e.StatusEvent)
 	case event.ApplyType:
 		r.processApplyEvent(e.ApplyEvent)
+	case event.PruneType:
+		r.processPruneEvent(e.PruneEvent)
 	case event.ErrorType:
 		r.processErrorEvent(e.ErrorEvent.Err)
 	}
@@ -180,8 +186,23 @@ func (r *ResourceStateCollector) processStatusEvent(e pe.Event) {
 func (r *ResourceStateCollector) processApplyEvent(e event.ApplyEvent) {
 	if e.Type == event.ApplyEventResourceUpdate {
 		identifier := toIdentifier(e.Object)
-		previous := r.resourceInfos[identifier]
+		previous, found := r.resourceInfos[identifier]
+		if !found {
+			return
+		}
 		previous.ApplyOpResult = &e.Operation
+	}
+}
+
+// processPruneEvent handles event related to prune operations.
+func (r *ResourceStateCollector) processPruneEvent(e event.PruneEvent) {
+	if e.Type == event.PruneEventResourceUpdate {
+		identifier := toIdentifier(e.Object)
+		previous, found := r.resourceInfos[identifier]
+		if !found {
+			return
+		}
+		previous.Pruned = true
 	}
 }
 
@@ -235,6 +256,7 @@ func (r *ResourceStateCollector) LatestState() *ResourceState {
 			resourceStatus: ri.resourceStatus,
 			ResourceAction: ri.ResourceAction,
 			ApplyOpResult:  ri.ApplyOpResult,
+			Pruned:         ri.Pruned,
 		})
 	}
 	sort.Sort(resourceInfos)
