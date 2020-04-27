@@ -125,7 +125,7 @@ func (po *PruneOptions) retrievePreviousGroupingObjects(namespace string) error 
 	}
 	// Get the grouping label for this grouping object, and create
 	// a label selector from it.
-	groupingLabel, err := retrieveGroupingLabel(po.currentGroupingObject.Object)
+	groupingLabel, err := retrieveInventoryLabel(po.currentGroupingObject.Object)
 	if err != nil {
 		return err
 	}
@@ -183,7 +183,7 @@ func unionPastInventory(infos []*resource.Info) (*Inventory, error) {
 // the current apply. Prune also delete all previous grouping
 // objects. Returns an error if there was a problem.
 func (po *PruneOptions) Prune(currentObjects []*resource.Info, eventChannel chan<- event.Event) error {
-	currentGroupingObject, found := FindGroupingObject(currentObjects)
+	currentGroupingObject, found := FindInventoryObj(currentObjects)
 	if !found {
 		return fmt.Errorf("current grouping object not found during prune")
 	}

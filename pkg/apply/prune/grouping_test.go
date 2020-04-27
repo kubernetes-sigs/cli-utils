@@ -161,7 +161,7 @@ func TestRetrieveGroupingLabel(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		actual, err := retrieveGroupingLabel(test.obj)
+		actual, err := retrieveInventoryLabel(test.obj)
 		if test.isError && err == nil {
 			t.Errorf("Did not receive expected error.\n")
 		}
@@ -176,7 +176,7 @@ func TestRetrieveGroupingLabel(t *testing.T) {
 	}
 }
 
-func TestIsGroupingObject(t *testing.T) {
+func TestIsInventoryObject(t *testing.T) {
 	tests := []struct {
 		obj        runtime.Object
 		isGrouping bool
@@ -196,12 +196,12 @@ func TestIsGroupingObject(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		grouping := IsGroupingObject(test.obj)
+		grouping := IsInventoryObject(test.obj)
 		if test.isGrouping && !grouping {
-			t.Errorf("Grouping object not identified: %#v", test.obj)
+			t.Errorf("Inventory object not identified: %#v", test.obj)
 		}
 		if !test.isGrouping && grouping {
-			t.Errorf("Non-grouping object identifed as grouping obj: %#v", test.obj)
+			t.Errorf("Non-inventory object identifed as grouping obj: %#v", test.obj)
 		}
 	}
 }
@@ -322,7 +322,7 @@ func TestCreateGroupingObject(t *testing.T) {
 	}
 }
 
-func TestFindGroupingObject(t *testing.T) {
+func TestFindInventoryObj(t *testing.T) {
 	tests := []struct {
 		infos  []*resource.Info
 		exists bool
@@ -361,7 +361,7 @@ func TestFindGroupingObject(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		groupingObj, found := FindGroupingObject(test.infos)
+		groupingObj, found := FindInventoryObj(test.infos)
 		if test.exists && !found {
 			t.Errorf("Should have found grouping object")
 		}
@@ -568,7 +568,7 @@ func TestAddRetrieveInventoryToFromGroupingObject(t *testing.T) {
 			}
 			// If the grouping object has an inventory, check the
 			// grouping object has an inventory hash.
-			groupingInfo, exists := FindGroupingObject(test.infos)
+			groupingInfo, exists := FindInventoryObj(test.infos)
 			if exists && len(test.expected) > 0 {
 				invHash := retrieveInventoryHash(groupingInfo)
 				if len(invHash) == 0 {
@@ -641,7 +641,7 @@ func TestAddSuffixToName(t *testing.T) {
 	}
 }
 
-func TestClearGroupingObject(t *testing.T) {
+func TestClearInventoryObject(t *testing.T) {
 	tests := map[string]struct {
 		infos   []*resource.Info
 		isError bool
@@ -678,7 +678,7 @@ func TestClearGroupingObject(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			err := ClearGroupingObj(tc.infos)
+			err := ClearInventoryObj(tc.infos)
 			if tc.isError {
 				if err == nil {
 					t.Errorf("Should have produced an error, but returned none.")
