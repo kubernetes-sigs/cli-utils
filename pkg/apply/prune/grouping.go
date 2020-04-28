@@ -22,17 +22,13 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/resource"
+	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
-const (
-	GroupingLabel = "cli-utils.sigs.k8s.io/inventory-id"
-	GroupingHash  = "cli-utils.sigs.k8s.io/inventory-hash"
-)
-
-// retrieveInventoryLabel returns the string value of the GroupingLabel
+// retrieveInventoryLabel returns the string value of the InventoryLabel
 // for the passed object. Returns error if the passed object is nil or
-// is not a grouping object.
+// is not a inventory object.
 func retrieveInventoryLabel(obj runtime.Object) (string, error) {
 	var inventoryLabel string
 	if obj == nil {
@@ -43,9 +39,9 @@ func retrieveInventoryLabel(obj runtime.Object) (string, error) {
 		return "", err
 	}
 	labels := accessor.GetLabels()
-	inventoryLabel, exists := labels[GroupingLabel]
+	inventoryLabel, exists := labels[common.InventoryLabel]
 	if !exists {
-		return "", fmt.Errorf("inventory label does not exist for inventory object: %s", GroupingLabel)
+		return "", fmt.Errorf("inventory label does not exist for inventory object: %s", common.InventoryLabel)
 	}
 	return strings.TrimSpace(inventoryLabel), nil
 }
@@ -64,8 +60,8 @@ func IsInventoryObject(obj runtime.Object) bool {
 	return false
 }
 
-// FindInventoryObj returns the "Grouping" object (ConfigMap with
-// grouping label) if it exists, and a boolean describing if it was found.
+// FindInventoryObj returns the "Inventory" object (ConfigMap with
+// inventory label) if it exists, and a boolean describing if it was found.
 func FindInventoryObj(infos []*resource.Info) (*resource.Info, bool) {
 	for _, info := range infos {
 		if info != nil && IsInventoryObject(info.Object) {
@@ -143,7 +139,7 @@ func AddInventoryToGroupingObj(infos []*resource.Info) error {
 		if annotations == nil {
 			annotations = map[string]string{}
 		}
-		annotations[GroupingHash] = invHashStr
+		annotations[common.InventoryHash] = invHashStr
 		groupingObj.SetAnnotations(annotations)
 	}
 	return nil
@@ -191,7 +187,7 @@ func CreateGroupingObj(groupingObjectTemplate *resource.Info,
 	if annotations == nil {
 		annotations = map[string]string{}
 	}
-	annotations[GroupingHash] = invHashStr
+	annotations[common.InventoryHash] = invHashStr
 	groupingObj.SetAnnotations(annotations)
 
 	// Creates a new Info for the newly created grouping object.
@@ -230,8 +226,8 @@ func computeInventoryHash(inventoryMap map[string]string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	// Compute the name of the grouping object. It is the name of the
-	// grouping object template that it is based on with an additional
+	// Compute the name of the inventory object. It is the name of the
+	// inventory object template that it is based on with an additional
 	// suffix which is based on the hash of the inventory.
 	return strconv.FormatUint(uint64(invHash), 16), nil
 }
@@ -270,13 +266,13 @@ func RetrieveInventoryFromGroupingObj(infos []*resource.Info) ([]*object.ObjMeta
 	return inventory, nil
 }
 
-// ClearInventoryObj finds the grouping object in the list of objects,
-// and sets an empty inventory. Returns error if the grouping object
-// is not Unstructured, the grouping object does not exist, or if
-// we can't set the empty inventory on the grouping object. If successful,
+// ClearInventoryObj finds the inventory object in the list of objects,
+// and sets an empty inventory. Returns error if the inventory object
+// is not Unstructured, the inventory object does not exist, or if
+// we can't set the empty inventory on the inventory object. If successful,
 // returns nil.
 func ClearInventoryObj(infos []*resource.Info) error {
-	// Initially, find the grouping object ConfigMap (in Unstructured format).
+	// Initially, find the inventory object ConfigMap (in Unstructured format).
 	var inventoryObj *unstructured.Unstructured
 	for _, info := range infos {
 		obj := info.Object
@@ -284,13 +280,13 @@ func ClearInventoryObj(infos []*resource.Info) error {
 			var ok bool
 			inventoryObj, ok = obj.(*unstructured.Unstructured)
 			if !ok {
-				return fmt.Errorf("grouping object is not an Unstructured: %#v", inventoryObj)
+				return fmt.Errorf("inventory object is not an Unstructured: %#v", inventoryObj)
 			}
 			break
 		}
 	}
 	if inventoryObj == nil {
-		return fmt.Errorf("grouping object not found")
+		return fmt.Errorf("inventory object not found")
 	}
 	// Clears the inventory map of the ConfigMap "data" section.
 	emptyMap := map[string]string{}
@@ -306,7 +302,7 @@ func ClearInventoryObj(infos []*resource.Info) error {
 // calcInventoryHash returns an unsigned int32 representing the hash
 // of the inventory strings. If there is an error writing bytes to
 // the hash, then the error is returned; nil is returned otherwise.
-// Used to quickly identify the set of resources in the grouping object.
+// Used to quickly identify the set of resources in the inventory object.
 func calcInventoryHash(inv []string) (uint32, error) {
 	h := fnv.New32a()
 	for _, is := range inv {
@@ -318,9 +314,9 @@ func calcInventoryHash(inv []string) (uint32, error) {
 	return h.Sum32(), nil
 }
 
-// retrieveInventoryHash takes a grouping object (encapsulated by
+// retrieveInventoryHash takes a inventory object (encapsulated by
 // a resource.Info), and returns the string representing the hash
-// of the grouping inventory; returns empty string if the grouping
+// of the inventory set; returns empty string if the inventory
 // object is not in Unstructured format, or if the hash annotation
 // does not exist.
 func retrieveInventoryHash(groupingInfo *resource.Info) string {
@@ -329,7 +325,7 @@ func retrieveInventoryHash(groupingInfo *resource.Info) string {
 	if ok {
 		annotations := groupingObj.GetAnnotations()
 		if annotations != nil {
-			invHash = annotations[GroupingHash]
+			invHash = annotations[common.InventoryHash]
 		}
 	}
 	return invHash

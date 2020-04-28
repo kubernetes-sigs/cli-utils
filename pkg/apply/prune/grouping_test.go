@@ -14,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/resource"
+	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
@@ -23,7 +24,7 @@ var pod1Name = "pod-1"
 var pod2Name = "pod-2"
 var pod3Name = "pod-3"
 
-var testGroupingLabel = "test-app-label"
+var testInventoryLabel = "test-app-label"
 
 var groupingObj = unstructured.Unstructured{
 	Object: map[string]interface{}{
@@ -33,7 +34,7 @@ var groupingObj = unstructured.Unstructured{
 			"name":      groupingObjName,
 			"namespace": testNamespace,
 			"labels": map[string]interface{}{
-				GroupingLabel: testGroupingLabel,
+				common.InventoryLabel: testInventoryLabel,
 			},
 		},
 	},
@@ -98,7 +99,7 @@ var nonUnstructuredGroupingObj = &corev1.ConfigMap{
 		Namespace: testNamespace,
 		Name:      groupingObjName,
 		Labels: map[string]string{
-			GroupingLabel: "true",
+			common.InventoryLabel: "true",
 		},
 	},
 }
@@ -123,7 +124,7 @@ var groupingObjLabelWithSpace = unstructured.Unstructured{
 			"name":      groupingObjName,
 			"namespace": testNamespace,
 			"labels": map[string]interface{}{
-				GroupingLabel: "\tgrouping-label ",
+				common.InventoryLabel: "\tgrouping-label ",
 			},
 		},
 	},
@@ -155,7 +156,7 @@ func TestRetrieveGroupingLabel(t *testing.T) {
 		},
 		{
 			obj:           &groupingObj,
-			groupingLabel: testGroupingLabel,
+			groupingLabel: testInventoryLabel,
 			isError:       false,
 		},
 	}

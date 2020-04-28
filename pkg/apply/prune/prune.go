@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/validation"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
+	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
@@ -129,7 +130,7 @@ func (po *PruneOptions) retrievePreviousGroupingObjects(namespace string) error 
 	if err != nil {
 		return err
 	}
-	labelSelector := fmt.Sprintf("%s=%s", GroupingLabel, groupingLabel)
+	labelSelector := fmt.Sprintf("%s=%s", common.InventoryLabel, groupingLabel)
 	retrievedGroupingInfos, err := po.builder.
 		Unstructured().
 		// TODO: Check if this validator is necessary.
