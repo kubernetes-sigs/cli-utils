@@ -207,7 +207,7 @@ func TestIsInventoryObject(t *testing.T) {
 	}
 }
 
-func TestCreateGroupingObject(t *testing.T) {
+func TestCreateInventoryObject(t *testing.T) {
 	testCases := map[string]struct {
 		groupingObjectTemplate *resource.Info
 		resources              []*resource.Info
@@ -282,7 +282,7 @@ func TestCreateGroupingObject(t *testing.T) {
 
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
-			groupingObj, err := CreateGroupingObj(tc.groupingObjectTemplate,
+			groupingObj, err := CreateInventoryObj(tc.groupingObjectTemplate,
 				tc.resources)
 
 			if tc.expectedError {
