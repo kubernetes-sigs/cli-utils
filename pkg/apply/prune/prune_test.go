@@ -118,57 +118,72 @@ func createGroupingInfo(name string, children ...*resource.Info) *resource.Info 
 	return groupingInfo
 }
 
-func TestUnionPastInventory(t *testing.T) {
+func TestUnionPastObjs(t *testing.T) {
 	tests := map[string]struct {
 		groupingInfos []*resource.Info
-		expected      []*object.ObjMetadata
+		expected      []object.ObjMetadata
 	}{
 		"Empty grouping objects = empty inventory": {
 			groupingInfos: []*resource.Info{},
-			expected:      []*object.ObjMetadata{},
+			expected:      []object.ObjMetadata{},
 		},
 		"No children in grouping object, equals no inventory": {
 			groupingInfos: []*resource.Info{createGroupingInfo("test-1")},
-			expected:      []*object.ObjMetadata{},
+			expected:      []object.ObjMetadata{},
 		},
 		"Grouping object with Pod1 returns inventory with Pod1": {
 			groupingInfos: []*resource.Info{createGroupingInfo("test-1", pod1Info)},
-			expected:      []*object.ObjMetadata{pod1Inv},
+			expected:      []object.ObjMetadata{*pod1Inv},
 		},
 		"Grouping object with three pods returns inventory with three pods": {
 			groupingInfos: []*resource.Info{
 				createGroupingInfo("test-1", pod1Info, pod2Info, pod3Info),
 			},
-			expected: []*object.ObjMetadata{pod1Inv, pod2Inv, pod3Inv},
+			expected: []object.ObjMetadata{*pod1Inv, *pod2Inv, *pod3Inv},
 		},
 		"Two grouping objects with different pods returns inventory with both pods": {
 			groupingInfos: []*resource.Info{
 				createGroupingInfo("test-1", pod1Info),
 				createGroupingInfo("test-2", pod2Info),
 			},
-			expected: []*object.ObjMetadata{pod1Inv, pod2Inv},
+			expected: []object.ObjMetadata{*pod1Inv, *pod2Inv},
 		},
 		"Two grouping objects with overlapping pods returns set of pods": {
 			groupingInfos: []*resource.Info{
 				createGroupingInfo("test-1", pod1Info, pod2Info),
 				createGroupingInfo("test-2", pod2Info, pod3Info),
 			},
-			expected: []*object.ObjMetadata{pod1Inv, pod2Inv, pod3Inv},
+			expected: []object.ObjMetadata{*pod1Inv, *pod2Inv, *pod3Inv},
 		},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			actual, err := unionPastInventory(tc.groupingInfos)
-			expected := NewInventory(tc.expected)
+			actual, err := unionPastObjs(tc.groupingInfos)
 			if err != nil {
 				t.Errorf("Unexpected error received: %s\n", err)
 			}
-			if !expected.Equals(actual) {
-				t.Errorf("Expected inventory (%s), got (%s)\n", expected, actual)
+			if len(tc.expected) != len(actual) {
+				t.Fatalf("Expected (%d) objects, got (%d)\n", len(tc.expected), len(actual))
+			}
+			for _, expectedObj := range tc.expected {
+				if !objInArray(expectedObj, actual) {
+					t.Fatalf("Expected object (%s), but not found\n", expectedObj)
+				}
 			}
 		})
 	}
+}
+
+// objInArray is a helper function that returns true if passed obj
+// is in array of objects; false otherwise.
+func objInArray(obj object.ObjMetadata, arr []object.ObjMetadata) bool {
+	for _, a := range arr {
+		if a == obj {
+			return true
+		}
+	}
+	return false
 }
 
 func TestPrune(t *testing.T) {

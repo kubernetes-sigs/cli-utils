@@ -161,21 +161,27 @@ func infoToObjMetadata(info *resource.Info) (*object.ObjMetadata, error) {
 	return object.CreateObjMetadata(info.Namespace, info.Name, gk)
 }
 
-// unionPastInventory takes a set of grouping objects (infos), returning the
-// union of the objects referenced by these grouping objects as an
-// Inventory. Returns an error if any of the passed objects are not
-// grouping objects, or if unable to retrieve the inventory from any
-// grouping object.
-func unionPastInventory(infos []*resource.Info) (*Inventory, error) {
-	inventorySet := NewInventory([]*object.ObjMetadata{})
+// unionPastObjs takes a set of inventory objects (infos), returning the
+// union of the objects referenced by these inventory objects.
+// Returns an error if any of the passed objects are not inventory
+// objects, or if unable to retrieve the referenced objects from any
+// inventory object.
+func unionPastObjs(infos []*resource.Info) ([]object.ObjMetadata, error) {
+	objSet := map[string]object.ObjMetadata{}
 	for _, info := range infos {
-		inv, err := RetrieveInventoryFromGroupingObj([]*resource.Info{info})
+		objs, err := RetrieveInventoryFromGroupingObj([]*resource.Info{info})
 		if err != nil {
 			return nil, err
 		}
-		inventorySet.AddItems(inv)
+		for _, obj := range objs {
+			objSet[(*obj).String()] = *obj // De-duping
+		}
 	}
-	return inventorySet, nil
+	pastObjs := make([]object.ObjMetadata, 0, len(objSet))
+	for _, obj := range objSet {
+		pastObjs = append(pastObjs, obj)
+	}
+	return pastObjs, nil
 }
 
 // Prune deletes the set of resources which were previously applied
@@ -195,18 +201,18 @@ func (po *PruneOptions) Prune(currentObjects []*resource.Info, eventChannel chan
 	if err != nil {
 		return err
 	}
-	prevObjs, err := unionPastInventory(pastGroupingInfos)
+	pastObjs, err := unionPastObjs(pastGroupingInfos)
 	if err != nil {
 		return err
 	}
 	// Iterate through set of all previously applied objects.
-	for _, inv := range prevObjs.GetItems() {
-		mapping, err := po.mapper.RESTMapping(inv.GroupKind)
+	for _, past := range pastObjs {
+		mapping, err := po.mapper.RESTMapping(past.GroupKind)
 		if err != nil {
 			return err
 		}
-		namespacedClient := po.client.Resource(mapping.Resource).Namespace(inv.Namespace)
-		obj, err := namespacedClient.Get(inv.Name, metav1.GetOptions{})
+		namespacedClient := po.client.Resource(mapping.Resource).Namespace(past.Namespace)
+		obj, err := namespacedClient.Get(past.Name, metav1.GetOptions{})
 		if err != nil {
 			// Object not found -- skip it and move to the next object.
 			if apierrors.IsNotFound(err) {
@@ -226,7 +232,7 @@ func (po *PruneOptions) Prune(currentObjects []*resource.Info, eventChannel chan
 			continue
 		}
 		if !po.DryRun {
-			err = namespacedClient.Delete(inv.Name, &metav1.DeleteOptions{})
+			err = namespacedClient.Delete(past.Name, &metav1.DeleteOptions{})
 			if err != nil {
 				return err
 			}
