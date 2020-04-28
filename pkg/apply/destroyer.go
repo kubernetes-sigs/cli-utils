@@ -89,7 +89,7 @@ func (d *Destroyer) Run() <-chan event.Event {
 		// so the prune will calculate the prune set as all the objects,
 		// deleting everything. We can ignore the error, since the Prune
 		// will catch the same problems.
-		_ = prune.ClearGroupingObj(infos)
+		_ = prune.ClearInventoryObj(infos)
 
 		// Start the event transformer goroutine so we can transform
 		// the Prune events emitted from the Prune function to Delete

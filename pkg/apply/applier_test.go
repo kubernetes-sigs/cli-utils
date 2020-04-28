@@ -523,19 +523,19 @@ func TestReadAndPrepareObjects(t *testing.T) {
 				return
 			}
 
-			groupingObj := objects[0]
-			if !prune.IsGroupingObject(groupingObj.Object) {
+			inventoryObj := objects[0]
+			if !prune.IsInventoryObject(inventoryObj.Object) {
 				t.Errorf(
 					"expected first item to be grouping object, but it wasn't")
 			}
 
-			inventory, err := prune.RetrieveInventoryFromGroupingObj(
-				[]*resource.Info{groupingObj})
+			pastObjs, err := prune.RetrieveInventoryFromGroupingObj(
+				[]*resource.Info{inventoryObj})
 			if err != nil {
 				t.Error(err)
 			}
 
-			if want, got := len(tc.resources)-1, len(inventory); want != got {
+			if want, got := len(tc.resources)-1, len(pastObjs); want != got {
 				t.Errorf("expected %d resources in inventory, got %d", want, got)
 			}
 		})

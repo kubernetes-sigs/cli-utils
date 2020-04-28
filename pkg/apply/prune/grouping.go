@@ -1,12 +1,12 @@
 // Copyright 2020 The Kubernetes Authors.
 // SPDX-License-Identifier: Apache-2.0
 //
-// This file contains code for a "grouping" object which
+// This file contains code for a "inventory" object which
 // stores object metadata to keep track of sets of
-// resources. This "grouping" object must be a ConfigMap
+// resources. This "inventory" object must be a ConfigMap
 // and it stores the object metadata in the data field
 // of the ConfigMap. By storing metadata from all applied
-// objects, we can correctly prune and teardown groupings
+// objects, we can correctly prune and teardown sets
 // of resources.
 
 package prune
@@ -30,45 +30,45 @@ const (
 	GroupingHash  = "cli-utils.sigs.k8s.io/inventory-hash"
 )
 
-// retrieveGroupingLabel returns the string value of the GroupingLabel
+// retrieveInventoryLabel returns the string value of the GroupingLabel
 // for the passed object. Returns error if the passed object is nil or
 // is not a grouping object.
-func retrieveGroupingLabel(obj runtime.Object) (string, error) {
-	var groupingLabel string
+func retrieveInventoryLabel(obj runtime.Object) (string, error) {
+	var inventoryLabel string
 	if obj == nil {
-		return "", fmt.Errorf("grouping object is nil")
+		return "", fmt.Errorf("inventory object is nil")
 	}
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
 		return "", err
 	}
 	labels := accessor.GetLabels()
-	groupingLabel, exists := labels[GroupingLabel]
+	inventoryLabel, exists := labels[GroupingLabel]
 	if !exists {
-		return "", fmt.Errorf("grouping label does not exist for grouping object: %s", GroupingLabel)
+		return "", fmt.Errorf("inventory label does not exist for inventory object: %s", GroupingLabel)
 	}
-	return strings.TrimSpace(groupingLabel), nil
+	return strings.TrimSpace(inventoryLabel), nil
 }
 
-// IsGroupingObject returns true if the passed object has the
-// grouping label.
+// IsInventoryObject returns true if the passed object has the
+// inventory label.
 // TODO(seans3): Check type is ConfigMap.
-func IsGroupingObject(obj runtime.Object) bool {
+func IsInventoryObject(obj runtime.Object) bool {
 	if obj == nil {
 		return false
 	}
-	groupingLabel, err := retrieveGroupingLabel(obj)
-	if err == nil && len(groupingLabel) > 0 {
+	inventoryLabel, err := retrieveInventoryLabel(obj)
+	if err == nil && len(inventoryLabel) > 0 {
 		return true
 	}
 	return false
 }
 
-// FindGroupingObject returns the "Grouping" object (ConfigMap with
+// FindInventoryObj returns the "Grouping" object (ConfigMap with
 // grouping label) if it exists, and a boolean describing if it was found.
-func FindGroupingObject(infos []*resource.Info) (*resource.Info, bool) {
+func FindInventoryObj(infos []*resource.Info) (*resource.Info, bool) {
 	for _, info := range infos {
-		if info != nil && IsGroupingObject(info.Object) {
+		if info != nil && IsInventoryObject(info.Object) {
 			return info, true
 		}
 	}
@@ -88,7 +88,7 @@ func AddInventoryToGroupingObj(infos []*resource.Info) error {
 	inventoryMap := map[string]string{}
 	for _, info := range infos {
 		obj := info.Object
-		if IsGroupingObject(obj) {
+		if IsInventoryObject(obj) {
 			// If we have more than one grouping object--error.
 			if groupingObj != nil {
 				return fmt.Errorf("error--applying more than one grouping object")
@@ -245,7 +245,7 @@ func computeInventoryHash(inventoryMap map[string]string) (string, error) {
 // "data" map, then returns an empty slice and no error.
 func RetrieveInventoryFromGroupingObj(infos []*resource.Info) ([]*object.ObjMetadata, error) {
 	inventory := []*object.ObjMetadata{}
-	groupingInfo, exists := FindGroupingObject(infos)
+	groupingInfo, exists := FindInventoryObj(infos)
 	if exists {
 		groupingObj, ok := groupingInfo.Object.(*unstructured.Unstructured)
 		if !ok {
@@ -270,31 +270,31 @@ func RetrieveInventoryFromGroupingObj(infos []*resource.Info) ([]*object.ObjMeta
 	return inventory, nil
 }
 
-// ClearGroupingObj finds the grouping object in the list of objects,
+// ClearInventoryObj finds the grouping object in the list of objects,
 // and sets an empty inventory. Returns error if the grouping object
 // is not Unstructured, the grouping object does not exist, or if
 // we can't set the empty inventory on the grouping object. If successful,
 // returns nil.
-func ClearGroupingObj(infos []*resource.Info) error {
+func ClearInventoryObj(infos []*resource.Info) error {
 	// Initially, find the grouping object ConfigMap (in Unstructured format).
-	var groupingObj *unstructured.Unstructured
+	var inventoryObj *unstructured.Unstructured
 	for _, info := range infos {
 		obj := info.Object
-		if IsGroupingObject(obj) {
+		if IsInventoryObject(obj) {
 			var ok bool
-			groupingObj, ok = obj.(*unstructured.Unstructured)
+			inventoryObj, ok = obj.(*unstructured.Unstructured)
 			if !ok {
-				return fmt.Errorf("grouping object is not an Unstructured: %#v", groupingObj)
+				return fmt.Errorf("grouping object is not an Unstructured: %#v", inventoryObj)
 			}
 			break
 		}
 	}
-	if groupingObj == nil {
+	if inventoryObj == nil {
 		return fmt.Errorf("grouping object not found")
 	}
 	// Clears the inventory map of the ConfigMap "data" section.
 	emptyMap := map[string]string{}
-	err := unstructured.SetNestedStringMap(groupingObj.UnstructuredContent(),
+	err := unstructured.SetNestedStringMap(inventoryObj.UnstructuredContent(),
 		emptyMap, "data")
 	if err != nil {
 		return err

@@ -183,7 +183,7 @@ func splitInfos(infos []*resource.Info) ([]*resource.Info, []*resource.Info) {
 	resources := make([]*resource.Info, 0)
 
 	for _, info := range infos {
-		if prune.IsGroupingObject(info.Object) {
+		if prune.IsInventoryObject(info.Object) {
 			groupingObjectTemplates = append(groupingObjectTemplates, info)
 		} else {
 			resources = append(resources, info)
