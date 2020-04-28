@@ -224,7 +224,7 @@ func (po *PruneOptions) Prune(currentObjects []*resource.Info, eventChannel chan
 		namespacedClient := po.client.Resource(mapping.Resource).Namespace(past.Namespace)
 		obj, err := namespacedClient.Get(past.Name, metav1.GetOptions{})
 		if err != nil {
-			// Object not found -- skip it and move to the next object.
+			// Object not found in cluster, so no need to delete it; skip to next object.
 			if apierrors.IsNotFound(err) {
 				continue
 			}
@@ -239,6 +239,17 @@ func (po *PruneOptions) Prune(currentObjects []*resource.Info, eventChannel chan
 		// applied object is part of the current apply set, skip it.
 		uid := string(metadata.GetUID())
 		if po.currentUids.Has(uid) {
+			continue
+		}
+		// Handle lifecycle directive preventing deletion.
+		if preventDeleteAnnotation(metadata.GetAnnotations()) {
+			eventChannel <- event.Event{
+				Type: event.PruneType,
+				PruneEvent: event.PruneEvent{
+					Type:   event.PruneEventSkipped,
+					Object: obj,
+				},
+			}
 			continue
 		}
 		if !o.DryRun {
@@ -276,4 +287,17 @@ func (po *PruneOptions) Prune(currentObjects []*resource.Info, eventChannel chan
 		}
 	}
 	return nil
+}
+
+// preventDeleteAnnotation returns true if the "onRemove:keep"
+// annotation exists within the annotation map; false otherwise.
+func preventDeleteAnnotation(annotations map[string]string) bool {
+	for annotation, value := range annotations {
+		if annotation == common.OnRemoveAnnotation {
+			if value == common.OnRemoveKeep {
+				return true
+			}
+		}
+	}
+	return false
 }
