@@ -7,7 +7,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"sigs.k8s.io/cli-utils/pkg/apply/prune"
+	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/kustomize/kyaml/kio"
 	"sigs.k8s.io/kustomize/kyaml/yaml"
@@ -77,7 +77,7 @@ func isValidKubernetesResource(id yaml.ResourceIdentifier) bool {
 // inventory object label key.
 func isGroupingObject(labels map[string]string) bool {
 	for key := range labels {
-		if key == prune.GroupingLabel {
+		if key == common.InventoryLabel {
 			return true
 		}
 	}

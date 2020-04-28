@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"sigs.k8s.io/cli-utils/pkg/apply/prune"
 	"sigs.k8s.io/kustomize/kyaml/kio"
 	"sigs.k8s.io/kustomize/kyaml/kio/kioutil"
 )
@@ -87,7 +86,7 @@ func expandDir(dir string) ([]string, error) {
 		}
 		// If object has inventory label, skip it.
 		labels := meta.Labels
-		if _, exists := labels[prune.GroupingLabel]; exists {
+		if _, exists := labels[InventoryLabel]; exists {
 			continue
 		}
 		path := meta.Annotations[kioutil.PathAnnotation]
