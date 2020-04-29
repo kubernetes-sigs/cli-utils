@@ -15,6 +15,7 @@ import (
 type PruneTask struct {
 	PruneOptions *prune.PruneOptions
 	Objects      []*resource.Info
+	DryRun       bool
 }
 
 // Start creates a new goroutine that will invoke
@@ -23,7 +24,10 @@ type PruneTask struct {
 // to signal to the taskrunner that the task has completed (or failed).
 func (p *PruneTask) Start(taskContext *taskrunner.TaskContext) {
 	go func() {
-		err := p.PruneOptions.Prune(p.Objects, taskContext.EventChannel())
+		err := p.PruneOptions.Prune(p.Objects, taskContext.EventChannel(),
+			prune.Options{
+				DryRun: p.DryRun,
+			})
 		taskContext.TaskChannel() <- taskrunner.TaskResult{
 			Err: err,
 		}

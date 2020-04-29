@@ -6,6 +6,7 @@ package task
 import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/cli-runtime/pkg/resource"
+	"k8s.io/kubectl/pkg/cmd/apply"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
@@ -15,6 +16,7 @@ import (
 type ApplyTask struct {
 	ApplyOptions applyOptions
 	Objects      []*resource.Info
+	DryRun       bool
 }
 
 // applyOptions defines the two key functions on the ApplyOptions
@@ -40,6 +42,7 @@ type applyOptions interface {
 // the desired state of a resource is changed.
 func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 	go func() {
+		a.setDryRunField()
 		a.ApplyOptions.SetObjects(a.Objects)
 		err := a.ApplyOptions.Run()
 		for _, info := range a.Objects {
@@ -52,6 +55,12 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 			Err: err,
 		}
 	}()
+}
+
+func (a *ApplyTask) setDryRunField() {
+	if ao, ok := a.ApplyOptions.(*apply.ApplyOptions); ok {
+		ao.DryRun = a.DryRun
+	}
 }
 
 // ClearTimeout is not supported by the ApplyTask.

@@ -63,9 +63,6 @@ type Applier struct {
 	ApplyOptions *apply.ApplyOptions
 	PruneOptions *prune.PruneOptions
 	statusPoller poller.Poller
-
-	NoPrune bool
-	DryRun  bool
 }
 
 // Initialize sets up the Applier for actually doing an apply against
@@ -86,10 +83,6 @@ func (a *Applier) Initialize(cmd *cobra.Command, paths []string) error {
 	if err != nil {
 		return errors.WrapPrefix(err, "error setting up PruneOptions", 1)
 	}
-
-	// Propagate dry-run flags.
-	a.ApplyOptions.DryRun = a.DryRun
-	a.PruneOptions.DryRun = a.DryRun
 
 	statusPoller, err := a.newStatusPoller()
 	if err != nil {
@@ -236,7 +229,8 @@ func (a *Applier) Run(ctx context.Context, options Options) <-chan event.Event {
 		}).BuildTaskQueue(infos, solver.Options{
 			WaitForReconcile:        options.WaitForReconcile,
 			WaitForReconcileTimeout: options.WaitTimeout,
-			Prune:                   !a.NoPrune,
+			Prune:                   !options.NoPrune,
+			DryRun:                  options.DryRun,
 		})
 
 		// Send event to inform the caller about the resources that
@@ -284,6 +278,14 @@ type Options struct {
 	// EmitStatusEvents defines whether status events should be
 	// emitted on the eventChannel to the caller.
 	EmitStatusEvents bool
+
+	// NoPrune defines whether pruning of previously applied
+	// objects should happen after apply.
+	NoPrune bool
+
+	// DryRun defines whether changes should actually be performed,
+	// or if it is just talk and no action.
+	DryRun bool
 }
 
 // setDefaults set the options to the default values if they

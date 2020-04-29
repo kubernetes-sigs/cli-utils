@@ -50,7 +50,6 @@ type PruneOptions struct {
 	pastGroupingObjects      []*resource.Info
 	retrievedGroupingObjects bool
 
-	DryRun    bool
 	validator validation.Schema
 
 	// TODO: DeleteOptions--cascade?
@@ -185,11 +184,19 @@ func unionPastObjs(infos []*resource.Info) ([]object.ObjMetadata, error) {
 	return pastObjs, nil
 }
 
+// Options defines a set of parameters that can be used to tune
+// the behavior of the pruner.
+type Options struct {
+	// DryRun defines whether objects should actually be pruned or if
+	// we should just print what would happen without actually doing it.
+	DryRun bool
+}
+
 // Prune deletes the set of resources which were previously applied
 // (retrieved from previous grouping objects) but omitted in
 // the current apply. Prune also delete all previous grouping
 // objects. Returns an error if there was a problem.
-func (po *PruneOptions) Prune(currentObjects []*resource.Info, eventChannel chan<- event.Event) error {
+func (po *PruneOptions) Prune(currentObjects []*resource.Info, eventChannel chan<- event.Event, o Options) error {
 	currentGroupingObject, found := FindInventoryObj(currentObjects)
 	if !found {
 		return fmt.Errorf("current grouping object not found during prune")
@@ -232,7 +239,7 @@ func (po *PruneOptions) Prune(currentObjects []*resource.Info, eventChannel chan
 		if po.currentUids.Has(uid) {
 			continue
 		}
-		if !po.DryRun {
+		if !o.DryRun {
 			err = namespacedClient.Delete(past.Name, &metav1.DeleteOptions{})
 			if err != nil {
 				return err
@@ -248,7 +255,7 @@ func (po *PruneOptions) Prune(currentObjects []*resource.Info, eventChannel chan
 	}
 	// Delete previous grouping objects.
 	for _, pastGroupInfo := range pastGroupingInfos {
-		if !po.DryRun {
+		if !o.DryRun {
 			err = po.client.Resource(pastGroupInfo.Mapping.Resource).
 				Namespace(pastGroupInfo.Namespace).
 				Delete(pastGroupInfo.Name, &metav1.DeleteOptions{})

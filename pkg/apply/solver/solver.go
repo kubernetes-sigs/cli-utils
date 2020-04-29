@@ -39,6 +39,7 @@ type Options struct {
 	WaitForReconcile        bool
 	WaitForReconcileTimeout time.Duration
 	Prune                   bool
+	DryRun                  bool
 }
 
 // BuildTaskQueue takes a set of resources in the form of info objects
