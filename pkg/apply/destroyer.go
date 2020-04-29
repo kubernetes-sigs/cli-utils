@@ -64,7 +64,6 @@ func (d *Destroyer) Initialize(cmd *cobra.Command, paths []string) error {
 
 	// Propagate dry-run flags.
 	d.ApplyOptions.DryRun = d.DryRun
-	d.PruneOptions.DryRun = d.DryRun
 	return nil
 }
 
@@ -96,7 +95,9 @@ func (d *Destroyer) Run() <-chan event.Event {
 		// Events. That we use Prune to implement destroy is an
 		// implementation detail and the events should not be Prune events.
 		tempChannel, completedChannel := runPruneEventTransformer(ch)
-		err = d.PruneOptions.Prune(infos, tempChannel)
+		err = d.PruneOptions.Prune(infos, tempChannel, prune.Options{
+			DryRun: d.DryRun,
+		})
 		// Close the tempChannel to signal to the event transformer that
 		// it should terminate.
 		close(tempChannel)

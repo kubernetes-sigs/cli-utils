@@ -29,7 +29,7 @@ func GetApplyRunner(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *A
 		Run:                   r.Run,
 	}
 
-	cmd.Flags().BoolVar(&r.applier.NoPrune, "no-prune", r.applier.NoPrune, "If true, do not prune previously applied objects.")
+	cmd.Flags().BoolVar(&r.noPrune, "no-prune", r.noPrune, "If true, do not prune previously applied objects.")
 	cmdutil.CheckErr(r.applier.SetFlags(cmd))
 
 	// The following flags are added, but hidden because other code
@@ -72,6 +72,7 @@ type ApplyRunner struct {
 	wait    bool
 	period  time.Duration
 	timeout time.Duration
+	noPrune bool
 }
 
 func (r *ApplyRunner) Run(cmd *cobra.Command, args []string) {
@@ -86,6 +87,8 @@ func (r *ApplyRunner) Run(cmd *cobra.Command, args []string) {
 		// If we are not waiting for status, tell the applier to not
 		// emit the events.
 		EmitStatusEvents: r.wait,
+		NoPrune:          r.noPrune,
+		DryRun:           false,
 	})
 
 	// The printer will print updates from the channel. It will block

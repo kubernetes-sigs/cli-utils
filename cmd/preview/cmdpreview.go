@@ -14,6 +14,10 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 )
 
+var (
+	noPrune = false
+)
+
 // NewCmdPreview creates the `preview` command
 func NewCmdPreview(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	applier := apply.NewApplier(f, ioStreams)
@@ -34,9 +38,6 @@ func NewCmdPreview(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *co
 			// if destroy flag is set in preview, transmit it to destroyer DryRun flag
 			// and pivot execution to destroy with dry-run
 			if !destroyer.DryRun {
-				// Set DryRun option true before Initialize. DryRun is propagated to
-				// ApplyOptions and PruneOptions in Initialize.
-				applier.DryRun = true
 				cmdutil.CheckErr(applier.Initialize(cmd, args))
 
 				// Create a context
@@ -46,6 +47,8 @@ func NewCmdPreview(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *co
 				// to keep track of progress and any issues.
 				ch = applier.Run(ctx, apply.Options{
 					EmitStatusEvents: false,
+					NoPrune:          noPrune,
+					DryRun:           true,
 				})
 			} else {
 				ch = destroyer.Run()
@@ -57,7 +60,7 @@ func NewCmdPreview(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *co
 		},
 	}
 
-	cmd.Flags().BoolVar(&applier.NoPrune, "no-prune", applier.NoPrune, "If true, do not prune previously applied objects.")
+	cmd.Flags().BoolVar(&noPrune, "no-prune", noPrune, "If true, do not prune previously applied objects.")
 	cmdutil.CheckErr(applier.SetFlags(cmd))
 
 	// The following flags are added, but hidden because other code

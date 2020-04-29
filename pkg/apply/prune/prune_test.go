@@ -229,7 +229,6 @@ func TestPrune(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			po := NewPruneOptions(populateObjectIds(tc.currentInfos, t))
-			po.DryRun = true
 			// Set up the previously applied objects.
 			pastGroupingInfo := createGroupingInfo("past-group", tc.pastInfos...)
 			po.pastGroupingObjects = []*resource.Info{pastGroupingInfo}
@@ -247,7 +246,9 @@ func TestPrune(t *testing.T) {
 			po.mapper = testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme,
 				scheme.Scheme.PrioritizedVersionsAllGroups()...)
 			// Run the prune and validate.
-			err := po.Prune(currentInfos, eventChannel)
+			err := po.Prune(currentInfos, eventChannel, Options{
+				DryRun: true,
+			})
 			if !tc.isError {
 				if err != nil {
 					t.Fatalf("Unexpected error during Prune(): %#v", err)

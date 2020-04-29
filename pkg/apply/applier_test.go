@@ -229,11 +229,12 @@ func TestApplier(t *testing.T) {
 
 			ioStreams, _, _, _ := genericclioptions.NewTestIOStreams() //nolint:dogsled
 			applier := NewApplier(tf, ioStreams)
-			applier.NoPrune = !tc.prune
 
 			cmd := &cobra.Command{}
 			_ = applier.SetFlags(cmd)
-			cmd.Flags().BoolVar(&applier.DryRun, "dry-run", applier.DryRun, "")
+			var notUsedFlag bool
+			// This flag needs to be set as there is a dependency on it.
+			cmd.Flags().BoolVar(&notUsedFlag, "dry-run", notUsedFlag, "")
 			cmdutil.AddValidateFlags(cmd)
 			cmdutil.AddServerSideApplyFlags(cmd)
 			err = applier.Initialize(cmd, []string{dirPath})
@@ -251,6 +252,7 @@ func TestApplier(t *testing.T) {
 			eventChannel := applier.Run(ctx, Options{
 				WaitForReconcile: tc.status,
 				EmitStatusEvents: true,
+				NoPrune:          !tc.prune,
 			})
 
 			var events []event.Event
