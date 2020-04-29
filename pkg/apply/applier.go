@@ -161,7 +161,7 @@ func (a *Applier) readAndPrepareObjects() ([]*resource.Info, error) {
 		}
 	}
 
-	groupingObject, err := prune.CreateGroupingObj(gots[0], resources)
+	groupingObject, err := prune.CreateInventoryObj(gots[0], resources)
 	if err != nil {
 		return nil, err
 	}

@@ -72,13 +72,13 @@ func FindInventoryObj(infos []*resource.Info) (*resource.Info, bool) {
 }
 
 // Adds the inventory of all objects (passed as infos) to the
-// grouping object. Returns an error if a grouping object does not
+// inventory object. Returns an error if a inventory object does not
 // exist, or we are unable to successfully add the inventory to
-// the grouping object; nil otherwise. Each object is in
+// the inventory object; nil otherwise. Each object is in
 // unstructured.Unstructured format.
 func AddInventoryToGroupingObj(infos []*resource.Info) error {
 	// Iterate through the objects (infos), creating an Inventory struct
-	// as metadata for each object, or if it's the grouping object, store it.
+	// as metadata for each object, or if it's the inventory object, store it.
 	var groupingInfo *resource.Info
 	var groupingObj *unstructured.Unstructured
 	inventoryMap := map[string]string{}
@@ -145,21 +145,21 @@ func AddInventoryToGroupingObj(infos []*resource.Info) error {
 	return nil
 }
 
-// CreateGroupingObj creates a grouping object based on a grouping object
+// CreateInventoryObj creates a grouping object based on a grouping object
 // template and the set of resources that will be in the inventory.
-func CreateGroupingObj(groupingObjectTemplate *resource.Info,
+func CreateInventoryObj(inventoryTemplate *resource.Info,
 	resources []*resource.Info) (*resource.Info, error) {
-	// Verify that the provided groupingObjectTemplate represents an
+	// Verify that the provided inventoryTemplate represents an
 	// actual resource in the Unstructured format.
-	obj := groupingObjectTemplate.Object
+	obj := inventoryTemplate.Object
 	if obj == nil {
-		return nil, fmt.Errorf("grouping object template has nil Object")
+		return nil, fmt.Errorf("inventory template has nil Object")
 	}
-	got, ok := obj.(*unstructured.Unstructured)
+	iot, ok := obj.(*unstructured.Unstructured)
 	if !ok {
 		return nil, fmt.Errorf(
-			"grouping object template is not an Unstructured: %s",
-			groupingObjectTemplate.Source)
+			"inventory template is not an Unstructured: %s",
+			inventoryTemplate.Source)
 	}
 
 	// Create the inventoryMap of all the resources.
@@ -172,32 +172,32 @@ func CreateGroupingObj(groupingObjectTemplate *resource.Info,
 	if err != nil {
 		return nil, err
 	}
-	name := fmt.Sprintf("%s-%s", got.GetName(), invHashStr)
+	name := fmt.Sprintf("%s-%s", iot.GetName(), invHashStr)
 
-	// Create the grouping object by copying the template.
-	groupingObj := got.DeepCopy()
-	groupingObj.SetName(name)
+	// Create the inventory object by copying the template.
+	inventoryObj := iot.DeepCopy()
+	inventoryObj.SetName(name)
 	// Adds the inventory map to the ConfigMap "data" section.
-	err = unstructured.SetNestedStringMap(groupingObj.UnstructuredContent(),
+	err = unstructured.SetNestedStringMap(inventoryObj.UnstructuredContent(),
 		inventoryMap, "data")
 	if err != nil {
 		return nil, err
 	}
-	annotations := groupingObj.GetAnnotations()
+	annotations := inventoryObj.GetAnnotations()
 	if annotations == nil {
 		annotations = map[string]string{}
 	}
 	annotations[common.InventoryHash] = invHashStr
-	groupingObj.SetAnnotations(annotations)
+	inventoryObj.SetAnnotations(annotations)
 
-	// Creates a new Info for the newly created grouping object.
+	// Creates a new Info for the newly created inventory object.
 	return &resource.Info{
-		Client:    groupingObjectTemplate.Client,
-		Mapping:   groupingObjectTemplate.Mapping,
+		Client:    inventoryTemplate.Client,
+		Mapping:   inventoryTemplate.Mapping,
 		Source:    "generated",
-		Name:      groupingObj.GetName(),
-		Namespace: groupingObj.GetNamespace(),
-		Object:    groupingObj,
+		Name:      inventoryObj.GetName(),
+		Namespace: inventoryObj.GetNamespace(),
+		Object:    inventoryObj,
 	}, nil
 }
 
@@ -319,11 +319,11 @@ func calcInventoryHash(inv []string) (uint32, error) {
 // of the inventory set; returns empty string if the inventory
 // object is not in Unstructured format, or if the hash annotation
 // does not exist.
-func retrieveInventoryHash(groupingInfo *resource.Info) string {
+func retrieveInventoryHash(inventoryInfo *resource.Info) string {
 	var invHash = ""
-	groupingObj, ok := groupingInfo.Object.(*unstructured.Unstructured)
+	inventoryObj, ok := inventoryInfo.Object.(*unstructured.Unstructured)
 	if ok {
-		annotations := groupingObj.GetAnnotations()
+		annotations := inventoryObj.GetAnnotations()
 		if annotations != nil {
 			invHash = annotations[common.InventoryHash]
 		}
@@ -358,7 +358,7 @@ func addSuffixToName(info *resource.Info, suffix string) error {
 	accessor, _ := meta.Accessor(info.Object)
 	name := accessor.GetName()
 	if name != info.Name {
-		return fmt.Errorf("grouping object (%s) and resource.Info (%s) have different names", name, info.Name)
+		return fmt.Errorf("inventory object (%s) and resource.Info (%s) have different names", name, info.Name)
 	}
 	// Error if name alread has suffix.
 	suffix = "-" + suffix
