@@ -309,7 +309,7 @@ func TestCreateInventoryObject(t *testing.T) {
 				t.Errorf("expected info and unstructured to have the same namespace, but they didn't")
 			}
 
-			inv, err := RetrieveInventoryFromGroupingObj(
+			inv, err := RetrieveObjsFromInventory(
 				[]*resource.Info{groupingObj})
 			if err != nil {
 				t.Error(err)
@@ -375,7 +375,7 @@ func TestFindInventoryObj(t *testing.T) {
 	}
 }
 
-func TestAddRetrieveInventoryToFromGroupingObject(t *testing.T) {
+func TestAddRetrieveObjsToFromInventory(t *testing.T) {
 	tests := []struct {
 		infos    []*resource.Info
 		expected []*object.ObjMetadata
@@ -539,7 +539,7 @@ func TestAddRetrieveInventoryToFromGroupingObject(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		err := AddInventoryToGroupingObj(test.infos)
+		err := addObjsToInventory(test.infos)
 		if test.isError && err == nil {
 			t.Errorf("Should have produced an error, but returned none.")
 		}
@@ -547,7 +547,7 @@ func TestAddRetrieveInventoryToFromGroupingObject(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Received error when expecting none (%s)\n", err)
 			}
-			retrieved, err := RetrieveInventoryFromGroupingObj(test.infos)
+			retrieved, err := RetrieveObjsFromInventory(test.infos)
 			if err != nil {
 				t.Fatalf("Error retrieving inventory: %s\n", err)
 			}
@@ -689,7 +689,7 @@ func TestClearInventoryObject(t *testing.T) {
 				if err != nil {
 					t.Fatalf("Received unexpected error: %#v", err)
 				}
-				objMetadata, err := RetrieveInventoryFromGroupingObj(tc.infos)
+				objMetadata, err := RetrieveObjsFromInventory(tc.infos)
 				if err != nil {
 					t.Fatalf("Received unexpected error: %#v", err)
 				}

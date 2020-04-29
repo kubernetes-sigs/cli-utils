@@ -114,7 +114,7 @@ func createGroupingInfo(name string, children ...*resource.Info) *resource.Info 
 	}
 	infos := []*resource.Info{groupingInfo}
 	infos = append(infos, children...)
-	_ = AddInventoryToGroupingObj(infos)
+	_ = addObjsToInventory(infos)
 	return groupingInfo
 }
 
