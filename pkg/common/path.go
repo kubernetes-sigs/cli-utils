@@ -13,32 +13,43 @@ import (
 	"sigs.k8s.io/kustomize/kyaml/kio/kioutil"
 )
 
+const stdinDash = "-"
+
 func processPaths(paths []string) genericclioptions.FileNameFlags {
 	// No arguments means we are reading from StdIn
 	fileNameFlags := genericclioptions.FileNameFlags{}
 	if len(paths) == 0 {
-		fileNames := []string{"-"}
+		fileNames := []string{stdinDash}
 		fileNameFlags.Filenames = &fileNames
 		return fileNameFlags
 	}
 
+	// Must be a single directory here; set recursive flag.
 	t := true
 	fileNameFlags.Filenames = &paths
 	fileNameFlags.Recursive = &t
 	return fileNameFlags
 }
 
+// DemandOneDirectoryOrStdin processes "paths" to ensure the
+// single argument in the array is a directory. Returns FileNameFlags
+// populated with the directory (recursive flag set), or
+// the StdIn dash. An empty array gets treated as StdIn
+// (adding dash to the array). Returns an error if more than
+// one element in the array or the filepath is not a directory.
 func DemandOneDirectory(paths []string) (genericclioptions.FileNameFlags, error) {
-	result := processPaths(paths)
-	// alas, the things called file names should have been called paths.
-	if len(*result.Filenames) != 1 {
+	result := genericclioptions.FileNameFlags{}
+	if len(paths) == 1 {
+		dirPath := paths[0]
+		if !isPathADirectory(dirPath) {
+			return result, fmt.Errorf("argument '%s' is not but must be a directory", dirPath)
+		}
+	}
+	if len(paths) > 1 {
 		return result, fmt.Errorf(
 			"specify exactly one directory path argument; rejecting %v", paths)
 	}
-	path := (*result.Filenames)[0]
-	if !isPathADirectory(path) {
-		return result, fmt.Errorf("argument '%s' is not but must be a directory", path)
-	}
+	result = processPaths(paths)
 	return result, nil
 }
 

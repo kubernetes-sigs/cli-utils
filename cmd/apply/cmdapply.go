@@ -23,9 +23,9 @@ func GetApplyRunner(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *A
 		ioStreams: ioStreams,
 	}
 	cmd := &cobra.Command{
-		Use:                   "apply DIRECTORY",
+		Use:                   "apply (DIRECTORY | STDIN)",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Apply a configuration to a resource by filename or stdin"),
+		Short:                 i18n.T("Apply a configuration to a resource by package directory or stdin"),
 		Run:                   r.Run,
 	}
 
