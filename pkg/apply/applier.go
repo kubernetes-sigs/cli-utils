@@ -146,11 +146,11 @@ func (a *Applier) readAndPrepareObjects() ([]*resource.Info, error) {
 	resources, gots := splitInfos(infos)
 
 	if len(gots) == 0 {
-		return nil, prune.NoGroupingObjError{}
+		return nil, prune.NoInventoryObjError{}
 	}
 	if len(gots) > 1 {
-		return nil, prune.MultipleGroupingObjError{
-			GroupingObjectTemplates: gots,
+		return nil, prune.MultipleInventoryObjError{
+			InventoryObjectTemplates: gots,
 		}
 	}
 
