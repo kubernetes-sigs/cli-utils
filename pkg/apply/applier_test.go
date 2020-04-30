@@ -42,7 +42,7 @@ import (
 var (
 	codec     = scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 	resources = map[string]resourceInfo{
-		"groupingObject": {
+		"inventoryObject": {
 			manifest: `
   kind: ConfigMap
   apiVersion: v1
@@ -51,7 +51,7 @@ var (
       cli-utils.sigs.k8s.io/inventory-id: test
     name: foo
 `,
-			fileName: "groupingObject.yaml",
+			fileName: "inventoryObject.yaml",
 		},
 		"deployment": {
 			manifest: `
@@ -103,11 +103,11 @@ func TestApplier(t *testing.T) {
 			namespace: "apply-test",
 			resources: []resourceInfo{
 				resources["deployment"],
-				resources["groupingObject"],
+				resources["inventoryObject"],
 			},
 			handlers: []handler{
 				&nsHandler{},
-				&groupingObjectHandler{},
+				&inventoryObjectHandler{},
 				&genericHandler{
 					resourceInfo: resources["deployment"],
 					namespace:    "apply-test",
@@ -133,15 +133,15 @@ func TestApplier(t *testing.T) {
 				},
 			},
 		},
-		"first apply with grouping object": {
+		"first apply with inventory object": {
 			namespace: "apply-test",
 			resources: []resourceInfo{
 				resources["deployment"],
-				resources["groupingObject"],
+				resources["inventoryObject"],
 			},
 			handlers: []handler{
 				&nsHandler{},
-				&groupingObjectHandler{},
+				&inventoryObjectHandler{},
 				&genericHandler{
 					resourceInfo: resources["deployment"],
 					namespace:    "apply-test",
@@ -289,15 +289,15 @@ func TestApplier(t *testing.T) {
 
 var namespace = "test-namespace"
 
-var groupingObjInfo = &resource.Info{
+var inventoryObjInfo = &resource.Info{
 	Namespace: namespace,
-	Name:      "test-grouping-obj",
+	Name:      "test-inventory-obj",
 	Object: &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"apiVersion": "v1",
 			"kind":       "ConfigMap",
 			"metadata": map[string]interface{}{
-				"name":      "test-grouping-obj",
+				"name":      "test-inventory-obj",
 				"namespace": namespace,
 				"labels": map[string]interface{}{
 					common.InventoryLabel: "test-app-label",
@@ -473,31 +473,31 @@ func TestReadAndPrepareObjects(t *testing.T) {
 		resources     []*resource.Info
 		expectedError bool
 	}{
-		"no grouping object": {
+		"no inventory object": {
 			resources:     []*resource.Info{obj1Info},
 			expectedError: true,
 		},
-		"multiple grouping objects": {
-			resources:     []*resource.Info{groupingObjInfo, groupingObjInfo},
+		"multiple inventory objects": {
+			resources:     []*resource.Info{inventoryObjInfo, inventoryObjInfo},
 			expectedError: true,
 		},
-		"only grouping object": {
-			resources:     []*resource.Info{groupingObjInfo},
+		"only inventory object": {
+			resources:     []*resource.Info{inventoryObjInfo},
 			expectedError: false,
 		},
-		"grouping object already at the beginning": {
-			resources: []*resource.Info{groupingObjInfo, obj1Info,
+		"inventory object already at the beginning": {
+			resources: []*resource.Info{inventoryObjInfo, obj1Info,
 				clusterScopedObjInfo},
 			expectedError: false,
 		},
-		"grouping object not at the beginning": {
-			resources: []*resource.Info{obj1Info, obj2Info, groupingObjInfo,
+		"inventory object not at the beginning": {
+			resources: []*resource.Info{obj1Info, obj2Info, inventoryObjInfo,
 				clusterScopedObjInfo},
 			expectedError: false,
 		},
 		"objects can not be in different namespaces": {
 			resources: []*resource.Info{obj1Info, obj2Info,
-				groupingObjInfo, obj3Info},
+				inventoryObjInfo, obj3Info},
 			expectedError: true,
 		},
 	}
@@ -529,7 +529,7 @@ func TestReadAndPrepareObjects(t *testing.T) {
 			inventoryObj := objects[0]
 			if !prune.IsInventoryObject(inventoryObj.Object) {
 				t.Errorf(
-					"expected first item to be grouping object, but it wasn't")
+					"expected first item to be inventory object, but it wasn't")
 			}
 
 			pastObjs, err := prune.RetrieveObjsFromInventory(
@@ -657,19 +657,19 @@ func (g *genericHandler) handle(t *testing.T, req *http.Request) (*http.Response
 	return nil, false, nil
 }
 
-// groupingObjectHandler knows how to handle requests on the grouping objects.
-// It knows how to handle creation, list and get requests for grouping objects.
-type groupingObjectHandler struct {
-	groupingObj *v1.ConfigMap
+// inventoryObjectHandler knows how to handle requests on the inventory objects.
+// It knows how to handle creation, list and get requests for inventory objects.
+type inventoryObjectHandler struct {
+	inventoryObj *v1.ConfigMap
 }
 
 var (
-	cmPathRegex       = regexp.MustCompile(`^/namespaces/([^/]+)/configmaps$`)
-	groupObjNameRegex = regexp.MustCompile(`^[a-zA-Z]+-[a-z0-9]+$`)
-	groupObjPathRegex = regexp.MustCompile(`^/namespaces/([^/]+)/configmaps/[a-zA-Z]+-[a-z0-9]+$`)
+	cmPathRegex     = regexp.MustCompile(`^/namespaces/([^/]+)/configmaps$`)
+	invObjNameRegex = regexp.MustCompile(`^[a-zA-Z]+-[a-z0-9]+$`)
+	invObjPathRegex = regexp.MustCompile(`^/namespaces/([^/]+)/configmaps/[a-zA-Z]+-[a-z0-9]+$`)
 )
 
-func (g *groupingObjectHandler) handle(t *testing.T, req *http.Request) (*http.Response, bool, error) {
+func (i *inventoryObjectHandler) handle(t *testing.T, req *http.Request) (*http.Response, bool, error) {
 	if req.Method == "POST" && cmPathRegex.Match([]byte(req.URL.Path)) {
 		b, err := ioutil.ReadAll(req.Body)
 		if err != nil {
@@ -680,8 +680,8 @@ func (g *groupingObjectHandler) handle(t *testing.T, req *http.Request) (*http.R
 		if err != nil {
 			return nil, false, err
 		}
-		if groupObjNameRegex.Match([]byte(cm.Name)) {
-			g.groupingObj = &cm
+		if invObjNameRegex.Match([]byte(cm.Name)) {
+			i.inventoryObj = &cm
 			bodyRC := ioutil.NopCloser(bytes.NewReader(b))
 			return &http.Response{StatusCode: http.StatusCreated, Header: cmdtesting.DefaultHeader(), Body: bodyRC}, true, nil
 		}
@@ -696,18 +696,18 @@ func (g *groupingObjectHandler) handle(t *testing.T, req *http.Request) (*http.R
 			},
 			Items: []v1.ConfigMap{},
 		}
-		if g.groupingObj != nil {
-			cmList.Items = append(cmList.Items, *g.groupingObj)
+		if i.inventoryObj != nil {
+			cmList.Items = append(cmList.Items, *i.inventoryObj)
 		}
 		bodyRC := ioutil.NopCloser(bytes.NewReader(toJSONBytes(t, &cmList)))
 		return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: bodyRC}, true, nil
 	}
 
-	if req.Method == http.MethodGet && groupObjPathRegex.Match([]byte(req.URL.Path)) {
-		if g.groupingObj == nil {
+	if req.Method == http.MethodGet && invObjPathRegex.Match([]byte(req.URL.Path)) {
+		if i.inventoryObj == nil {
 			return &http.Response{StatusCode: http.StatusNotFound, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.StringBody("")}, true, nil
 		}
-		bodyRC := ioutil.NopCloser(bytes.NewReader(toJSONBytes(t, g.groupingObj)))
+		bodyRC := ioutil.NopCloser(bytes.NewReader(toJSONBytes(t, i.inventoryObj)))
 		return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: bodyRC}, true, nil
 	}
 	return nil, false, nil
