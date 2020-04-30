@@ -532,7 +532,7 @@ func TestReadAndPrepareObjects(t *testing.T) {
 					"expected first item to be grouping object, but it wasn't")
 			}
 
-			pastObjs, err := prune.RetrieveInventoryFromGroupingObj(
+			pastObjs, err := prune.RetrieveObjsFromInventory(
 				[]*resource.Info{inventoryObj})
 			if err != nil {
 				t.Error(err)

@@ -169,7 +169,7 @@ func infoToObjMetadata(info *resource.Info) (*object.ObjMetadata, error) {
 func unionPastObjs(infos []*resource.Info) ([]object.ObjMetadata, error) {
 	objSet := map[string]object.ObjMetadata{}
 	for _, info := range infos {
-		objs, err := RetrieveInventoryFromGroupingObj([]*resource.Info{info})
+		objs, err := RetrieveObjsFromInventory([]*resource.Info{info})
 		if err != nil {
 			return nil, err
 		}

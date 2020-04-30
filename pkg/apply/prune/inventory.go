@@ -71,30 +71,28 @@ func FindInventoryObj(infos []*resource.Info) (*resource.Info, bool) {
 	return nil, false
 }
 
-// Adds the inventory of all objects (passed as infos) to the
+// Adds the metadata of all objects (passed as infos) to the
 // inventory object. Returns an error if a inventory object does not
-// exist, or we are unable to successfully add the inventory to
+// exist, or we are unable to successfully add the metadata to
 // the inventory object; nil otherwise. Each object is in
 // unstructured.Unstructured format.
-func AddInventoryToGroupingObj(infos []*resource.Info) error {
-	// Iterate through the objects (infos), creating an Inventory struct
-	// as metadata for each object, or if it's the inventory object, store it.
-	var groupingInfo *resource.Info
-	var groupingObj *unstructured.Unstructured
-	inventoryMap := map[string]string{}
+func addObjsToInventory(infos []*resource.Info) error {
+	var inventoryInfo *resource.Info
+	var inventoryObj *unstructured.Unstructured
+	objMap := map[string]string{}
 	for _, info := range infos {
 		obj := info.Object
 		if IsInventoryObject(obj) {
-			// If we have more than one grouping object--error.
-			if groupingObj != nil {
-				return fmt.Errorf("error--applying more than one grouping object")
+			// If we have more than one inventory object--error.
+			if inventoryObj != nil {
+				return fmt.Errorf("error--applying more than one inventory object")
 			}
 			var ok bool
-			groupingObj, ok = obj.(*unstructured.Unstructured)
+			inventoryObj, ok = obj.(*unstructured.Unstructured)
 			if !ok {
-				return fmt.Errorf("grouping object is not an Unstructured: %#v", groupingObj)
+				return fmt.Errorf("inventory object is not an Unstructured: %#v", inventoryObj)
 			}
-			groupingInfo = info
+			inventoryInfo = info
 		} else {
 			if obj == nil {
 				return fmt.Errorf("creating inventory; object is nil")
@@ -104,49 +102,51 @@ func AddInventoryToGroupingObj(infos []*resource.Info) error {
 			if err != nil {
 				return err
 			}
-			inventoryMap[objMetadata.String()] = ""
+			objMap[objMetadata.String()] = ""
 		}
 	}
 
-	// If we've found the grouping object, store the object metadata inventory
-	// in the grouping config map.
-	if groupingObj == nil {
-		return fmt.Errorf("grouping object not found")
+	// If we've found the inventory object, store the object metadata inventory
+	// in the inventory config map.
+	if inventoryObj == nil {
+		return fmt.Errorf("inventory object not found")
 	}
 
-	if len(inventoryMap) > 0 {
+	if len(objMap) > 0 {
 		// Adds the inventory map to the ConfigMap "data" section.
-		err := unstructured.SetNestedStringMap(groupingObj.UnstructuredContent(),
-			inventoryMap, "data")
+		err := unstructured.SetNestedStringMap(inventoryObj.UnstructuredContent(),
+			objMap, "data")
 		if err != nil {
 			return err
 		}
-		// Adds the hash of the inventory strings as an annotation to the
-		// grouping object. Inventory strings must be sorted to make hash
+		// Adds the hash of the obj metadata strings as an annotation to the
+		// inventory object. Object metadata strings must be sorted to make hash
 		// deterministic.
-		inventoryList := mapKeysToSlice(inventoryMap)
-		sort.Strings(inventoryList)
-		invHash, err := calcInventoryHash(inventoryList)
+		objList := mapKeysToSlice(objMap)
+		sort.Strings(objList)
+		objsHash, err := calcInventoryHash(objList)
 		if err != nil {
 			return err
 		}
-		// Add the hash as a suffix to the grouping object's name.
-		invHashStr := strconv.FormatUint(uint64(invHash), 16)
-		if err := addSuffixToName(groupingInfo, invHashStr); err != nil {
+		// Add the hash as a suffix to the inventory object's name.
+		objsHashStr := strconv.FormatUint(uint64(objsHash), 16)
+		if err := addSuffixToName(inventoryInfo, objsHashStr); err != nil {
 			return err
 		}
-		annotations := groupingObj.GetAnnotations()
+		annotations := inventoryObj.GetAnnotations()
 		if annotations == nil {
 			annotations = map[string]string{}
 		}
-		annotations[common.InventoryHash] = invHashStr
-		groupingObj.SetAnnotations(annotations)
+		annotations[common.InventoryHash] = objsHashStr
+		inventoryObj.SetAnnotations(annotations)
 	}
 	return nil
 }
 
-// CreateInventoryObj creates a grouping object based on a grouping object
-// template and the set of resources that will be in the inventory.
+// CreateInventoryObj creates an inventory object based on a inventory object
+// template. The passed "resources" parameter are applied at the same time
+// as the inventory object, and metadata for each is stored in the inventory
+// object.
 func CreateInventoryObj(inventoryTemplate *resource.Info,
 	resources []*resource.Info) (*resource.Info, error) {
 	// Verify that the provided inventoryTemplate represents an
@@ -162,13 +162,13 @@ func CreateInventoryObj(inventoryTemplate *resource.Info,
 			inventoryTemplate.Source)
 	}
 
-	// Create the inventoryMap of all the resources.
-	inventoryMap, err := buildInventoryMap(resources)
+	// Create the objMap of all the resources.
+	objMap, err := buildObjMap(resources)
 	if err != nil {
 		return nil, err
 	}
 
-	invHashStr, err := computeInventoryHash(inventoryMap)
+	invHashStr, err := computeInventoryHash(objMap)
 	if err != nil {
 		return nil, err
 	}
@@ -179,7 +179,7 @@ func CreateInventoryObj(inventoryTemplate *resource.Info,
 	inventoryObj.SetName(name)
 	// Adds the inventory map to the ConfigMap "data" section.
 	err = unstructured.SetNestedStringMap(inventoryObj.UnstructuredContent(),
-		inventoryMap, "data")
+		objMap, "data")
 	if err != nil {
 		return nil, err
 	}
@@ -201,11 +201,11 @@ func CreateInventoryObj(inventoryTemplate *resource.Info,
 	}, nil
 }
 
-func buildInventoryMap(resources []*resource.Info) (map[string]string, error) {
-	inventoryMap := map[string]string{}
+func buildObjMap(resources []*resource.Info) (map[string]string, error) {
+	objMap := map[string]string{}
 	for _, res := range resources {
 		if res.Object == nil {
-			return nil, fmt.Errorf("creating inventory; object is nil")
+			return nil, fmt.Errorf("creating obj metadata; object is nil")
 		}
 		obj := res.Object
 		gk := obj.GetObjectKind().GroupVersionKind().GroupKind()
@@ -214,15 +214,15 @@ func buildInventoryMap(resources []*resource.Info) (map[string]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		inventoryMap[objMetadata.String()] = ""
+		objMap[objMetadata.String()] = ""
 	}
-	return inventoryMap, nil
+	return objMap, nil
 }
 
-func computeInventoryHash(inventoryMap map[string]string) (string, error) {
-	inventoryList := mapKeysToSlice(inventoryMap)
-	sort.Strings(inventoryList)
-	invHash, err := calcInventoryHash(inventoryList)
+func computeInventoryHash(objMap map[string]string) (string, error) {
+	objList := mapKeysToSlice(objMap)
+	sort.Strings(objList)
+	invHash, err := calcInventoryHash(objList)
 	if err != nil {
 		return "", err
 	}
@@ -232,38 +232,38 @@ func computeInventoryHash(inventoryMap map[string]string) (string, error) {
 	return strconv.FormatUint(uint64(invHash), 16), nil
 }
 
-// RetrieveInventoryFromGroupingObj returns a slice of pointers to the
-// inventory metadata. This function finds the grouping object, then
-// parses the stored resource metadata into Inventory structs. Returns
-// an error if there is a problem parsing the data into Inventory
-// structs, or if the grouping object is not in Unstructured format; nil
-// otherwise. If a grouping object does not exist, or it does not have a
+// RetrieveObjsFromInventoryObj returns a slice of pointers to the
+// object metadata. This function finds the inventory object, then
+// parses the stored resource metadata into ObjMetadata structs. Returns
+// an error if there is a problem parsing the data into ObjMetadata
+// structs, or if the inventory object is not in Unstructured format; nil
+// otherwise. If a inventory object does not exist, or it does not have a
 // "data" map, then returns an empty slice and no error.
-func RetrieveInventoryFromGroupingObj(infos []*resource.Info) ([]*object.ObjMetadata, error) {
-	inventory := []*object.ObjMetadata{}
-	groupingInfo, exists := FindInventoryObj(infos)
+func RetrieveObjsFromInventory(infos []*resource.Info) ([]*object.ObjMetadata, error) {
+	objs := []*object.ObjMetadata{}
+	inventoryInfo, exists := FindInventoryObj(infos)
 	if exists {
-		groupingObj, ok := groupingInfo.Object.(*unstructured.Unstructured)
+		inventoryObj, ok := inventoryInfo.Object.(*unstructured.Unstructured)
 		if !ok {
-			err := fmt.Errorf("grouping object is not an Unstructured: %#v", groupingObj)
-			return inventory, err
+			err := fmt.Errorf("inventory object is not an Unstructured: %#v", inventoryObj)
+			return objs, err
 		}
-		invMap, exists, err := unstructured.NestedStringMap(groupingObj.Object, "data")
+		objMap, exists, err := unstructured.NestedStringMap(inventoryObj.Object, "data")
 		if err != nil {
-			err := fmt.Errorf("error retrieving inventory from grouping object")
-			return inventory, err
+			err := fmt.Errorf("error retrieving object metadata from inventory object")
+			return objs, err
 		}
 		if exists {
-			for invStr := range invMap {
-				inv, err := object.ParseObjMetadata(invStr)
+			for objStr := range objMap {
+				obj, err := object.ParseObjMetadata(objStr)
 				if err != nil {
-					return inventory, err
+					return objs, err
 				}
-				inventory = append(inventory, inv)
+				objs = append(objs, obj)
 			}
 		}
 	}
-	return inventory, nil
+	return objs, nil
 }
 
 // ClearInventoryObj finds the inventory object in the list of objects,
@@ -300,7 +300,7 @@ func ClearInventoryObj(infos []*resource.Info) error {
 }
 
 // calcInventoryHash returns an unsigned int32 representing the hash
-// of the inventory strings. If there is an error writing bytes to
+// of the obj metadata strings. If there is an error writing bytes to
 // the hash, then the error is returned; nil is returned otherwise.
 // Used to quickly identify the set of resources in the inventory object.
 func calcInventoryHash(inv []string) (uint32, error) {
@@ -316,7 +316,7 @@ func calcInventoryHash(inv []string) (uint32, error) {
 
 // retrieveInventoryHash takes a inventory object (encapsulated by
 // a resource.Info), and returns the string representing the hash
-// of the inventory set; returns empty string if the inventory
+// of the set of obj metadata; returns empty string if the inventory
 // object is not in Unstructured format, or if the hash annotation
 // does not exist.
 func retrieveInventoryHash(inventoryInfo *resource.Info) string {
