@@ -136,25 +136,25 @@ func (a *Applier) newStatusPoller() (poller.Poller, error) {
 }
 
 // readAndPrepareObjects reads the resources that should be applied,
-// handles ordering of resources and sets up the grouping object
-// based on the provided grouping object template.
+// handles ordering of resources and sets up the inventory object
+// based on the provided inventory object template.
 func (a *Applier) readAndPrepareObjects() ([]*resource.Info, error) {
 	infos, err := a.ApplyOptions.GetObjects()
 	if err != nil {
 		return nil, err
 	}
-	resources, gots := splitInfos(infos)
+	resources, invs := splitInfos(infos)
 
-	if len(gots) == 0 {
+	if len(invs) == 0 {
 		return nil, prune.NoInventoryObjError{}
 	}
-	if len(gots) > 1 {
+	if len(invs) > 1 {
 		return nil, prune.MultipleInventoryObjError{
-			InventoryObjectTemplates: gots,
+			InventoryObjectTemplates: invs,
 		}
 	}
 
-	groupingObject, err := prune.CreateInventoryObj(gots[0], resources)
+	inventoryObject, err := prune.CreateInventoryObj(invs[0], resources)
 	if err != nil {
 		return nil, err
 	}
@@ -165,24 +165,24 @@ func (a *Applier) readAndPrepareObjects() ([]*resource.Info, error) {
 		return nil, fmt.Errorf("objects have differing namespaces")
 	}
 
-	return append([]*resource.Info{groupingObject}, resources...), nil
+	return append([]*resource.Info{inventoryObject}, resources...), nil
 }
 
 // splitInfos takes a slice of resource.Info objects and splits it
-// into one slice that contains the grouping object templates and
+// into one slice that contains the inventory object templates and
 // another one that contains the remaining resources.
 func splitInfos(infos []*resource.Info) ([]*resource.Info, []*resource.Info) {
-	groupingObjectTemplates := make([]*resource.Info, 0)
+	inventoryObjectTemplates := make([]*resource.Info, 0)
 	resources := make([]*resource.Info, 0)
 
 	for _, info := range infos {
 		if prune.IsInventoryObject(info.Object) {
-			groupingObjectTemplates = append(groupingObjectTemplates, info)
+			inventoryObjectTemplates = append(inventoryObjectTemplates, info)
 		} else {
 			resources = append(resources, info)
 		}
 	}
-	return resources, groupingObjectTemplates
+	return resources, inventoryObjectTemplates
 }
 
 // Run performs the Apply step. This happens asynchronously with updates
@@ -208,7 +208,7 @@ func (a *Applier) Run(ctx context.Context, options Options) <-chan event.Event {
 
 		// This provides us with a slice of all the objects that will be
 		// applied to the cluster. This takes care of ordering resources
-		// and handling the grouping object.
+		// and handling the inventory object.
 		infos, err := a.readAndPrepareObjects()
 		if err != nil {
 			handleError(eventChannel, err)
