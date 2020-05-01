@@ -17,7 +17,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
-var pod1Inv = &object.ObjMetadata{
+var pod1Metadata = &object.ObjMetadata{
 	Namespace: testNamespace,
 	Name:      pod1Name,
 	GroupKind: schema.GroupKind{
@@ -26,7 +26,7 @@ var pod1Inv = &object.ObjMetadata{
 	},
 }
 
-var pod2Inv = &object.ObjMetadata{
+var pod2Metadata = &object.ObjMetadata{
 	Namespace: testNamespace,
 	Name:      pod2Name,
 	GroupKind: schema.GroupKind{
@@ -35,7 +35,7 @@ var pod2Inv = &object.ObjMetadata{
 	},
 }
 
-var pod3Inv = &object.ObjMetadata{
+var pod3Metadata = &object.ObjMetadata{
 	Namespace: testNamespace,
 	Name:      pod3Name,
 	GroupKind: schema.GroupKind{
@@ -44,9 +44,9 @@ var pod3Inv = &object.ObjMetadata{
 	},
 }
 
-var groupingInv = &object.ObjMetadata{
+var invMetadata = &object.ObjMetadata{
 	Namespace: testNamespace,
-	Name:      groupingObjName,
+	Name:      inventoryObjName,
 	GroupKind: schema.GroupKind{
 		Group: "",
 		Kind:  "ConfigMap",
@@ -71,12 +71,12 @@ func TestInfoToObjMetadata(t *testing.T) {
 		},
 		"Pod 1 object becomes Pod 1 object metadata": {
 			info:     pod1Info,
-			expected: pod1Inv,
+			expected: pod1Metadata,
 			isError:  false,
 		},
-		"Grouping object becomes grouping object metadata": {
-			info:     copyGroupingInfo(),
-			expected: groupingInv,
+		"Inventory object becomes inventory object metadata": {
+			info:     copyInventoryInfo(),
+			expected: invMetadata,
 			isError:  false,
 		},
 	}
@@ -99,67 +99,67 @@ func TestInfoToObjMetadata(t *testing.T) {
 	}
 }
 
-// Returns a grouping object with the inventory set from
+// Returns a inventory object with the inventory set from
 // the passed "children".
-func createGroupingInfo(name string, children ...*resource.Info) *resource.Info {
-	groupingName := groupingObjName
+func createInventoryInfo(name string, children ...*resource.Info) *resource.Info {
+	inventoryName := inventoryObjName
 	if len(name) > 0 {
-		groupingName = name
+		inventoryName = name
 	}
-	groupingObjCopy := groupingObj.DeepCopy()
-	var groupingInfo = &resource.Info{
+	inventoryObjCopy := inventoryObj.DeepCopy()
+	var inventoryInfo = &resource.Info{
 		Namespace: testNamespace,
-		Name:      groupingName,
-		Object:    groupingObjCopy,
+		Name:      inventoryName,
+		Object:    inventoryObjCopy,
 	}
-	infos := []*resource.Info{groupingInfo}
+	infos := []*resource.Info{inventoryInfo}
 	infos = append(infos, children...)
 	_ = addObjsToInventory(infos)
-	return groupingInfo
+	return inventoryInfo
 }
 
 func TestUnionPastObjs(t *testing.T) {
 	tests := map[string]struct {
-		groupingInfos []*resource.Info
-		expected      []object.ObjMetadata
+		inventoryInfos []*resource.Info
+		expected       []object.ObjMetadata
 	}{
-		"Empty grouping objects = empty inventory": {
-			groupingInfos: []*resource.Info{},
-			expected:      []object.ObjMetadata{},
+		"Empty inventory objects = empty inventory": {
+			inventoryInfos: []*resource.Info{},
+			expected:       []object.ObjMetadata{},
 		},
-		"No children in grouping object, equals no inventory": {
-			groupingInfos: []*resource.Info{createGroupingInfo("test-1")},
-			expected:      []object.ObjMetadata{},
+		"No children in inventory object, equals no inventory": {
+			inventoryInfos: []*resource.Info{createInventoryInfo("test-1")},
+			expected:       []object.ObjMetadata{},
 		},
-		"Grouping object with Pod1 returns inventory with Pod1": {
-			groupingInfos: []*resource.Info{createGroupingInfo("test-1", pod1Info)},
-			expected:      []object.ObjMetadata{*pod1Inv},
+		"Inventory object with Pod1 returns inventory with Pod1": {
+			inventoryInfos: []*resource.Info{createInventoryInfo("test-1", pod1Info)},
+			expected:       []object.ObjMetadata{*pod1Metadata},
 		},
-		"Grouping object with three pods returns inventory with three pods": {
-			groupingInfos: []*resource.Info{
-				createGroupingInfo("test-1", pod1Info, pod2Info, pod3Info),
+		"Inventory object with three pods returns inventory with three pods": {
+			inventoryInfos: []*resource.Info{
+				createInventoryInfo("test-1", pod1Info, pod2Info, pod3Info),
 			},
-			expected: []object.ObjMetadata{*pod1Inv, *pod2Inv, *pod3Inv},
+			expected: []object.ObjMetadata{*pod1Metadata, *pod2Metadata, *pod3Metadata},
 		},
-		"Two grouping objects with different pods returns inventory with both pods": {
-			groupingInfos: []*resource.Info{
-				createGroupingInfo("test-1", pod1Info),
-				createGroupingInfo("test-2", pod2Info),
+		"Two inventory objects with different pods returns inventory with both pods": {
+			inventoryInfos: []*resource.Info{
+				createInventoryInfo("test-1", pod1Info),
+				createInventoryInfo("test-2", pod2Info),
 			},
-			expected: []object.ObjMetadata{*pod1Inv, *pod2Inv},
+			expected: []object.ObjMetadata{*pod1Metadata, *pod2Metadata},
 		},
-		"Two grouping objects with overlapping pods returns set of pods": {
-			groupingInfos: []*resource.Info{
-				createGroupingInfo("test-1", pod1Info, pod2Info),
-				createGroupingInfo("test-2", pod2Info, pod3Info),
+		"Two inventory objects with overlapping pods returns set of pods": {
+			inventoryInfos: []*resource.Info{
+				createInventoryInfo("test-1", pod1Info, pod2Info),
+				createInventoryInfo("test-2", pod2Info, pod3Info),
 			},
-			expected: []object.ObjMetadata{*pod1Inv, *pod2Inv, *pod3Inv},
+			expected: []object.ObjMetadata{*pod1Metadata, *pod2Metadata, *pod3Metadata},
 		},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			actual, err := unionPastObjs(tc.groupingInfos)
+			actual, err := unionPastObjs(tc.inventoryInfos)
 			if err != nil {
 				t.Errorf("Unexpected error received: %s\n", err)
 			}
@@ -188,8 +188,8 @@ func objInArray(obj object.ObjMetadata, arr []object.ObjMetadata) bool {
 
 func TestPrune(t *testing.T) {
 	tests := map[string]struct {
-		// pastInfos/currentInfos do NOT contain the grouping object.
-		// Grouping object is generated from these past/current objects.
+		// pastInfos/currentInfos do NOT contain the inventory object.
+		// Inventory object is generated from these past/current objects.
 		pastInfos    []*resource.Info
 		currentInfos []*resource.Info
 		prunedInfos  []*resource.Info
@@ -230,15 +230,15 @@ func TestPrune(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			po := NewPruneOptions(populateObjectIds(tc.currentInfos, t))
 			// Set up the previously applied objects.
-			pastGroupingInfo := createGroupingInfo("past-group", tc.pastInfos...)
-			po.pastGroupingObjects = []*resource.Info{pastGroupingInfo}
-			po.retrievedGroupingObjects = true
+			pastInventoryInfo := createInventoryInfo("past-group", tc.pastInfos...)
+			po.pastInventoryObjects = []*resource.Info{pastInventoryInfo}
+			po.retrievedInventoryObjects = true
 			// Set up the currently applied objects.
-			currentGroupingInfo := createGroupingInfo("current-group", tc.currentInfos...)
-			currentInfos := append(tc.currentInfos, currentGroupingInfo)
+			currentInventoryInfo := createInventoryInfo("current-group", tc.currentInfos...)
+			currentInfos := append(tc.currentInfos, currentInventoryInfo)
 			// The event channel can not block; make sure its bigger than all
 			// the events that can be put on it.
-			eventChannel := make(chan event.Event, len(tc.pastInfos)+1) // Add one for grouping object
+			eventChannel := make(chan event.Event, len(tc.pastInfos)+1) // Add one for inventory object
 			defer close(eventChannel)
 			// Set up the fake dynamic client to recognize all objects, and the RESTMapper.
 			po.client = fake.NewSimpleDynamicClient(scheme.Scheme,
@@ -254,7 +254,7 @@ func TestPrune(t *testing.T) {
 					t.Fatalf("Unexpected error during Prune(): %#v", err)
 				}
 				// Validate the prune events on the event channel.
-				expectedPruneEvents := len(tc.prunedInfos) + 1 // One extra for pruning grouping object
+				expectedPruneEvents := len(tc.prunedInfos) + 1 // One extra for pruning inventory object
 				actualPruneEvents := len(eventChannel)
 				if expectedPruneEvents != actualPruneEvents {
 					t.Errorf("Expected (%d) prune events, got (%d)",

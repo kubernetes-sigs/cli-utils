@@ -3,7 +3,7 @@
 //
 // Prune functionality deletes previously applied objects
 // which are subsequently omitted in further apply operations.
-// This functionality relies on "grouping" objects to store
+// This functionality relies on "inventory" objects to store
 // object metadata for each apply operation. This file defines
 // PruneOptions to encapsulate information necessary to
 // calculate the prune set, and to delete the objects in
@@ -34,21 +34,21 @@ type PruneOptions struct {
 	builder *resource.Builder
 	mapper  meta.RESTMapper
 	// The currently applied objects (as Infos), including the
-	// current grouping object. These objects are used to
+	// current inventory object. These objects are used to
 	// calculate the prune set after retrieving the previous
-	// grouping objects.
-	currentGroupingObject *resource.Info
+	// inventory objects.
+	currentInventoryObject *resource.Info
 	// Stores the UID for each of the currently applied objects.
 	// These UID's are written during the apply, and this data
 	// structure is shared. IMPORTANT: the apply task must
 	// always complete before this prune is run.
 	currentUids sets.String
-	// The set of retrieved grouping objects (as Infos) selected
-	// by the grouping label. This set should also include the
-	// current grouping object. Stored here to make testing
-	// easier by manually setting the retrieved grouping infos.
-	pastGroupingObjects      []*resource.Info
-	retrievedGroupingObjects bool
+	// The set of retrieved inventory objects (as Infos) selected
+	// by the inventory label. This set should also include the
+	// current inventory object. Stored here to make testing
+	// easier by manually setting the retrieved inventory infos.
+	pastInventoryObjects      []*resource.Info
+	retrievedInventoryObjects bool
 
 	validator validation.Schema
 
@@ -79,30 +79,30 @@ func (po *PruneOptions) Initialize(factory util.Factory) error {
 	if err != nil {
 		return err
 	}
-	// Initialize past grouping objects as empty.
-	po.pastGroupingObjects = []*resource.Info{}
-	po.retrievedGroupingObjects = false
+	// Initialize past inventory objects as empty.
+	po.pastInventoryObjects = []*resource.Info{}
+	po.retrievedInventoryObjects = false
 	return nil
 }
 
-// getPreviousGroupingObjects returns the set of grouping objects
-// that have the same label as the current grouping object. Removes
-// the current grouping object from this set. Returns an error
-// if there is a problem retrieving the grouping objects.
-func (po *PruneOptions) getPreviousGroupingObjects() ([]*resource.Info, error) {
-	current, err := infoToObjMetadata(po.currentGroupingObject)
+// getPreviousInventoryObjects returns the set of inventory objects
+// that have the same label as the current inventory object. Removes
+// the current inventory object from this set. Returns an error
+// if there is a problem retrieving the inventory objects.
+func (po *PruneOptions) getPreviousInventoryObjects() ([]*resource.Info, error) {
+	current, err := infoToObjMetadata(po.currentInventoryObject)
 	if err != nil {
 		return nil, err
 	}
-	// Ensures the "pastGroupingObjects" is set.
-	if !po.retrievedGroupingObjects {
-		if err := po.retrievePreviousGroupingObjects(current.Namespace); err != nil {
+	// Ensures the "pastInventoryObjects" is set.
+	if !po.retrievedInventoryObjects {
+		if err := po.retrievePreviousInventoryObjects(current.Namespace); err != nil {
 			return nil, err
 		}
 	}
-	// Remove the current grouping info from the previous grouping infos.
+	// Remove the current inventory info from the previous inventory infos.
 	pastGroupInfos := []*resource.Info{}
-	for _, pastInfo := range po.pastGroupingObjects {
+	for _, pastInfo := range po.pastInventoryObjects {
 		past, err := infoToObjMetadata(pastInfo)
 		if err != nil {
 			return nil, err
@@ -114,23 +114,23 @@ func (po *PruneOptions) getPreviousGroupingObjects() ([]*resource.Info, error) {
 	return pastGroupInfos, nil
 }
 
-// retrievePreviousGroupingObjects requests the previous grouping objects
-// using the grouping label from the current grouping object. Sets
-// the field "pastGroupingObjects". Returns an error if the grouping
-// label doesn't exist for the current currentGroupingObject does not
-// exist or if the call to retrieve the past grouping objects fails.
-func (po *PruneOptions) retrievePreviousGroupingObjects(namespace string) error {
-	if po.currentGroupingObject == nil || po.currentGroupingObject.Object == nil {
-		return fmt.Errorf("missing current grouping object")
+// retrievePreviousInventoryObjects requests the previous inventory objects
+// using the inventory label from the current inventory object. Sets
+// the field "pastInventoryObjects". Returns an error if the inventory
+// label doesn't exist for the current currentInventoryObject does not
+// exist or if the call to retrieve the past inventory objects fails.
+func (po *PruneOptions) retrievePreviousInventoryObjects(namespace string) error {
+	if po.currentInventoryObject == nil || po.currentInventoryObject.Object == nil {
+		return fmt.Errorf("missing current inventory object")
 	}
-	// Get the grouping label for this grouping object, and create
+	// Get the inventory label for this inventory object, and create
 	// a label selector from it.
-	groupingLabel, err := retrieveInventoryLabel(po.currentGroupingObject.Object)
+	inventoryLabel, err := retrieveInventoryLabel(po.currentInventoryObject.Object)
 	if err != nil {
 		return err
 	}
-	labelSelector := fmt.Sprintf("%s=%s", common.InventoryLabel, groupingLabel)
-	retrievedGroupingInfos, err := po.builder.
+	labelSelector := fmt.Sprintf("%s=%s", common.InventoryLabel, inventoryLabel)
+	retrievedInventoryInfos, err := po.builder.
 		Unstructured().
 		// TODO: Check if this validator is necessary.
 		Schema(po.validator).
@@ -144,8 +144,8 @@ func (po *PruneOptions) retrievePreviousGroupingObjects(namespace string) error 
 	if err != nil {
 		return err
 	}
-	po.pastGroupingObjects = retrievedGroupingInfos
-	po.retrievedGroupingObjects = true
+	po.pastInventoryObjects = retrievedInventoryInfos
+	po.retrievedInventoryObjects = true
 	return nil
 }
 
@@ -193,23 +193,23 @@ type Options struct {
 }
 
 // Prune deletes the set of resources which were previously applied
-// (retrieved from previous grouping objects) but omitted in
-// the current apply. Prune also delete all previous grouping
+// (retrieved from previous inventory objects) but omitted in
+// the current apply. Prune also delete all previous inventory
 // objects. Returns an error if there was a problem.
 func (po *PruneOptions) Prune(currentObjects []*resource.Info, eventChannel chan<- event.Event, o Options) error {
-	currentGroupingObject, found := FindInventoryObj(currentObjects)
+	currentInventoryObject, found := FindInventoryObj(currentObjects)
 	if !found {
-		return fmt.Errorf("current grouping object not found during prune")
+		return fmt.Errorf("current inventory object not found during prune")
 	}
-	po.currentGroupingObject = currentGroupingObject
+	po.currentInventoryObject = currentInventoryObject
 
-	// Retrieve previous grouping objects, and calculate the
+	// Retrieve previous inventory objects, and calculate the
 	// union of the previous applies as an inventory set.
-	pastGroupingInfos, err := po.getPreviousGroupingObjects()
+	pastInventoryInfos, err := po.getPreviousInventoryObjects()
 	if err != nil {
 		return err
 	}
-	pastObjs, err := unionPastObjs(pastGroupingInfos)
+	pastObjs, err := unionPastObjs(pastInventoryInfos)
 	if err != nil {
 		return err
 	}
@@ -253,8 +253,8 @@ func (po *PruneOptions) Prune(currentObjects []*resource.Info, eventChannel chan
 			},
 		}
 	}
-	// Delete previous grouping objects.
-	for _, pastGroupInfo := range pastGroupingInfos {
+	// Delete previous inventory objects.
+	for _, pastGroupInfo := range pastInventoryInfos {
 		if !o.DryRun {
 			err = po.client.Resource(pastGroupInfo.Mapping.Resource).
 				Namespace(pastGroupInfo.Namespace).
