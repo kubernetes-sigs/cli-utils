@@ -18,20 +18,20 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
-var testNamespace = "test-grouping-namespace"
-var groupingObjName = "test-grouping-obj"
+var testNamespace = "test-inventory-namespace"
+var inventoryObjName = "test-inventory-obj"
 var pod1Name = "pod-1"
 var pod2Name = "pod-2"
 var pod3Name = "pod-3"
 
 var testInventoryLabel = "test-app-label"
 
-var groupingObj = unstructured.Unstructured{
+var inventoryObj = unstructured.Unstructured{
 	Object: map[string]interface{}{
 		"apiVersion": "v1",
 		"kind":       "ConfigMap",
 		"metadata": map[string]interface{}{
-			"name":      groupingObjName,
+			"name":      inventoryObjName,
 			"namespace": testNamespace,
 			"labels": map[string]interface{}{
 				common.InventoryLabel: testInventoryLabel,
@@ -94,70 +94,70 @@ var pod3Info = &resource.Info{
 	Object:    &pod3,
 }
 
-var nonUnstructuredGroupingObj = &corev1.ConfigMap{
+var nonUnstructuredInventoryObj = &corev1.ConfigMap{
 	ObjectMeta: metav1.ObjectMeta{
 		Namespace: testNamespace,
-		Name:      groupingObjName,
+		Name:      inventoryObjName,
 		Labels: map[string]string{
 			common.InventoryLabel: "true",
 		},
 	},
 }
 
-var nonUnstructuredGroupingInfo = &resource.Info{
+var nonUnstructuredInventoryInfo = &resource.Info{
 	Namespace: testNamespace,
-	Name:      groupingObjName,
-	Object:    nonUnstructuredGroupingObj,
+	Name:      inventoryObjName,
+	Object:    nonUnstructuredInventoryObj,
 }
 
 var nilInfo = &resource.Info{
 	Namespace: testNamespace,
-	Name:      groupingObjName,
+	Name:      inventoryObjName,
 	Object:    nil,
 }
 
-var groupingObjLabelWithSpace = unstructured.Unstructured{
+var inventoryObjLabelWithSpace = unstructured.Unstructured{
 	Object: map[string]interface{}{
 		"apiVersion": "v1",
 		"kind":       "ConfigMap",
 		"metadata": map[string]interface{}{
-			"name":      groupingObjName,
+			"name":      inventoryObjName,
 			"namespace": testNamespace,
 			"labels": map[string]interface{}{
-				common.InventoryLabel: "\tgrouping-label ",
+				common.InventoryLabel: "\tinventory-label ",
 			},
 		},
 	},
 }
 
-func TestRetrieveGroupingLabel(t *testing.T) {
+func TestRetrieveInventoryLabel(t *testing.T) {
 	tests := []struct {
-		obj           runtime.Object
-		groupingLabel string
-		isError       bool
+		obj            runtime.Object
+		inventoryLabel string
+		isError        bool
 	}{
-		// Nil grouping object throws error.
+		// Nil inventory object throws error.
 		{
-			obj:           nil,
-			groupingLabel: "",
-			isError:       true,
+			obj:            nil,
+			inventoryLabel: "",
+			isError:        true,
 		},
-		// Pod is not a grouping object.
+		// Pod is not a inventory object.
 		{
-			obj:           &pod2,
-			groupingLabel: "",
-			isError:       true,
+			obj:            &pod2,
+			inventoryLabel: "",
+			isError:        true,
 		},
 		// Retrieves label without preceding/trailing whitespace.
 		{
-			obj:           &groupingObjLabelWithSpace,
-			groupingLabel: "grouping-label",
-			isError:       false,
+			obj:            &inventoryObjLabelWithSpace,
+			inventoryLabel: "inventory-label",
+			isError:        false,
 		},
 		{
-			obj:           &groupingObj,
-			groupingLabel: testInventoryLabel,
-			isError:       false,
+			obj:            &inventoryObj,
+			inventoryLabel: testInventoryLabel,
+			isError:        false,
 		},
 	}
 
@@ -170,8 +170,8 @@ func TestRetrieveGroupingLabel(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Received unexpected error: %s\n", err)
 			}
-			if test.groupingLabel != actual {
-				t.Errorf("Expected grouping label (%s), got (%s)\n", test.groupingLabel, actual)
+			if test.inventoryLabel != actual {
+				t.Errorf("Expected inventory label (%s), got (%s)\n", test.inventoryLabel, actual)
 			}
 		}
 	}
@@ -179,58 +179,58 @@ func TestRetrieveGroupingLabel(t *testing.T) {
 
 func TestIsInventoryObject(t *testing.T) {
 	tests := []struct {
-		obj        runtime.Object
-		isGrouping bool
+		obj         runtime.Object
+		isInventory bool
 	}{
 		{
-			obj:        nil,
-			isGrouping: false,
+			obj:         nil,
+			isInventory: false,
 		},
 		{
-			obj:        &groupingObj,
-			isGrouping: true,
+			obj:         &inventoryObj,
+			isInventory: true,
 		},
 		{
-			obj:        &pod2,
-			isGrouping: false,
+			obj:         &pod2,
+			isInventory: false,
 		},
 	}
 
 	for _, test := range tests {
-		grouping := IsInventoryObject(test.obj)
-		if test.isGrouping && !grouping {
+		inventory := IsInventoryObject(test.obj)
+		if test.isInventory && !inventory {
 			t.Errorf("Inventory object not identified: %#v", test.obj)
 		}
-		if !test.isGrouping && grouping {
-			t.Errorf("Non-inventory object identifed as grouping obj: %#v", test.obj)
+		if !test.isInventory && inventory {
+			t.Errorf("Non-inventory object identifed as inventory obj: %#v", test.obj)
 		}
 	}
 }
 
 func TestCreateInventoryObject(t *testing.T) {
 	testCases := map[string]struct {
-		groupingObjectTemplate *resource.Info
-		resources              []*resource.Info
+		inventoryObjectTemplate *resource.Info
+		resources               []*resource.Info
 
 		expectedError     bool
 		expectedInventory []*object.ObjMetadata
 	}{
-		"grouping object template has nil object": {
-			groupingObjectTemplate: nilInfo,
-			expectedError:          true,
+		"inventory object template has nil object": {
+			inventoryObjectTemplate: nilInfo,
+			expectedError:           true,
 		},
-		"grouping object template is not unstructured": {
-			groupingObjectTemplate: nonUnstructuredGroupingInfo,
-			expectedError:          true,
+		"inventory object template is not unstructured": {
+			inventoryObjectTemplate: nonUnstructuredInventoryInfo,
+			expectedError:           true,
 		},
 		"no resources": {
-			groupingObjectTemplate: copyGroupingInfo(),
-			resources:              []*resource.Info{},
-			expectedInventory:      []*object.ObjMetadata{},
+			inventoryObjectTemplate: copyInventoryInfo(),
+			resources:               []*resource.Info{},
+			expectedInventory:       []*object.ObjMetadata{},
 		},
 		"single resource": {
-			groupingObjectTemplate: copyGroupingInfo(),
-			resources:              []*resource.Info{pod1Info},
+			inventoryObjectTemplate: copyInventoryInfo(),
+			resources:               []*resource.Info{pod1Info},
 			expectedInventory: []*object.ObjMetadata{
 				{
 					Namespace: testNamespace,
@@ -243,7 +243,7 @@ func TestCreateInventoryObject(t *testing.T) {
 			},
 		},
 		"multiple resources": {
-			groupingObjectTemplate: copyGroupingInfo(),
+			inventoryObjectTemplate: copyInventoryInfo(),
 			resources: []*resource.Info{pod1Info, pod2Info,
 				pod3Info},
 			expectedInventory: []*object.ObjMetadata{
@@ -274,15 +274,15 @@ func TestCreateInventoryObject(t *testing.T) {
 			},
 		},
 		"resource has nil object": {
-			groupingObjectTemplate: copyGroupingInfo(),
-			resources:              []*resource.Info{nilInfo},
-			expectedError:          true,
+			inventoryObjectTemplate: copyInventoryInfo(),
+			resources:               []*resource.Info{nilInfo},
+			expectedError:           true,
 		},
 	}
 
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
-			groupingObj, err := CreateInventoryObj(tc.groupingObjectTemplate,
+			inventoryObj, err := CreateInventoryObj(tc.inventoryObjectTemplate,
 				tc.resources)
 
 			if tc.expectedError {
@@ -297,20 +297,20 @@ func TestCreateInventoryObject(t *testing.T) {
 				return
 			}
 
-			accessor, err := meta.Accessor(groupingObj.Object)
+			accessor, err := meta.Accessor(inventoryObj.Object)
 			if err != nil {
 				t.Error(err)
 			}
 
-			if accessor.GetName() != groupingObj.Name {
+			if accessor.GetName() != inventoryObj.Name {
 				t.Errorf("expected info and unstructured to have the same name, but they didn't")
 			}
-			if accessor.GetNamespace() != groupingObj.Namespace {
+			if accessor.GetNamespace() != inventoryObj.Namespace {
 				t.Errorf("expected info and unstructured to have the same namespace, but they didn't")
 			}
 
 			inv, err := RetrieveObjsFromInventory(
-				[]*resource.Info{groupingObj})
+				[]*resource.Info{inventoryObj})
 			if err != nil {
 				t.Error(err)
 			}
@@ -340,9 +340,9 @@ func TestFindInventoryObj(t *testing.T) {
 			name:   "",
 		},
 		{
-			infos:  []*resource.Info{copyGroupingInfo()},
+			infos:  []*resource.Info{copyInventoryInfo()},
 			exists: true,
-			name:   groupingObjName,
+			name:   inventoryObjName,
 		},
 		{
 			infos:  []*resource.Info{pod1Info},
@@ -355,22 +355,22 @@ func TestFindInventoryObj(t *testing.T) {
 			name:   "",
 		},
 		{
-			infos:  []*resource.Info{pod1Info, pod2Info, copyGroupingInfo(), pod3Info},
+			infos:  []*resource.Info{pod1Info, pod2Info, copyInventoryInfo(), pod3Info},
 			exists: true,
-			name:   groupingObjName,
+			name:   inventoryObjName,
 		},
 	}
 
 	for _, test := range tests {
-		groupingObj, found := FindInventoryObj(test.infos)
+		inventoryObj, found := FindInventoryObj(test.infos)
 		if test.exists && !found {
-			t.Errorf("Should have found grouping object")
+			t.Errorf("Should have found inventory object")
 		}
 		if !test.exists && found {
-			t.Errorf("Grouping object found, but it does not exist: %#v", groupingObj)
+			t.Errorf("Inventory object found, but it does not exist: %#v", inventoryObj)
 		}
-		if test.exists && found && test.name != groupingObj.Name {
-			t.Errorf("Grouping object name does not match: %s/%s", test.name, groupingObj.Name)
+		if test.exists && found && test.name != inventoryObj.Name {
+			t.Errorf("Inventory object name does not match: %s/%s", test.name, inventoryObj.Name)
 		}
 	}
 }
@@ -381,45 +381,45 @@ func TestAddRetrieveObjsToFromInventory(t *testing.T) {
 		expected []*object.ObjMetadata
 		isError  bool
 	}{
-		// No grouping object is an error.
+		// No inventory object is an error.
 		{
 			infos:   []*resource.Info{},
 			isError: true,
 		},
-		// No grouping object is an error.
+		// No inventory object is an error.
 		{
 			infos:   []*resource.Info{pod1Info, pod2Info},
 			isError: true,
 		},
-		// Grouping object without other objects is OK.
+		// Inventory object without other objects is OK.
 		{
-			infos:   []*resource.Info{copyGroupingInfo(), nilInfo},
+			infos:   []*resource.Info{copyInventoryInfo(), nilInfo},
 			isError: true,
 		},
 		{
-			infos:   []*resource.Info{nonUnstructuredGroupingInfo},
+			infos:   []*resource.Info{nonUnstructuredInventoryInfo},
 			isError: true,
 		},
 		{
-			infos:    []*resource.Info{copyGroupingInfo()},
+			infos:    []*resource.Info{copyInventoryInfo()},
 			expected: []*object.ObjMetadata{},
 			isError:  false,
 		},
-		// More than one grouping object is an error.
+		// More than one inventory object is an error.
 		{
-			infos:    []*resource.Info{copyGroupingInfo(), copyGroupingInfo()},
+			infos:    []*resource.Info{copyInventoryInfo(), copyInventoryInfo()},
 			expected: []*object.ObjMetadata{},
 			isError:  true,
 		},
-		// More than one grouping object is an error.
+		// More than one inventory object is an error.
 		{
-			infos:    []*resource.Info{copyGroupingInfo(), pod1Info, copyGroupingInfo()},
+			infos:    []*resource.Info{copyInventoryInfo(), pod1Info, copyInventoryInfo()},
 			expected: []*object.ObjMetadata{},
 			isError:  true,
 		},
-		// Basic test case: one grouping object, one pod.
+		// Basic test case: one inventory object, one pod.
 		{
-			infos: []*resource.Info{copyGroupingInfo(), pod1Info},
+			infos: []*resource.Info{copyInventoryInfo(), pod1Info},
 			expected: []*object.ObjMetadata{
 				{
 					Namespace: testNamespace,
@@ -433,7 +433,7 @@ func TestAddRetrieveObjsToFromInventory(t *testing.T) {
 			isError: false,
 		},
 		{
-			infos: []*resource.Info{pod1Info, copyGroupingInfo()},
+			infos: []*resource.Info{pod1Info, copyInventoryInfo()},
 			expected: []*object.ObjMetadata{
 				{
 					Namespace: testNamespace,
@@ -447,7 +447,7 @@ func TestAddRetrieveObjsToFromInventory(t *testing.T) {
 			isError: false,
 		},
 		{
-			infos: []*resource.Info{pod1Info, pod2Info, copyGroupingInfo(), pod3Info},
+			infos: []*resource.Info{pod1Info, pod2Info, copyInventoryInfo(), pod3Info},
 			expected: []*object.ObjMetadata{
 				{
 					Namespace: testNamespace,
@@ -477,7 +477,7 @@ func TestAddRetrieveObjsToFromInventory(t *testing.T) {
 			isError: false,
 		},
 		{
-			infos: []*resource.Info{pod1Info, pod2Info, pod3Info, copyGroupingInfo()},
+			infos: []*resource.Info{pod1Info, pod2Info, pod3Info, copyInventoryInfo()},
 			expected: []*object.ObjMetadata{
 				{
 					Namespace: testNamespace,
@@ -507,7 +507,7 @@ func TestAddRetrieveObjsToFromInventory(t *testing.T) {
 			isError: false,
 		},
 		{
-			infos: []*resource.Info{copyGroupingInfo(), pod1Info, pod2Info, pod3Info},
+			infos: []*resource.Info{copyInventoryInfo(), pod1Info, pod2Info, pod3Info},
 			expected: []*object.ObjMetadata{
 				{
 					Namespace: testNamespace,
@@ -567,13 +567,13 @@ func TestAddRetrieveObjsToFromInventory(t *testing.T) {
 					t.Errorf("Expected inventory (%s) not found", expected)
 				}
 			}
-			// If the grouping object has an inventory, check the
-			// grouping object has an inventory hash.
-			groupingInfo, exists := FindInventoryObj(test.infos)
+			// If the inventory object has an inventory, check the
+			// inventory object has an inventory hash.
+			inventoryInfo, exists := FindInventoryObj(test.infos)
 			if exists && len(test.expected) > 0 {
-				invHash := retrieveInventoryHash(groupingInfo)
+				invHash := retrieveInventoryHash(inventoryInfo)
 				if len(invHash) == 0 {
-					t.Errorf("Grouping object missing inventory hash")
+					t.Errorf("Inventory object missing inventory hash")
 				}
 			}
 		}
@@ -596,22 +596,22 @@ func TestAddSuffixToName(t *testing.T) {
 		},
 		// Empty suffix should return error.
 		{
-			info:     copyGroupingInfo(),
+			info:     copyInventoryInfo(),
 			suffix:   "",
 			expected: "",
 			isError:  true,
 		},
 		// Empty suffix should return error.
 		{
-			info:     copyGroupingInfo(),
+			info:     copyInventoryInfo(),
 			suffix:   " \t",
 			expected: "",
 			isError:  true,
 		},
 		{
-			info:     copyGroupingInfo(),
+			info:     copyInventoryInfo(),
 			suffix:   "hashsuffix",
-			expected: groupingObjName + "-hashsuffix",
+			expected: inventoryObjName + "-hashsuffix",
 			isError:  false,
 		},
 	}
@@ -651,28 +651,28 @@ func TestClearInventoryObject(t *testing.T) {
 			infos:   []*resource.Info{},
 			isError: true,
 		},
-		"Non-Unstructured grouping object should error": {
-			infos:   []*resource.Info{nonUnstructuredGroupingInfo},
+		"Non-Unstructured inventory object should error": {
+			infos:   []*resource.Info{nonUnstructuredInventoryInfo},
 			isError: true,
 		},
 		"Info with nil Object should error": {
 			infos:   []*resource.Info{nilInfo},
 			isError: true,
 		},
-		"Single grouping object should work": {
-			infos:   []*resource.Info{copyGroupingInfo()},
+		"Single inventory object should work": {
+			infos:   []*resource.Info{copyInventoryInfo()},
 			isError: false,
 		},
-		"Single non-grouping object should error": {
+		"Single non-inventory object should error": {
 			infos:   []*resource.Info{pod1Info},
 			isError: true,
 		},
-		"Multiple non-grouping objects should error": {
+		"Multiple non-inventory objects should error": {
 			infos:   []*resource.Info{pod1Info, pod2Info},
 			isError: true,
 		},
-		"Grouping object with single inventory object should work": {
-			infos:   []*resource.Info{copyGroupingInfo(), pod1Info},
+		"Inventory object with single inventory object should work": {
+			infos:   []*resource.Info{copyInventoryInfo(), pod1Info},
 			isError: false,
 		},
 	}
@@ -694,7 +694,7 @@ func TestClearInventoryObject(t *testing.T) {
 					t.Fatalf("Received unexpected error: %#v", err)
 				}
 				if len(objMetadata) > 0 {
-					t.Errorf("Grouping object inventory not cleared: %#v\n", objMetadata)
+					t.Errorf("Inventory object inventory not cleared: %#v\n", objMetadata)
 				}
 			}
 		})
@@ -704,17 +704,17 @@ func TestClearInventoryObject(t *testing.T) {
 func getObjectName(obj runtime.Object) (string, error) {
 	u, ok := obj.(*unstructured.Unstructured)
 	if !ok {
-		return "", fmt.Errorf("Grouping object is not Unstructured format")
+		return "", fmt.Errorf("Inventory object is not Unstructured format")
 	}
 	return u.GetName(), nil
 }
 
-func copyGroupingInfo() *resource.Info {
-	groupingObjCopy := groupingObj.DeepCopy()
-	var groupingInfo = &resource.Info{
+func copyInventoryInfo() *resource.Info {
+	inventoryObjCopy := inventoryObj.DeepCopy()
+	var inventoryInfo = &resource.Info{
 		Namespace: testNamespace,
-		Name:      groupingObjName,
-		Object:    groupingObjCopy,
+		Name:      inventoryObjName,
+		Object:    inventoryObjCopy,
 	}
-	return groupingInfo
+	return inventoryInfo
 }
