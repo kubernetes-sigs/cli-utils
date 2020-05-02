@@ -26,10 +26,10 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
-// retrieveInventoryLabel returns the string value of the InventoryLabel
+// RetrieveInventoryLabel returns the string value of the InventoryLabel
 // for the passed object. Returns error if the passed object is nil or
 // is not a inventory object.
-func retrieveInventoryLabel(obj runtime.Object) (string, error) {
+func RetrieveInventoryLabel(obj runtime.Object) (string, error) {
 	var inventoryLabel string
 	if obj == nil {
 		return "", fmt.Errorf("inventory object is nil")
@@ -53,7 +53,7 @@ func IsInventoryObject(obj runtime.Object) bool {
 	if obj == nil {
 		return false
 	}
-	inventoryLabel, err := retrieveInventoryLabel(obj)
+	inventoryLabel, err := RetrieveInventoryLabel(obj)
 	if err == nil && len(inventoryLabel) > 0 {
 		return true
 	}

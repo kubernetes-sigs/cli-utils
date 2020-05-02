@@ -94,12 +94,16 @@ func (po *PruneOptions) getPreviousInventoryObjects() ([]*resource.Info, error) 
 	if err != nil {
 		return nil, err
 	}
-	// Ensures the "pastInventoryObjects" is set.
-	if !po.retrievedInventoryObjects {
-		if err := po.retrievePreviousInventoryObjects(current.Namespace); err != nil {
-			return nil, err
-		}
+
+	label, err := RetrieveInventoryLabel(po.currentInventoryObject.Object)
+	if err != nil {
+		return nil, err
 	}
+
+	if _, err := po.RetrievePreviousInventoryObjects(label, current.Namespace); err != nil {
+		return nil, err
+	}
+
 	// Remove the current inventory info from the previous inventory infos.
 	pastGroupInfos := []*resource.Info{}
 	for _, pastInfo := range po.pastInventoryObjects {
@@ -114,22 +118,16 @@ func (po *PruneOptions) getPreviousInventoryObjects() ([]*resource.Info, error) 
 	return pastGroupInfos, nil
 }
 
-// retrievePreviousInventoryObjects requests the previous inventory objects
+// RetrievePreviousInventoryObjects requests the previous inventory objects
 // using the inventory label from the current inventory object. Sets
 // the field "pastInventoryObjects". Returns an error if the inventory
 // label doesn't exist for the current currentInventoryObject does not
 // exist or if the call to retrieve the past inventory objects fails.
-func (po *PruneOptions) retrievePreviousInventoryObjects(namespace string) error {
-	if po.currentInventoryObject == nil || po.currentInventoryObject.Object == nil {
-		return fmt.Errorf("missing current inventory object")
+func (po *PruneOptions) RetrievePreviousInventoryObjects(label, namespace string) ([]*resource.Info, error) {
+	if po.retrievedInventoryObjects {
+		return po.pastInventoryObjects, nil
 	}
-	// Get the inventory label for this inventory object, and create
-	// a label selector from it.
-	inventoryLabel, err := retrieveInventoryLabel(po.currentInventoryObject.Object)
-	if err != nil {
-		return err
-	}
-	labelSelector := fmt.Sprintf("%s=%s", common.InventoryLabel, inventoryLabel)
+	labelSelector := fmt.Sprintf("%s=%s", common.InventoryLabel, label)
 	retrievedInventoryInfos, err := po.builder.
 		Unstructured().
 		// TODO: Check if this validator is necessary.
@@ -142,11 +140,11 @@ func (po *PruneOptions) retrievePreviousInventoryObjects(namespace string) error
 		Do().
 		Infos()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	po.pastInventoryObjects = retrievedInventoryInfos
 	po.retrievedInventoryObjects = true
-	return nil
+	return retrievedInventoryInfos, nil
 }
 
 // infoToObjMetadata transforms the object represented by the passed "info"
@@ -161,12 +159,12 @@ func infoToObjMetadata(info *resource.Info) (*object.ObjMetadata, error) {
 	return object.CreateObjMetadata(info.Namespace, info.Name, gk)
 }
 
-// unionPastObjs takes a set of inventory objects (infos), returning the
+// UnionPastObjs takes a set of inventory objects (infos), returning the
 // union of the objects referenced by these inventory objects.
 // Returns an error if any of the passed objects are not inventory
 // objects, or if unable to retrieve the referenced objects from any
 // inventory object.
-func unionPastObjs(infos []*resource.Info) ([]object.ObjMetadata, error) {
+func UnionPastObjs(infos []*resource.Info) ([]object.ObjMetadata, error) {
 	objSet := map[string]object.ObjMetadata{}
 	for _, info := range infos {
 		objs, err := RetrieveObjsFromInventory([]*resource.Info{info})
@@ -211,7 +209,7 @@ func (po *PruneOptions) Prune(currentObjects []*resource.Info, eventChannel chan
 	if err != nil {
 		return err
 	}
-	pastObjs, err := unionPastObjs(pastInventoryInfos)
+	pastObjs, err := UnionPastObjs(pastInventoryInfos)
 	if err != nil {
 		return err
 	}

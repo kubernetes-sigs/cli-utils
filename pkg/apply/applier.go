@@ -36,7 +36,7 @@ import (
 // between the two.
 func NewApplier(factory util.Factory, ioStreams genericclioptions.IOStreams) *Applier {
 	applyOptions := apply.NewApplyOptions(ioStreams)
-	return &Applier{
+	a := &Applier{
 		ApplyOptions: applyOptions,
 		// VisitedUids keeps track of the unique identifiers for all
 		// currently applied objects. Used to calculate prune set.
@@ -44,6 +44,8 @@ func NewApplier(factory util.Factory, ioStreams genericclioptions.IOStreams) *Ap
 		factory:      factory,
 		ioStreams:    ioStreams,
 	}
+	a.previousInventoriesFunc = a.previousInventories
+	return a
 }
 
 // Applier performs the step of applying a set of resources into a cluster,
@@ -63,6 +65,11 @@ type Applier struct {
 	ApplyOptions *apply.ApplyOptions
 	PruneOptions *prune.PruneOptions
 	statusPoller poller.Poller
+
+	// previousInventoriesFunc is used to fetch the existing inventories
+	// from the apiserver. It is defined here so we can override it in
+	// unit tests.
+	previousInventoriesFunc func(label, namespace string) ([]*resource.Info, error)
 }
 
 // Initialize sets up the Applier for actually doing an apply against
@@ -135,10 +142,14 @@ func (a *Applier) newStatusPoller() (poller.Poller, error) {
 	return polling.NewStatusPoller(c, mapper), nil
 }
 
+func (a *Applier) previousInventories(label, namespace string) ([]*resource.Info, error) {
+	return a.PruneOptions.RetrievePreviousInventoryObjects(label, namespace)
+}
+
 // readAndPrepareObjects reads the resources that should be applied,
 // handles ordering of resources and sets up the inventory object
 // based on the provided inventory object template.
-func (a *Applier) readAndPrepareObjects() ([]*resource.Info, error) {
+func (a *Applier) readAndPrepareObjects() (*ResourceObjects, error) {
 	infos, err := a.ApplyOptions.GetObjects()
 	if err != nil {
 		return nil, err
@@ -159,13 +170,81 @@ func (a *Applier) readAndPrepareObjects() ([]*resource.Info, error) {
 		return nil, err
 	}
 
+	// Fetch the inventory label used for the current set of resources.
+	inventoryLabel, err := prune.RetrieveInventoryLabel(inventoryObject.Object)
+	if err != nil {
+		return nil, err
+	}
+	// Fetch all previous inventories.
+	previousInventories, err := a.previousInventoriesFunc(inventoryLabel,
+		inventoryObject.Namespace)
+	if err != nil {
+		return nil, err
+	}
+
 	sort.Sort(ResourceInfos(resources))
 
 	if !validateNamespace(resources) {
 		return nil, fmt.Errorf("objects have differing namespaces")
 	}
 
-	return append([]*resource.Info{inventoryObject}, resources...), nil
+	return &ResourceObjects{
+		CurrentInventory:    inventoryObject,
+		PreviousInventories: previousInventories,
+		Resources:           resources,
+	}, nil
+}
+
+// ResourceObjects contains information about the resources that
+// will be applied and the existing inventories used to determine
+// resources that should be pruned.
+type ResourceObjects struct {
+	CurrentInventory    *resource.Info
+	PreviousInventories []*resource.Info
+	Resources           []*resource.Info
+}
+
+// InfosForApply returns the infos representation for all the resources
+// that should be applied, including the inventory object. The
+// resources will be in sorted order.
+func (r *ResourceObjects) InfosForApply() []*resource.Info {
+	return append([]*resource.Info{r.CurrentInventory}, r.Resources...)
+}
+
+// IdsForApply returns the Ids for all resources that should be applied,
+// including the inventory object.
+func (r *ResourceObjects) IdsForApply() []object.ObjMetadata {
+	var ids []object.ObjMetadata
+	for _, info := range r.InfosForApply() {
+		ids = append(ids, object.InfoToObjMeta(info))
+	}
+	return ids
+}
+
+// IdsForPrune returns the Ids for all resources that should
+// be pruned.
+func (r *ResourceObjects) IdsForPrune() []object.ObjMetadata {
+	inventory, _ := prune.UnionPastObjs(r.PreviousInventories)
+
+	applyIds := make(map[object.ObjMetadata]bool)
+	for _, id := range r.IdsForApply() {
+		applyIds[id] = true
+	}
+
+	var ids []object.ObjMetadata
+	for _, id := range inventory {
+		if _, found := applyIds[id]; found {
+			continue
+		}
+		ids = append(ids, id)
+	}
+	return ids
+}
+
+// AllIds returns the Ids for all resources that are relevant. This
+// includes resources that will be applied or pruned.
+func (r *ResourceObjects) AllIds() []object.ObjMetadata {
+	return append(r.IdsForApply(), r.IdsForPrune()...)
 }
 
 // splitInfos takes a slice of resource.Info objects and splits it
@@ -209,24 +288,17 @@ func (a *Applier) Run(ctx context.Context, options Options) <-chan event.Event {
 		// This provides us with a slice of all the objects that will be
 		// applied to the cluster. This takes care of ordering resources
 		// and handling the inventory object.
-		infos, err := a.readAndPrepareObjects()
+		resourceObjects, err := a.readAndPrepareObjects()
 		if err != nil {
 			handleError(eventChannel, err)
 			return
 		}
 
-		// Extract the object metadata needed to identify each
-		// of the resources. This is just a lightweight representation
-		// of the resources in the infos struct. The status library
-		// relies on identifiers rather than infos, so we need to use
-		// both.
-		identifiers := object.InfosToObjMetas(infos)
-
 		// Fetch the queue (channel) of tasks that should be executed.
 		taskQueue := (&solver.TaskQueueSolver{
 			ApplyOptions: a.ApplyOptions,
 			PruneOptions: a.PruneOptions,
-		}).BuildTaskQueue(infos, solver.Options{
+		}).BuildTaskQueue(resourceObjects, solver.Options{
 			WaitForReconcile:        options.WaitForReconcile,
 			WaitForReconcileTimeout: options.WaitTimeout,
 			Prune:                   !options.NoPrune,
@@ -242,14 +314,18 @@ func (a *Applier) Run(ctx context.Context, options Options) <-chan event.Event {
 				ResourceGroups: []event.ResourceGroup{
 					{
 						Action:      event.ApplyAction,
-						Identifiers: identifiers,
+						Identifiers: resourceObjects.IdsForApply(),
+					},
+					{
+						Action:      event.PruneAction,
+						Identifiers: resourceObjects.IdsForPrune(),
 					},
 				},
 			},
 		}
 
 		// Create a new TaskStatusRunner to execute the taskQueue.
-		runner := taskrunner.NewTaskStatusRunner(identifiers, a.statusPoller)
+		runner := taskrunner.NewTaskStatusRunner(resourceObjects.AllIds(), a.statusPoller)
 		err = runner.Run(ctx, taskQueue, eventChannel, taskrunner.Options{
 			PollInterval:     options.PollInterval,
 			UseCache:         true,

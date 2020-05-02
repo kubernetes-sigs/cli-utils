@@ -42,15 +42,23 @@ type Options struct {
 	Prune                   bool
 	DryRun                  bool
 	PrunePropagationPolicy  metav1.DeletionPropagation
+	WaitForPrune            bool
+	WaitForPruneTimeout     time.Duration
+}
+
+type resourceObjects interface {
+	InfosForApply() []*resource.Info
+	IdsForApply() []object.ObjMetadata
+	IdsForPrune() []object.ObjMetadata
 }
 
 // BuildTaskQueue takes a set of resources in the form of info objects
 // and constructs the task queue. The options parameter allows
 // customization of how the task queue are built.
-func (t *TaskQueueSolver) BuildTaskQueue(infos []*resource.Info,
+func (t *TaskQueueSolver) BuildTaskQueue(ro resourceObjects,
 	o Options) chan taskrunner.Task {
 	var tasks []taskrunner.Task
-	remainingInfos := infos
+	remainingInfos := ro.InfosForApply()
 
 	crdSplitRes, hasCRDs := splitAfterCRDs(remainingInfos)
 	if hasCRDs {
@@ -86,7 +94,7 @@ func (t *TaskQueueSolver) BuildTaskQueue(infos []*resource.Info,
 	if o.WaitForReconcile {
 		tasks = append(tasks,
 			taskrunner.NewWaitTask(
-				object.InfosToObjMetas(infos),
+				ro.IdsForApply(),
 				taskrunner.AllCurrent,
 				o.WaitForReconcileTimeout),
 			&task.SendEventTask{
@@ -103,7 +111,7 @@ func (t *TaskQueueSolver) BuildTaskQueue(infos []*resource.Info,
 	if o.Prune {
 		tasks = append(tasks,
 			&task.PruneTask{
-				Objects:           infos,
+				Objects:           ro.InfosForApply(),
 				PruneOptions:      t.PruneOptions,
 				PropagationPolicy: o.PrunePropagationPolicy,
 				DryRun:            o.DryRun,
@@ -117,6 +125,23 @@ func (t *TaskQueueSolver) BuildTaskQueue(infos []*resource.Info,
 				},
 			},
 		)
+
+		if o.WaitForPrune {
+			tasks = append(tasks,
+				taskrunner.NewWaitTask(
+					ro.IdsForPrune(),
+					taskrunner.AllNotFound,
+					o.WaitForPruneTimeout),
+				&task.SendEventTask{
+					Event: event.Event{
+						Type: event.StatusType,
+						StatusEvent: pollevent.Event{
+							EventType: pollevent.CompletedEvent,
+						},
+					},
+				},
+			)
+		}
 	}
 
 	return tasksToQueue(tasks)
