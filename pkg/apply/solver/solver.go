@@ -57,6 +57,7 @@ func (t *TaskQueueSolver) BuildTaskQueue(infos []*resource.Info,
 		tasks = append(tasks, &task.ApplyTask{
 			Objects:      append(crdSplitRes.before, crdSplitRes.crds...),
 			ApplyOptions: t.ApplyOptions,
+			DryRun:       o.DryRun,
 		},
 			taskrunner.NewWaitTask(
 				object.InfosToObjMetas(crdSplitRes.crds),
@@ -70,6 +71,7 @@ func (t *TaskQueueSolver) BuildTaskQueue(infos []*resource.Info,
 		&task.ApplyTask{
 			Objects:      remainingInfos,
 			ApplyOptions: t.ApplyOptions,
+			DryRun:       o.DryRun,
 		},
 		&task.SendEventTask{
 			Event: event.Event{
@@ -104,6 +106,7 @@ func (t *TaskQueueSolver) BuildTaskQueue(infos []*resource.Info,
 				Objects:           infos,
 				PruneOptions:      t.PruneOptions,
 				PropagationPolicy: o.PrunePropagationPolicy,
+				DryRun:            o.DryRun,
 			},
 			&task.SendEventTask{
 				Event: event.Event{
