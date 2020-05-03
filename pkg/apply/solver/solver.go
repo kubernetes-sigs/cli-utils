@@ -19,6 +19,7 @@ import (
 
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/kubectl/pkg/cmd/apply"
@@ -40,6 +41,7 @@ type Options struct {
 	WaitForReconcileTimeout time.Duration
 	Prune                   bool
 	DryRun                  bool
+	PrunePropagationPolicy  metav1.DeletionPropagation
 }
 
 // BuildTaskQueue takes a set of resources in the form of info objects
@@ -99,8 +101,9 @@ func (t *TaskQueueSolver) BuildTaskQueue(infos []*resource.Info,
 	if o.Prune {
 		tasks = append(tasks,
 			&task.PruneTask{
-				Objects:      infos,
-				PruneOptions: t.PruneOptions,
+				Objects:           infos,
+				PruneOptions:      t.PruneOptions,
+				PropagationPolicy: o.PrunePropagationPolicy,
 			},
 			&task.SendEventTask{
 				Event: event.Event{

@@ -4,6 +4,7 @@
 package task
 
 import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/resource"
 	"sigs.k8s.io/cli-utils/pkg/apply/prune"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
@@ -13,9 +14,10 @@ import (
 // by using the PruneOptions. The provided Objects is the
 // set of resources that have just been applied.
 type PruneTask struct {
-	PruneOptions *prune.PruneOptions
-	Objects      []*resource.Info
-	DryRun       bool
+	PruneOptions      *prune.PruneOptions
+	Objects           []*resource.Info
+	DryRun            bool
+	PropagationPolicy metav1.DeletionPropagation
 }
 
 // Start creates a new goroutine that will invoke
@@ -26,7 +28,8 @@ func (p *PruneTask) Start(taskContext *taskrunner.TaskContext) {
 	go func() {
 		err := p.PruneOptions.Prune(p.Objects, taskContext.EventChannel(),
 			prune.Options{
-				DryRun: p.DryRun,
+				DryRun:            p.DryRun,
+				PropagationPolicy: p.PropagationPolicy,
 			})
 		taskContext.TaskChannel() <- taskrunner.TaskResult{
 			Err: err,
