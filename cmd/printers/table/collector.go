@@ -4,12 +4,15 @@
 package table
 
 import (
+	"bytes"
+	"fmt"
 	"sort"
 	"sync"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
+	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
 	pe "sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
 	"sigs.k8s.io/cli-utils/pkg/object"
@@ -208,7 +211,35 @@ func (r *ResourceStateCollector) processPruneEvent(e event.PruneEvent) {
 
 // processErrorEvent handles events for errors.
 func (r *ResourceStateCollector) processErrorEvent(err error) {
+	if timeoutErr, ok := taskrunner.IsTimeoutError(err); ok {
+		r.err = r.handleTimeoutError(timeoutErr)
+		return
+	}
 	r.err = err
+}
+
+// handleTimeoutError transforms a TimeoutError into a new error which includes
+// information about which resources failed to reach the desired status.
+func (r *ResourceStateCollector) handleTimeoutError(timeoutErr taskrunner.TimeoutError) error {
+	var errInfo ResourceInfos
+	for _, id := range timeoutErr.Identifiers {
+		ri, ok := r.resourceInfos[id]
+		if !ok {
+			continue
+		}
+		if timeoutErr.Condition.Meets(ri.resourceStatus.Status) {
+			continue
+		}
+		errInfo = append(errInfo, ri)
+	}
+	sort.Sort(errInfo)
+	var b bytes.Buffer
+	_, _ = fmt.Fprint(&b, timeoutErr.Error()+"\n")
+	for _, ri := range errInfo {
+		_, _ = fmt.Fprintf(&b, "%s/%s %s %s\n", ri.identifier.GroupKind.Kind,
+			ri.identifier.Name, ri.resourceStatus.Status, ri.resourceStatus.Message)
+	}
+	return fmt.Errorf(b.String())
 }
 
 // toIdentifier extracts the identifying information from an

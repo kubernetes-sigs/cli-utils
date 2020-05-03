@@ -61,7 +61,7 @@ func getGeneration(r *event.ResourceStatus) int64 {
 
 // conditionMet tests whether the provided Condition holds true for
 // all resources given by the list of Identifiers.
-func (a *resourceStatusCollector) conditionMet(rwd []resourceWaitData, c condition) bool {
+func (a *resourceStatusCollector) conditionMet(rwd []resourceWaitData, c Condition) bool {
 	switch c {
 	case AllCurrent:
 		return a.allMatchStatus(rwd, status.CurrentStatus)

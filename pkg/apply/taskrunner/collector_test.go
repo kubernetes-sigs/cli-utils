@@ -34,7 +34,7 @@ func TestCollector_ConditionMet(t *testing.T) {
 	testCases := map[string]struct {
 		collectorState map[object.ObjMetadata]resourceStatus
 		waitTaskData   []resourceWaitData
-		condition      condition
+		condition      Condition
 		expectedResult bool
 	}{
 		"single resource with current status": {

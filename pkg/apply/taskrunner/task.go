@@ -4,9 +4,9 @@
 package taskrunner
 
 import (
-	"fmt"
 	"time"
 
+	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
@@ -19,7 +19,7 @@ type Task interface {
 
 // NewWaitTask creates a new wait task where we will wait until
 // the resources specifies by ids all meet the specified condition.
-func NewWaitTask(ids []object.ObjMetadata, cond condition, timeout time.Duration) *WaitTask {
+func NewWaitTask(ids []object.ObjMetadata, cond Condition, timeout time.Duration) *WaitTask {
 	// Create the token channel and only add one item.
 	tokenChannel := make(chan struct{}, 1)
 	tokenChannel <- struct{}{}
@@ -44,7 +44,7 @@ type WaitTask struct {
 	// Identifiers is the list of resources that we are waiting for.
 	Identifiers []object.ObjMetadata
 	// Condition defines the status we want all resources to reach
-	Condition condition
+	Condition Condition
 	// Timeout defines how long we are willing to wait for the condition
 	// to be met.
 	Timeout time.Duration
@@ -83,9 +83,10 @@ func (w *WaitTask) setTimer(taskContext *TaskContext) {
 		// to the token first.
 		case <-w.token:
 			taskContext.TaskChannel() <- TaskResult{
-				Err: timeoutError{
-					message: fmt.Sprintf("timeout after %.0f seconds waiting for %d resources to reach condition %s",
-						w.Timeout.Seconds(), len(w.Identifiers), w.Condition),
+				Err: TimeoutError{
+					Identifiers: w.Identifiers,
+					Timeout:     w.Timeout,
+					Condition:   w.Condition,
 				},
 			}
 		default:
@@ -155,15 +156,28 @@ type resourceWaitData struct {
 
 // Condition is a type that defines the types of conditions
 // which a WaitTask can use.
-type condition string
+type Condition string
 
 const (
 	// AllCurrent Condition means all the provided resources
 	// has reached (and remains in) the Current status.
-	AllCurrent condition = "AllCurrent"
+	AllCurrent Condition = "AllCurrent"
 
 	// AllNotFound Condition means all the provided resources
 	// has reached the NotFound status, i.e. they are all deleted
 	// from the cluster.
-	AllNotFound condition = "AllNotFound"
+	AllNotFound Condition = "AllNotFound"
 )
+
+// Meets returns true if the provided status meets the condition and
+// false if it does not.
+func (c Condition) Meets(s status.Status) bool {
+	switch c {
+	case AllCurrent:
+		return s == status.CurrentStatus
+	case AllNotFound:
+		return s == status.NotFoundStatus
+	default:
+		return false
+	}
+}

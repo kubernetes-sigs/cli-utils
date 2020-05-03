@@ -275,21 +275,30 @@ type TaskResult struct {
 	Err error
 }
 
-// timeoutError is a special error used by tasks when they have
+// TimeoutError is a special error used by tasks when they have
 // timed out.
-type timeoutError struct {
-	message string
+type TimeoutError struct {
+	// Identifiers contains the identifiers of all resources that the
+	// WaitTask was waiting for.
+	Identifiers []object.ObjMetadata
+
+	// Timeout is the amount of time it took before it timed out.
+	Timeout time.Duration
+
+	// Condition defines the criteria for which the task was waiting.
+	Condition Condition
 }
 
-func (te timeoutError) Error() string {
-	return te.message
+func (te TimeoutError) Error() string {
+	return fmt.Sprintf("timeout after %.0f seconds waiting for %d resources to reach condition %s",
+		te.Timeout.Seconds(), len(te.Identifiers), te.Condition)
 }
 
 // IsTimeoutError checks whether a given error is
-// a timeoutError.
-func IsTimeoutError(err error) bool {
-	if _, ok := err.(timeoutError); ok {
-		return true
+// a TimeoutError.
+func IsTimeoutError(err error) (TimeoutError, bool) {
+	if e, ok := err.(TimeoutError); ok {
+		return e, true
 	}
-	return false
+	return TimeoutError{}, false
 }

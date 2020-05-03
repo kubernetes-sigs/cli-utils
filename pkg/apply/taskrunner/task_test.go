@@ -25,7 +25,7 @@ func TestWaitTask_TimeoutTriggered(t *testing.T) {
 
 	select {
 	case res := <-taskContext.TaskChannel():
-		if res.Err == nil || !IsTimeoutError(res.Err) {
+		if _, ok := IsTimeoutError(res.Err); !ok {
 			t.Errorf("expected timeout error, but got %v", res.Err)
 		}
 		return
