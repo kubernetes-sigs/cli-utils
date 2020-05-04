@@ -39,6 +39,12 @@ function expectedOutputLine() {
   $(grep "$@" $OUTPUT/status | wc -l); \
   echo $?
 }
+
+function expectedNotFound() {
+  test 0 == \
+  $(grep "$@" $OUTPUT/status | wc -l); \
+  echo $?
+}
 ```
 
 Let's add a simple config map resource in `base`
@@ -49,7 +55,7 @@ cat <<EOF >$BASE/configMap.yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: the-map
+  name: the-map1
   namespace: hellospace
 data:
   altGreeting: "Good Morning!"
@@ -90,12 +96,12 @@ spec:
           valueFrom:
             configMapKeyRef:
               key: altGreeting
-              name: the-map
+              name: the-map1
         - name: ENABLE_RISKY
           valueFrom:
             configMapKeyRef:
               key: enableRisky
-              name: the-map
+              name: the-map1
         image: monopole/hello:1
         name: the-container
         ports:
@@ -124,24 +130,6 @@ spec:
 EOF
 ```
 
-Create a `grouping.yaml` resource. By this, you are defining the grouping of the current directory,
-`base`. `kapply` uses the unique label in this file to track any future state changes made to this
-directory. Make sure the label key is `cli-utils.sigs.k8s.io/inventory-id` and give any unique
-label value and DO NOT change it in future.
-
-<!-- @createGroupingYaml @testE2EAgainstLatestRelease-->
-```
-cat <<EOF >$BASE/grouping.yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: inventory-map
-  namespace: hellospace
-  labels:
-    cli-utils.sigs.k8s.io/inventory-id: hello-app
-EOF
-```
-
 ## Run end-to-end tests
 
 The following requires installation of [kind].
@@ -159,23 +147,48 @@ Create the `hellospace` namespace where we will install the resources.
 kubectl create namespace hellospace
 ```
 
+Use the kapply init command to generate the inventory template. This contains
+the namespace and inventory id used by apply to create inventory objects. 
+<!-- @createInventoryTemplate @testE2EAgainstLatestRelease-->
+```
+kapply init $BASE
+
+ls -1 $BASE > $OUTPUT/status
+expectedOutputLine "inventory-template.yaml"
+```
+
+Run preview to check which commands will be executed
+<!-- @previewHelloApp @testE2EAgainstLatestRelease -->
+```
+kapply preview $BASE > $OUTPUT/status
+
+expectedOutputLine "4 resource(s) applied. 4 created, 0 unchanged, 0 configured (preview)"
+
+# Verify that preview didn't create any resources.
+kubectl get all -n hellospace > $OUTPUT/status 2>&1
+expectedOutputLine "No resources found in hellospace namespace."
+```
+
 Use the `kapply` binary in `MYGOBIN` to apply a deployment and verify it is successful.
 <!-- @runHelloApp @testE2EAgainstLatestRelease -->
 ```
-kapply apply $BASE --wait-for-reconcile > $OUTPUT/status;
+kapply apply $BASE --wait-for-reconcile > $OUTPUT/status
 
 expectedOutputLine "deployment.apps/the-deployment is Current: Deployment is available. Replicas: 3"
 
 expectedOutputLine "service/the-service is Current: Service is ready"
 
-expectedOutputLine "configmap/inventory-map-cb5a8e is Current: Resource is always ready"
+expectedOutputLine "configmap/inventory-5fe947f is Current: Resource is always ready"
 
-expectedOutputLine "configmap/the-map is Current: Resource is always ready"
+expectedOutputLine "configmap/the-map1 is Current: Resource is always ready"
 
+# Verify that we have the pods running in the cluster
+kubectl get --no-headers pod -n hellospace | wc -l | xargs > $OUTPUT/status
+expectedOutputLine "3"
 ```
 
 Now let's replace the configMap with configMap2 apply the config, fetch and verify the status.
-This should delete the-map from deployment and add the-map2.
+This should delete the-map1 from deployment and add the-map2.
 <!-- @replaceConfigMapInHello @testE2EAgainstLatestRelease -->
 ```
 cat <<EOF >$BASE/configMap2.yaml
@@ -197,14 +210,18 @@ expectedOutputLine "deployment.apps/the-deployment is Current: Deployment is ava
 
 expectedOutputLine "service/the-service is Current: Service is ready"
 
-expectedOutputLine "configmap/inventory-map-db36ed56 is Current: Resource is always ready"
+expectedOutputLine "configmap/inventory-db36ed56 is Current: Resource is always ready"
 
 expectedOutputLine "configmap/the-map2 is Current: Resource is always ready"
 
-expectedOutputLine "configmap/the-map pruned"
+expectedOutputLine "configmap/the-map1 pruned"
 
-expectedOutputLine "configmap/inventory-map-cb5a8e pruned"
+expectedOutputLine "configmap/inventory-5fe947f pruned"
 
+# Verify that the new configmap has been created and the old one pruned.
+kubectl get cm -n hellospace --no-headers | awk '{print $1}' > $OUTPUT/status
+expectedOutputLine "the-map2"
+expectedNotFound "the-map1"
 ```
 
 Clean-up the cluster 
@@ -218,7 +235,12 @@ expectedOutputLine "configmap/the-map2 deleted (preview)"
 
 expectedOutputLine "service/the-service deleted (preview)"
 
-expectedOutputLine "configmap/inventory-map-db36ed56 deleted (preview)"
+expectedOutputLine "configmap/inventory-db36ed56 deleted (preview)"
+
+# Verify that preview all resources are still there after running preview.
+kubectl get --no-headers all -n hellospace | wc -l | xargs > $OUTPUT/status
+expectedOutputLine "6"
+
 
 kapply destroy $BASE > $OUTPUT/status;
 
@@ -228,7 +250,7 @@ expectedOutputLine "configmap/the-map2 deleted"
 
 expectedOutputLine "service/the-service deleted"
 
-expectedOutputLine "configmap/inventory-map-db36ed56 deleted"
+expectedOutputLine "configmap/inventory-db36ed56 deleted"
 
 kind delete cluster;
 ```
