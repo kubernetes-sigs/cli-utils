@@ -190,6 +190,8 @@ type Options struct {
 	// DryRun defines whether objects should actually be pruned or if
 	// we should just print what would happen without actually doing it.
 	DryRun bool
+
+	PropagationPolicy metav1.DeletionPropagation
 }
 
 // Prune deletes the set of resources which were previously applied
@@ -258,7 +260,9 @@ func (po *PruneOptions) Prune(currentObjects []*resource.Info, eventChannel chan
 		if !o.DryRun {
 			err = po.client.Resource(pastGroupInfo.Mapping.Resource).
 				Namespace(pastGroupInfo.Namespace).
-				Delete(pastGroupInfo.Name, &metav1.DeleteOptions{})
+				Delete(pastGroupInfo.Name, &metav1.DeleteOptions{
+					PropagationPolicy: &o.PropagationPolicy,
+				})
 			if err != nil {
 				return err
 			}

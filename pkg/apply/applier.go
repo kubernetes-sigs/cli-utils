@@ -231,6 +231,7 @@ func (a *Applier) Run(ctx context.Context, options Options) <-chan event.Event {
 			WaitForReconcileTimeout: options.WaitTimeout,
 			Prune:                   !options.NoPrune,
 			DryRun:                  options.DryRun,
+			PrunePropagationPolicy:  options.PrunePropagationPolicy,
 		})
 
 		// Send event to inform the caller about the resources that
@@ -286,6 +287,11 @@ type Options struct {
 	// DryRun defines whether changes should actually be performed,
 	// or if it is just talk and no action.
 	DryRun bool
+
+	// PrunePropagationPolicy defines the deletion propagation policy
+	// that should be used for pruning. If this is not provided, the
+	// default is to use the Background policy.
+	PrunePropagationPolicy metav1.DeletionPropagation
 }
 
 // setDefaults set the options to the default values if they
@@ -296,6 +302,9 @@ func setDefaults(o *Options) {
 	}
 	if o.WaitTimeout == time.Duration(0) {
 		o.WaitTimeout = time.Minute
+	}
+	if o.PrunePropagationPolicy == metav1.DeletionPropagation("") {
+		o.PrunePropagationPolicy = metav1.DeletePropagationBackground
 	}
 }
 

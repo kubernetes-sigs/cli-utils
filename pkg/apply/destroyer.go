@@ -7,6 +7,7 @@ import (
 	"github.com/go-errors/errors"
 	"github.com/spf13/cobra"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/kubectl/pkg/cmd/apply"
@@ -96,7 +97,8 @@ func (d *Destroyer) Run() <-chan event.Event {
 		// implementation detail and the events should not be Prune events.
 		tempChannel, completedChannel := runPruneEventTransformer(ch)
 		err = d.PruneOptions.Prune(infos, tempChannel, prune.Options{
-			DryRun: d.DryRun,
+			DryRun:            d.DryRun,
+			PropagationPolicy: metav1.DeletePropagationBackground,
 		})
 		// Close the tempChannel to signal to the event transformer that
 		// it should terminate.

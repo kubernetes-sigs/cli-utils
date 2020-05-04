@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/i18n"
@@ -26,10 +27,9 @@ func GetApplyRunner(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *A
 		Use:                   "apply (DIRECTORY | STDIN)",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Apply a configuration to a resource by package directory or stdin"),
-		Run:                   r.Run,
+		RunE:                  r.RunE,
 	}
 
-	cmd.Flags().BoolVar(&r.noPrune, "no-prune", r.noPrune, "If true, do not prune previously applied objects.")
 	cmdutil.CheckErr(r.applier.SetFlags(cmd))
 
 	// The following flags are added, but hidden because other code
@@ -54,6 +54,10 @@ func GetApplyRunner(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *A
 		"Polling period for resource statuses.")
 	cmd.Flags().DurationVar(&r.timeout, "wait-timeout", time.Minute,
 		"Timeout threshold for waiting for all resources to reach the Current status.")
+	cmd.Flags().BoolVar(&r.noPrune, "no-prune", r.noPrune,
+		"If true, do not prune previously applied objects.")
+	cmd.Flags().StringVar(&r.prunePropagationPolicy, "prune-propagation-policy",
+		"Background", "Propagation policy for pruning")
 
 	r.command = cmd
 	return r
@@ -68,14 +72,20 @@ type ApplyRunner struct {
 	ioStreams genericclioptions.IOStreams
 	applier   *apply.Applier
 
-	output  string
-	wait    bool
-	period  time.Duration
-	timeout time.Duration
-	noPrune bool
+	output                 string
+	wait                   bool
+	period                 time.Duration
+	timeout                time.Duration
+	noPrune                bool
+	prunePropagationPolicy string
 }
 
-func (r *ApplyRunner) Run(cmd *cobra.Command, args []string) {
+func (r *ApplyRunner) RunE(cmd *cobra.Command, args []string) error {
+	prunePropPolicy, err := convertPropagationPolicy(r.prunePropagationPolicy)
+	if err != nil {
+		return err
+	}
+
 	cmdutil.CheckErr(r.applier.Initialize(cmd, args))
 
 	// Run the applier. It will return a channel where we can receive updates
@@ -86,13 +96,31 @@ func (r *ApplyRunner) Run(cmd *cobra.Command, args []string) {
 		WaitTimeout:      r.timeout,
 		// If we are not waiting for status, tell the applier to not
 		// emit the events.
-		EmitStatusEvents: r.wait,
-		NoPrune:          r.noPrune,
-		DryRun:           false,
+		EmitStatusEvents:       r.wait,
+		NoPrune:                r.noPrune,
+		DryRun:                 false,
+		PrunePropagationPolicy: prunePropPolicy,
 	})
 
 	// The printer will print updates from the channel. It will block
 	// until the channel is closed.
 	printer := printers.GetPrinter(r.output, r.ioStreams)
 	printer.Print(ch, false)
+	return nil
+}
+
+// convertPropagationPolicy converts a propagationPolicy described as a
+// string to a DeletionPropagation type that is passed into the Applier.
+func convertPropagationPolicy(propagationPolicy string) (metav1.DeletionPropagation, error) {
+	switch propagationPolicy {
+	case string(metav1.DeletePropagationForeground):
+		return metav1.DeletePropagationForeground, nil
+	case string(metav1.DeletePropagationBackground):
+		return metav1.DeletePropagationBackground, nil
+	case string(metav1.DeletePropagationOrphan):
+		return metav1.DeletePropagationOrphan, nil
+	default:
+		return metav1.DeletePropagationBackground, fmt.Errorf(
+			"prune propagation policy must be one of Background, Foreground, Orphan")
+	}
 }
