@@ -53,31 +53,12 @@ function expectedOutputLine() {
 }
 ```
 
-Create a `grouping.yaml` resource. By this, you are defining the grouping of the current 
-directories. kapply uses the unique label in this file to track any future state changes 
-made to this directory. Make sure the label key is `cli-utils.sigs.k8s.io/inventory-id` 
-and give any unique label value and DO NOT change it in future.
-
-<!-- @createGroupingYaml @testE2EAgainstLatestRelease-->
+Use the kapply init command to generate the inventory template. This contains
+the namespace and inventory id used by apply to create inventory objects.
+<!-- @createInventoryTemplate @testE2EAgainstLatestRelease-->
 ```
-cat <<EOF >$BASE/mysql/grouping.yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: inventory-map-mysql
-  labels:
-    cli-utils.sigs.k8s.io/inventory-id: mysql-app
-EOF
-
-cat <<EOF >$BASE/wordpress/grouping.yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: inventory-map-wordpress
-  labels:
-    cli-utils.sigs.k8s.io/inventory-id: wordpress-app
-EOF
-
+kapply init $BASE/mysql
+kapply init $BASE/wordpress
 ```
 
 Delete any existing kind cluster and create a new one. By default the name of the cluster is "kind"
@@ -87,27 +68,42 @@ kind delete cluster
 kind create cluster
 ```
 
-Let's apply the wordpress and mysql services.
-<!-- @RunWordpressAndMysql @testE2EAgainstLatestRelease -->
+Let's apply the mysql service
+<!-- @RunMysql @testE2EAgainstLatestRelease -->
 ```
-kapply apply $BASE/mysql --wait-for-reconcile > $OUTPUT/status;
+kapply apply $BASE/mysql --wait-for-reconcile --wait-timeout=120s > $OUTPUT/status;
 
 expectedOutputLine "deployment.apps/mysql is Current: Deployment is available. Replicas: 1"
 
 expectedOutputLine "secret/mysql-pass is Current: Resource is always ready"
 
-expectedOutputLine "configmap/inventory-map-mysql-57005c71 is Current: Resource is always ready"
+expectedOutputLine "configmap/inventory-57005c71 is Current: Resource is always ready"
 
 expectedOutputLine "service/mysql is Current: Service is ready"
 
-kapply apply $BASE/wordpress --wait-for-reconcile > $OUTPUT/status;
+# Verify that we have the mysql resources in the cluster.
+kubectl get all --no-headers --selector=app=mysql | wc -l | xargs > $OUTPUT/status
+expectedOutputLine "4"
 
-expectedOutputLine "configmap/inventory-map-wordpress-2fbd5b91 is Current: Resource is always ready"
+# Verify that we don't have any of the wordpress resources in the cluster. 
+kubectl get all --no-headers --selector=app=wordpress | wc -l | xargs > $OUTPUT/status
+expectedOutputLine "0"
+```
+
+And the apply the wordpress service
+<!-- @RunWordpress @testE2EAgainstLatestRelease -->
+```
+kapply apply $BASE/wordpress --wait-for-reconcile --wait-timeout=120s > $OUTPUT/status;
+
+expectedOutputLine "configmap/inventory-2fbd5b91 is Current: Resource is always ready"
 
 expectedOutputLine "service/wordpress is Current: Service is ready"
 
 expectedOutputLine "deployment.apps/wordpress is Current: Deployment is available. Replicas: 1"
 
+# Verify that we now have the wordpress resources in the cluster.
+kubectl get all --no-headers --selector=app=wordpress | wc -l | xargs > $OUTPUT/status
+expectedOutputLine "4"
 ```
 
 Destroy one service and make sure that only that service is destroyed and clean-up the cluster.
@@ -119,7 +115,14 @@ expectedOutputLine "service/wordpress deleted"
 
 expectedOutputLine "deployment.apps/wordpress deleted"
 
-expectedOutputLine "configmap/inventory-map-wordpress-2fbd5b91 deleted"
+expectedOutputLine "configmap/inventory-2fbd5b91 deleted"
+
+# Verify that we still have the mysql resources in the cluster.
+kubectl get all --no-headers --selector=app=mysql | wc -l | xargs > $OUTPUT/status
+expectedOutputLine "4"
+
+# TODO: When we implement wait for prune/destroy, add a check here to make
+# sure the wordpress resources are actually deleted.
 
 kind delete cluster;
 ```
