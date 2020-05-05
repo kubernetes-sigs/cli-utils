@@ -85,7 +85,7 @@ func (d *Destroyer) Run() <-chan event.Event {
 			}
 			return
 		}
-		// Clear the data/inventory section of the grouping object configmap,
+		// Clear the data/inventory section of the inventory object configmap,
 		// so the prune will calculate the prune set as all the objects,
 		// deleting everything. We can ignore the error, since the Prune
 		// will catch the same problems.
