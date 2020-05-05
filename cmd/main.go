@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/util/logs"
 	"sigs.k8s.io/cli-utils/cmd/apply"
 	"sigs.k8s.io/cli-utils/cmd/destroy"
 	"sigs.k8s.io/cli-utils/cmd/diff"
@@ -60,6 +61,9 @@ func main() {
 	updateHelp(names, statusCmd)
 
 	cmd.AddCommand(initCmd, applyCmd, diffCmd, destroyCmd, previewCmd, statusCmd)
+
+	logs.InitLogs()
+	defer logs.FlushLogs()
 
 	if err := cmd.Execute(); err != nil {
 		os.Exit(1)
