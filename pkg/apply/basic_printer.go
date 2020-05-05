@@ -51,11 +51,16 @@ func (a *applyStats) sum() int {
 }
 
 type pruneStats struct {
-	count int
+	pruned  int
+	skipped int
 }
 
-func (p *pruneStats) inc() {
-	p.count++
+func (p *pruneStats) incPruned() {
+	p.pruned++
+}
+
+func (p *pruneStats) incSkipped() {
+	p.skipped++
 }
 
 type deleteStats struct {
@@ -160,12 +165,18 @@ func printResourceStatus(id object.ObjMetadata, se pollevent.Event, p printFunc)
 func (b *BasicPrinter) processPruneEvent(pe event.PruneEvent, ps *pruneStats, p printFunc) {
 	switch pe.Type {
 	case event.PruneEventCompleted:
-		p("%d resource(s) pruned", ps.count)
+		p("%d resource(s) pruned, %d skipped", ps.pruned, ps.skipped)
+	case event.PruneEventSkipped:
+		obj := pe.Object
+		gvk := obj.GetObjectKind().GroupVersionKind()
+		name := getName(obj)
+		ps.incSkipped()
+		p("%s %s", resourceIDToString(gvk.GroupKind(), name), "pruned skipped")
 	case event.PruneEventResourceUpdate:
 		obj := pe.Object
 		gvk := obj.GetObjectKind().GroupVersionKind()
 		name := getName(obj)
-		ps.inc()
+		ps.incPruned()
 		p("%s %s", resourceIDToString(gvk.GroupKind(), name), "pruned")
 	}
 }

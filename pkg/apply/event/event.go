@@ -104,6 +104,7 @@ type PruneEventType int
 
 const (
 	PruneEventResourceUpdate PruneEventType = iota
+	PruneEventSkipped
 	PruneEventCompleted
 )
 

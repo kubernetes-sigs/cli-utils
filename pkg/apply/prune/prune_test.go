@@ -8,12 +8,14 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/dynamic/fake"
 	"k8s.io/kubectl/pkg/scheme"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
+	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
@@ -186,6 +188,28 @@ func objInArray(obj object.ObjMetadata, arr []object.ObjMetadata) bool {
 	return false
 }
 
+// preventDelete object contains the "on-remove:keep" lifecycle directive.
+var preventDelete = unstructured.Unstructured{
+	Object: map[string]interface{}{
+		"apiVersion": "v1",
+		"kind":       "Pod",
+		"metadata": map[string]interface{}{
+			"name":      "test-prevent-delete",
+			"namespace": testNamespace,
+			"annotations": map[string]interface{}{
+				common.OnRemoveAnnotation: common.OnRemoveKeep,
+			},
+			"uid": "prevent-delete",
+		},
+	},
+}
+
+var preventDeleteInfo = &resource.Info{
+	Namespace: testNamespace,
+	Name:      "test-prevent-delete",
+	Object:    &preventDelete,
+}
+
 func TestPrune(t *testing.T) {
 	tests := map[string]struct {
 		// pastInfos/currentInfos do NOT contain the inventory object.
@@ -223,6 +247,12 @@ func TestPrune(t *testing.T) {
 			pastInfos:    []*resource.Info{pod1Info, pod2Info},
 			currentInfos: []*resource.Info{pod2Info, pod3Info},
 			prunedInfos:  []*resource.Info{pod1Info},
+			isError:      false,
+		},
+		"Prevent delete lifecycle annotation stops pruning": {
+			pastInfos:    []*resource.Info{preventDeleteInfo, pod2Info},
+			currentInfos: []*resource.Info{pod2Info, pod3Info},
+			prunedInfos:  []*resource.Info{},
 			isError:      false,
 		},
 	}
@@ -281,4 +311,46 @@ func populateObjectIds(infos []*resource.Info, t *testing.T) sets.String {
 		uids.Insert(uid)
 	}
 	return uids
+}
+
+func TestPreventDeleteAnnotation(t *testing.T) {
+	tests := map[string]struct {
+		annotations map[string]string
+		expected    bool
+	}{
+		"Nil map returns false": {
+			annotations: nil,
+			expected:    false,
+		},
+		"Empty map returns false": {
+			annotations: map[string]string{},
+			expected:    false,
+		},
+		"Wrong annotation key/value is false": {
+			annotations: map[string]string{
+				"foo": "bar",
+			},
+			expected: false,
+		},
+		"Annotation key without value is false": {
+			annotations: map[string]string{
+				common.OnRemoveAnnotation: "bar",
+			},
+			expected: false,
+		},
+		"Annotation key and value is true": {
+			annotations: map[string]string{
+				common.OnRemoveAnnotation: common.OnRemoveKeep,
+			},
+			expected: true,
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			actual := preventDeleteAnnotation(tc.annotations)
+			if tc.expected != actual {
+				t.Errorf("preventDeleteAnnotation Expected (%t), got (%t)", tc.expected, actual)
+			}
+		})
+	}
 }

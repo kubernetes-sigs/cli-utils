@@ -18,4 +18,8 @@ const (
 	// used as a suffix of the inventory object name. Example:
 	//   inventory-1e5824fb
 	InventoryHash = "cli-utils.sigs.k8s.io/inventory-hash"
+	// Resource lifecycle annotation key for "on-remove" operations.
+	OnRemoveAnnotation = "cli-utils.sigs.k8s.io/on-remove"
+	// Resource lifecycle annotation value to prevent deletion.
+	OnRemoveKeep = "keep"
 )
