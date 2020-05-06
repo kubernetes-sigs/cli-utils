@@ -31,7 +31,7 @@ var cmd = &cobra.Command{
 
 func main() {
 	// configure kubectl dependencies and flags
-	flags := cmd.Flags()
+	flags := cmd.PersistentFlags()
 	kubeConfigFlags := genericclioptions.NewConfigFlags(true).WithDeprecatedPasswordFlag()
 	kubeConfigFlags.AddFlags(flags)
 	matchVersionKubeConfigFlags := util.NewMatchVersionFlags(kubeConfigFlags)
