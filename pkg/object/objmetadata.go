@@ -31,7 +31,7 @@ const fieldSeparator = "_"
 
 // ObjMetadata organizes and stores the indentifying information
 // for an object. This struct (as a string) is stored in a
-// grouping object to keep track of sets of applied objects.
+// inventory object to keep track of sets of applied objects.
 type ObjMetadata struct {
 	Namespace string
 	Name      string

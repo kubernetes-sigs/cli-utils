@@ -12,13 +12,13 @@ import (
 )
 
 // NewCmdInit creates the `init` command, which generates the
-// grouping object template ConfigMap for a package.
+// inventory object template ConfigMap for a package.
 func NewCmdInit(ioStreams genericclioptions.IOStreams) *cobra.Command {
 	io := config.NewInitOptions(ioStreams)
 	cmd := &cobra.Command{
 		Use:                   "init DIRECTORY",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Create a prune manifest ConfigMap as a grouping object"),
+		Short:                 i18n.T("Create a prune manifest ConfigMap as a inventory object"),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(io.Complete(args))
 			cmdutil.CheckErr(io.Run())

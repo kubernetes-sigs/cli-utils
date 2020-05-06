@@ -51,9 +51,9 @@ func (f *CaptureIdentifiersFilter) Filter(slice []*yaml.RNode) ([]*yaml.RNode,
 			namespace = id.Namespace
 		}
 		// We only want to add yaml that actually represents Kubernetes resources.
-		// We also need to filter out grouping object templates, since there will
+		// We also need to filter out inventory object templates, since there will
 		// never be an actual resource with that name and namespace.
-		if isValidKubernetesResource(id) && !isGroupingObject(objectMeta.Labels) {
+		if isValidKubernetesResource(id) && !isInventoryObject(objectMeta.Labels) {
 			f.Identifiers = append(f.Identifiers, object.ObjMetadata{
 				Name:      id.Name,
 				Namespace: namespace,
@@ -73,9 +73,9 @@ func isValidKubernetesResource(id yaml.ResourceIdentifier) bool {
 	return id.GetKind() != "" && id.GetAPIVersion() != "" && id.GetName() != ""
 }
 
-// isGroupingObject checks if the provided map of labels contain the
+// isInventoryObject checks if the provided map of labels contain the
 // inventory object label key.
-func isGroupingObject(labels map[string]string) bool {
+func isInventoryObject(labels map[string]string) bool {
 	for key := range labels {
 		if key == common.InventoryLabel {
 			return true
