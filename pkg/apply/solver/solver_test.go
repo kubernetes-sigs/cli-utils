@@ -151,7 +151,11 @@ func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 				PruneOptions: pruneOptions,
 			}
 
-			tq := tqs.BuildTaskQueue(tc.infos, tc.options)
+			tq := tqs.BuildTaskQueue(&fakeResourceObjects{
+				infosForApply: tc.infos,
+				idsForApply:   object.InfosToObjMetas(tc.infos),
+				idsForPrune:   nil,
+			}, tc.options)
 
 			tasks := queueToSlice(tq)
 
@@ -230,4 +234,22 @@ func queueToSlice(tq chan taskrunner.Task) []taskrunner.Task {
 
 func getType(task taskrunner.Task) reflect.Type {
 	return reflect.TypeOf(task)
+}
+
+type fakeResourceObjects struct {
+	infosForApply []*resource.Info
+	idsForApply   []object.ObjMetadata
+	idsForPrune   []object.ObjMetadata
+}
+
+func (f *fakeResourceObjects) InfosForApply() []*resource.Info {
+	return f.infosForApply
+}
+
+func (f *fakeResourceObjects) IdsForApply() []object.ObjMetadata {
+	return f.idsForApply
+}
+
+func (f *fakeResourceObjects) IdsForPrune() []object.ObjMetadata {
+	return f.idsForPrune
 }

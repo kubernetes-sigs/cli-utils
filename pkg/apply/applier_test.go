@@ -511,8 +511,11 @@ func TestReadAndPrepareObjects(t *testing.T) {
 			applier := NewApplier(tf, ioStreams)
 
 			applier.ApplyOptions.SetObjects(tc.resources)
+			applier.previousInventoriesFunc = func(label, namespace string) ([]*resource.Info, error) {
+				return []*resource.Info{}, nil
+			}
 
-			objects, err := applier.readAndPrepareObjects()
+			resourceObjects, err := applier.readAndPrepareObjects()
 
 			if tc.expectedError {
 				if err == nil {
@@ -526,7 +529,7 @@ func TestReadAndPrepareObjects(t *testing.T) {
 				return
 			}
 
-			inventoryObj := objects[0]
+			inventoryObj := resourceObjects.CurrentInventory
 			if !prune.IsInventoryObject(inventoryObj.Object) {
 				t.Errorf(
 					"expected first item to be inventory object, but it wasn't")

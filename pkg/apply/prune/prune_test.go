@@ -161,7 +161,7 @@ func TestUnionPastObjs(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			actual, err := unionPastObjs(tc.inventoryInfos)
+			actual, err := UnionPastObjs(tc.inventoryInfos)
 			if err != nil {
 				t.Errorf("Unexpected error received: %s\n", err)
 			}
