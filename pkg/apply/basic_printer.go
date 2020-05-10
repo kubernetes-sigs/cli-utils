@@ -11,8 +11,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
+	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
 	pollevent "sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
@@ -96,7 +96,7 @@ func (b *BasicPrinter) Print(ch <-chan event.Event, preview bool) {
 	for e := range ch {
 		switch e.Type {
 		case event.ErrorType:
-			cmdutil.CheckErr(e.ErrorEvent.Err)
+			b.processErrorEvent(e.ErrorEvent, statusCollector, printFunc)
 		case event.ApplyType:
 			b.processApplyEvent(e.ApplyEvent, applyStats, statusCollector, printFunc)
 		case event.StatusType:
@@ -105,6 +105,25 @@ func (b *BasicPrinter) Print(ch <-chan event.Event, preview bool) {
 			b.processPruneEvent(e.PruneEvent, pruneStats, printFunc)
 		case event.DeleteType:
 			b.processDeleteEvent(e.DeleteEvent, deleteStats, printFunc)
+		}
+	}
+}
+
+func (b *BasicPrinter) processErrorEvent(ee event.ErrorEvent, c *statusCollector,
+	p printFunc) {
+	p("\nFatal error: %s", ee.Err.Error())
+
+	if timeoutErr, ok := taskrunner.IsTimeoutError(ee.Err); ok {
+		for _, id := range timeoutErr.Identifiers {
+			ls, found := c.latestStatus[id]
+			if !found {
+				continue
+			}
+			if timeoutErr.Condition.Meets(ls.Resource.Status) {
+				continue
+			}
+			p("%s/%s %s %s", id.GroupKind.Kind,
+				id.Name, ls.Resource.Status, ls.Resource.Message)
 		}
 	}
 }

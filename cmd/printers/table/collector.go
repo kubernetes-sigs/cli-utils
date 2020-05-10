@@ -235,9 +235,12 @@ func (r *ResourceStateCollector) handleTimeoutError(timeoutErr taskrunner.Timeou
 	sort.Sort(errInfo)
 	var b bytes.Buffer
 	_, _ = fmt.Fprint(&b, timeoutErr.Error()+"\n")
-	for _, ri := range errInfo {
-		_, _ = fmt.Fprintf(&b, "%s/%s %s %s\n", ri.identifier.GroupKind.Kind,
+	for i, ri := range errInfo {
+		_, _ = fmt.Fprintf(&b, "%s/%s %s %s", ri.identifier.GroupKind.Kind,
 			ri.identifier.Name, ri.resourceStatus.Status, ri.resourceStatus.Message)
+		if i != len(errInfo)-1 {
+			_, _ = fmt.Fprint(&b, "\n")
+		}
 	}
 	return fmt.Errorf(b.String())
 }
