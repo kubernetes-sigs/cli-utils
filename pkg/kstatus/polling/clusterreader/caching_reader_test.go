@@ -14,6 +14,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/testutil"
@@ -30,7 +31,7 @@ var (
 func TestSync(t *testing.T) {
 	testCases := map[string]struct {
 		identifiers    []object.ObjMetadata
-		expectedSynced []gvkNamespace
+		expectedSynced []gkNamespace
 	}{
 		"no identifiers": {
 			identifiers: []object.ObjMetadata{},
@@ -48,29 +49,29 @@ func TestSync(t *testing.T) {
 					Namespace: "Bar",
 				},
 			},
-			expectedSynced: []gvkNamespace{
+			expectedSynced: []gkNamespace{
 				{
-					GVK:       deploymentGVK,
+					GroupKind: deploymentGVK.GroupKind(),
 					Namespace: "Foo",
 				},
 				{
-					GVK:       rsGVK,
+					GroupKind: rsGVK.GroupKind(),
 					Namespace: "Foo",
 				},
 				{
-					GVK:       podGVK,
+					GroupKind: podGVK.GroupKind(),
 					Namespace: "Foo",
 				},
 				{
-					GVK:       deploymentGVK,
+					GroupKind: deploymentGVK.GroupKind(),
 					Namespace: "Bar",
 				},
 				{
-					GVK:       rsGVK,
+					GroupKind: rsGVK.GroupKind(),
 					Namespace: "Bar",
 				},
 				{
-					GVK:       podGVK,
+					GroupKind: podGVK.GroupKind(),
 					Namespace: "Bar",
 				},
 			},
@@ -106,19 +107,46 @@ func TestSync(t *testing.T) {
 
 func TestSync_Errors(t *testing.T) {
 	testCases := map[string]struct {
+		mapper          meta.RESTMapper
 		readerError     error
 		expectSyncError bool
+		cacheError      bool
+		cacheErrorText  string
 	}{
+		"mapping and reader are successful": {
+			mapper: testutil.NewFakeRESTMapper(
+				apiextv1.SchemeGroupVersion.WithKind("CustomResourceDefinition"),
+			),
+			readerError:     nil,
+			expectSyncError: false,
+			cacheError:      false,
+		},
 		"reader returns NotFound error": {
+			mapper: testutil.NewFakeRESTMapper(
+				apiextv1.SchemeGroupVersion.WithKind("CustomResourceDefinition"),
+			),
 			readerError: errors.NewNotFound(schema.GroupResource{
 				Group:    "apiextensions.k8s.io",
 				Resource: "customresourcedefinitions",
 			}, "my-crd"),
 			expectSyncError: false,
+			cacheError:      true,
+			cacheErrorText:  "not found",
 		},
 		"reader returns other error": {
+			mapper: testutil.NewFakeRESTMapper(
+				apiextv1.SchemeGroupVersion.WithKind("CustomResourceDefinition"),
+			),
 			readerError:     errors.NewInternalError(fmt.Errorf("testing")),
 			expectSyncError: true,
+			cacheError:      true,
+			cacheErrorText:  "not found",
+		},
+		"mapping not found": {
+			mapper:          testutil.NewFakeRESTMapper(),
+			expectSyncError: false,
+			cacheError:      true,
+			cacheErrorText:  "no matches for kind",
 		},
 	}
 
@@ -134,15 +162,11 @@ func TestSync_Errors(t *testing.T) {
 				},
 			}
 
-			fakeMapper := testutil.NewFakeRESTMapper(
-				apiextv1.SchemeGroupVersion.WithKind("CustomResourceDefinition"),
-			)
-
 			fakeReader := &fakeReader{
 				err: tc.readerError,
 			}
 
-			clusterReader, err := NewCachingClusterReader(fakeReader, fakeMapper, identifiers)
+			clusterReader, err := NewCachingClusterReader(fakeReader, tc.mapper, identifiers)
 			assert.NilError(t, err)
 
 			err = clusterReader.Sync(context.Background())
@@ -153,26 +177,28 @@ func TestSync_Errors(t *testing.T) {
 			}
 			assert.NilError(t, err)
 
-			cacheEntry, found := clusterReader.cache[gvkNamespace{
-				GVK: apiextv1.SchemeGroupVersion.WithKind("CustomResourceDefinition"),
+			cacheEntry, found := clusterReader.cache[gkNamespace{
+				GroupKind: apiextv1.SchemeGroupVersion.WithKind("CustomResourceDefinition").GroupKind(),
 			}]
 			assert.Check(t, found)
-			assert.ErrorContains(t, cacheEntry.err, "not found")
+			if tc.cacheError {
+				assert.ErrorContains(t, cacheEntry.err, tc.cacheErrorText)
+			}
 		})
 	}
 }
 
-func sortGVKNamespaces(gvkNamespaces []gvkNamespace) {
+func sortGVKNamespaces(gvkNamespaces []gkNamespace) {
 	sort.Slice(gvkNamespaces, func(i, j int) bool {
-		if gvkNamespaces[i].GVK.String() != gvkNamespaces[j].GVK.String() {
-			return gvkNamespaces[i].GVK.String() < gvkNamespaces[j].GVK.String()
+		if gvkNamespaces[i].GroupKind.String() != gvkNamespaces[j].GroupKind.String() {
+			return gvkNamespaces[i].GroupKind.String() < gvkNamespaces[j].GroupKind.String()
 		}
 		return gvkNamespaces[i].Namespace < gvkNamespaces[j].Namespace
 	})
 }
 
 type fakeReader struct {
-	syncedGVKNamespaces []gvkNamespace
+	syncedGVKNamespaces []gkNamespace
 	err                 error
 }
 
@@ -191,8 +217,8 @@ func (f *fakeReader) List(_ context.Context, list runtime.Object, opts ...client
 	}
 
 	gvk := list.GetObjectKind().GroupVersionKind()
-	f.syncedGVKNamespaces = append(f.syncedGVKNamespaces, gvkNamespace{
-		GVK:       gvk,
+	f.syncedGVKNamespaces = append(f.syncedGVKNamespaces, gkNamespace{
+		GroupKind: gvk.GroupKind(),
 		Namespace: namespace,
 	})
 
