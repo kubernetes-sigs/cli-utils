@@ -20,6 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/klog"
 	"k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/validation"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
@@ -128,6 +129,7 @@ func (po *PruneOptions) RetrievePreviousInventoryObjects(label, namespace string
 		return po.pastInventoryObjects, nil
 	}
 	labelSelector := fmt.Sprintf("%s=%s", common.InventoryLabel, label)
+	klog.V(4).Infof("prune inventory object fetch: %s/%s", namespace, labelSelector)
 	retrievedInventoryInfos, err := po.builder.
 		Unstructured().
 		// TODO: Check if this validator is necessary.
@@ -144,6 +146,7 @@ func (po *PruneOptions) RetrievePreviousInventoryObjects(label, namespace string
 	}
 	po.pastInventoryObjects = retrievedInventoryInfos
 	po.retrievedInventoryObjects = true
+	klog.V(4).Infof("prune %d inventory objects found", len(po.pastInventoryObjects))
 	return retrievedInventoryInfos, nil
 }
 
@@ -202,6 +205,8 @@ func (po *PruneOptions) Prune(currentObjects []*resource.Info, eventChannel chan
 		return fmt.Errorf("current inventory object not found during prune")
 	}
 	po.currentInventoryObject = currentInventoryObject
+	klog.V(7).Infof("prune current inventory object: %s/%s",
+		currentInventoryObject.Namespace, currentInventoryObject.Name)
 
 	// Retrieve previous inventory objects, and calculate the
 	// union of the previous applies as an inventory set.
@@ -213,6 +218,8 @@ func (po *PruneOptions) Prune(currentObjects []*resource.Info, eventChannel chan
 	if err != nil {
 		return err
 	}
+	klog.V(4).Infof("prune %d currently applied objects", len(po.currentUids))
+	klog.V(4).Infof("prune %d previously applied objects", len(pastObjs))
 	// Iterate through set of all previously applied objects.
 	for _, past := range pastObjs {
 		mapping, err := po.mapper.RESTMapping(past.GroupKind)
@@ -236,11 +243,14 @@ func (po *PruneOptions) Prune(currentObjects []*resource.Info, eventChannel chan
 		// object, then it has been omitted--prune it. If the previously
 		// applied object is part of the current apply set, skip it.
 		uid := string(metadata.GetUID())
+		klog.V(7).Infof("prune previously applied object UID: %s", uid)
 		if po.currentUids.Has(uid) {
+			klog.V(7).Infof("prune object in current apply; do not prune: %s", uid)
 			continue
 		}
 		// Handle lifecycle directive preventing deletion.
 		if preventDeleteAnnotation(metadata.GetAnnotations()) {
+			klog.V(7).Infof("prune object lifecycle directive; do not prune: %s", uid)
 			eventChannel <- event.Event{
 				Type: event.PruneType,
 				PruneEvent: event.PruneEvent{
@@ -251,6 +261,7 @@ func (po *PruneOptions) Prune(currentObjects []*resource.Info, eventChannel chan
 			continue
 		}
 		if !o.DryRun {
+			klog.V(7).Infof("prune object delete: %s/%s", past.Namespace, past.Name)
 			err = namespacedClient.Delete(past.Name, &metav1.DeleteOptions{})
 			if err != nil {
 				return err
@@ -267,6 +278,8 @@ func (po *PruneOptions) Prune(currentObjects []*resource.Info, eventChannel chan
 	// Delete previous inventory objects.
 	for _, pastGroupInfo := range pastInventoryInfos {
 		if !o.DryRun {
+			klog.V(7).Infof("prune delete previous inventory object: %s/%s",
+				pastGroupInfo.Namespace, pastGroupInfo.Name)
 			err = po.client.Resource(pastGroupInfo.Mapping.Resource).
 				Namespace(pastGroupInfo.Namespace).
 				Delete(pastGroupInfo.Name, &metav1.DeleteOptions{
