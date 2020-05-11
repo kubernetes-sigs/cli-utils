@@ -24,6 +24,7 @@ import (
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/kubectl/pkg/cmd/apply"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
+	"sigs.k8s.io/cli-utils/pkg/apply/info"
 	"sigs.k8s.io/cli-utils/pkg/apply/prune"
 	"sigs.k8s.io/cli-utils/pkg/apply/task"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
@@ -34,6 +35,7 @@ import (
 type TaskQueueSolver struct {
 	ApplyOptions *apply.ApplyOptions
 	PruneOptions *prune.PruneOptions
+	InfoHelper   info.InfoHelper
 }
 
 type Options struct {
@@ -66,6 +68,7 @@ func (t *TaskQueueSolver) BuildTaskQueue(ro resourceObjects,
 			Objects:      append(crdSplitRes.before, crdSplitRes.crds...),
 			ApplyOptions: t.ApplyOptions,
 			DryRun:       o.DryRun,
+			InfoHelper:   t.InfoHelper,
 		},
 			taskrunner.NewWaitTask(
 				object.InfosToObjMetas(crdSplitRes.crds),
@@ -80,6 +83,7 @@ func (t *TaskQueueSolver) BuildTaskQueue(ro resourceObjects,
 			Objects:      remainingInfos,
 			ApplyOptions: t.ApplyOptions,
 			DryRun:       o.DryRun,
+			InfoHelper:   t.InfoHelper,
 		},
 		&task.SendEventTask{
 			Event: event.Event{
@@ -173,7 +177,7 @@ func splitAfterCRDs(infos []*resource.Info) (crdSplitResult, bool) {
 
 	var crds []*resource.Info
 	for _, info := range infos {
-		if isCRD(info) {
+		if IsCRD(info) {
 			crds = append(crds, info)
 			continue
 		}
@@ -191,7 +195,7 @@ func splitAfterCRDs(infos []*resource.Info) (crdSplitResult, bool) {
 	}, len(crds) > 0
 }
 
-func isCRD(info *resource.Info) bool {
+func IsCRD(info *resource.Info) bool {
 	gvk, found := toGVK(info)
 	if !found {
 		return false

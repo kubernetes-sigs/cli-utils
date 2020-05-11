@@ -19,6 +19,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -31,6 +32,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
+	"sigs.k8s.io/cli-utils/pkg/apply/info"
 	"sigs.k8s.io/cli-utils/pkg/apply/prune"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling"
@@ -247,6 +249,12 @@ func TestApplier(t *testing.T) {
 				start:  make(chan struct{}),
 			}
 			applier.statusPoller = poller
+
+			applier.infoHelperFactoryFunc = func() info.InfoHelper {
+				return &fakeInfoHelper{
+					factory: tf,
+				}
+			}
 
 			ctx := context.Background()
 			eventChannel := applier.Run(ctx, Options{
@@ -510,7 +518,9 @@ func TestReadAndPrepareObjects(t *testing.T) {
 			ioStreams, _, _, _ := genericclioptions.NewTestIOStreams() //nolint:dogsled
 			applier := NewApplier(tf, ioStreams)
 
-			applier.ApplyOptions.SetObjects(tc.resources)
+			applier.manifestReaderFunc = func() (infos []*resource.Info, err error) {
+				return tc.resources, nil
+			}
 			applier.previousInventoriesFunc = func(label, namespace string) ([]*resource.Info, error) {
 				return []*resource.Info{}, nil
 			}
@@ -545,6 +555,182 @@ func TestReadAndPrepareObjects(t *testing.T) {
 				t.Errorf("expected %d resources in inventory, got %d", want, got)
 			}
 		})
+	}
+}
+
+func TestSetNamespaces(t *testing.T) {
+	// We need the RESTMapper in the testFactory to contain the CRD
+	// types, so add them to the scheme here.
+	_ = apiextv1.AddToScheme(scheme.Scheme)
+
+	testCases := map[string]struct {
+		infos            []*resource.Info
+		defaultNamspace  string
+		enforceNamespace bool
+
+		expectedNamespaces []string
+		expectedErrText    string
+	}{
+		"resources already have namespace": {
+			infos: []*resource.Info{
+				toInfo(schema.GroupVersionKind{
+					Group:   "apps",
+					Version: "v1",
+					Kind:    "Deployment",
+				}, "default"),
+				toInfo(schema.GroupVersionKind{
+					Group:   "policy",
+					Version: "v1beta1",
+					Kind:    "PodDisruptionBudget",
+				}, "default"),
+			},
+			defaultNamspace:  "foo",
+			enforceNamespace: false,
+			expectedNamespaces: []string{
+				"default",
+				"default",
+			},
+		},
+		"resources without namespace and mapping in RESTMapper": {
+			infos: []*resource.Info{
+				toInfo(schema.GroupVersionKind{
+					Group:   "apps",
+					Version: "v1",
+					Kind:    "Deployment",
+				}, ""),
+			},
+			defaultNamspace:    "foo",
+			enforceNamespace:   false,
+			expectedNamespaces: []string{"foo"},
+		},
+		"resource with namespace that does match enforced ns": {
+			infos: []*resource.Info{
+				toInfo(schema.GroupVersionKind{
+					Group:   "apps",
+					Version: "v1",
+					Kind:    "Deployment",
+				}, "bar"),
+			},
+			defaultNamspace:    "bar",
+			enforceNamespace:   true,
+			expectedNamespaces: []string{"bar"},
+		},
+		"resource with namespace that doesn't match enforced ns": {
+			infos: []*resource.Info{
+				toInfo(schema.GroupVersionKind{
+					Group:   "apps",
+					Version: "v1",
+					Kind:    "Deployment",
+				}, "foo"),
+			},
+			defaultNamspace:  "bar",
+			enforceNamespace: true,
+			expectedErrText:  "does not match the namespace",
+		},
+		"cluster-scoped CR with CRD": {
+			infos: []*resource.Info{
+				toInfo(schema.GroupVersionKind{
+					Group:   "custom.io",
+					Version: "v1",
+					Kind:    "Custom",
+				}, ""),
+				toCRDInfo(schema.GroupVersionKind{
+					Group:   "apiextensions.k8s.io",
+					Version: "v1",
+					Kind:    "CustomResourceDefinition",
+				}, schema.GroupKind{
+					Group: "custom.io",
+					Kind:  "Custom",
+				}, "Cluster"),
+			},
+			defaultNamspace:    "bar",
+			enforceNamespace:   true,
+			expectedNamespaces: []string{"", ""},
+		},
+		"namespace-scoped CR with CRD": {
+			infos: []*resource.Info{
+				toCRDInfo(schema.GroupVersionKind{
+					Group:   "apiextensions.k8s.io",
+					Version: "v1",
+					Kind:    "CustomResourceDefinition",
+				}, schema.GroupKind{
+					Group: "custom.io",
+					Kind:  "Custom",
+				}, "Namespaced"),
+				toInfo(schema.GroupVersionKind{
+					Group:   "custom.io",
+					Version: "v1",
+					Kind:    "Custom",
+				}, ""),
+			},
+			defaultNamspace:    "bar",
+			enforceNamespace:   true,
+			expectedNamespaces: []string{"", "bar"},
+		},
+	}
+
+	for tn, tc := range testCases {
+		t.Run(tn, func(t *testing.T) {
+			tf := cmdtesting.NewTestFactory().WithNamespace("namespace")
+			defer tf.Cleanup()
+
+			ioStreams, _, _, _ := genericclioptions.NewTestIOStreams() //nolint:dogsled
+
+			applier := NewApplier(tf, ioStreams)
+
+			err := applier.setNamespaces(tc.infos, tc.defaultNamspace, tc.enforceNamespace)
+
+			if tc.expectedErrText != "" {
+				if err == nil {
+					t.Errorf("expected error %s, but not nil", tc.expectedErrText)
+				}
+				assert.Contains(t, err.Error(), tc.expectedErrText)
+				return
+			}
+
+			assert.NoError(t, err)
+
+			for i, inf := range tc.infos {
+				expectedNs := tc.expectedNamespaces[i]
+				assert.Equal(t, expectedNs, inf.Namespace)
+				accessor, _ := meta.Accessor(inf.Object)
+				assert.Equal(t, expectedNs, accessor.GetNamespace())
+			}
+		})
+	}
+}
+
+func toInfo(gvk schema.GroupVersionKind, namespace string) *resource.Info {
+	return &resource.Info{
+		Namespace: namespace,
+		Object: &unstructured.Unstructured{
+			Object: map[string]interface{}{
+				"apiVersion": gvk.GroupVersion().String(),
+				"kind":       gvk.Kind,
+				"metadata": map[string]interface{}{
+					"namespace": namespace,
+				},
+			},
+		},
+	}
+}
+
+func toCRDInfo(gvk schema.GroupVersionKind, gk schema.GroupKind,
+	scope string) *resource.Info {
+	return &resource.Info{
+		Object: &unstructured.Unstructured{
+			Object: map[string]interface{}{
+				"apiVersion": gvk.GroupVersion().String(),
+				"kind":       gvk.Kind,
+				"spec": map[string]interface{}{
+					"group": gk.Group,
+					"names": map[string]interface{}{
+						"kind": gk.Kind,
+					},
+					"scope": scope,
+				},
+			},
+		},
 	}
 }
 
@@ -761,4 +947,47 @@ func (f *fakePoller) Poll(ctx context.Context, _ []object.ObjMetadata, _ polling
 		<-ctx.Done()
 	}()
 	return eventChannel
+}
+
+type fakeInfoHelper struct {
+	factory *cmdtesting.TestFactory
+}
+
+// TODO(mortent): This has too much code in common with the
+// infoHelper implementation. We need to find a better way to structure
+// this.
+func (f *fakeInfoHelper) UpdateInfos(infos []*resource.Info) error {
+	mapper, err := f.factory.ToRESTMapper()
+	if err != nil {
+		return err
+	}
+	for _, info := range infos {
+		gvk := info.Object.GetObjectKind().GroupVersionKind()
+		mapping, err := mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+		if err != nil {
+			return err
+		}
+		info.Mapping = mapping
+
+		c, err := f.getClient(gvk.GroupVersion())
+		if err != nil {
+			return err
+		}
+		info.Client = c
+	}
+	return nil
+}
+
+func (f *fakeInfoHelper) getClient(gv schema.GroupVersion) (resource.RESTClient, error) {
+	if f.factory.UnstructuredClientForMappingFunc != nil {
+		return f.factory.UnstructuredClientForMappingFunc(gv)
+	}
+	if f.factory.UnstructuredClient != nil {
+		return f.factory.UnstructuredClient, nil
+	}
+	return f.factory.Client, nil
+}
+
+func (f *fakeInfoHelper) ResetRESTMapper() error {
+	return nil
 }

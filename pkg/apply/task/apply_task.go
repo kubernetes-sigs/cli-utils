@@ -7,6 +7,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/kubectl/pkg/cmd/apply"
+	"sigs.k8s.io/cli-utils/pkg/apply/info"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
@@ -15,6 +16,7 @@ import (
 // by using the ApplyOptions.
 type ApplyTask struct {
 	ApplyOptions applyOptions
+	InfoHelper   info.InfoHelper
 	Objects      []*resource.Info
 	DryRun       bool
 }
@@ -27,7 +29,7 @@ type applyOptions interface {
 	// to the cluster.
 	Run() error
 
-	// SetObjects sets the slice of resource (in the form form info objects)
+	// SetObjects sets the slice of resource (in the form form resourceInfo objects)
 	// that will be applied upon invoking the Run function.
 	SetObjects([]*resource.Info)
 }
@@ -42,19 +44,42 @@ type applyOptions interface {
 // the desired state of a resource is changed.
 func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 	go func() {
+		// Update the dry-run field on the Applier.
 		a.setDryRunField()
+		// Set the client and mapping fields on the provided
+		// infos so they can be applied to the cluster.
+		err := a.InfoHelper.UpdateInfos(a.Objects)
+		if err != nil {
+			a.sendTaskResult(taskContext, err)
+			return
+		}
 		a.ApplyOptions.SetObjects(a.Objects)
-		err := a.ApplyOptions.Run()
-		for _, info := range a.Objects {
-			id := object.InfoToObjMeta(info)
-			acc, _ := meta.Accessor(info.Object)
+		err = a.ApplyOptions.Run()
+		if err != nil {
+			a.sendTaskResult(taskContext, err)
+			return
+		}
+		// Fetch the Generation from all Infos after they have been
+		// applied.
+		for _, obj := range a.Objects {
+			id := object.InfoToObjMeta(obj)
+			acc, _ := meta.Accessor(obj.Object)
 			gen := acc.GetGeneration()
 			taskContext.ResourceApplied(id, gen)
 		}
-		taskContext.TaskChannel() <- taskrunner.TaskResult{
-			Err: err,
+		err = a.InfoHelper.ResetRESTMapper()
+		if err != nil {
+			a.sendTaskResult(taskContext, err)
+			return
 		}
+		a.sendTaskResult(taskContext, nil)
 	}()
+}
+
+func (a *ApplyTask) sendTaskResult(taskContext *taskrunner.TaskContext, err error) {
+	taskContext.TaskChannel() <- taskrunner.TaskResult{
+		Err: err,
+	}
 }
 
 func (a *ApplyTask) setDryRunField() {
