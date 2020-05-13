@@ -58,6 +58,10 @@ func GetApplyRunner(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *A
 		"If true, do not prune previously applied objects.")
 	cmd.Flags().StringVar(&r.prunePropagationPolicy, "prune-propagation-policy",
 		"Background", "Propagation policy for pruning")
+	cmd.Flags().BoolVar(&r.waitForPrune, "wait-for-prune", false,
+		"Wait for all pruned resources to be deleted.")
+	cmd.Flags().DurationVar(&r.waitForPruneTimeout, "wait-for-prune-timeout", 1*time.Minute,
+		"Timeout threshold for waiting for all pruned resources to be deleted")
 
 	r.command = cmd
 	return r
@@ -78,6 +82,8 @@ type ApplyRunner struct {
 	timeout                time.Duration
 	noPrune                bool
 	prunePropagationPolicy string
+	waitForPrune           bool
+	waitForPruneTimeout    time.Duration
 }
 
 func (r *ApplyRunner) RunE(cmd *cobra.Command, args []string) error {
@@ -100,6 +106,8 @@ func (r *ApplyRunner) RunE(cmd *cobra.Command, args []string) error {
 		NoPrune:                r.noPrune,
 		DryRun:                 false,
 		PrunePropagationPolicy: prunePropPolicy,
+		WaitForPrune:           r.waitForPrune,
+		WaitForPruneTimeout:    r.waitForPruneTimeout,
 	})
 
 	// The printer will print updates from the channel. It will block
