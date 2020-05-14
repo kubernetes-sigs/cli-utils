@@ -15,7 +15,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
-type info struct {
+type resourceInfo struct {
 	group      string
 	apiVersion string
 	kind       string
@@ -26,10 +26,10 @@ type info struct {
 
 func TestApplyTask_FetchGeneration(t *testing.T) {
 	testCases := map[string]struct {
-		infos []info
+		infos []resourceInfo
 	}{
 		"single namespaced resource": {
-			infos: []info{
+			infos: []resourceInfo{
 				{
 					group:      "apps",
 					apiVersion: "apps/v1",
@@ -41,7 +41,7 @@ func TestApplyTask_FetchGeneration(t *testing.T) {
 			},
 		},
 		"multiple clusterscoped resources": {
-			infos: []info{
+			infos: []resourceInfo{
 				{
 					group:      "custom.io",
 					apiVersion: "custom.io/v1beta1",
@@ -89,6 +89,7 @@ func TestApplyTask_FetchGeneration(t *testing.T) {
 			applyTask := &ApplyTask{
 				ApplyOptions: applyOptions,
 				Objects:      infos,
+				InfoHelper:   &fakeInfoHelper{},
 			}
 
 			applyTask.Start(taskContext)
@@ -118,3 +119,13 @@ func (f *fakeApplyOptions) Run() error {
 }
 
 func (f *fakeApplyOptions) SetObjects([]*resource.Info) {}
+
+type fakeInfoHelper struct{}
+
+func (f *fakeInfoHelper) UpdateInfos(infos []*resource.Info) error {
+	return nil
+}
+
+func (f *fakeInfoHelper) ResetRESTMapper() error {
+	return nil
+}

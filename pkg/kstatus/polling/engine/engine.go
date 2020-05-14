@@ -103,6 +103,11 @@ func (s *PollerEngine) validateIdentifiers(identifiers []object.ObjMetadata) err
 	for _, id := range identifiers {
 		mapping, err := s.Mapper.RESTMapping(id.GroupKind)
 		if err != nil {
+			// If we can't find a match, just keep going. This can happen
+			// if CRDs and CRs are applied at the same time.
+			if meta.IsNoMatchError(err) {
+				continue
+			}
 			return err
 		}
 		if mapping.Scope.Name() == meta.RESTScopeNameNamespace && id.Namespace == "" {

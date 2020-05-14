@@ -11,13 +11,16 @@ import (
 
 	"github.com/go-errors/errors"
 	"github.com/spf13/cobra"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/kubectl/pkg/cmd/apply"
 	"k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
+	"sigs.k8s.io/cli-utils/pkg/apply/info"
 	"sigs.k8s.io/cli-utils/pkg/apply/poller"
 	"sigs.k8s.io/cli-utils/pkg/apply/prune"
 	"sigs.k8s.io/cli-utils/pkg/apply/solver"
@@ -45,6 +48,8 @@ func NewApplier(factory util.Factory, ioStreams genericclioptions.IOStreams) *Ap
 		ioStreams:    ioStreams,
 	}
 	a.previousInventoriesFunc = a.previousInventories
+	a.infoHelperFactoryFunc = a.infoHelperFactory
+	a.manifestReaderFunc = a.readObjects
 	return a
 }
 
@@ -66,10 +71,19 @@ type Applier struct {
 	PruneOptions *prune.PruneOptions
 	statusPoller poller.Poller
 
+	//TODO(mortent): See if we can come up with a better structure here
+	// so we don't need these functions to facilitate testing.
+	//
 	// previousInventoriesFunc is used to fetch the existing inventories
 	// from the apiserver. It is defined here so we can override it in
 	// unit tests.
 	previousInventoriesFunc func(label, namespace string) ([]*resource.Info, error)
+	// infoHelperFactoryFunc is used to create a new instance of the
+	// InfoHelper. It is defined here so we can override it in unit tests.
+	infoHelperFactoryFunc func() info.InfoHelper
+	// manifestReaderFunc is used to read manifests from files or from
+	// stdin. It is defined here so we can override it in unit tests.
+	manifestReaderFunc func() ([]*resource.Info, error)
 }
 
 // Initialize sets up the Applier for actually doing an apply against
@@ -142,18 +156,139 @@ func (a *Applier) newStatusPoller() (poller.Poller, error) {
 	return polling.NewStatusPoller(c, mapper), nil
 }
 
+// previousInventories returns the infos for all the inventory objects
+// in the cluster.
 func (a *Applier) previousInventories(label, namespace string) ([]*resource.Info, error) {
 	return a.PruneOptions.RetrievePreviousInventoryObjects(label, namespace)
+}
+
+// infoHelperFactory returns a new instance of the InfoHelper.
+func (a *Applier) infoHelperFactory() info.InfoHelper {
+	return info.NewInfoHelper(a.factory, a.ApplyOptions.Namespace)
+}
+
+// readObjects reads the manifests from disk with the local flag set on
+// the Builder. This means that the resulting Info resources does not have
+// the mapping and client properties set. We are doing it this way because
+// it allows us to read in both CRDs and CRs in the same set without
+// errors.
+func (a *Applier) readObjects() ([]*resource.Info, error) {
+	r := a.factory.NewBuilder().
+		Local().
+		Unstructured().
+		Schema(a.ApplyOptions.Validator).
+		ContinueOnError().
+		NamespaceParam(a.ApplyOptions.Namespace).DefaultNamespace().
+		FilenameParam(a.ApplyOptions.EnforceNamespace, &a.ApplyOptions.DeleteOptions.FilenameOptions).
+		LabelSelectorParam(a.ApplyOptions.Selector).
+		Flatten().
+		Do()
+	if err := r.Err(); err != nil {
+		return nil, err
+	}
+	return r.Infos()
+}
+
+// setNamespaces verifies that every namespaced resource has the namespace
+// set, and if one does not, it will set the namespace to the provided
+// defaultNamespace.
+// This implementation will check each resource (that doesn't already have
+// the namespace set) on whether it is namespace or cluster scoped. It does
+// this by first checking the RESTMapper, and it there is not match there,
+// it will look for CRDs in the provided Infos.
+func (a *Applier) setNamespaces(infos []*resource.Info, defaultNamespace string,
+	enforceNamespace bool) error {
+	var crdInfos []*resource.Info
+
+	// find any crds in the set of resources.
+	for _, inf := range infos {
+		if solver.IsCRD(inf) {
+			crdInfos = append(crdInfos, inf)
+		}
+	}
+
+	mapper, err := a.factory.ToRESTMapper()
+	if err != nil {
+		return err
+	}
+	for _, inf := range infos {
+		accessor, _ := meta.Accessor(inf.Object)
+		// if the resource already has the namespace set, we don't
+		// need to do anything
+		if ns := accessor.GetNamespace(); ns != "" {
+			if enforceNamespace && ns != defaultNamespace {
+				return fmt.Errorf("the namespace from the provided object %q "+
+					"does not match the namespace %q. You must pass '--namespace=%s' to perform this operation",
+					ns, defaultNamespace, ns)
+			}
+			continue
+		}
+
+		gk := inf.Object.GetObjectKind().GroupVersionKind().GroupKind()
+		mapping, err := mapper.RESTMapping(gk)
+
+		if err != nil && !meta.IsNoMatchError(err) {
+			return err
+		}
+
+		if err == nil {
+			// If we find a mapping for the resource type in the RESTMapper,
+			// we just use it.
+			if mapping.Scope == meta.RESTScopeNamespace {
+				// This means the resource does not have the namespace set,
+				// but it is a namespaced resource. So we set the namespace
+				// to the provided default value.
+				inf.Namespace = defaultNamespace
+				accessor.SetNamespace(defaultNamespace)
+			}
+			continue
+		}
+
+		// If we get here, it means the resource does not have the namespace
+		// set and we didn't find the resource type in the RESTMapper. As
+		// a last try, we look at all the CRDS that are part of the set and
+		// see if we get a match on the resource type. If so, we can determine
+		// from the CRD whether the resource type is cluster-scoped or
+		// namespace-scoped. If it is the latter, we set the namespace
+		// to the provided default.
+		var scope string
+		for _, crdInf := range crdInfos {
+			u, _ := crdInf.Object.(*unstructured.Unstructured)
+			group, _, _ := unstructured.NestedString(u.Object, "spec", "group")
+			kind, _, _ := unstructured.NestedString(u.Object, "spec", "names", "kind")
+			if gk.Kind == kind && gk.Group == group {
+				scope, _, _ = unstructured.NestedString(u.Object, "spec", "scope")
+			}
+		}
+
+		switch scope {
+		case "":
+			return fmt.Errorf("can't find scope for resource %s %s", gk.String(), accessor.GetName())
+		case "Cluster":
+			continue
+		case "Namespaced":
+			inf.Namespace = defaultNamespace
+			accessor.SetNamespace(defaultNamespace)
+		}
+	}
+
+	return nil
 }
 
 // readAndPrepareObjects reads the resources that should be applied,
 // handles ordering of resources and sets up the inventory object
 // based on the provided inventory object template.
 func (a *Applier) readAndPrepareObjects() (*ResourceObjects, error) {
-	infos, err := a.ApplyOptions.GetObjects()
+	infos, err := a.manifestReaderFunc()
 	if err != nil {
 		return nil, err
 	}
+
+	err = a.setNamespaces(infos, a.ApplyOptions.Namespace, a.ApplyOptions.EnforceNamespace)
+	if err != nil {
+		return nil, err
+	}
+
 	resources, invs := splitInfos(infos)
 
 	if len(invs) == 0 {
@@ -298,6 +433,7 @@ func (a *Applier) Run(ctx context.Context, options Options) <-chan event.Event {
 		taskQueue := (&solver.TaskQueueSolver{
 			ApplyOptions: a.ApplyOptions,
 			PruneOptions: a.PruneOptions,
+			InfoHelper:   a.infoHelperFactoryFunc(),
 		}).BuildTaskQueue(resourceObjects, solver.Options{
 			WaitForReconcile:        options.WaitForReconcile,
 			WaitForReconcileTimeout: options.WaitTimeout,
