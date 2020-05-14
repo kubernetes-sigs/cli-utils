@@ -440,6 +440,8 @@ func (a *Applier) Run(ctx context.Context, options Options) <-chan event.Event {
 			Prune:                   !options.NoPrune,
 			DryRun:                  options.DryRun,
 			PrunePropagationPolicy:  options.PrunePropagationPolicy,
+			WaitForPrune:            options.WaitForPrune,
+			WaitForPruneTimeout:     options.WaitForPruneTimeout,
 		})
 
 		// Send event to inform the caller about the resources that
@@ -504,6 +506,15 @@ type Options struct {
 	// that should be used for pruning. If this is not provided, the
 	// default is to use the Background policy.
 	PrunePropagationPolicy metav1.DeletionPropagation
+
+	// WaitForPrune defines whether we should wait for all resources
+	// to be fully deleted after pruning. This is only effective
+	// if the PrunePropagationPolicy is set to Forground.
+	WaitForPrune bool
+
+	// WaitForPruneTimeout defines how long we should wait for all
+	// resources to be deleted after prune before giving up.
+	WaitForPruneTimeout time.Duration
 }
 
 // setDefaults set the options to the default values if they
@@ -517,6 +528,9 @@ func setDefaults(o *Options) {
 	}
 	if o.PrunePropagationPolicy == metav1.DeletionPropagation("") {
 		o.PrunePropagationPolicy = metav1.DeletePropagationBackground
+	}
+	if o.WaitForPruneTimeout == time.Duration(0) {
+		o.WaitForPruneTimeout = time.Minute
 	}
 }
 
