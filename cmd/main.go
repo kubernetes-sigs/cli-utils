@@ -7,14 +7,9 @@ import (
 	"flag"
 	"os"
 	"strings"
-	"sync"
 
 	"github.com/spf13/cobra"
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/client-go/discovery"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/logs"
 	"sigs.k8s.io/cli-utils/cmd/apply"
@@ -23,6 +18,7 @@ import (
 	"sigs.k8s.io/cli-utils/cmd/initcmd"
 	"sigs.k8s.io/cli-utils/cmd/preview"
 	"sigs.k8s.io/cli-utils/cmd/status"
+	"sigs.k8s.io/cli-utils/pkg/util/factory"
 
 	// This is here rather than in the libraries because of
 	// https://github.com/kubernetes-sigs/kustomize/issues/2060
@@ -40,8 +36,8 @@ func main() {
 	flags := cmd.PersistentFlags()
 	kubeConfigFlags := genericclioptions.NewConfigFlags(true).WithDeprecatedPasswordFlag()
 	kubeConfigFlags.AddFlags(flags)
-	matchVersionKubeConfigFlags := util.NewMatchVersionFlags(&cachingRESTClientGetter{
-		delegate: kubeConfigFlags,
+	matchVersionKubeConfigFlags := util.NewMatchVersionFlags(&factory.CachingRESTClientGetter{
+		Delegate: kubeConfigFlags,
 	})
 	matchVersionKubeConfigFlags.AddFlags(cmd.PersistentFlags())
 	cmd.PersistentFlags().AddGoFlagSet(flag.CommandLine)
@@ -85,33 +81,4 @@ func updateHelp(names []string, c *cobra.Command) {
 		c.Long = strings.ReplaceAll(c.Long, "kubectl "+name, "kapply "+name)
 		c.Example = strings.ReplaceAll(c.Example, "kubectl "+name, "kapply "+name)
 	}
-}
-
-// cachingRESTClientGetter caches the RESTMapper so every call to
-// ToRESTMapper will get a reference to the same mapper.
-type cachingRESTClientGetter struct {
-	once     sync.Once
-	delegate genericclioptions.RESTClientGetter
-
-	mapper meta.RESTMapper
-}
-
-func (c *cachingRESTClientGetter) ToRESTConfig() (*rest.Config, error) {
-	return c.delegate.ToRESTConfig()
-}
-
-func (c *cachingRESTClientGetter) ToDiscoveryClient() (discovery.CachedDiscoveryInterface, error) {
-	return c.delegate.ToDiscoveryClient()
-}
-
-func (c *cachingRESTClientGetter) ToRESTMapper() (meta.RESTMapper, error) {
-	var err error
-	c.once.Do(func() {
-		c.mapper, err = c.delegate.ToRESTMapper()
-	})
-	return c.mapper, err
-}
-
-func (c *cachingRESTClientGetter) ToRawKubeConfigLoader() clientcmd.ClientConfig {
-	return c.delegate.ToRawKubeConfigLoader()
 }
