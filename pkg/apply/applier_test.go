@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"testing"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -96,7 +97,7 @@ func TestApplier(t *testing.T) {
 		namespace          string
 		resources          []resourceInfo
 		handlers           []handler
-		status             bool
+		reconcileTimeout   time.Duration
 		prune              bool
 		statusEvents       []pollevent.Event
 		expectedEventTypes []expectedEvent
@@ -115,8 +116,8 @@ func TestApplier(t *testing.T) {
 					namespace:    "apply-test",
 				},
 			},
-			status: false,
-			prune:  false,
+			reconcileTimeout: time.Duration(0),
+			prune:            false,
 			expectedEventTypes: []expectedEvent{
 				{
 					eventType: event.InitType,
@@ -149,7 +150,7 @@ func TestApplier(t *testing.T) {
 					namespace:    "apply-test",
 				},
 			},
-			status: true,
+			reconcileTimeout: time.Minute,
 			statusEvents: []pollevent.Event{
 				{
 					EventType: pollevent.ResourceUpdateEvent,
@@ -258,7 +259,7 @@ func TestApplier(t *testing.T) {
 
 			ctx := context.Background()
 			eventChannel := applier.Run(ctx, Options{
-				WaitForReconcile: tc.status,
+				ReconcileTimeout: tc.reconcileTimeout,
 				EmitStatusEvents: true,
 				NoPrune:          !tc.prune,
 			})

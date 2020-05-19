@@ -39,13 +39,11 @@ type TaskQueueSolver struct {
 }
 
 type Options struct {
-	WaitForReconcile        bool
-	WaitForReconcileTimeout time.Duration
-	Prune                   bool
-	DryRun                  bool
-	PrunePropagationPolicy  metav1.DeletionPropagation
-	WaitForPrune            bool
-	WaitForPruneTimeout     time.Duration
+	ReconcileTimeout       time.Duration
+	Prune                  bool
+	DryRun                 bool
+	PrunePropagationPolicy metav1.DeletionPropagation
+	PruneTimeout           time.Duration
 }
 
 type resourceObjects interface {
@@ -95,12 +93,12 @@ func (t *TaskQueueSolver) BuildTaskQueue(ro resourceObjects,
 		},
 	)
 
-	if o.WaitForReconcile {
+	if o.ReconcileTimeout != time.Duration(0) {
 		tasks = append(tasks,
 			taskrunner.NewWaitTask(
 				ro.IdsForApply(),
 				taskrunner.AllCurrent,
-				o.WaitForReconcileTimeout),
+				o.ReconcileTimeout),
 			&task.SendEventTask{
 				Event: event.Event{
 					Type: event.StatusType,
@@ -130,12 +128,12 @@ func (t *TaskQueueSolver) BuildTaskQueue(ro resourceObjects,
 			},
 		)
 
-		if o.WaitForPrune {
+		if o.PruneTimeout != time.Duration(0) {
 			tasks = append(tasks,
 				taskrunner.NewWaitTask(
 					ro.IdsForPrune(),
 					taskrunner.AllNotFound,
-					o.WaitForPruneTimeout),
+					o.PruneTimeout),
 				&task.SendEventTask{
 					Event: event.Event{
 						Type: event.StatusType,

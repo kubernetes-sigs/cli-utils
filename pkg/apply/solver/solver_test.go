@@ -61,7 +61,7 @@ func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 				customInfo,
 			},
 			options: Options{
-				WaitForReconcile: true,
+				ReconcileTimeout: time.Minute,
 			},
 			expectedTasks: []taskrunner.Task{
 				&task.ApplyTask{
@@ -86,7 +86,7 @@ func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 				customInfo,
 			},
 			options: Options{
-				WaitForReconcile: true,
+				ReconcileTimeout: time.Minute,
 				Prune:            true,
 			},
 			expectedTasks: []taskrunner.Task{
@@ -114,7 +114,7 @@ func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 				depInfo,
 			},
 			options: Options{
-				WaitForReconcile: true,
+				ReconcileTimeout: time.Minute,
 			},
 			expectedTasks: []taskrunner.Task{
 				&task.ApplyTask{

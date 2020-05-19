@@ -122,7 +122,7 @@ expectedOutputLine "inventory-template.yaml"
 Use the `kapply` binary in `MYGOBIN` to apply both the CRD and the CR.
 <!-- @runApply @testE2EAgainstLatestRelease -->
 ```
-kapply apply $BASE --wait-for-reconcile > $OUTPUT/status
+kapply apply $BASE --reconcile-timeout=1m > $OUTPUT/status
 
 expectedOutputLine "customresourcedefinition.apiextensions.k8s.io/foos.custom.io is Current: Resource is current"
 

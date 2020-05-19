@@ -48,19 +48,15 @@ func GetApplyRunner(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *A
 	cmd.Flags().StringVar(&r.output, "output", printers.DefaultPrinter(),
 		fmt.Sprintf("Output format, must be one of %s", strings.Join(printers.SupportedPrinters(), ",")))
 
-	cmd.Flags().BoolVar(&r.wait, "wait-for-reconcile", false,
-		"Wait for all applied resources to reach the Current status.")
-	cmd.Flags().DurationVar(&r.period, "wait-polling-period", 2*time.Second,
+	cmd.Flags().DurationVar(&r.period, "poll-period", 2*time.Second,
 		"Polling period for resource statuses.")
-	cmd.Flags().DurationVar(&r.timeout, "wait-timeout", time.Minute,
+	cmd.Flags().DurationVar(&r.reconcileTimeout, "reconcile-timeout", time.Duration(0),
 		"Timeout threshold for waiting for all resources to reach the Current status.")
 	cmd.Flags().BoolVar(&r.noPrune, "no-prune", r.noPrune,
 		"If true, do not prune previously applied objects.")
 	cmd.Flags().StringVar(&r.prunePropagationPolicy, "prune-propagation-policy",
 		"Background", "Propagation policy for pruning")
-	cmd.Flags().BoolVar(&r.waitForPrune, "wait-for-prune", false,
-		"Wait for all pruned resources to be deleted.")
-	cmd.Flags().DurationVar(&r.waitForPruneTimeout, "wait-for-prune-timeout", 1*time.Minute,
+	cmd.Flags().DurationVar(&r.pruneTimeout, "prune-timeout", time.Duration(0),
 		"Timeout threshold for waiting for all pruned resources to be deleted")
 
 	r.command = cmd
@@ -77,13 +73,11 @@ type ApplyRunner struct {
 	applier   *apply.Applier
 
 	output                 string
-	wait                   bool
 	period                 time.Duration
-	timeout                time.Duration
+	reconcileTimeout       time.Duration
 	noPrune                bool
 	prunePropagationPolicy string
-	waitForPrune           bool
-	waitForPruneTimeout    time.Duration
+	pruneTimeout           time.Duration
 }
 
 func (r *ApplyRunner) RunE(cmd *cobra.Command, args []string) error {
@@ -94,20 +88,27 @@ func (r *ApplyRunner) RunE(cmd *cobra.Command, args []string) error {
 
 	cmdutil.CheckErr(r.applier.Initialize(cmd, args))
 
+	// Only emit status events if we are waiting for status.
+	//TODO: This is not the right way to do this. There are situations where
+	// we do need status events event if we are not waiting for status. The
+	// printers should be updated to handle this.
+	var emitStatusEvents bool
+	if r.reconcileTimeout != time.Duration(0) || r.pruneTimeout != time.Duration(0) {
+		emitStatusEvents = true
+	}
+
 	// Run the applier. It will return a channel where we can receive updates
 	// to keep track of progress and any issues.
 	ch := r.applier.Run(context.Background(), apply.Options{
-		WaitForReconcile: r.wait,
 		PollInterval:     r.period,
-		WaitTimeout:      r.timeout,
+		ReconcileTimeout: r.reconcileTimeout,
 		// If we are not waiting for status, tell the applier to not
 		// emit the events.
-		EmitStatusEvents:       r.wait,
+		EmitStatusEvents:       emitStatusEvents,
 		NoPrune:                r.noPrune,
 		DryRun:                 false,
 		PrunePropagationPolicy: prunePropPolicy,
-		WaitForPrune:           r.waitForPrune,
-		WaitForPruneTimeout:    r.waitForPruneTimeout,
+		PruneTimeout:           r.pruneTimeout,
 	})
 
 	// The printer will print updates from the channel. It will block
