@@ -248,7 +248,7 @@ func TestApplier(t *testing.T) {
 				events: tc.statusEvents,
 				start:  make(chan struct{}),
 			}
-			applier.statusPoller = poller
+			applier.StatusPoller = poller
 
 			applier.infoHelperFactoryFunc = func() info.InfoHelper {
 				return &fakeInfoHelper{
