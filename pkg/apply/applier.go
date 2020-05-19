@@ -50,6 +50,8 @@ func NewApplier(factory util.Factory, ioStreams genericclioptions.IOStreams) *Ap
 	a.previousInventoriesFunc = a.previousInventories
 	a.infoHelperFactoryFunc = a.infoHelperFactory
 	a.manifestReaderFunc = a.readObjects
+	a.InventoryFactoryFunc = prune.WrapInventoryObj
+
 	return a
 }
 
@@ -84,6 +86,9 @@ type Applier struct {
 	// manifestReaderFunc is used to read manifests from files or from
 	// stdin. It is defined here so we can override it in unit tests.
 	manifestReaderFunc func() ([]*resource.Info, error)
+	// InventoryFactoryFunc wraps and returns an interface for the
+	// object which will load and store the inventory.
+	InventoryFactoryFunc func(*resource.Info) prune.Inventory
 }
 
 // Initialize sets up the Applier for actually doing an apply against
@@ -300,7 +305,8 @@ func (a *Applier) readAndPrepareObjects() (*ResourceObjects, error) {
 		}
 	}
 
-	inventoryObject, err := prune.CreateInventoryObj(invs[0], resources)
+	inv := a.InventoryFactoryFunc(invs[0])
+	inventoryObject, err := prune.CreateInventoryObj(inv, resources)
 	if err != nil {
 		return nil, err
 	}

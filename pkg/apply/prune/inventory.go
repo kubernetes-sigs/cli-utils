@@ -26,6 +26,11 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
+type Inventory interface {
+	object.ObjLoadStorer
+	GetObject() (*resource.Info, error)
+}
+
 // RetrieveInventoryLabel returns the string value of the InventoryLabel
 // for the passed object. Returns error if the passed object is nil or
 // is not a inventory object.
@@ -48,7 +53,6 @@ func RetrieveInventoryLabel(obj runtime.Object) (string, error) {
 
 // IsInventoryObject returns true if the passed object has the
 // inventory label.
-// TODO(seans3): Check type is ConfigMap.
 func IsInventoryObject(obj runtime.Object) bool {
 	if obj == nil {
 		return false
@@ -147,89 +151,35 @@ func addObjsToInventory(infos []*resource.Info) error {
 // template. The passed "resources" parameter are applied at the same time
 // as the inventory object, and metadata for each is stored in the inventory
 // object.
-func CreateInventoryObj(inventoryTemplate *resource.Info,
-	resources []*resource.Info) (*resource.Info, error) {
-	// Verify that the provided inventoryTemplate represents an
-	// actual resource in the Unstructured format.
-	obj := inventoryTemplate.Object
-	if obj == nil {
-		return nil, fmt.Errorf("inventory template has nil Object")
-	}
-	iot, ok := obj.(*unstructured.Unstructured)
-	if !ok {
-		return nil, fmt.Errorf(
-			"inventory template is not an Unstructured: %s",
-			inventoryTemplate.Source)
-	}
-
-	// Create the objMap of all the resources.
-	objMap, err := buildObjMap(resources)
+func CreateInventoryObj(inventory Inventory, resources []*resource.Info) (*resource.Info, error) {
+	objMetas, err := buildObjMetadata(resources)
 	if err != nil {
 		return nil, err
 	}
-
-	invHashStr, err := computeInventoryHash(objMap)
-	if err != nil {
+	if err = inventory.Store(objMetas); err != nil {
 		return nil, err
 	}
-	name := fmt.Sprintf("%s-%s", iot.GetName(), invHashStr)
-
-	// Create the inventory object by copying the template.
-	inventoryObj := iot.DeepCopy()
-	inventoryObj.SetName(name)
-	// Adds the inventory map to the ConfigMap "data" section.
-	err = unstructured.SetNestedStringMap(inventoryObj.UnstructuredContent(),
-		objMap, "data")
-	if err != nil {
-		return nil, err
-	}
-	annotations := inventoryObj.GetAnnotations()
-	if annotations == nil {
-		annotations = map[string]string{}
-	}
-	annotations[common.InventoryHash] = invHashStr
-	inventoryObj.SetAnnotations(annotations)
-
-	// Creates a new Info for the newly created inventory object.
-	return &resource.Info{
-		Client:    inventoryTemplate.Client,
-		Mapping:   inventoryTemplate.Mapping,
-		Source:    "generated",
-		Name:      inventoryObj.GetName(),
-		Namespace: inventoryObj.GetNamespace(),
-		Object:    inventoryObj,
-	}, nil
+	return inventory.GetObject()
 }
 
-func buildObjMap(resources []*resource.Info) (map[string]string, error) {
-	objMap := map[string]string{}
-	for _, res := range resources {
-		if res.Object == nil {
-			return nil, fmt.Errorf("creating obj metadata; object is nil")
+// buildObjectMetadata returns object metadata (ObjMetadata) for the
+// passed objects (infos). The object metadata is then stored in the
+// inventory object.
+func buildObjMetadata(infos []*resource.Info) ([]*object.ObjMetadata, error) {
+	objMetas := []*object.ObjMetadata{}
+	for _, info := range infos {
+		obj := info.Object
+		if obj == nil {
+			return nil, fmt.Errorf("")
 		}
-		obj := res.Object
 		gk := obj.GetObjectKind().GroupVersionKind().GroupKind()
-		objMetadata, err := object.CreateObjMetadata(res.Namespace,
-			res.Name, gk)
+		objMeta, err := object.CreateObjMetadata(info.Namespace, info.Name, gk)
 		if err != nil {
 			return nil, err
 		}
-		objMap[objMetadata.String()] = ""
+		objMetas = append(objMetas, objMeta)
 	}
-	return objMap, nil
-}
-
-func computeInventoryHash(objMap map[string]string) (string, error) {
-	objList := mapKeysToSlice(objMap)
-	sort.Strings(objList)
-	invHash, err := calcInventoryHash(objList)
-	if err != nil {
-		return "", err
-	}
-	// Compute the name of the inventory object. It is the name of the
-	// inventory object template that it is based on with an additional
-	// suffix which is based on the hash of the inventory.
-	return strconv.FormatUint(uint64(invHash), 16), nil
+	return objMetas, nil
 }
 
 // RetrieveObjsFromInventoryObj returns a slice of pointers to the
@@ -329,17 +279,6 @@ func retrieveInventoryHash(inventoryInfo *resource.Info) string {
 		}
 	}
 	return invHash
-}
-
-// mapKeysToSlice returns the map keys as a slice of strings.
-func mapKeysToSlice(m map[string]string) []string {
-	s := make([]string, len(m))
-	i := 0
-	for k := range m {
-		s[i] = k
-		i++
-	}
-	return s
 }
 
 // addSuffixToName adds the passed suffix (usually a hash) as a suffix

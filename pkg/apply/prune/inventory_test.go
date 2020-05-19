@@ -282,9 +282,8 @@ func TestCreateInventoryObject(t *testing.T) {
 
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
-			inventoryObj, err := CreateInventoryObj(tc.inventoryObjectTemplate,
-				tc.resources)
-
+			invConfigMap := WrapInventoryObj(tc.inventoryObjectTemplate)
+			inventoryObj, err := CreateInventoryObj(invConfigMap, tc.resources)
 			if tc.expectedError {
 				if err == nil {
 					t.Errorf("expected error, but didn't get one")
@@ -309,8 +308,7 @@ func TestCreateInventoryObject(t *testing.T) {
 				t.Errorf("expected info and unstructured to have the same namespace, but they didn't")
 			}
 
-			inv, err := RetrieveObjsFromInventory(
-				[]*resource.Info{inventoryObj})
+			inv, err := RetrieveObjsFromInventory([]*resource.Info{inventoryObj})
 			if err != nil {
 				t.Error(err)
 			}

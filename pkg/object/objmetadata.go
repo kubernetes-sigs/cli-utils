@@ -29,6 +29,19 @@ import (
 // resource name.
 const fieldSeparator = "_"
 
+type ObjLoader interface {
+	Load() ([]*ObjMetadata, error)
+}
+
+type ObjStorer interface {
+	Store(objs []*ObjMetadata) error
+}
+
+type ObjLoadStorer interface {
+	ObjLoader
+	ObjStorer
+}
+
 // ObjMetadata organizes and stores the indentifying information
 // for an object. This struct (as a string) is stored in a
 // inventory object to keep track of sets of applied objects.
