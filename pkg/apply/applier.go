@@ -435,13 +435,11 @@ func (a *Applier) Run(ctx context.Context, options Options) <-chan event.Event {
 			PruneOptions: a.PruneOptions,
 			InfoHelper:   a.infoHelperFactoryFunc(),
 		}).BuildTaskQueue(resourceObjects, solver.Options{
-			WaitForReconcile:        options.WaitForReconcile,
-			WaitForReconcileTimeout: options.WaitTimeout,
-			Prune:                   !options.NoPrune,
-			DryRun:                  options.DryRun,
-			PrunePropagationPolicy:  options.PrunePropagationPolicy,
-			WaitForPrune:            options.WaitForPrune,
-			WaitForPruneTimeout:     options.WaitForPruneTimeout,
+			ReconcileTimeout:       options.ReconcileTimeout,
+			Prune:                  !options.NoPrune,
+			DryRun:                 options.DryRun,
+			PrunePropagationPolicy: options.PrunePropagationPolicy,
+			PruneTimeout:           options.PruneTimeout,
 		})
 
 		// Send event to inform the caller about the resources that
@@ -477,18 +475,14 @@ func (a *Applier) Run(ctx context.Context, options Options) <-chan event.Event {
 }
 
 type Options struct {
-	// WaitForReconcile defines whether the applier should wait
-	// until all applied resources have been reconciled before
-	// pruning and exiting.
-	WaitForReconcile bool
+	// ReconcileTimeout defines whether the applier should wait
+	// until all applied resources have been reconciled, and if so,
+	// how long to wait.
+	ReconcileTimeout time.Duration
 
 	// PollInterval defines how often we should poll for the status
 	// of resources.
 	PollInterval time.Duration
-
-	// WaitTimeout defines how long we should wait for resources
-	// to be reconciled before giving up.
-	WaitTimeout time.Duration
 
 	// EmitStatusEvents defines whether status events should be
 	// emitted on the eventChannel to the caller.
@@ -507,14 +501,10 @@ type Options struct {
 	// default is to use the Background policy.
 	PrunePropagationPolicy metav1.DeletionPropagation
 
-	// WaitForPrune defines whether we should wait for all resources
-	// to be fully deleted after pruning. This is only effective
-	// if the PrunePropagationPolicy is set to Forground.
-	WaitForPrune bool
-
-	// WaitForPruneTimeout defines how long we should wait for all
-	// resources to be deleted after prune before giving up.
-	WaitForPruneTimeout time.Duration
+	// PruneTimeout defines whether we should wait for all resources
+	// to be fully deleted after pruning, and if so, how long we should
+	// wait.
+	PruneTimeout time.Duration
 }
 
 // setDefaults set the options to the default values if they
@@ -523,14 +513,8 @@ func setDefaults(o *Options) {
 	if o.PollInterval == time.Duration(0) {
 		o.PollInterval = 2 * time.Second
 	}
-	if o.WaitTimeout == time.Duration(0) {
-		o.WaitTimeout = time.Minute
-	}
 	if o.PrunePropagationPolicy == metav1.DeletionPropagation("") {
 		o.PrunePropagationPolicy = metav1.DeletePropagationBackground
-	}
-	if o.WaitForPruneTimeout == time.Duration(0) {
-		o.WaitForPruneTimeout = time.Minute
 	}
 }
 
