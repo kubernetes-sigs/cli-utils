@@ -413,12 +413,6 @@ func (a *Applier) Run(ctx context.Context, options Options) <-chan event.Event {
 
 	go func() {
 		defer close(eventChannel)
-		adapter := &KubectlPrinterAdapter{
-			ch: eventChannel,
-		}
-		// The adapter is used to intercept what is meant to be printing
-		// in the ApplyOptions, and instead turn those into events.
-		a.ApplyOptions.ToPrinter = adapter.toPrinterFunc()
 
 		// This provides us with a slice of all the objects that will be
 		// applied to the cluster. This takes care of ordering resources
