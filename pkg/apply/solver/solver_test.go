@@ -108,6 +108,28 @@ func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 				&task.SendEventTask{},
 			},
 		},
+		"multiple resources with wait, prune and dryrun": {
+			infos: []*resource.Info{
+				depInfo,
+				customInfo,
+			},
+			options: Options{
+				ReconcileTimeout: time.Minute,
+				Prune:            true,
+				DryRun:           true,
+			},
+			expectedTasks: []taskrunner.Task{
+				&task.ApplyTask{
+					Objects: []*resource.Info{
+						depInfo,
+						customInfo,
+					},
+				},
+				&task.SendEventTask{},
+				&task.PruneTask{},
+				&task.SendEventTask{},
+			},
+		},
 		"multiple resources including CRD": {
 			infos: []*resource.Info{
 				crdInfo,
@@ -139,6 +161,29 @@ func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 						object.InfoToObjMeta(depInfo),
 					},
 					taskrunner.AllCurrent, 1*time.Second),
+				&task.SendEventTask{},
+			},
+		},
+		"no wait with CRDs if it is a dryrun": {
+			infos: []*resource.Info{
+				crdInfo,
+				depInfo,
+			},
+			options: Options{
+				ReconcileTimeout: time.Minute,
+				DryRun:           true,
+			},
+			expectedTasks: []taskrunner.Task{
+				&task.ApplyTask{
+					Objects: []*resource.Info{
+						crdInfo,
+					},
+				},
+				&task.ApplyTask{
+					Objects: []*resource.Info{
+						depInfo,
+					},
+				},
 				&task.SendEventTask{},
 			},
 		},

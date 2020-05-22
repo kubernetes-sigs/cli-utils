@@ -67,12 +67,14 @@ func (t *TaskQueueSolver) BuildTaskQueue(ro resourceObjects,
 			ApplyOptions: t.ApplyOptions,
 			DryRun:       o.DryRun,
 			InfoHelper:   t.InfoHelper,
-		},
-			taskrunner.NewWaitTask(
+		})
+		if !o.DryRun {
+			tasks = append(tasks, taskrunner.NewWaitTask(
 				object.InfosToObjMetas(crdSplitRes.crds),
 				taskrunner.AllCurrent,
 				1*time.Minute),
-		)
+			)
+		}
 		remainingInfos = crdSplitRes.after
 	}
 
@@ -93,7 +95,7 @@ func (t *TaskQueueSolver) BuildTaskQueue(ro resourceObjects,
 		},
 	)
 
-	if o.ReconcileTimeout != time.Duration(0) {
+	if !o.DryRun && o.ReconcileTimeout != time.Duration(0) {
 		tasks = append(tasks,
 			taskrunner.NewWaitTask(
 				ro.IdsForApply(),
@@ -128,7 +130,7 @@ func (t *TaskQueueSolver) BuildTaskQueue(ro resourceObjects,
 			},
 		)
 
-		if o.PruneTimeout != time.Duration(0) {
+		if !o.DryRun && o.PruneTimeout != time.Duration(0) {
 			tasks = append(tasks,
 				taskrunner.NewWaitTask(
 					ro.IdsForPrune(),
