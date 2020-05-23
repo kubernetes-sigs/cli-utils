@@ -992,3 +992,7 @@ func (f *fakeInfoHelper) getClient(gv schema.GroupVersion) (resource.RESTClient,
 func (f *fakeInfoHelper) ResetRESTMapper() error {
 	return nil
 }
+
+func (f *fakeInfoHelper) ToRESTMapper() (meta.RESTMapper, error) {
+	return f.factory.ToRESTMapper()
+}

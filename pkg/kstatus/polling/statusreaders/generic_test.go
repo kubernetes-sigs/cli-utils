@@ -14,6 +14,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/testutil"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
 	"sigs.k8s.io/cli-utils/pkg/object"
+	fakemapper "sigs.k8s.io/cli-utils/pkg/testutil"
 )
 
 var (
@@ -59,7 +60,7 @@ func TestGenericStatusReader(t *testing.T) {
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
 			fakeReader := testutil.NewNoopClusterReader()
-			fakeMapper := testutil.NewFakeRESTMapper()
+			fakeMapper := fakemapper.NewFakeRESTMapper()
 			resourceStatusReader := &genericStatusReader{
 				reader: fakeReader,
 				mapper: fakeMapper,

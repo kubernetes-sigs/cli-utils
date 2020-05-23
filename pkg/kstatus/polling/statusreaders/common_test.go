@@ -16,6 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/testutil"
 	"sigs.k8s.io/cli-utils/pkg/object"
+	fakemapper "sigs.k8s.io/cli-utils/pkg/testutil"
 )
 
 var (
@@ -72,7 +73,7 @@ func TestLookupResource(t *testing.T) {
 			fakeReader := &fakeClusterReader{
 				getErr: tc.readerErr,
 			}
-			fakeMapper := testutil.NewFakeRESTMapper(deploymentGVK)
+			fakeMapper := fakemapper.NewFakeRESTMapper(deploymentGVK)
 
 			statusReader := &baseStatusReader{
 				reader: fakeReader,
@@ -197,7 +198,7 @@ spec:
 				},
 				listErr: tc.listErr,
 			}
-			fakeMapper := testutil.NewFakeRESTMapper(rsGVK)
+			fakeMapper := fakemapper.NewFakeRESTMapper(rsGVK)
 			fakeStatusReader := &fakeStatusReader{}
 
 			object := testutil.YamlToUnstructured(t, tc.manifest)

@@ -19,6 +19,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/testutil"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
 	"sigs.k8s.io/cli-utils/pkg/object"
+	fakemapper "sigs.k8s.io/cli-utils/pkg/testutil"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -104,7 +105,7 @@ func TestStatusPollerRunner(t *testing.T) {
 
 			identifiers := tc.identifiers
 
-			fakeMapper := testutil.NewFakeRESTMapper(
+			fakeMapper := fakemapper.NewFakeRESTMapper(
 				appsv1.SchemeGroupVersion.WithKind("Deployment"),
 				v1.SchemeGroupVersion.WithKind("Service"),
 			)
@@ -196,7 +197,7 @@ func TestNewStatusPollerRunnerIdentifierValidation(t *testing.T) {
 	}
 
 	engine := PollerEngine{
-		Mapper: testutil.NewFakeRESTMapper(
+		Mapper: fakemapper.NewFakeRESTMapper(
 			appsv1.SchemeGroupVersion.WithKind("Deployment"),
 		),
 	}

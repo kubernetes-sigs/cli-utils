@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"reflect"
 
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/rest"
@@ -24,6 +25,9 @@ type InfoHelper interface {
 	// ResetRESTMapper resets the state of the RESTMapper so any
 	// added resource types in the cluster will be picked up.
 	ResetRESTMapper() error
+
+	// ToRESTMapper returns a RESTMapper
+	ToRESTMapper() (meta.RESTMapper, error)
 }
 
 func NewInfoHelper(factory util.Factory, namespace string) *infoHelper {
@@ -58,6 +62,10 @@ func (ih *infoHelper) UpdateInfos(infos []*resource.Info) error {
 		info.Client = c
 	}
 	return nil
+}
+
+func (ih *infoHelper) ToRESTMapper() (meta.RESTMapper, error) {
+	return ih.factory.ToRESTMapper()
 }
 
 func (ih *infoHelper) ResetRESTMapper() error {
