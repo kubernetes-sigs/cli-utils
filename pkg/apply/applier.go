@@ -69,7 +69,7 @@ type Applier struct {
 
 	ApplyOptions *apply.ApplyOptions
 	PruneOptions *prune.PruneOptions
-	statusPoller poller.Poller
+	StatusPoller poller.Poller
 
 	//TODO(mortent): See if we can come up with a better structure here
 	// so we don't need these functions to facilitate testing.
@@ -109,7 +109,7 @@ func (a *Applier) Initialize(cmd *cobra.Command, paths []string) error {
 	if err != nil {
 		return errors.WrapPrefix(err, "error creating resolver", 1)
 	}
-	a.statusPoller = statusPoller
+	a.StatusPoller = statusPoller
 	return nil
 }
 
@@ -461,7 +461,7 @@ func (a *Applier) Run(ctx context.Context, options Options) <-chan event.Event {
 		}
 
 		// Create a new TaskStatusRunner to execute the taskQueue.
-		runner := taskrunner.NewTaskStatusRunner(resourceObjects.AllIds(), a.statusPoller)
+		runner := taskrunner.NewTaskStatusRunner(resourceObjects.AllIds(), a.StatusPoller)
 		err = runner.Run(ctx, taskQueue, eventChannel, taskrunner.Options{
 			PollInterval:     options.PollInterval,
 			UseCache:         true,
