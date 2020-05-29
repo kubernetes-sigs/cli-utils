@@ -64,11 +64,16 @@ func (p *pruneStats) incSkipped() {
 }
 
 type deleteStats struct {
-	count int
+	deleted int
+	skipped int
 }
 
-func (d *deleteStats) inc() {
-	d.count++
+func (d *deleteStats) incDeleted() {
+	d.deleted++
+}
+
+func (d *deleteStats) incSkipped() {
+	d.skipped++
 }
 
 type statusCollector struct {
@@ -185,31 +190,37 @@ func (b *BasicPrinter) processPruneEvent(pe event.PruneEvent, ps *pruneStats, p 
 	switch pe.Type {
 	case event.PruneEventCompleted:
 		p("%d resource(s) pruned, %d skipped", ps.pruned, ps.skipped)
-	case event.PruneEventSkipped:
-		obj := pe.Object
-		gvk := obj.GetObjectKind().GroupVersionKind()
-		name := getName(obj)
-		ps.incSkipped()
-		p("%s %s", resourceIDToString(gvk.GroupKind(), name), "pruned skipped")
 	case event.PruneEventResourceUpdate:
 		obj := pe.Object
 		gvk := obj.GetObjectKind().GroupVersionKind()
 		name := getName(obj)
-		ps.incPruned()
-		p("%s %s", resourceIDToString(gvk.GroupKind(), name), "pruned")
+		switch pe.Operation {
+		case event.Pruned:
+			ps.incPruned()
+			p("%s %s", resourceIDToString(gvk.GroupKind(), name), "pruned")
+		case event.PruneSkipped:
+			ps.incSkipped()
+			p("%s %s", resourceIDToString(gvk.GroupKind(), name), "prune skipped")
+		}
 	}
 }
 
 func (b *BasicPrinter) processDeleteEvent(de event.DeleteEvent, ds *deleteStats, p printFunc) {
 	switch de.Type {
 	case event.DeleteEventCompleted:
-		p("%d resource(s) deleted", ds.count)
+		p("%d resource(s) deleted, %d skipped", ds.deleted, ds.skipped)
 	case event.DeleteEventResourceUpdate:
 		obj := de.Object
 		gvk := obj.GetObjectKind().GroupVersionKind()
 		name := getName(obj)
-		ds.inc()
-		p("%s %s", resourceIDToString(gvk.GroupKind(), name), "deleted")
+		switch de.Operation {
+		case event.Deleted:
+			ds.incDeleted()
+			p("%s %s", resourceIDToString(gvk.GroupKind(), name), "deleted")
+		case event.DeleteSkipped:
+			ds.incSkipped()
+			p("%s %s", resourceIDToString(gvk.GroupKind(), name), "delete skipped")
+		}
 	}
 }
 

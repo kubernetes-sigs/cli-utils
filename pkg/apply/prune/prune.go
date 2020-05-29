@@ -254,8 +254,9 @@ func (po *PruneOptions) Prune(currentObjects []*resource.Info, eventChannel chan
 			eventChannel <- event.Event{
 				Type: event.PruneType,
 				PruneEvent: event.PruneEvent{
-					Type:   event.PruneEventSkipped,
-					Object: obj,
+					Type:      event.PruneEventResourceUpdate,
+					Operation: event.PruneSkipped,
+					Object:    obj,
 				},
 			}
 			continue
@@ -270,8 +271,9 @@ func (po *PruneOptions) Prune(currentObjects []*resource.Info, eventChannel chan
 		eventChannel <- event.Event{
 			Type: event.PruneType,
 			PruneEvent: event.PruneEvent{
-				Type:   event.PruneEventResourceUpdate,
-				Object: obj,
+				Type:      event.PruneEventResourceUpdate,
+				Operation: event.Pruned,
+				Object:    obj,
 			},
 		}
 	}
@@ -292,8 +294,9 @@ func (po *PruneOptions) Prune(currentObjects []*resource.Info, eventChannel chan
 		eventChannel <- event.Event{
 			Type: event.PruneType,
 			PruneEvent: event.PruneEvent{
-				Type:   event.PruneEventResourceUpdate,
-				Object: pastGroupInfo.Object,
+				Type:      event.PruneEventResourceUpdate,
+				Operation: event.Pruned,
+				Object:    pastGroupInfo.Object,
 			},
 		}
 	}

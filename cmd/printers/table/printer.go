@@ -89,8 +89,8 @@ var (
 					text = resInfo.ApplyOpResult.String()
 				}
 			case event.PruneAction:
-				if resInfo.Pruned {
-					text = "Pruned"
+				if resInfo.PruneOpResult != nil {
+					text = resInfo.PruneOpResult.String()
 				}
 			}
 

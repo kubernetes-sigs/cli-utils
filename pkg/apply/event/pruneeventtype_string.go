@@ -12,13 +12,12 @@ func _() {
 	// Re-run the stringer command to generate them again.
 	var x [1]struct{}
 	_ = x[PruneEventResourceUpdate-0]
-	_ = x[PruneEventSkipped-1]
-	_ = x[PruneEventCompleted-2]
+	_ = x[PruneEventCompleted-1]
 }
 
-const _PruneEventType_name = "PruneEventResourceUpdatePruneEventSkippedPruneEventCompleted"
+const _PruneEventType_name = "PruneEventResourceUpdatePruneEventCompleted"
 
-var _PruneEventType_index = [...]uint8{0, 24, 41, 60}
+var _PruneEventType_index = [...]uint8{0, 24, 43}
 
 func (i PruneEventType) String() string {
 	if i < 0 || i >= PruneEventType(len(_PruneEventType_index)-1) {

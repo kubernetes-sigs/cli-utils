@@ -13,6 +13,7 @@ import (
 
 var (
 	createdOpResult = event.Created
+	prunedOpResult  = event.Pruned
 )
 
 func TestActionColumnDef(t *testing.T) {
@@ -42,7 +43,7 @@ func TestActionColumnDef(t *testing.T) {
 		"pruned": {
 			resource: &ResourceInfo{
 				ResourceAction: event.PruneAction,
-				Pruned:         true,
+				PruneOpResult:  &prunedOpResult,
 			},
 			columnWidth:    15,
 			expectedOutput: "Pruned",
