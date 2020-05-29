@@ -4,6 +4,8 @@
 package diff
 
 import (
+	"fmt"
+
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/kubectl/pkg/cmd/apply"
@@ -19,7 +21,7 @@ import (
 func NewCmdDiff(f util.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	options := diff.NewDiffOptions(ioStreams)
 	cmd := &cobra.Command{
-		Use:                   "diff (DIRECTORY | STDIN)",
+		Use:                   "diff DIRECTORY",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Diff local config against cluster applied version"),
 		Args:                  cobra.MaximumNArgs(1),
@@ -36,6 +38,10 @@ func NewCmdDiff(f util.Factory, ioStreams genericclioptions.IOStreams) *cobra.Co
 // Returns error if there is an error filling in the options or if there
 // is not one argument that is a directory.
 func Initialize(o *diff.DiffOptions, f util.Factory, args []string) error {
+	// TODO(seans3): Accept no arguments, treating it as stdin like other commands.
+	if len(args) == 0 {
+		return fmt.Errorf("missing argument; specify exactly one directory path argument")
+	}
 	// Validate the only argument is a (package) directory path.
 	filenameFlags, err := common.DemandOneDirectory(args)
 	if err != nil {
