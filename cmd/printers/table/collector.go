@@ -76,9 +76,13 @@ type ResourceInfo struct {
 	// a resource has been applied to the cluster.
 	ApplyOpResult *event.ApplyEventOperation
 
-	// Pruned contains information about whether
-	// the resources has been pruned.
-	Pruned bool
+	// PruneOpResult contains the result after
+	// a prune operation on a resource
+	PruneOpResult *event.PruneEventOperation
+
+	// DeleteOpResult contains the result after
+	// a delete operation on a resource
+	DeleteOpResult *event.DeleteEventOperation
 }
 
 // Identifier returns the identifier for the given resource.
@@ -205,7 +209,7 @@ func (r *ResourceStateCollector) processPruneEvent(e event.PruneEvent) {
 		if !found {
 			return
 		}
-		previous.Pruned = true
+		previous.PruneOpResult = &e.Operation
 	}
 }
 
@@ -290,7 +294,8 @@ func (r *ResourceStateCollector) LatestState() *ResourceState {
 			resourceStatus: ri.resourceStatus,
 			ResourceAction: ri.ResourceAction,
 			ApplyOpResult:  ri.ApplyOpResult,
-			Pruned:         ri.Pruned,
+			PruneOpResult:  ri.PruneOpResult,
+			DeleteOpResult: ri.DeleteOpResult,
 		})
 	}
 	sort.Sort(resourceInfos)

@@ -4,9 +4,10 @@
 package apply
 
 import (
+	"fmt"
+
 	"github.com/go-errors/errors"
 	"github.com/spf13/cobra"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -165,11 +166,23 @@ func runPruneEventTransformer(eventChannel chan event.Event) (chan event.Event, 
 			eventChannel <- event.Event{
 				Type: event.DeleteType,
 				DeleteEvent: event.DeleteEvent{
-					Type:   event.DeleteEventResourceUpdate,
-					Object: msg.PruneEvent.Object,
+					Type:      event.DeleteEventResourceUpdate,
+					Operation: transformPruneOperation(msg.PruneEvent.Operation),
+					Object:    msg.PruneEvent.Object,
 				},
 			}
 		}
 	}()
 	return tempEventChannel, completedChannel
+}
+
+func transformPruneOperation(pruneOp event.PruneEventOperation) event.DeleteEventOperation {
+	switch pruneOp {
+	case event.PruneSkipped:
+		return event.DeleteSkipped
+	case event.Pruned:
+		return event.Deleted
+	default:
+		panic(fmt.Errorf("unknown prune operation %s", pruneOp.String()))
+	}
 }

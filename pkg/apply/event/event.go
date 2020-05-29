@@ -104,13 +104,21 @@ type PruneEventType int
 
 const (
 	PruneEventResourceUpdate PruneEventType = iota
-	PruneEventSkipped
 	PruneEventCompleted
 )
 
+//go:generate stringer -type=PruneEventOperation
+type PruneEventOperation int
+
+const (
+	Pruned PruneEventOperation = iota
+	PruneSkipped
+)
+
 type PruneEvent struct {
-	Type   PruneEventType
-	Object runtime.Object
+	Type      PruneEventType
+	Operation PruneEventOperation
+	Object    runtime.Object
 }
 
 //go:generate stringer -type=DeleteEventType
@@ -121,7 +129,16 @@ const (
 	DeleteEventCompleted
 )
 
+//go:generate stringer -type=DeleteEventOperation
+type DeleteEventOperation int
+
+const (
+	Deleted DeleteEventOperation = iota
+	DeleteSkipped
+)
+
 type DeleteEvent struct {
-	Type   DeleteEventType
-	Object runtime.Object
+	Type      DeleteEventType
+	Operation DeleteEventOperation
+	Object    runtime.Object
 }
