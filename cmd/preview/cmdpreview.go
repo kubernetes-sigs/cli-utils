@@ -7,11 +7,14 @@ import (
 	"context"
 
 	"github.com/spf13/cobra"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"sigs.k8s.io/cli-utils/pkg/apply"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
+	"sigs.k8s.io/cli-utils/pkg/common"
+	"sigs.k8s.io/cli-utils/pkg/manifestreader"
 )
 
 var (
@@ -38,14 +41,37 @@ func NewCmdPreview(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *co
 			// if destroy flag is set in preview, transmit it to destroyer DryRun flag
 			// and pivot execution to destroy with dry-run
 			if !destroyer.DryRun {
-				cmdutil.CheckErr(applier.Initialize(cmd, args))
+				cmdutil.CheckErr(applier.Initialize(cmd))
 
 				// Create a context
 				ctx := context.Background()
 
+				_, err := common.DemandOneDirectory(args)
+				cmdutil.CheckErr(err)
+
+				var reader manifestreader.ManifestReader
+				readerOptions := manifestreader.ReaderOptions{
+					Factory:   f,
+					Namespace: metav1.NamespaceDefault,
+				}
+				if len(args) == 0 {
+					reader = &manifestreader.StreamManifestReader{
+						ReaderName:    "stdin",
+						Reader:        cmd.InOrStdin(),
+						ReaderOptions: readerOptions,
+					}
+				} else {
+					reader = &manifestreader.PathManifestReader{
+						Path:          args[0],
+						ReaderOptions: readerOptions,
+					}
+				}
+				infos, err := reader.Read()
+				cmdutil.CheckErr(err)
+
 				// Run the applier. It will return a channel where we can receive updates
 				// to keep track of progress and any issues.
-				ch = applier.Run(ctx, apply.Options{
+				ch = applier.Run(ctx, infos, apply.Options{
 					EmitStatusEvents: false,
 					NoPrune:          noPrune,
 					DryRun:           true,

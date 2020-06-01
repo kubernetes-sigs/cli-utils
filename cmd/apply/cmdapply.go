@@ -16,12 +16,15 @@ import (
 	"k8s.io/kubectl/pkg/util/i18n"
 	"sigs.k8s.io/cli-utils/cmd/printers"
 	"sigs.k8s.io/cli-utils/pkg/apply"
+	"sigs.k8s.io/cli-utils/pkg/common"
+	"sigs.k8s.io/cli-utils/pkg/manifestreader"
 )
 
 func GetApplyRunner(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *ApplyRunner {
 	r := &ApplyRunner{
 		Applier:   apply.NewApplier(f, ioStreams),
 		ioStreams: ioStreams,
+		factory:   f,
 	}
 	cmd := &cobra.Command{
 		Use:                   "apply (DIRECTORY | STDIN)",
@@ -71,6 +74,7 @@ type ApplyRunner struct {
 	command   *cobra.Command
 	ioStreams genericclioptions.IOStreams
 	Applier   *apply.Applier
+	factory   cmdutil.Factory
 
 	output                 string
 	period                 time.Duration
@@ -86,7 +90,7 @@ func (r *ApplyRunner) RunE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	cmdutil.CheckErr(r.Applier.Initialize(cmd, args))
+	cmdutil.CheckErr(r.Applier.Initialize(cmd))
 
 	// Only emit status events if we are waiting for status.
 	//TODO: This is not the right way to do this. There are situations where
@@ -97,9 +101,38 @@ func (r *ApplyRunner) RunE(cmd *cobra.Command, args []string) error {
 		emitStatusEvents = true
 	}
 
-	// Run the Applier. It will return a channel where we can receive updates
+	// TODO: Fix DemandOneDirectory to no longer return FileNameFlags
+	// since we are no longer using them.
+	_, err = common.DemandOneDirectory(args)
+	if err != nil {
+		return err
+	}
+
+	var reader manifestreader.ManifestReader
+	readerOptions := manifestreader.ReaderOptions{
+		Factory:   r.factory,
+		Namespace: metav1.NamespaceDefault,
+	}
+	if len(args) == 0 {
+		reader = &manifestreader.StreamManifestReader{
+			ReaderName:    "stdin",
+			Reader:        cmd.InOrStdin(),
+			ReaderOptions: readerOptions,
+		}
+	} else {
+		reader = &manifestreader.PathManifestReader{
+			Path:          args[0],
+			ReaderOptions: readerOptions,
+		}
+	}
+	infos, err := reader.Read()
+	if err != nil {
+		return err
+	}
+
+	// Run the applier. It will return a channel where we can receive updates
 	// to keep track of progress and any issues.
-	ch := r.Applier.Run(context.Background(), apply.Options{
+	ch := r.Applier.Run(context.Background(), infos, apply.Options{
 		PollInterval:     r.period,
 		ReconcileTimeout: r.reconcileTimeout,
 		// If we are not waiting for status, tell the applier to not
