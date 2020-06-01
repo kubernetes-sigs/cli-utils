@@ -122,38 +122,38 @@ func createInventoryInfo(name string, children ...*resource.Info) *resource.Info
 
 func TestUnionPastObjs(t *testing.T) {
 	tests := map[string]struct {
-		inventoryInfos []*resource.Info
-		expected       []object.ObjMetadata
+		prevInventories []Inventory
+		expected        []object.ObjMetadata
 	}{
 		"Empty inventory objects = empty inventory": {
-			inventoryInfos: []*resource.Info{},
-			expected:       []object.ObjMetadata{},
+			prevInventories: []Inventory{},
+			expected:        []object.ObjMetadata{},
 		},
 		"No children in inventory object, equals no inventory": {
-			inventoryInfos: []*resource.Info{createInventoryInfo("test-1")},
-			expected:       []object.ObjMetadata{},
+			prevInventories: []Inventory{WrapInventoryObj(createInventoryInfo("test-1"))},
+			expected:        []object.ObjMetadata{},
 		},
 		"Inventory object with Pod1 returns inventory with Pod1": {
-			inventoryInfos: []*resource.Info{createInventoryInfo("test-1", pod1Info)},
-			expected:       []object.ObjMetadata{*pod1Metadata},
+			prevInventories: []Inventory{WrapInventoryObj(createInventoryInfo("test-1", pod1Info))},
+			expected:        []object.ObjMetadata{*pod1Metadata},
 		},
 		"Inventory object with three pods returns inventory with three pods": {
-			inventoryInfos: []*resource.Info{
-				createInventoryInfo("test-1", pod1Info, pod2Info, pod3Info),
+			prevInventories: []Inventory{
+				WrapInventoryObj(createInventoryInfo("test-1", pod1Info, pod2Info, pod3Info)),
 			},
 			expected: []object.ObjMetadata{*pod1Metadata, *pod2Metadata, *pod3Metadata},
 		},
 		"Two inventory objects with different pods returns inventory with both pods": {
-			inventoryInfos: []*resource.Info{
-				createInventoryInfo("test-1", pod1Info),
-				createInventoryInfo("test-2", pod2Info),
+			prevInventories: []Inventory{
+				WrapInventoryObj(createInventoryInfo("test-1", pod1Info)),
+				WrapInventoryObj(createInventoryInfo("test-2", pod2Info)),
 			},
 			expected: []object.ObjMetadata{*pod1Metadata, *pod2Metadata},
 		},
 		"Two inventory objects with overlapping pods returns set of pods": {
-			inventoryInfos: []*resource.Info{
-				createInventoryInfo("test-1", pod1Info, pod2Info),
-				createInventoryInfo("test-2", pod2Info, pod3Info),
+			prevInventories: []Inventory{
+				WrapInventoryObj(createInventoryInfo("test-1", pod1Info, pod2Info)),
+				WrapInventoryObj(createInventoryInfo("test-2", pod2Info, pod3Info)),
 			},
 			expected: []object.ObjMetadata{*pod1Metadata, *pod2Metadata, *pod3Metadata},
 		},
@@ -161,7 +161,7 @@ func TestUnionPastObjs(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			actual, err := UnionPastObjs(tc.inventoryInfos)
+			actual, err := UnionPastObjs(tc.prevInventories)
 			if err != nil {
 				t.Errorf("Unexpected error received: %s\n", err)
 			}
@@ -259,6 +259,7 @@ func TestPrune(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			po := NewPruneOptions(populateObjectIds(tc.currentInfos, t))
+			po.InventoryFactoryFunc = WrapInventoryObj
 			// Set up the previously applied objects.
 			pastInventoryInfo := createInventoryInfo("past-group", tc.pastInfos...)
 			po.pastInventoryObjects = []*resource.Info{pastInventoryInfo}

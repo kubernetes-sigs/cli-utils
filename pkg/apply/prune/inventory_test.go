@@ -162,7 +162,7 @@ func TestRetrieveInventoryLabel(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		actual, err := RetrieveInventoryLabel(test.obj)
+		actual, err := retrieveInventoryLabel(test.obj)
 		if test.isError && err == nil {
 			t.Errorf("Did not receive expected error.\n")
 		}

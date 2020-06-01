@@ -1,5 +1,10 @@
 // Copyright 2020 The Kubernetes Authors.
 // SPDX-License-Identifier: Apache-2.0
+//
+// Introduces the InventoryConfigMap struct which implements
+// the Inventory interface. The InventoryConfigMap wraps a
+// ConfigMap resource which stores the set of inventory
+// (object metadata).
 
 package prune
 
@@ -14,17 +19,25 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
+// WrapInventoryObj takes a passed ConfigMap (as a resource.Info),
+// wraps it with the InventoryConfigMap and upcasts the wrapper as
+// an the Inventory interface.
 func WrapInventoryObj(info *resource.Info) Inventory {
 	return &InventoryConfigMap{inv: info}
 }
 
+// InventoryConfigMap wraps a ConfigMap resource and implements
+// the Inventory interface. This wrapper loads and stores the
+// object metadata (inventory) to and from the wrapped ConfigMap.
 type InventoryConfigMap struct {
 	inv      *resource.Info
-	objMetas []*object.ObjMetadata
+	objMetas []object.ObjMetadata
 }
 
-func (icm *InventoryConfigMap) Load() ([]*object.ObjMetadata, error) {
-	objs := []*object.ObjMetadata{}
+// Load is an Inventory interface function returning the set of
+// object metadata from the wrapped ConfigMap, or an error.
+func (icm *InventoryConfigMap) Load() ([]object.ObjMetadata, error) {
+	objs := []object.ObjMetadata{}
 	inventoryObj, ok := icm.inv.Object.(*unstructured.Unstructured)
 	if !ok {
 		err := fmt.Errorf("inventory object is not an Unstructured: %#v", inventoryObj)
@@ -41,17 +54,22 @@ func (icm *InventoryConfigMap) Load() ([]*object.ObjMetadata, error) {
 			if err != nil {
 				return objs, err
 			}
-			objs = append(objs, obj)
+			objs = append(objs, *obj)
 		}
 	}
 	return objs, nil
 }
 
-func (icm *InventoryConfigMap) Store(objMetas []*object.ObjMetadata) error {
+// Store is an Inventory interface function implemented to store
+// the object metadata in the wrapped ConfigMap. Actual storing
+// happens in "GetObject".
+func (icm *InventoryConfigMap) Store(objMetas []object.ObjMetadata) error {
 	icm.objMetas = objMetas
 	return nil
 }
 
+// GetObject returns the wrapped object (ConfigMap) as a resource.Info
+// or an error if one occurs.
 func (icm *InventoryConfigMap) GetObject() (*resource.Info, error) {
 	// Verify the ConfigMap is in Unstructured format.
 	obj := icm.inv.Object
@@ -99,7 +117,7 @@ func (icm *InventoryConfigMap) GetObject() (*resource.Info, error) {
 	}, nil
 }
 
-func buildObjMap(objMetas []*object.ObjMetadata) map[string]string {
+func buildObjMap(objMetas []object.ObjMetadata) map[string]string {
 	objMap := map[string]string{}
 	for _, objMetadata := range objMetas {
 		objMap[objMetadata.String()] = ""

@@ -26,15 +26,22 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
+// Inventory describes methods necessary for an object which
+// can persist the object metadata for pruning and other group
+// operations.
 type Inventory interface {
-	object.ObjLoadStorer
+	// Load retrieves the set of object metadata from the inventory object
+	Load() ([]object.ObjMetadata, error)
+	// Store the set of object metadata in the inventory object
+	Store(objs []object.ObjMetadata) error
+	// GetObject returns the object that stores the inventory
 	GetObject() (*resource.Info, error)
 }
 
-// RetrieveInventoryLabel returns the string value of the InventoryLabel
+// retrieveInventoryLabel returns the string value of the InventoryLabel
 // for the passed object. Returns error if the passed object is nil or
 // is not a inventory object.
-func RetrieveInventoryLabel(obj runtime.Object) (string, error) {
+func retrieveInventoryLabel(obj runtime.Object) (string, error) {
 	var inventoryLabel string
 	if obj == nil {
 		return "", fmt.Errorf("inventory object is nil")
@@ -57,7 +64,7 @@ func IsInventoryObject(obj runtime.Object) bool {
 	if obj == nil {
 		return false
 	}
-	inventoryLabel, err := RetrieveInventoryLabel(obj)
+	inventoryLabel, err := retrieveInventoryLabel(obj)
 	if err == nil && len(inventoryLabel) > 0 {
 		return true
 	}
@@ -165,8 +172,8 @@ func CreateInventoryObj(inventory Inventory, resources []*resource.Info) (*resou
 // buildObjectMetadata returns object metadata (ObjMetadata) for the
 // passed objects (infos). The object metadata is then stored in the
 // inventory object.
-func buildObjMetadata(infos []*resource.Info) ([]*object.ObjMetadata, error) {
-	objMetas := []*object.ObjMetadata{}
+func buildObjMetadata(infos []*resource.Info) ([]object.ObjMetadata, error) {
+	objMetas := []object.ObjMetadata{}
 	for _, info := range infos {
 		obj := info.Object
 		if obj == nil {
@@ -177,7 +184,7 @@ func buildObjMetadata(infos []*resource.Info) ([]*object.ObjMetadata, error) {
 		if err != nil {
 			return nil, err
 		}
-		objMetas = append(objMetas, objMeta)
+		objMetas = append(objMetas, *objMeta)
 	}
 	return objMetas, nil
 }

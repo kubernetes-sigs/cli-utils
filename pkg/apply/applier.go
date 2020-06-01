@@ -47,10 +47,11 @@ func NewApplier(factory util.Factory, ioStreams genericclioptions.IOStreams) *Ap
 		factory:      factory,
 		ioStreams:    ioStreams,
 	}
-	a.previousInventoriesFunc = a.previousInventories
+	a.previousInventoriesFunc = a.PruneOptions.GetPreviousInventoryObjects
 	a.infoHelperFactoryFunc = a.infoHelperFactory
 	a.manifestReaderFunc = a.readObjects
 	a.InventoryFactoryFunc = prune.WrapInventoryObj
+	a.PruneOptions.InventoryFactoryFunc = prune.WrapInventoryObj
 
 	return a
 }
@@ -77,9 +78,10 @@ type Applier struct {
 	// so we don't need these functions to facilitate testing.
 	//
 	// previousInventoriesFunc is used to fetch the existing inventories
-	// from the apiserver. It is defined here so we can override it in
+	// from the apiserver, taking the current inventory object as the
+	// parameter. It is defined here so we can override it in
 	// unit tests.
-	previousInventoriesFunc func(label, namespace string) ([]*resource.Info, error)
+	previousInventoriesFunc func(*resource.Info) ([]prune.Inventory, error)
 	// infoHelperFactoryFunc is used to create a new instance of the
 	// InfoHelper. It is defined here so we can override it in unit tests.
 	infoHelperFactoryFunc func() info.InfoHelper
@@ -159,12 +161,6 @@ func (a *Applier) newStatusPoller() (poller.Poller, error) {
 	}
 
 	return polling.NewStatusPoller(c, mapper), nil
-}
-
-// previousInventories returns the infos for all the inventory objects
-// in the cluster.
-func (a *Applier) previousInventories(label, namespace string) ([]*resource.Info, error) {
-	return a.PruneOptions.RetrievePreviousInventoryObjects(label, namespace)
 }
 
 // infoHelperFactory returns a new instance of the InfoHelper.
@@ -311,14 +307,8 @@ func (a *Applier) readAndPrepareObjects() (*ResourceObjects, error) {
 		return nil, err
 	}
 
-	// Fetch the inventory label used for the current set of resources.
-	inventoryLabel, err := prune.RetrieveInventoryLabel(inventoryObject.Object)
-	if err != nil {
-		return nil, err
-	}
 	// Fetch all previous inventories.
-	previousInventories, err := a.previousInventoriesFunc(inventoryLabel,
-		inventoryObject.Namespace)
+	previousInventories, err := a.previousInventoriesFunc(inventoryObject)
 	if err != nil {
 		return nil, err
 	}
@@ -341,7 +331,7 @@ func (a *Applier) readAndPrepareObjects() (*ResourceObjects, error) {
 // resources that should be pruned.
 type ResourceObjects struct {
 	CurrentInventory    *resource.Info
-	PreviousInventories []*resource.Info
+	PreviousInventories []prune.Inventory
 	Resources           []*resource.Info
 }
 
