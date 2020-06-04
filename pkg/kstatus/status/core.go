@@ -34,6 +34,7 @@ var legacyTypes = map[string]GetConditionsFn{
 	"batch/CronJob":              alwaysReady,
 	"ConfigMap":                  alwaysReady,
 	"batch/Job":                  jobConditions,
+	"apiextensions.k8s.io/CustomResourceDefinition": crdConditions,
 }
 
 const (
@@ -543,4 +544,32 @@ func serviceConditions(u *unstructured.Unstructured) (*Result, error) {
 		Message:    "Service is ready",
 		Conditions: []Condition{},
 	}, nil
+}
+
+func crdConditions(u *unstructured.Unstructured) (*Result, error) {
+	obj := u.UnstructuredContent()
+
+	objc, err := GetObjectWithConditions(obj)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, c := range objc.Status.Conditions {
+		if c.Type == "NamesAccepted" && c.Status == corev1.ConditionFalse {
+			return newFailedStatus(c.Reason, c.Message), nil
+		}
+		if c.Type == "Established" {
+			if c.Status == corev1.ConditionFalse && c.Reason != "Installing" {
+				return newFailedStatus(c.Reason, c.Message), nil
+			}
+			if c.Status == corev1.ConditionTrue {
+				return &Result{
+					Status:     CurrentStatus,
+					Message:    "CRD is established",
+					Conditions: []Condition{},
+				}, nil
+			}
+		}
+	}
+	return newInProgressStatus("Installing", "Install in progress"), nil
 }
