@@ -5,15 +5,23 @@ package common
 
 import (
 	"fmt"
+	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/klog"
 	"sigs.k8s.io/kustomize/kyaml/kio"
 	"sigs.k8s.io/kustomize/kyaml/kio/kioutil"
+	"sigs.k8s.io/kustomize/kyaml/yaml"
 )
 
-const stdinDash = "-"
+const (
+	stdinDash    = "-"
+	tmpDirPrefix = "diff-cmd-config"
+	fileRegexp   = "config-*.yaml"
+)
 
 func processPaths(paths []string) genericclioptions.FileNameFlags {
 	// No arguments means we are reading from StdIn
@@ -78,6 +86,54 @@ func ExpandPackageDir(f genericclioptions.FileNameFlags) (genericclioptions.File
 	}
 	f.Filenames = &configFilepaths
 	return f, nil
+}
+
+// FilterInputFile copies the resource config on stdin into a file
+// at the tmpDir, filtering the inventory object. It is the
+// responsibility of the caller to clean up the tmpDir. Returns
+// an error if one occurs.
+func FilterInputFile(in io.Reader, tmpDir string) error {
+	// Copy the config from "in" into a local temp file.
+	dir, err := ioutil.TempDir("", tmpDirPrefix)
+	if err != nil {
+		return err
+	}
+	tmpFile, err := ioutil.TempFile(dir, fileRegexp)
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(dir)
+	klog.V(6).Infof("Temp File: %s", tmpFile.Name())
+	if _, err := io.Copy(tmpFile, in); err != nil {
+		return err
+	}
+	// Read the config stored locally, parsing into RNodes
+	r := kio.LocalPackageReader{PackagePath: dir}
+	nodes, err := r.Read()
+	if err != nil {
+		return err
+	}
+	klog.V(6).Infof("Num read configs: %d", len(nodes))
+	// Filter RNodes to remove the inventory object.
+	filteredNodes := []*yaml.RNode{}
+	for _, node := range nodes {
+		meta, err := node.GetMeta()
+		if err != nil {
+			continue
+		}
+		// If object has inventory label, skip it.
+		labels := meta.Labels
+		if _, exists := labels[InventoryLabel]; !exists {
+			filteredNodes = append(filteredNodes, node)
+		}
+	}
+	// Write the remaining configs into a file in the tmpDir
+	w := kio.LocalPackageWriter{
+		PackagePath:           tmpDir,
+		KeepReaderAnnotations: false,
+	}
+	klog.V(6).Infof("Writing %d configs", len(filteredNodes))
+	return w.Write(filteredNodes)
 }
 
 // expandDir takes a single package directory as a parameter, and returns

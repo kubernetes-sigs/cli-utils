@@ -4,6 +4,9 @@
 package common
 
 import (
+	"bytes"
+	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -18,6 +21,7 @@ const (
 	inventoryFilename = "inventory.yaml"
 	podAFilename      = "pod-a.yaml"
 	podBFilename      = "pod-b.yaml"
+	configSeparator   = "---"
 )
 
 var (
@@ -68,7 +72,7 @@ var podB = []byte(`
 apiVersion: v1
 kind: Pod
 metadata:
-  name: pod-a
+  name: pod-b
   namespace: test-namespace
   labels:
     name: test-pod-label
@@ -77,6 +81,17 @@ spec:
   - name: kubernetes-pause
     image: k8s.gcr.io/pause:2.0
 `)
+
+func buildMultiResourceConfig(configs ...[]byte) []byte {
+	r := []byte{}
+	for i, config := range configs {
+		if i > 0 {
+			r = append(r, []byte(configSeparator)...)
+		}
+		r = append(r, config...)
+	}
+	return r
+}
 
 func TestProcessPaths(t *testing.T) {
 	tf := setupTestFilesystem(t)
@@ -125,6 +140,79 @@ func TestProcessPaths(t *testing.T) {
 			assert.DeepEqual(t, tc.expectedFileNameFlags, fileNameFlags)
 			if err != nil && err.Error() != tc.errFromDemandOneDirectory {
 				assert.Equal(t, err.Error(), tc.errFromDemandOneDirectory)
+			}
+		})
+	}
+}
+
+func TestFilterInputFile(t *testing.T) {
+	tf := testutil.Setup(t)
+	defer tf.Clean()
+
+	testCases := map[string]struct {
+		configObjects   [][]byte
+		expectedObjects [][]byte
+	}{
+		"Empty config objects writes empty file": {
+			configObjects:   [][]byte{},
+			expectedObjects: [][]byte{},
+		},
+		"Only inventory obj writes empty file": {
+			configObjects:   [][]byte{inventoryConfigMap},
+			expectedObjects: [][]byte{},
+		},
+		"Only pods writes both pods": {
+			configObjects:   [][]byte{podA, podB},
+			expectedObjects: [][]byte{podA, podB},
+		},
+		"Basic case of inventory obj and two pods": {
+			configObjects:   [][]byte{inventoryConfigMap, podA, podB},
+			expectedObjects: [][]byte{podA, podB},
+		},
+		"Basic case of inventory obj and two pods in different order": {
+			configObjects:   [][]byte{podB, inventoryConfigMap, podA},
+			expectedObjects: [][]byte{podB, podA},
+		},
+	}
+	for tn, tc := range testCases {
+		t.Run(tn, func(t *testing.T) {
+			// Build a single file of multiple resource configs, and
+			// call the tested function FilterInputFile. This writes
+			// the passed file to the test filesystem, filtering
+			// the inventory object if it exists in the passed file.
+			in := buildMultiResourceConfig(tc.configObjects...)
+			err := FilterInputFile(bytes.NewReader(in), tf.GetRootDir())
+			if err != nil {
+				t.Fatalf("Unexpected error in FilterInputFile: %s", err)
+			}
+			// Retrieve the files from the test filesystem.
+			actualFiles, err := ioutil.ReadDir(tf.GetRootDir())
+			if err != nil {
+				t.Fatalf("Error reading test filesystem directory: %s", err)
+			}
+			// Since we remove the generated file for each test, there should
+			// not be more than one file in the test filesystem.
+			if len(actualFiles) > 1 {
+				t.Fatalf("Wrong number of files (%d) in dir: %s", len(actualFiles), tf.GetRootDir())
+			}
+			// If there is a generated file, then read it into actualStr.
+			actualStr := ""
+			if len(actualFiles) != 0 {
+				actualFilename := (actualFiles[0]).Name()
+				defer os.Remove(actualFilename)
+				actual, err := ioutil.ReadFile(actualFilename)
+				if err != nil {
+					t.Fatalf("Error reading created file (%s): %s", actualFilename, err)
+				}
+				actualStr = strings.TrimSpace(string(actual))
+			}
+			// Build the expected string from the expectedObjects. This expected
+			// string should not have the inventory object config in it.
+			expected := buildMultiResourceConfig(tc.expectedObjects...)
+			expectedStr := strings.TrimSpace(string(expected))
+			if expectedStr != actualStr {
+				t.Errorf("Expected file contents (%s) not equal to actual file contents (%s)",
+					expectedStr, actualStr)
 			}
 		})
 	}
