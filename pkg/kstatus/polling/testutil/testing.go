@@ -8,10 +8,8 @@ import (
 	"testing"
 
 	"gopkg.in/yaml.v3"
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -23,18 +21,6 @@ func YamlToUnstructured(t *testing.T, yml string) *unstructured.Unstructured {
 		return nil
 	}
 	return &unstructured.Unstructured{Object: m}
-}
-
-func NewFakeRESTMapper(gvks ...schema.GroupVersionKind) meta.RESTMapper {
-	var groupVersions []schema.GroupVersion
-	for _, gvk := range gvks {
-		groupVersions = append(groupVersions, gvk.GroupVersion())
-	}
-	mapper := meta.NewDefaultRESTMapper(groupVersions)
-	for _, gvk := range gvks {
-		mapper.Add(gvk, meta.RESTScopeNamespace)
-	}
-	return mapper
 }
 
 func NewNoopClusterReader() *NoopClusterReader {

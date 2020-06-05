@@ -64,6 +64,7 @@ func (t *TaskQueueSolver) BuildTaskQueue(ro resourceObjects,
 	if hasCRDs {
 		tasks = append(tasks, &task.ApplyTask{
 			Objects:      append(crdSplitRes.before, crdSplitRes.crds...),
+			CRDs:         crdSplitRes.crds,
 			ApplyOptions: t.ApplyOptions,
 			DryRun:       o.DryRun,
 			InfoHelper:   t.InfoHelper,
@@ -81,6 +82,7 @@ func (t *TaskQueueSolver) BuildTaskQueue(ro resourceObjects,
 	tasks = append(tasks,
 		&task.ApplyTask{
 			Objects:      remainingInfos,
+			CRDs:         crdSplitRes.crds,
 			ApplyOptions: t.ApplyOptions,
 			DryRun:       o.DryRun,
 			InfoHelper:   t.InfoHelper,

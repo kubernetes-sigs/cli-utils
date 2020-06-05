@@ -15,6 +15,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/testutil"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
 	"sigs.k8s.io/cli-utils/pkg/object"
+	fakemapper "sigs.k8s.io/cli-utils/pkg/testutil"
 )
 
 func TestPodControllerStatusReader(t *testing.T) {
@@ -78,7 +79,7 @@ func TestPodControllerStatusReader(t *testing.T) {
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
 			fakeReader := testutil.NewNoopClusterReader()
-			fakeMapper := testutil.NewFakeRESTMapper()
+			fakeMapper := fakemapper.NewFakeRESTMapper()
 			podControllerStatusReader := &podControllerStatusReader{
 				reader: fakeReader,
 				mapper: fakeMapper,

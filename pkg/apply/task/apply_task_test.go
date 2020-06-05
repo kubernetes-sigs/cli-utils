@@ -4,15 +4,18 @@
 package task
 
 import (
+	"sync"
 	"testing"
 
 	"gotest.tools/assert"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/resource"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
 	"sigs.k8s.io/cli-utils/pkg/object"
+	"sigs.k8s.io/cli-utils/pkg/testutil"
 )
 
 type resourceInfo struct {
@@ -26,10 +29,10 @@ type resourceInfo struct {
 
 func TestApplyTask_FetchGeneration(t *testing.T) {
 	testCases := map[string]struct {
-		infos []resourceInfo
+		rss []resourceInfo
 	}{
 		"single namespaced resource": {
-			infos: []resourceInfo{
+			rss: []resourceInfo{
 				{
 					group:      "apps",
 					apiVersion: "apps/v1",
@@ -41,7 +44,7 @@ func TestApplyTask_FetchGeneration(t *testing.T) {
 			},
 		},
 		"multiple clusterscoped resources": {
-			infos: []resourceInfo{
+			rss: []resourceInfo{
 				{
 					group:      "custom.io",
 					apiVersion: "custom.io/v1beta1",
@@ -66,23 +69,7 @@ func TestApplyTask_FetchGeneration(t *testing.T) {
 			defer close(eventChannel)
 			taskContext := taskrunner.NewTaskContext(eventChannel)
 
-			var infos []*resource.Info
-
-			for _, info := range tc.infos {
-				infos = append(infos, &resource.Info{
-					Object: &unstructured.Unstructured{
-						Object: map[string]interface{}{
-							"apiVersion": info.apiVersion,
-							"kind":       info.kind,
-							"metadata": map[string]interface{}{
-								"name":       info.name,
-								"namespace":  info.namespace,
-								"generation": info.generation,
-							},
-						},
-					},
-				})
-			}
+			infos := toInfos(tc.rss)
 
 			applyOptions := &fakeApplyOptions{}
 
@@ -96,7 +83,7 @@ func TestApplyTask_FetchGeneration(t *testing.T) {
 
 			<-taskContext.TaskChannel()
 
-			for _, info := range tc.infos {
+			for _, info := range tc.rss {
 				id := object.ObjMetadata{
 					GroupKind: schema.GroupKind{
 						Group: info.group,
@@ -112,20 +99,226 @@ func TestApplyTask_FetchGeneration(t *testing.T) {
 	}
 }
 
-type fakeApplyOptions struct{}
+func TestApplyTask_DryRun(t *testing.T) {
+	testCases := map[string]struct {
+		infos           []*resource.Info
+		crds            []*resource.Info
+		expectedObjects []object.ObjMetadata
+		expectedEvents  []event.Event
+	}{
+		"dry run with no CRDs or CRs": {
+			infos: []*resource.Info{
+				toInfo(map[string]interface{}{
+					"apiVersion": "apps/v1",
+					"kind":       "Deployment",
+					"metadata": map[string]interface{}{
+						"name":      "foo",
+						"namespace": "default",
+					},
+				}),
+			},
+			expectedObjects: []object.ObjMetadata{
+				{
+					GroupKind: schema.GroupKind{
+						Group: "apps",
+						Kind:  "Deployment",
+					},
+					Name:      "foo",
+					Namespace: "default",
+				},
+			},
+			expectedEvents: []event.Event{},
+		},
+		"dry run with CRD and CR": {
+			crds: []*resource.Info{
+				toInfo(map[string]interface{}{
+					"apiVersion": "apiextensions.k8s.io/v1",
+					"kind":       "CustomResourceDefinition",
+					"metadata": map[string]interface{}{
+						"name": "foo",
+					},
+					"spec": map[string]interface{}{
+						"group": "custom.io",
+						"names": map[string]interface{}{
+							"kind": "Custom",
+						},
+						"versions": []interface{}{
+							map[string]interface{}{
+								"name": "v1alpha1",
+							},
+						},
+					},
+				}),
+			},
+			infos: []*resource.Info{
+				toInfo(map[string]interface{}{
+					"apiVersion": "custom.io/v1alpha1",
+					"kind":       "Custom",
+					"metadata": map[string]interface{}{
+						"name": "bar",
+					},
+				}),
+			},
+			expectedObjects: []object.ObjMetadata{},
+			expectedEvents: []event.Event{
+				{
+					Type: event.ApplyType,
+				},
+			},
+		},
+		"dry run with CRD and CR and CRD already installed": {
+			crds: []*resource.Info{
+				toInfo(map[string]interface{}{
+					"apiVersion": "apiextensions.k8s.io/v1",
+					"kind":       "CustomResourceDefinition",
+					"metadata": map[string]interface{}{
+						"name": "foo",
+					},
+					"spec": map[string]interface{}{
+						"group": "anothercustom.io",
+						"names": map[string]interface{}{
+							"kind": "AnotherCustom",
+						},
+						"versions": []interface{}{
+							map[string]interface{}{
+								"name": "v2",
+							},
+						},
+					},
+				}),
+			},
+			infos: []*resource.Info{
+				toInfo(map[string]interface{}{
+					"apiVersion": "anothercustom.io/v2",
+					"kind":       "AnotherCustom",
+					"metadata": map[string]interface{}{
+						"name":      "bar",
+						"namespace": "barbar",
+					},
+				}),
+			},
+			expectedObjects: []object.ObjMetadata{
+				{
+					GroupKind: schema.GroupKind{
+						Group: "anothercustom.io",
+						Kind:  "AnotherCustom",
+					},
+					Name:      "bar",
+					Namespace: "barbar",
+				},
+			},
+			expectedEvents: []event.Event{},
+		},
+	}
+
+	for tn, tc := range testCases {
+		t.Run(tn, func(t *testing.T) {
+			eventChannel := make(chan event.Event)
+			taskContext := taskrunner.NewTaskContext(eventChannel)
+
+			restMapper := testutil.NewFakeRESTMapper(schema.GroupVersionKind{
+				Group:   "apps",
+				Version: "v1",
+				Kind:    "Deployment",
+			}, schema.GroupVersionKind{
+				Group:   "anothercustom.io",
+				Version: "v2",
+				Kind:    "AnotherCustom",
+			})
+
+			applyOptions := &fakeApplyOptions{}
+
+			applyTask := &ApplyTask{
+				ApplyOptions: applyOptions,
+				Objects:      tc.infos,
+				InfoHelper: &fakeInfoHelper{
+					restMapper: restMapper,
+				},
+				DryRun: true,
+				CRDs:   tc.crds,
+			}
+
+			var events []event.Event
+			var wg sync.WaitGroup
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				for msg := range eventChannel {
+					events = append(events, msg)
+				}
+			}()
+
+			applyTask.Start(taskContext)
+			<-taskContext.TaskChannel()
+			close(eventChannel)
+			wg.Wait()
+
+			assert.Equal(t, len(tc.expectedObjects), len(applyOptions.objects))
+			for i, obj := range applyOptions.objects {
+				assert.Equal(t, tc.expectedObjects[i], object.InfoToObjMeta(obj))
+			}
+
+			assert.Equal(t, len(tc.expectedEvents), len(events))
+			for i, e := range events {
+				assert.Equal(t, tc.expectedEvents[i].Type, e.Type)
+			}
+		})
+	}
+}
+
+func toInfo(obj map[string]interface{}) *resource.Info {
+	return &resource.Info{
+		Object: &unstructured.Unstructured{
+			Object: obj,
+		},
+	}
+}
+
+func toInfos(rss []resourceInfo) []*resource.Info {
+	var infos []*resource.Info
+
+	for _, rs := range rss {
+		infos = append(infos, &resource.Info{
+			Object: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"apiVersion": rs.apiVersion,
+					"kind":       rs.kind,
+					"metadata": map[string]interface{}{
+						"name":       rs.name,
+						"namespace":  rs.namespace,
+						"generation": rs.generation,
+					},
+				},
+			},
+		})
+	}
+	return infos
+}
+
+type fakeApplyOptions struct {
+	objects []*resource.Info
+}
 
 func (f *fakeApplyOptions) Run() error {
 	return nil
 }
 
-func (f *fakeApplyOptions) SetObjects([]*resource.Info) {}
+func (f *fakeApplyOptions) SetObjects(objects []*resource.Info) {
+	f.objects = objects
+}
 
-type fakeInfoHelper struct{}
+type fakeInfoHelper struct {
+	restMapper meta.RESTMapper
+}
 
-func (f *fakeInfoHelper) UpdateInfos(infos []*resource.Info) error {
+func (f *fakeInfoHelper) UpdateInfos([]*resource.Info) error {
 	return nil
 }
 
 func (f *fakeInfoHelper) ResetRESTMapper() error {
 	return nil
+}
+
+func (f *fakeInfoHelper) ToRESTMapper() (meta.RESTMapper, error) {
+	return f.restMapper, nil
 }
