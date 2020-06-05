@@ -522,8 +522,8 @@ func TestReadAndPrepareObjects(t *testing.T) {
 			applier.manifestReaderFunc = func() (infos []*resource.Info, err error) {
 				return tc.resources, nil
 			}
-			applier.previousInventoriesFunc = func(label, namespace string) ([]*resource.Info, error) {
-				return []*resource.Info{}, nil
+			applier.previousInventoriesFunc = func(currentInv *resource.Info) ([]prune.Inventory, error) {
+				return []prune.Inventory{}, nil
 			}
 
 			resourceObjects, err := applier.readAndPrepareObjects()
