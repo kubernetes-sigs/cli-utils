@@ -4,7 +4,9 @@
 package status
 
 import (
+	"fmt"
 	"testing"
+	"time"
 
 	"github.com/ghodss/yaml"
 	"github.com/stretchr/testify/assert"
@@ -109,6 +111,22 @@ status:
       reason: PodCompleted
 `
 
+var podBeingScheduled = `
+apiVersion: v1
+kind: Pod
+metadata:
+   creationTimestamp: %s
+   generation: 1
+   name: test
+   namespace: qual
+status:
+   phase: Pending
+   conditions:
+    - type: PodScheduled 
+      status: "False"
+      reason: Unschedulable
+`
+
 var podUnschedulable = `
 apiVersion: v1
 kind: Pod
@@ -183,6 +201,20 @@ func TestPodStatus(t *testing.T) {
 			expectedConditions: []Condition{},
 			absentConditionTypes: []ConditionType{
 				ConditionReconciling,
+				ConditionStalled,
+			},
+		},
+		"podBeingScheduled": {
+			spec:           fmt.Sprintf(podBeingScheduled, time.Now().Format(time.RFC3339)),
+			expectedStatus: InProgressStatus,
+			expectedConditions: []Condition{
+				{
+					Type:   ConditionReconciling,
+					Status: corev1.ConditionTrue,
+					Reason: "PodNotScheduled",
+				},
+			},
+			absentConditionTypes: []ConditionType{
 				ConditionStalled,
 			},
 		},

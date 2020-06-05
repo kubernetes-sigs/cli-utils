@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math"
 	"strings"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -44,6 +45,10 @@ const (
 	extraPods       = "ExtraPods"
 
 	onDeleteUpdateStrategy = "OnDelete"
+
+	// How long a pod can be unscheduled before it is reported as
+	// unschedulable.
+	scheduleWindow = 15 * time.Second
 )
 
 // GetLegacyConditionsFn returns a function that can compute the status for the
@@ -400,6 +405,11 @@ func podConditions(u *unstructured.Unstructured) (*Result, error) {
 	case "Pending":
 		c, found := getConditionWithStatus(objc.Status.Conditions, "PodScheduled", corev1.ConditionFalse)
 		if found && c.Reason == "Unschedulable" {
+			if time.Now().Add(-scheduleWindow).Before(u.GetCreationTimestamp().Time) {
+				// We give the pod 15 seconds to be scheduled before we report it
+				// as unschedulable.
+				return newInProgressStatus("PodNotScheduled", "Pod has not been scheduled"), nil
+			}
 			return newFailedStatus("PodUnschedulable", "Pod could not be scheduled"), nil
 		}
 		return newInProgressStatus("PodPending", "Pod is in the Pending phase"), nil
