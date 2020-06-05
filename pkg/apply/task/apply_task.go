@@ -7,6 +7,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/kubectl/pkg/cmd/apply"
+	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/info"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
 	"sigs.k8s.io/cli-utils/pkg/object"
@@ -45,7 +46,7 @@ type applyOptions interface {
 func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 	go func() {
 		// Update the dry-run field on the Applier.
-		a.setDryRunField()
+		a.setApplyOptionsFields(taskContext.EventChannel())
 		// Set the client and mapping fields on the provided
 		// infos so they can be applied to the cluster.
 		err := a.InfoHelper.UpdateInfos(a.Objects)
@@ -82,9 +83,15 @@ func (a *ApplyTask) sendTaskResult(taskContext *taskrunner.TaskContext, err erro
 	}
 }
 
-func (a *ApplyTask) setDryRunField() {
+func (a *ApplyTask) setApplyOptionsFields(eventChannel chan event.Event) {
 	if ao, ok := a.ApplyOptions.(*apply.ApplyOptions); ok {
 		ao.DryRun = a.DryRun
+		adapter := &KubectlPrinterAdapter{
+			ch: eventChannel,
+		}
+		// The adapter is used to intercept what is meant to be printing
+		// in the ApplyOptions, and instead turn those into events.
+		ao.ToPrinter = adapter.toPrinterFunc()
 	}
 }
 
