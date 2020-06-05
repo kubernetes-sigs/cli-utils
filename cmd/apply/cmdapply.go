@@ -20,7 +20,7 @@ import (
 
 func GetApplyRunner(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *ApplyRunner {
 	r := &ApplyRunner{
-		applier:   apply.NewApplier(f, ioStreams),
+		Applier:   apply.NewApplier(f, ioStreams),
 		ioStreams: ioStreams,
 	}
 	cmd := &cobra.Command{
@@ -30,7 +30,7 @@ func GetApplyRunner(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *A
 		RunE:                  r.RunE,
 	}
 
-	cmdutil.CheckErr(r.applier.SetFlags(cmd))
+	cmdutil.CheckErr(r.Applier.SetFlags(cmd))
 
 	// The following flags are added, but hidden because other code
 	// depend on them when parsing flags. These flags are hidden and unused.
@@ -70,7 +70,7 @@ func ApplyCommand(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cob
 type ApplyRunner struct {
 	command   *cobra.Command
 	ioStreams genericclioptions.IOStreams
-	applier   *apply.Applier
+	Applier   *apply.Applier
 
 	output                 string
 	period                 time.Duration
@@ -86,7 +86,7 @@ func (r *ApplyRunner) RunE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	cmdutil.CheckErr(r.applier.Initialize(cmd, args))
+	cmdutil.CheckErr(r.Applier.Initialize(cmd, args))
 
 	// Only emit status events if we are waiting for status.
 	//TODO: This is not the right way to do this. There are situations where
@@ -97,9 +97,9 @@ func (r *ApplyRunner) RunE(cmd *cobra.Command, args []string) error {
 		emitStatusEvents = true
 	}
 
-	// Run the applier. It will return a channel where we can receive updates
+	// Run the Applier. It will return a channel where we can receive updates
 	// to keep track of progress and any issues.
-	ch := r.applier.Run(context.Background(), apply.Options{
+	ch := r.Applier.Run(context.Background(), apply.Options{
 		PollInterval:     r.period,
 		ReconcileTimeout: r.reconcileTimeout,
 		// If we are not waiting for status, tell the applier to not
