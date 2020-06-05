@@ -1351,3 +1351,115 @@ func TestServiceStatus(t *testing.T) {
 		})
 	}
 }
+
+var crdNoConditions = `
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+   generation: 1
+`
+
+var crdInstalling = `
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+   generation: 1
+status:
+   conditions:
+    - type: NamesAccepted
+      status: "True"
+      reason: NoConflicts
+    - type: Established
+      status: "False"
+      reason: Installing
+`
+
+var crdNamesNotAccepted = `
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+   generation: 1
+status:
+   conditions:
+    - type: NamesAccepted
+      status: "False"
+      reason: SomeReason
+`
+
+var crdEstablished = `
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+   generation: 1
+status:
+   conditions:
+    - type: NamesAccepted
+      status: "True"
+      reason: NoConflicts
+    - type: Established
+      status: "True"
+      reason: InitialNamesAccepted
+`
+
+func TestCRDStatus(t *testing.T) {
+	testCases := map[string]testSpec{
+		"crdNoConditions": {
+			spec:           crdNoConditions,
+			expectedStatus: InProgressStatus,
+			expectedConditions: []Condition{
+				{
+					Type:   ConditionReconciling,
+					Status: corev1.ConditionTrue,
+					Reason: "Installing",
+				},
+			},
+			absentConditionTypes: []ConditionType{
+				ConditionStalled,
+			},
+		},
+		"crdInstalling": {
+			spec:           crdInstalling,
+			expectedStatus: InProgressStatus,
+			expectedConditions: []Condition{
+				{
+					Type:   ConditionReconciling,
+					Status: corev1.ConditionTrue,
+					Reason: "Installing",
+				},
+			},
+			absentConditionTypes: []ConditionType{
+				ConditionStalled,
+			},
+		},
+		"crdNamesNotAccepted": {
+			spec:           crdNamesNotAccepted,
+			expectedStatus: FailedStatus,
+			expectedConditions: []Condition{
+				{
+					Type:   ConditionStalled,
+					Status: corev1.ConditionTrue,
+					Reason: "SomeReason",
+				},
+			},
+			absentConditionTypes: []ConditionType{
+				ConditionReconciling,
+			},
+		},
+		"crdEstablished": {
+			spec:               crdEstablished,
+			expectedStatus:     CurrentStatus,
+			expectedConditions: []Condition{},
+			absentConditionTypes: []ConditionType{
+				ConditionReconciling,
+				ConditionStalled,
+			},
+		},
+	}
+
+	for tn, tc := range testCases {
+		tc := tc
+		t.Run(tn, func(t *testing.T) {
+			runStatusTest(t, tc)
+		})
+	}
+}
