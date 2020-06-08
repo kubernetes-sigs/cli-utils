@@ -59,16 +59,16 @@ func GetApplyRunner(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *A
 	cmd.Flags().DurationVar(&r.pruneTimeout, "prune-timeout", time.Duration(0),
 		"Timeout threshold for waiting for all pruned resources to be deleted")
 
-	r.command = cmd
+	r.Command = cmd
 	return r
 }
 
 func ApplyCommand(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
-	return GetApplyRunner(f, ioStreams).command
+	return GetApplyRunner(f, ioStreams).Command
 }
 
 type ApplyRunner struct {
-	command   *cobra.Command
+	Command   *cobra.Command
 	ioStreams genericclioptions.IOStreams
 	Applier   *apply.Applier
 
