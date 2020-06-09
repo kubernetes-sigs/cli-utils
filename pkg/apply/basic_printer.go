@@ -20,7 +20,7 @@ import (
 
 const (
 	defaultExitErrorCode int = 1
-	timeoutExitErrorCode int = -1
+	timeoutExitErrorCode int = 3
 )
 
 // BasicPrinter is a simple implementation that just prints the events
