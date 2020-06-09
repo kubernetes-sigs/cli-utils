@@ -11,9 +11,7 @@ import (
 
 	"github.com/go-errors/errors"
 	"github.com/spf13/cobra"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/kubectl/pkg/cmd/apply"
@@ -25,7 +23,6 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/apply/prune"
 	"sigs.k8s.io/cli-utils/pkg/apply/solver"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
-	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -49,10 +46,8 @@ func NewApplier(factory util.Factory, ioStreams genericclioptions.IOStreams) *Ap
 	}
 	a.previousInventoriesFunc = a.PruneOptions.GetPreviousInventoryObjects
 	a.infoHelperFactoryFunc = a.infoHelperFactory
-	a.manifestReaderFunc = a.readObjects
 	a.InventoryFactoryFunc = prune.WrapInventoryObj
 	a.PruneOptions.InventoryFactoryFunc = prune.WrapInventoryObj
-
 	return a
 }
 
@@ -85,9 +80,6 @@ type Applier struct {
 	// infoHelperFactoryFunc is used to create a new instance of the
 	// InfoHelper. It is defined here so we can override it in unit tests.
 	infoHelperFactoryFunc func() info.InfoHelper
-	// manifestReaderFunc is used to read manifests from files or from
-	// stdin. It is defined here so we can override it in unit tests.
-	manifestReaderFunc func() ([]*resource.Info, error)
 	// InventoryFactoryFunc wraps and returns an interface for the
 	// object which will load and store the inventory.
 	InventoryFactoryFunc func(*resource.Info) prune.Inventory
@@ -96,13 +88,12 @@ type Applier struct {
 // Initialize sets up the Applier for actually doing an apply against
 // a cluster. This involves validating command line inputs and configuring
 // clients for communicating with the cluster.
-func (a *Applier) Initialize(cmd *cobra.Command, paths []string) error {
-	fileNameFlags, err := common.DemandOneDirectory(paths)
-	if err != nil {
-		return err
+func (a *Applier) Initialize(cmd *cobra.Command) error {
+	// Setting this to satisfy ApplyOptions. It is not actually being used.
+	a.ApplyOptions.DeleteFlags.FileNameFlags = &genericclioptions.FileNameFlags{
+		Filenames: &[]string{"-"},
 	}
-	a.ApplyOptions.DeleteFlags.FileNameFlags = &fileNameFlags
-	err = a.ApplyOptions.Complete(a.factory, cmd)
+	err := a.ApplyOptions.Complete(a.factory, cmd)
 	if err != nil {
 		return errors.WrapPrefix(err, "error setting up ApplyOptions", 1)
 	}
@@ -168,128 +159,9 @@ func (a *Applier) infoHelperFactory() info.InfoHelper {
 	return info.NewInfoHelper(a.factory, a.ApplyOptions.Namespace)
 }
 
-// readObjects reads the manifests from disk with the local flag set on
-// the Builder. This means that the resulting Info resources does not have
-// the mapping and client properties set. We are doing it this way because
-// it allows us to read in both CRDs and CRs in the same set without
-// errors.
-func (a *Applier) readObjects() ([]*resource.Info, error) {
-	r := a.factory.NewBuilder().
-		Local().
-		Unstructured().
-		Schema(a.ApplyOptions.Validator).
-		ContinueOnError().
-		NamespaceParam(a.ApplyOptions.Namespace).DefaultNamespace().
-		FilenameParam(a.ApplyOptions.EnforceNamespace, &a.ApplyOptions.DeleteOptions.FilenameOptions).
-		LabelSelectorParam(a.ApplyOptions.Selector).
-		Flatten().
-		Do()
-	if err := r.Err(); err != nil {
-		return nil, err
-	}
-	return r.Infos()
-}
-
-// setNamespaces verifies that every namespaced resource has the namespace
-// set, and if one does not, it will set the namespace to the provided
-// defaultNamespace.
-// This implementation will check each resource (that doesn't already have
-// the namespace set) on whether it is namespace or cluster scoped. It does
-// this by first checking the RESTMapper, and it there is not match there,
-// it will look for CRDs in the provided Infos.
-func (a *Applier) setNamespaces(infos []*resource.Info, defaultNamespace string,
-	enforceNamespace bool) error {
-	var crdInfos []*resource.Info
-
-	// find any crds in the set of resources.
-	for _, inf := range infos {
-		if solver.IsCRD(inf) {
-			crdInfos = append(crdInfos, inf)
-		}
-	}
-
-	mapper, err := a.factory.ToRESTMapper()
-	if err != nil {
-		return err
-	}
-	for _, inf := range infos {
-		accessor, _ := meta.Accessor(inf.Object)
-		// if the resource already has the namespace set, we don't
-		// need to do anything
-		if ns := accessor.GetNamespace(); ns != "" {
-			if enforceNamespace && ns != defaultNamespace {
-				return fmt.Errorf("the namespace from the provided object %q "+
-					"does not match the namespace %q. You must pass '--namespace=%s' to perform this operation",
-					ns, defaultNamespace, ns)
-			}
-			continue
-		}
-
-		gk := inf.Object.GetObjectKind().GroupVersionKind().GroupKind()
-		mapping, err := mapper.RESTMapping(gk)
-
-		if err != nil && !meta.IsNoMatchError(err) {
-			return err
-		}
-
-		if err == nil {
-			// If we find a mapping for the resource type in the RESTMapper,
-			// we just use it.
-			if mapping.Scope == meta.RESTScopeNamespace {
-				// This means the resource does not have the namespace set,
-				// but it is a namespaced resource. So we set the namespace
-				// to the provided default value.
-				inf.Namespace = defaultNamespace
-				accessor.SetNamespace(defaultNamespace)
-			}
-			continue
-		}
-
-		// If we get here, it means the resource does not have the namespace
-		// set and we didn't find the resource type in the RESTMapper. As
-		// a last try, we look at all the CRDS that are part of the set and
-		// see if we get a match on the resource type. If so, we can determine
-		// from the CRD whether the resource type is cluster-scoped or
-		// namespace-scoped. If it is the latter, we set the namespace
-		// to the provided default.
-		var scope string
-		for _, crdInf := range crdInfos {
-			u, _ := crdInf.Object.(*unstructured.Unstructured)
-			group, _, _ := unstructured.NestedString(u.Object, "spec", "group")
-			kind, _, _ := unstructured.NestedString(u.Object, "spec", "names", "kind")
-			if gk.Kind == kind && gk.Group == group {
-				scope, _, _ = unstructured.NestedString(u.Object, "spec", "scope")
-			}
-		}
-
-		switch scope {
-		case "":
-			return fmt.Errorf("can't find scope for resource %s %s", gk.String(), accessor.GetName())
-		case "Cluster":
-			continue
-		case "Namespaced":
-			inf.Namespace = defaultNamespace
-			accessor.SetNamespace(defaultNamespace)
-		}
-	}
-
-	return nil
-}
-
-// readAndPrepareObjects reads the resources that should be applied,
-// handles ordering of resources and sets up the inventory object
+// prepareObjects handles ordering of resources and sets up the inventory object
 // based on the provided inventory object template.
-func (a *Applier) readAndPrepareObjects() (*ResourceObjects, error) {
-	infos, err := a.manifestReaderFunc()
-	if err != nil {
-		return nil, err
-	}
-
-	err = a.setNamespaces(infos, a.ApplyOptions.Namespace, a.ApplyOptions.EnforceNamespace)
-	if err != nil {
-		return nil, err
-	}
-
+func (a *Applier) prepareObjects(infos []*resource.Info) (*ResourceObjects, error) {
 	resources, invs := splitInfos(infos)
 
 	if len(invs) == 0 {
@@ -403,7 +275,7 @@ func splitInfos(infos []*resource.Info) ([]*resource.Info, []*resource.Info) {
 // before all the given resources have been applied to the cluster. Any
 // cancellation or timeout will only affect how long we Wait for the
 // resources to become current.
-func (a *Applier) Run(ctx context.Context, options Options) <-chan event.Event {
+func (a *Applier) Run(ctx context.Context, objects []*resource.Info, options Options) <-chan event.Event {
 	eventChannel := make(chan event.Event)
 	setDefaults(&options)
 
@@ -413,7 +285,7 @@ func (a *Applier) Run(ctx context.Context, options Options) <-chan event.Event {
 		// This provides us with a slice of all the objects that will be
 		// applied to the cluster. This takes care of ordering resources
 		// and handling the inventory object.
-		resourceObjects, err := a.readAndPrepareObjects()
+		resourceObjects, err := a.prepareObjects(objects)
 		if err != nil {
 			handleError(eventChannel, err)
 			return

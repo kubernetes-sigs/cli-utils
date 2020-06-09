@@ -9,9 +9,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"os"
 	"path"
-	"path/filepath"
 	"regexp"
 	"testing"
 	"time"
@@ -20,7 +18,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -53,8 +50,8 @@ var (
     labels:
       cli-utils.sigs.k8s.io/inventory-id: test
     name: foo
+    namespace: default
 `,
-			fileName: "inventoryObject.yaml",
 		},
 		"deployment": {
 			manifest: `
@@ -62,10 +59,10 @@ var (
   apiVersion: apps/v1
   metadata:
     name: foo
+    namespace: default
   spec:
     replicas: 1
 `,
-			fileName:    "deployment.yaml",
 			basePath:    "/namespaces/%s/deployments",
 			factoryFunc: func() runtime.Object { return &appsv1.Deployment{} },
 		},
@@ -78,7 +75,6 @@ var (
 // resource of the given type.
 type resourceInfo struct {
 	manifest    string
-	fileName    string
 	basePath    string
 	factoryFunc func() runtime.Object
 }
@@ -103,7 +99,7 @@ func TestApplier(t *testing.T) {
 		expectedEventTypes []expectedEvent
 	}{
 		"apply without status or prune": {
-			namespace: "apply-test",
+			namespace: "default",
 			resources: []resourceInfo{
 				resources["deployment"],
 				resources["inventoryObject"],
@@ -113,7 +109,7 @@ func TestApplier(t *testing.T) {
 				&inventoryObjectHandler{},
 				&genericHandler{
 					resourceInfo: resources["deployment"],
-					namespace:    "apply-test",
+					namespace:    "default",
 				},
 			},
 			reconcileTimeout: time.Duration(0),
@@ -137,7 +133,7 @@ func TestApplier(t *testing.T) {
 			},
 		},
 		"first apply with inventory object": {
-			namespace: "apply-test",
+			namespace: "default",
 			resources: []resourceInfo{
 				resources["deployment"],
 				resources["inventoryObject"],
@@ -147,7 +143,7 @@ func TestApplier(t *testing.T) {
 				&inventoryObjectHandler{},
 				&genericHandler{
 					resourceInfo: resources["deployment"],
-					namespace:    "apply-test",
+					namespace:    "default",
 				},
 			},
 			reconcileTimeout: time.Minute,
@@ -156,8 +152,8 @@ func TestApplier(t *testing.T) {
 					EventType: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
 						Identifier: object.ObjMetadata{
-							Name:      "foo-91afd0fc",
-							Namespace: "apply-test",
+							Name:      "foo-dcf2c498",
+							Namespace: "default",
 							GroupKind: schema.GroupKind{
 								Group: "",
 								Kind:  "ConfigMap",
@@ -169,14 +165,14 @@ func TestApplier(t *testing.T) {
 				{
 					EventType: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
-						Identifier: toIdentifier(t, resources["deployment"], "apply-test"),
+						Identifier: toIdentifier(t, resources["deployment"], "default"),
 						Status:     status.InProgressStatus,
 					},
 				},
 				{
 					EventType: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
-						Identifier: toIdentifier(t, resources["deployment"], "apply-test"),
+						Identifier: toIdentifier(t, resources["deployment"], "default"),
 						Status:     status.CurrentStatus,
 					},
 				},
@@ -219,11 +215,8 @@ func TestApplier(t *testing.T) {
 
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
-			dirPath, cleanup, err := writeResourceManifests(tc.resources)
-			if !assert.NoError(t, err) {
-				return
-			}
-			defer cleanup()
+			infos, err := createInfos(tc.resources)
+			assert.NoError(t, err)
 
 			tf := cmdtesting.NewTestFactory().WithNamespace(tc.namespace)
 			defer tf.Cleanup()
@@ -240,7 +233,7 @@ func TestApplier(t *testing.T) {
 			cmd.Flags().BoolVar(&notUsedFlag, "dry-run", notUsedFlag, "")
 			cmdutil.AddValidateFlags(cmd)
 			cmdutil.AddServerSideApplyFlags(cmd)
-			err = applier.Initialize(cmd, []string{dirPath})
+			err = applier.Initialize(cmd)
 			if !assert.NoError(t, err) {
 				return
 			}
@@ -258,7 +251,7 @@ func TestApplier(t *testing.T) {
 			}
 
 			ctx := context.Background()
-			eventChannel := applier.Run(ctx, Options{
+			eventChannel := applier.Run(ctx, infos, Options{
 				ReconcileTimeout: tc.reconcileTimeout,
 				EmitStatusEvents: true,
 				NoPrune:          !tc.prune,
@@ -519,14 +512,11 @@ func TestReadAndPrepareObjects(t *testing.T) {
 			ioStreams, _, _, _ := genericclioptions.NewTestIOStreams() //nolint:dogsled
 			applier := NewApplier(tf, ioStreams)
 
-			applier.manifestReaderFunc = func() (infos []*resource.Info, err error) {
-				return tc.resources, nil
-			}
 			applier.previousInventoriesFunc = func(currentInv *resource.Info) ([]prune.Inventory, error) {
 				return []prune.Inventory{}, nil
 			}
 
-			resourceObjects, err := applier.readAndPrepareObjects()
+			resourceObjects, err := applier.prepareObjects(tc.resources)
 
 			if tc.expectedError {
 				if err == nil {
@@ -556,182 +546,6 @@ func TestReadAndPrepareObjects(t *testing.T) {
 				t.Errorf("expected %d resources in inventory, got %d", want, got)
 			}
 		})
-	}
-}
-
-func TestSetNamespaces(t *testing.T) {
-	// We need the RESTMapper in the testFactory to contain the CRD
-	// types, so add them to the scheme here.
-	_ = apiextv1.AddToScheme(scheme.Scheme)
-
-	testCases := map[string]struct {
-		infos            []*resource.Info
-		defaultNamspace  string
-		enforceNamespace bool
-
-		expectedNamespaces []string
-		expectedErrText    string
-	}{
-		"resources already have namespace": {
-			infos: []*resource.Info{
-				toInfo(schema.GroupVersionKind{
-					Group:   "apps",
-					Version: "v1",
-					Kind:    "Deployment",
-				}, "default"),
-				toInfo(schema.GroupVersionKind{
-					Group:   "policy",
-					Version: "v1beta1",
-					Kind:    "PodDisruptionBudget",
-				}, "default"),
-			},
-			defaultNamspace:  "foo",
-			enforceNamespace: false,
-			expectedNamespaces: []string{
-				"default",
-				"default",
-			},
-		},
-		"resources without namespace and mapping in RESTMapper": {
-			infos: []*resource.Info{
-				toInfo(schema.GroupVersionKind{
-					Group:   "apps",
-					Version: "v1",
-					Kind:    "Deployment",
-				}, ""),
-			},
-			defaultNamspace:    "foo",
-			enforceNamespace:   false,
-			expectedNamespaces: []string{"foo"},
-		},
-		"resource with namespace that does match enforced ns": {
-			infos: []*resource.Info{
-				toInfo(schema.GroupVersionKind{
-					Group:   "apps",
-					Version: "v1",
-					Kind:    "Deployment",
-				}, "bar"),
-			},
-			defaultNamspace:    "bar",
-			enforceNamespace:   true,
-			expectedNamespaces: []string{"bar"},
-		},
-		"resource with namespace that doesn't match enforced ns": {
-			infos: []*resource.Info{
-				toInfo(schema.GroupVersionKind{
-					Group:   "apps",
-					Version: "v1",
-					Kind:    "Deployment",
-				}, "foo"),
-			},
-			defaultNamspace:  "bar",
-			enforceNamespace: true,
-			expectedErrText:  "does not match the namespace",
-		},
-		"cluster-scoped CR with CRD": {
-			infos: []*resource.Info{
-				toInfo(schema.GroupVersionKind{
-					Group:   "custom.io",
-					Version: "v1",
-					Kind:    "Custom",
-				}, ""),
-				toCRDInfo(schema.GroupVersionKind{
-					Group:   "apiextensions.k8s.io",
-					Version: "v1",
-					Kind:    "CustomResourceDefinition",
-				}, schema.GroupKind{
-					Group: "custom.io",
-					Kind:  "Custom",
-				}, "Cluster"),
-			},
-			defaultNamspace:    "bar",
-			enforceNamespace:   true,
-			expectedNamespaces: []string{"", ""},
-		},
-		"namespace-scoped CR with CRD": {
-			infos: []*resource.Info{
-				toCRDInfo(schema.GroupVersionKind{
-					Group:   "apiextensions.k8s.io",
-					Version: "v1",
-					Kind:    "CustomResourceDefinition",
-				}, schema.GroupKind{
-					Group: "custom.io",
-					Kind:  "Custom",
-				}, "Namespaced"),
-				toInfo(schema.GroupVersionKind{
-					Group:   "custom.io",
-					Version: "v1",
-					Kind:    "Custom",
-				}, ""),
-			},
-			defaultNamspace:    "bar",
-			enforceNamespace:   true,
-			expectedNamespaces: []string{"", "bar"},
-		},
-	}
-
-	for tn, tc := range testCases {
-		t.Run(tn, func(t *testing.T) {
-			tf := cmdtesting.NewTestFactory().WithNamespace("namespace")
-			defer tf.Cleanup()
-
-			ioStreams, _, _, _ := genericclioptions.NewTestIOStreams() //nolint:dogsled
-
-			applier := NewApplier(tf, ioStreams)
-
-			err := applier.setNamespaces(tc.infos, tc.defaultNamspace, tc.enforceNamespace)
-
-			if tc.expectedErrText != "" {
-				if err == nil {
-					t.Errorf("expected error %s, but not nil", tc.expectedErrText)
-				}
-				assert.Contains(t, err.Error(), tc.expectedErrText)
-				return
-			}
-
-			assert.NoError(t, err)
-
-			for i, inf := range tc.infos {
-				expectedNs := tc.expectedNamespaces[i]
-				assert.Equal(t, expectedNs, inf.Namespace)
-				accessor, _ := meta.Accessor(inf.Object)
-				assert.Equal(t, expectedNs, accessor.GetNamespace())
-			}
-		})
-	}
-}
-
-func toInfo(gvk schema.GroupVersionKind, namespace string) *resource.Info {
-	return &resource.Info{
-		Namespace: namespace,
-		Object: &unstructured.Unstructured{
-			Object: map[string]interface{}{
-				"apiVersion": gvk.GroupVersion().String(),
-				"kind":       gvk.Kind,
-				"metadata": map[string]interface{}{
-					"namespace": namespace,
-				},
-			},
-		},
-	}
-}
-
-func toCRDInfo(gvk schema.GroupVersionKind, gk schema.GroupKind,
-	scope string) *resource.Info {
-	return &resource.Info{
-		Object: &unstructured.Unstructured{
-			Object: map[string]interface{}{
-				"apiVersion": gvk.GroupVersion().String(),
-				"kind":       gvk.Kind,
-				"spec": map[string]interface{}{
-					"group": gk.Group,
-					"names": map[string]interface{}{
-						"kind": gk.Kind,
-					},
-					"scope": scope,
-				},
-			},
-		},
 	}
 }
 
@@ -786,22 +600,21 @@ func toIdentifier(t *testing.T, resourceInfo resourceInfo, namespace string) obj
 	}
 }
 
-func writeResourceManifests(resources []resourceInfo) (string, func(), error) {
-	d, err := ioutil.TempDir("", "kustomize-apply-test")
-	cleanup := func() { _ = os.RemoveAll(d) }
-	if err != nil {
-		cleanup()
-		return d, cleanup, err
-	}
-	for _, r := range resources {
-		p := filepath.Join(d, r.fileName)
-		err = ioutil.WriteFile(p, []byte(r.manifest), 0600)
+func createInfos(resources []resourceInfo) ([]*resource.Info, error) {
+	var infos []*resource.Info
+	for _, ri := range resources {
+		u := &unstructured.Unstructured{}
+		err := runtime.DecodeInto(codec, []byte(ri.manifest), u)
 		if err != nil {
-			cleanup()
-			return d, cleanup, err
+			return nil, err
 		}
+		infos = append(infos, &resource.Info{
+			Object:    u,
+			Name:      u.GetName(),
+			Namespace: u.GetNamespace(),
+		})
 	}
-	return d, cleanup, nil
+	return infos, nil
 }
 
 // The handler interface allows different testcases to provide
