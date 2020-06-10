@@ -5,6 +5,7 @@ package apply
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -15,6 +16,11 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
 	pollevent "sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/object"
+)
+
+const (
+	defaultExitErrorCode int = 1
+	timeoutExitErrorCode int = 3
 )
 
 // BasicPrinter is a simple implementation that just prints the events
@@ -130,7 +136,9 @@ func (b *BasicPrinter) processErrorEvent(ee event.ErrorEvent, c *statusCollector
 			p("%s/%s %s %s", id.GroupKind.Kind,
 				id.Name, ls.Resource.Status, ls.Resource.Message)
 		}
+		os.Exit(timeoutExitErrorCode)
 	}
+	os.Exit(defaultExitErrorCode)
 }
 
 func (b *BasicPrinter) processApplyEvent(ae event.ApplyEvent, as *applyStats,
