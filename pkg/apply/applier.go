@@ -16,7 +16,6 @@ import (
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/kubectl/pkg/cmd/apply"
 	"k8s.io/kubectl/pkg/cmd/util"
-	"k8s.io/kubectl/pkg/scheme"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/info"
 	"sigs.k8s.io/cli-utils/pkg/apply/poller"
@@ -24,10 +23,9 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/apply/solver"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
-	"sigs.k8s.io/cli-utils/pkg/kstatus/polling"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/ordering"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/cli-utils/pkg/util/factory"
 )
 
 // newApplier returns a new Applier. It will set up the ApplyOptions and
@@ -101,7 +99,7 @@ func (a *Applier) Initialize(cmd *cobra.Command) error {
 		return errors.WrapPrefix(err, "error setting up PruneOptions", 1)
 	}
 
-	statusPoller, err := a.newStatusPoller()
+	statusPoller, err := factory.NewStatusPoller(a.factory)
 	if err != nil {
 		return errors.WrapPrefix(err, "error creating resolver", 1)
 	}
@@ -129,27 +127,6 @@ func (a *Applier) SetFlags(cmd *cobra.Command) error {
 	_ = cmd.Flags().MarkHidden("wait")
 	a.ApplyOptions.Overwrite = true
 	return nil
-}
-
-// newStatusPoller sets up a new StatusPoller for computing status. The configuration
-// needed for the poller is taken from the Factory.
-func (a *Applier) newStatusPoller() (poller.Poller, error) {
-	config, err := a.factory.ToRESTConfig()
-	if err != nil {
-		return nil, errors.WrapPrefix(err, "error getting RESTConfig", 1)
-	}
-
-	mapper, err := a.factory.ToRESTMapper()
-	if err != nil {
-		return nil, errors.WrapPrefix(err, "error getting RESTMapper", 1)
-	}
-
-	c, err := client.New(config, client.Options{Scheme: scheme.Scheme, Mapper: mapper})
-	if err != nil {
-		return nil, errors.WrapPrefix(err, "error creating client", 1)
-	}
-
-	return polling.NewStatusPoller(c, mapper), nil
 }
 
 // infoHelperFactory returns a new instance of the InfoHelper.

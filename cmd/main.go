@@ -60,7 +60,7 @@ func main() {
 	updateHelp(names, diffCmd)
 	destroyCmd := destroy.NewCmdDestroy(f, ioStreams)
 	updateHelp(names, destroyCmd)
-	statusCmd := status.StatusCommand()
+	statusCmd := status.StatusCommand(f)
 	updateHelp(names, statusCmd)
 
 	cmd.AddCommand(initCmd, applyCmd, diffCmd, destroyCmd, previewCmd, statusCmd)

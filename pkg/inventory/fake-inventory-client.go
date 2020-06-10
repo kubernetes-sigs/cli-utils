@@ -10,8 +10,8 @@ import (
 
 // FakeInventoryClient is a testing implementation of the InventoryClient interface.
 type FakeInventoryClient struct {
-	objs []object.ObjMetadata
-	err  error
+	Objs []object.ObjMetadata
+	Err  error
 }
 
 var _ InventoryClient = &FakeInventoryClient{}
@@ -19,45 +19,45 @@ var _ InventoryClient = &FakeInventoryClient{}
 // NewFakeInventoryClient returns a FakeInventoryClient.
 func NewFakeInventoryClient(initObjs []object.ObjMetadata) *FakeInventoryClient {
 	return &FakeInventoryClient{
-		objs: initObjs,
-		err:  nil,
+		Objs: initObjs,
+		Err:  nil,
 	}
 }
 
 // GetClusterObjs returns currently stored set of objects.
 func (fic *FakeInventoryClient) GetClusterObjs(inv *resource.Info) ([]object.ObjMetadata, error) {
-	if fic.err != nil {
-		return []object.ObjMetadata{}, fic.err
+	if fic.Err != nil {
+		return []object.ObjMetadata{}, fic.Err
 	}
-	return fic.objs, nil
+	return fic.Objs, nil
 }
 
 // Merge stores the passed objects with the current stored cluster inventory
 // objects. Returns the set difference of the current set of objects minus
 // the passed set of objects, or an error if one is set up.
 func (fic *FakeInventoryClient) Merge(inv *resource.Info, objs []object.ObjMetadata) ([]object.ObjMetadata, error) {
-	if fic.err != nil {
-		return []object.ObjMetadata{}, fic.err
+	if fic.Err != nil {
+		return []object.ObjMetadata{}, fic.Err
 	}
-	diffObjs := object.SetDiff(fic.objs, objs)
-	fic.objs = object.Union(fic.objs, objs)
+	diffObjs := object.SetDiff(fic.Objs, objs)
+	fic.Objs = object.Union(fic.Objs, objs)
 	return diffObjs, nil
 }
 
 // Replace the stored cluster inventory objs with the passed obj, or an
 // error if one is set up.
 func (fic *FakeInventoryClient) Replace(inv *resource.Info, objs []object.ObjMetadata) error {
-	if fic.err != nil {
-		return fic.err
+	if fic.Err != nil {
+		return fic.Err
 	}
-	fic.objs = objs
+	fic.Objs = objs
 	return nil
 }
 
 // DeleteInventoryObj returns an error if one is forced; does nothing otherwise.
 func (fic *FakeInventoryClient) DeleteInventoryObj(inv *resource.Info) error {
-	if fic.err != nil {
-		return fic.err
+	if fic.Err != nil {
+		return fic.Err
 	}
 	return nil
 }
@@ -66,10 +66,10 @@ func (fic *FakeInventoryClient) SetDryRun(dryRun bool) {}
 
 // SetError forces an error on the subsequent client call if it returns an error.
 func (fic *FakeInventoryClient) SetError(err error) {
-	fic.err = err
+	fic.Err = err
 }
 
 // ClearError clears the force error
 func (fic *FakeInventoryClient) ClearError() {
-	fic.err = nil
+	fic.Err = nil
 }
