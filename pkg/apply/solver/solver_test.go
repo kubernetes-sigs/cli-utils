@@ -16,6 +16,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/apply/task"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
 	"sigs.k8s.io/cli-utils/pkg/object"
+	"sigs.k8s.io/cli-utils/pkg/testutil"
 )
 
 var (
@@ -149,6 +150,7 @@ func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 						object.InfoToObjMeta(crdInfo),
 					},
 					taskrunner.AllCurrent, 1*time.Second),
+				&task.ResetRESTMapperTask{},
 				&task.ApplyTask{
 					Objects: []*resource.Info{
 						depInfo,
@@ -194,6 +196,7 @@ func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 			tqs := TaskQueueSolver{
 				ApplyOptions: applyOptions,
 				PruneOptions: pruneOptions,
+				Mapper:       testutil.NewFakeRESTMapper(),
 			}
 
 			tq := tqs.BuildTaskQueue(&fakeResourceObjects{

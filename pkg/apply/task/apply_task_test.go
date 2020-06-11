@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"gotest.tools/assert"
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/resource"
@@ -231,11 +230,10 @@ func TestApplyTask_DryRun(t *testing.T) {
 			applyTask := &ApplyTask{
 				ApplyOptions: applyOptions,
 				Objects:      tc.infos,
-				InfoHelper: &fakeInfoHelper{
-					restMapper: restMapper,
-				},
-				DryRun: true,
-				CRDs:   tc.crds,
+				InfoHelper:   &fakeInfoHelper{},
+				Mapper:       restMapper,
+				DryRun:       true,
+				CRDs:         tc.crds,
 			}
 
 			var events []event.Event
@@ -307,18 +305,8 @@ func (f *fakeApplyOptions) SetObjects(objects []*resource.Info) {
 	f.objects = objects
 }
 
-type fakeInfoHelper struct {
-	restMapper meta.RESTMapper
-}
+type fakeInfoHelper struct{}
 
 func (f *fakeInfoHelper) UpdateInfos([]*resource.Info) error {
 	return nil
-}
-
-func (f *fakeInfoHelper) ResetRESTMapper() error {
-	return nil
-}
-
-func (f *fakeInfoHelper) ToRESTMapper() (meta.RESTMapper, error) {
-	return f.restMapper, nil
 }

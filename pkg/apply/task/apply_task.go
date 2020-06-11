@@ -20,6 +20,7 @@ import (
 type ApplyTask struct {
 	ApplyOptions applyOptions
 	InfoHelper   info.InfoHelper
+	Mapper       meta.RESTMapper
 	Objects      []*resource.Info
 	CRDs         []*resource.Info
 	DryRun       bool
@@ -113,11 +114,6 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 			gen := acc.GetGeneration()
 			taskContext.ResourceApplied(id, gen)
 		}
-		err = a.InfoHelper.ResetRESTMapper()
-		if err != nil {
-			a.sendTaskResult(taskContext, err)
-			return
-		}
 		a.sendTaskResult(taskContext, nil)
 	}()
 }
@@ -149,18 +145,13 @@ func (a *ApplyTask) filterCRsWithCRDInSet(objects []*resource.Info) ([]*resource
 	var objs []*resource.Info
 	var objsWithCRD []*resource.Info
 
-	mapper, err := a.InfoHelper.ToRESTMapper()
-	if err != nil {
-		return objs, objsWithCRD, err
-	}
-
 	crdsInfo := buildCRDsInfo(a.CRDs)
 	for _, obj := range objects {
 		gvk := obj.Object.GetObjectKind().GroupVersionKind()
 
 		// First check if we find the type in the RESTMapper.
 		//TODO: Maybe we do care if there is a new version of the CRD?
-		_, err := mapper.RESTMapping(gvk.GroupKind())
+		_, err := a.Mapper.RESTMapping(gvk.GroupKind())
 		if err != nil && !meta.IsNoMatchError(err) {
 			return objs, objsWithCRD, err
 		}

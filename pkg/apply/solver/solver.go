@@ -19,6 +19,7 @@ import (
 
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/resource"
@@ -36,6 +37,7 @@ type TaskQueueSolver struct {
 	ApplyOptions *apply.ApplyOptions
 	PruneOptions *prune.PruneOptions
 	InfoHelper   info.InfoHelper
+	Mapper       meta.RESTMapper
 }
 
 type Options struct {
@@ -68,13 +70,16 @@ func (t *TaskQueueSolver) BuildTaskQueue(ro resourceObjects,
 			ApplyOptions: t.ApplyOptions,
 			DryRun:       o.DryRun,
 			InfoHelper:   t.InfoHelper,
+			Mapper:       t.Mapper,
 		})
 		if !o.DryRun {
 			tasks = append(tasks, taskrunner.NewWaitTask(
 				object.InfosToObjMetas(crdSplitRes.crds),
 				taskrunner.AllCurrent,
 				1*time.Minute),
-			)
+				&task.ResetRESTMapperTask{
+					Mapper: t.Mapper,
+				})
 		}
 		remainingInfos = crdSplitRes.after
 	}
@@ -86,6 +91,7 @@ func (t *TaskQueueSolver) BuildTaskQueue(ro resourceObjects,
 			ApplyOptions: t.ApplyOptions,
 			DryRun:       o.DryRun,
 			InfoHelper:   t.InfoHelper,
+			Mapper:       t.Mapper,
 		},
 		&task.SendEventTask{
 			Event: event.Event{
