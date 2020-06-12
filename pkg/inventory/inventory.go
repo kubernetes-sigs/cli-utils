@@ -9,7 +9,7 @@
 // objects, we can correctly prune and teardown sets
 // of resources.
 
-package prune
+package inventory
 
 import (
 	"fmt"
@@ -38,10 +38,10 @@ type Inventory interface {
 	GetObject() (*resource.Info, error)
 }
 
-// retrieveInventoryLabel returns the string value of the InventoryLabel
+// RetrieveInventoryLabel returns the string value of the InventoryLabel
 // for the passed object. Returns error if the passed object is nil or
 // is not a inventory object.
-func retrieveInventoryLabel(obj runtime.Object) (string, error) {
+func RetrieveInventoryLabel(obj runtime.Object) (string, error) {
 	var inventoryLabel string
 	if obj == nil {
 		return "", fmt.Errorf("inventory object is nil")
@@ -64,7 +64,7 @@ func IsInventoryObject(obj runtime.Object) bool {
 	if obj == nil {
 		return false
 	}
-	inventoryLabel, err := retrieveInventoryLabel(obj)
+	inventoryLabel, err := RetrieveInventoryLabel(obj)
 	if err == nil && len(inventoryLabel) > 0 {
 		return true
 	}
@@ -87,7 +87,7 @@ func FindInventoryObj(infos []*resource.Info) (*resource.Info, bool) {
 // exist, or we are unable to successfully add the metadata to
 // the inventory object; nil otherwise. Each object is in
 // unstructured.Unstructured format.
-func addObjsToInventory(infos []*resource.Info) error {
+func AddObjsToInventory(infos []*resource.Info) error {
 	var inventoryInfo *resource.Info
 	var inventoryObj *unstructured.Unstructured
 	objMap := map[string]string{}

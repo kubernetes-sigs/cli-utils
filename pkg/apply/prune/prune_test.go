@@ -16,8 +16,91 @@ import (
 	"k8s.io/kubectl/pkg/scheme"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/common"
+	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
+
+var testNamespace = "test-inventory-namespace"
+var inventoryObjName = "test-inventory-obj"
+var pod1Name = "pod-1"
+var pod2Name = "pod-2"
+var pod3Name = "pod-3"
+
+var testInventoryLabel = "test-app-label"
+
+var inventoryObj = unstructured.Unstructured{
+	Object: map[string]interface{}{
+		"apiVersion": "v1",
+		"kind":       "ConfigMap",
+		"metadata": map[string]interface{}{
+			"name":      inventoryObjName,
+			"namespace": testNamespace,
+			"labels": map[string]interface{}{
+				common.InventoryLabel: testInventoryLabel,
+			},
+		},
+	},
+}
+
+var pod1 = unstructured.Unstructured{
+	Object: map[string]interface{}{
+		"apiVersion": "v1",
+		"kind":       "Pod",
+		"metadata": map[string]interface{}{
+			"name":      pod1Name,
+			"namespace": testNamespace,
+			"uid":       "uid1",
+		},
+	},
+}
+
+var pod1Info = &resource.Info{
+	Namespace: testNamespace,
+	Name:      pod1Name,
+	Object:    &pod1,
+}
+
+var pod2 = unstructured.Unstructured{
+	Object: map[string]interface{}{
+		"apiVersion": "v1",
+		"kind":       "Pod",
+		"metadata": map[string]interface{}{
+			"name":      pod2Name,
+			"namespace": testNamespace,
+			"uid":       "uid2",
+		},
+	},
+}
+
+var pod2Info = &resource.Info{
+	Namespace: testNamespace,
+	Name:      pod2Name,
+	Object:    &pod2,
+}
+
+var pod3 = unstructured.Unstructured{
+	Object: map[string]interface{}{
+		"apiVersion": "v1",
+		"kind":       "Pod",
+		"metadata": map[string]interface{}{
+			"name":      pod3Name,
+			"namespace": testNamespace,
+			"uid":       "uid3",
+		},
+	},
+}
+
+var pod3Info = &resource.Info{
+	Namespace: testNamespace,
+	Name:      pod3Name,
+	Object:    &pod3,
+}
+
+var nilInfo = &resource.Info{
+	Namespace: testNamespace,
+	Name:      inventoryObjName,
+	Object:    nil,
+}
 
 var pod1Metadata = &object.ObjMetadata{
 	Namespace: testNamespace,
@@ -53,6 +136,16 @@ var invMetadata = &object.ObjMetadata{
 		Group: "",
 		Kind:  "ConfigMap",
 	},
+}
+
+func copyInventoryInfo() *resource.Info {
+	inventoryObjCopy := inventoryObj.DeepCopy()
+	var inventoryInfo = &resource.Info{
+		Namespace: testNamespace,
+		Name:      inventoryObjName,
+		Object:    inventoryObjCopy,
+	}
+	return inventoryInfo
 }
 
 func TestInfoToObjMetadata(t *testing.T) {
@@ -116,44 +209,44 @@ func createInventoryInfo(name string, children ...*resource.Info) *resource.Info
 	}
 	infos := []*resource.Info{inventoryInfo}
 	infos = append(infos, children...)
-	_ = addObjsToInventory(infos)
+	_ = inventory.AddObjsToInventory(infos)
 	return inventoryInfo
 }
 
 func TestUnionPastObjs(t *testing.T) {
 	tests := map[string]struct {
-		prevInventories []Inventory
+		prevInventories []inventory.Inventory
 		expected        []object.ObjMetadata
 	}{
 		"Empty inventory objects = empty inventory": {
-			prevInventories: []Inventory{},
+			prevInventories: []inventory.Inventory{},
 			expected:        []object.ObjMetadata{},
 		},
 		"No children in inventory object, equals no inventory": {
-			prevInventories: []Inventory{WrapInventoryObj(createInventoryInfo("test-1"))},
+			prevInventories: []inventory.Inventory{inventory.WrapInventoryObj(createInventoryInfo("test-1"))},
 			expected:        []object.ObjMetadata{},
 		},
 		"Inventory object with Pod1 returns inventory with Pod1": {
-			prevInventories: []Inventory{WrapInventoryObj(createInventoryInfo("test-1", pod1Info))},
+			prevInventories: []inventory.Inventory{inventory.WrapInventoryObj(createInventoryInfo("test-1", pod1Info))},
 			expected:        []object.ObjMetadata{*pod1Metadata},
 		},
 		"Inventory object with three pods returns inventory with three pods": {
-			prevInventories: []Inventory{
-				WrapInventoryObj(createInventoryInfo("test-1", pod1Info, pod2Info, pod3Info)),
+			prevInventories: []inventory.Inventory{
+				inventory.WrapInventoryObj(createInventoryInfo("test-1", pod1Info, pod2Info, pod3Info)),
 			},
 			expected: []object.ObjMetadata{*pod1Metadata, *pod2Metadata, *pod3Metadata},
 		},
 		"Two inventory objects with different pods returns inventory with both pods": {
-			prevInventories: []Inventory{
-				WrapInventoryObj(createInventoryInfo("test-1", pod1Info)),
-				WrapInventoryObj(createInventoryInfo("test-2", pod2Info)),
+			prevInventories: []inventory.Inventory{
+				inventory.WrapInventoryObj(createInventoryInfo("test-1", pod1Info)),
+				inventory.WrapInventoryObj(createInventoryInfo("test-2", pod2Info)),
 			},
 			expected: []object.ObjMetadata{*pod1Metadata, *pod2Metadata},
 		},
 		"Two inventory objects with overlapping pods returns set of pods": {
-			prevInventories: []Inventory{
-				WrapInventoryObj(createInventoryInfo("test-1", pod1Info, pod2Info)),
-				WrapInventoryObj(createInventoryInfo("test-2", pod2Info, pod3Info)),
+			prevInventories: []inventory.Inventory{
+				inventory.WrapInventoryObj(createInventoryInfo("test-1", pod1Info, pod2Info)),
+				inventory.WrapInventoryObj(createInventoryInfo("test-2", pod2Info, pod3Info)),
 			},
 			expected: []object.ObjMetadata{*pod1Metadata, *pod2Metadata, *pod3Metadata},
 		},
@@ -259,7 +352,7 @@ func TestPrune(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			po := NewPruneOptions(populateObjectIds(tc.currentInfos, t))
-			po.InventoryFactoryFunc = WrapInventoryObj
+			po.InventoryFactoryFunc = inventory.WrapInventoryObj
 			// Set up the previously applied objects.
 			pastInventoryInfo := createInventoryInfo("past-group", tc.pastInfos...)
 			po.pastInventoryObjects = []*resource.Info{pastInventoryInfo}

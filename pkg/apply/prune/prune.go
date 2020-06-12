@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubectl/pkg/validation"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/common"
+	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
@@ -53,7 +54,7 @@ type PruneOptions struct {
 	validator                 validation.Schema
 	// InventoryFactoryFunc wraps and returns an interface for the
 	// object which will load and store the inventory.
-	InventoryFactoryFunc func(*resource.Info) Inventory
+	InventoryFactoryFunc func(*resource.Info) inventory.Inventory
 }
 
 // NewPruneOptions returns a struct (PruneOptions) encapsulating the necessary
@@ -61,7 +62,7 @@ type PruneOptions struct {
 // gathering this information.
 func NewPruneOptions(currentUids sets.String) *PruneOptions {
 	po := &PruneOptions{currentUids: currentUids}
-	po.InventoryFactoryFunc = WrapInventoryObj
+	po.InventoryFactoryFunc = inventory.WrapInventoryObj
 	return po
 }
 
@@ -91,12 +92,12 @@ func (po *PruneOptions) Initialize(factory util.Factory) error {
 // that have the same label as the current inventory object. Removes
 // the current inventory object from this set. Returns an error
 // if there is a problem retrieving the inventory objects.
-func (po *PruneOptions) GetPreviousInventoryObjects(currentInv *resource.Info) ([]Inventory, error) {
+func (po *PruneOptions) GetPreviousInventoryObjects(currentInv *resource.Info) ([]inventory.Inventory, error) {
 	current, err := infoToObjMetadata(currentInv)
 	if err != nil {
 		return nil, err
 	}
-	label, err := retrieveInventoryLabel(currentInv.Object)
+	label, err := inventory.RetrieveInventoryLabel(currentInv.Object)
 	if err != nil {
 		return nil, err
 	}
@@ -105,7 +106,7 @@ func (po *PruneOptions) GetPreviousInventoryObjects(currentInv *resource.Info) (
 	}
 	// Remove the current inventory info from the previous inventory infos.
 	pastInventoryInfos := []*resource.Info{}
-	pastInventories := []Inventory{}
+	pastInventories := []inventory.Inventory{}
 	for _, pastInfo := range po.pastInventoryObjects {
 		past, err := infoToObjMetadata(pastInfo)
 		if err != nil {
@@ -175,7 +176,7 @@ func infoToObjMetadata(info *resource.Info) (*object.ObjMetadata, error) {
 // Returns an error if any of the passed objects are not inventory
 // objects, or if unable to retrieve the referenced objects from any
 // inventory object.
-func UnionPastObjs(pastInvs []Inventory) ([]object.ObjMetadata, error) {
+func UnionPastObjs(pastInvs []inventory.Inventory) ([]object.ObjMetadata, error) {
 	objSet := map[string]object.ObjMetadata{}
 	for _, inv := range pastInvs {
 		objs, err := inv.Load()
@@ -208,7 +209,7 @@ type Options struct {
 // the current apply. Prune also delete all previous inventory
 // objects. Returns an error if there was a problem.
 func (po *PruneOptions) Prune(currentObjects []*resource.Info, eventChannel chan<- event.Event, o Options) error {
-	currentInventoryObject, found := FindInventoryObj(currentObjects)
+	currentInventoryObject, found := inventory.FindInventoryObj(currentObjects)
 	if !found {
 		return fmt.Errorf("current inventory object not found during prune")
 	}

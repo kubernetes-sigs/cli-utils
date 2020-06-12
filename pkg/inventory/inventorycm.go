@@ -6,7 +6,7 @@
 // ConfigMap resource which stores the set of inventory
 // (object metadata).
 
-package prune
+package inventory
 
 import (
 	"fmt"
