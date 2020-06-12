@@ -31,8 +31,8 @@ import (
 	"k8s.io/kubectl/pkg/scheme"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/info"
-	"sigs.k8s.io/cli-utils/pkg/apply/prune"
 	"sigs.k8s.io/cli-utils/pkg/common"
+	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling"
 	pollevent "sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
@@ -512,8 +512,8 @@ func TestReadAndPrepareObjects(t *testing.T) {
 			ioStreams, _, _, _ := genericclioptions.NewTestIOStreams() //nolint:dogsled
 			applier := NewApplier(tf, ioStreams)
 
-			applier.previousInventoriesFunc = func(currentInv *resource.Info) ([]prune.Inventory, error) {
-				return []prune.Inventory{}, nil
+			applier.previousInventoriesFunc = func(currentInv *resource.Info) ([]inventory.Inventory, error) {
+				return []inventory.Inventory{}, nil
 			}
 
 			resourceObjects, err := applier.prepareObjects(tc.resources)
@@ -531,12 +531,12 @@ func TestReadAndPrepareObjects(t *testing.T) {
 			}
 
 			inventoryObj := resourceObjects.CurrentInventory
-			if !prune.IsInventoryObject(inventoryObj.Object) {
+			if !inventory.IsInventoryObject(inventoryObj.Object) {
 				t.Errorf(
 					"expected first item to be inventory object, but it wasn't")
 			}
 
-			pastObjs, err := prune.RetrieveObjsFromInventory(
+			pastObjs, err := inventory.RetrieveObjsFromInventory(
 				[]*resource.Info{inventoryObj})
 			if err != nil {
 				t.Error(err)

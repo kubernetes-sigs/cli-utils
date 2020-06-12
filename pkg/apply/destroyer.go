@@ -16,6 +16,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/prune"
 	"sigs.k8s.io/cli-utils/pkg/common"
+	"sigs.k8s.io/cli-utils/pkg/inventory"
 )
 
 // NewDestroyer returns a new destroyer. It will set up the ApplyOptions and
@@ -90,7 +91,7 @@ func (d *Destroyer) Run() <-chan event.Event {
 		// so the prune will calculate the prune set as all the objects,
 		// deleting everything. We can ignore the error, since the Prune
 		// will catch the same problems.
-		_ = prune.ClearInventoryObj(infos)
+		_ = inventory.ClearInventoryObj(infos)
 
 		// Start the event transformer goroutine so we can transform
 		// the Prune events emitted from the Prune function to Delete

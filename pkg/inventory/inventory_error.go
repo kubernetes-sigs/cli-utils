@@ -3,7 +3,7 @@
 //
 // Errors when applying inventory object templates.
 
-package prune
+package inventory
 
 import "k8s.io/cli-runtime/pkg/resource"
 

@@ -1,7 +1,7 @@
 // Copyright 2020 The Kubernetes Authors.
 // SPDX-License-Identifier: Apache-2.0
 
-package prune
+package inventory
 
 import (
 	"fmt"
@@ -162,7 +162,7 @@ func TestRetrieveInventoryLabel(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		actual, err := retrieveInventoryLabel(test.obj)
+		actual, err := RetrieveInventoryLabel(test.obj)
 		if test.isError && err == nil {
 			t.Errorf("Did not receive expected error.\n")
 		}
@@ -537,7 +537,7 @@ func TestAddRetrieveObjsToFromInventory(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		err := addObjsToInventory(test.infos)
+		err := AddObjsToInventory(test.infos)
 		if test.isError && err == nil {
 			t.Errorf("Should have produced an error, but returned none.")
 		}

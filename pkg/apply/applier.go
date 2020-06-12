@@ -23,6 +23,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/apply/prune"
 	"sigs.k8s.io/cli-utils/pkg/apply/solver"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
+	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -46,8 +47,8 @@ func NewApplier(factory util.Factory, ioStreams genericclioptions.IOStreams) *Ap
 	}
 	a.previousInventoriesFunc = a.PruneOptions.GetPreviousInventoryObjects
 	a.infoHelperFactoryFunc = a.infoHelperFactory
-	a.InventoryFactoryFunc = prune.WrapInventoryObj
-	a.PruneOptions.InventoryFactoryFunc = prune.WrapInventoryObj
+	a.InventoryFactoryFunc = inventory.WrapInventoryObj
+	a.PruneOptions.InventoryFactoryFunc = inventory.WrapInventoryObj
 	return a
 }
 
@@ -76,13 +77,13 @@ type Applier struct {
 	// from the apiserver, taking the current inventory object as the
 	// parameter. It is defined here so we can override it in
 	// unit tests.
-	previousInventoriesFunc func(*resource.Info) ([]prune.Inventory, error)
+	previousInventoriesFunc func(*resource.Info) ([]inventory.Inventory, error)
 	// infoHelperFactoryFunc is used to create a new instance of the
 	// InfoHelper. It is defined here so we can override it in unit tests.
 	infoHelperFactoryFunc func() info.InfoHelper
 	// InventoryFactoryFunc wraps and returns an interface for the
 	// object which will load and store the inventory.
-	InventoryFactoryFunc func(*resource.Info) prune.Inventory
+	InventoryFactoryFunc func(*resource.Info) inventory.Inventory
 }
 
 // Initialize sets up the Applier for actually doing an apply against
@@ -165,16 +166,16 @@ func (a *Applier) prepareObjects(infos []*resource.Info) (*ResourceObjects, erro
 	resources, invs := splitInfos(infos)
 
 	if len(invs) == 0 {
-		return nil, prune.NoInventoryObjError{}
+		return nil, inventory.NoInventoryObjError{}
 	}
 	if len(invs) > 1 {
-		return nil, prune.MultipleInventoryObjError{
+		return nil, inventory.MultipleInventoryObjError{
 			InventoryObjectTemplates: invs,
 		}
 	}
 
 	inv := a.InventoryFactoryFunc(invs[0])
-	inventoryObject, err := prune.CreateInventoryObj(inv, resources)
+	inventoryObject, err := inventory.CreateInventoryObj(inv, resources)
 	if err != nil {
 		return nil, err
 	}
@@ -203,7 +204,7 @@ func (a *Applier) prepareObjects(infos []*resource.Info) (*ResourceObjects, erro
 // resources that should be pruned.
 type ResourceObjects struct {
 	CurrentInventory    *resource.Info
-	PreviousInventories []prune.Inventory
+	PreviousInventories []inventory.Inventory
 	Resources           []*resource.Info
 }
 
@@ -258,7 +259,7 @@ func splitInfos(infos []*resource.Info) ([]*resource.Info, []*resource.Info) {
 	resources := make([]*resource.Info, 0)
 
 	for _, info := range infos {
-		if prune.IsInventoryObject(info.Object) {
+		if inventory.IsInventoryObject(info.Object) {
 			inventoryObjectTemplates = append(inventoryObjectTemplates, info)
 		} else {
 			resources = append(resources, info)
