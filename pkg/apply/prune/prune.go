@@ -22,24 +22,17 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/klog"
 	"k8s.io/kubectl/pkg/cmd/util"
-	"k8s.io/kubectl/pkg/validation"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
-	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
 // PruneOptions encapsulates the necessary information to
 // implement the prune functionality.
 type PruneOptions struct {
-	client  dynamic.Interface
-	builder *resource.Builder
-	mapper  meta.RESTMapper
-	// The currently applied objects (as Infos), including the
-	// current inventory object. These objects are used to
-	// calculate the prune set after retrieving the previous
-	// inventory objects.
-	currentInventoryObject *resource.Info
+	invClient inventory.InventoryClient
+	client    dynamic.Interface
+	mapper    meta.RESTMapper
 	// Stores the UID for each of the currently applied objects.
 	// These UID's are written during the apply, and this data
 	// structure is shared. IMPORTANT: the apply task must
@@ -49,9 +42,7 @@ type PruneOptions struct {
 	// by the inventory label. This set should also include the
 	// current inventory object. Stored here to make testing
 	// easier by manually setting the retrieved inventory infos.
-	pastInventoryObjects      []*resource.Info
-	retrievedInventoryObjects bool
-	validator                 validation.Schema
+
 	// InventoryFactoryFunc wraps and returns an interface for the
 	// object which will load and store the inventory.
 	InventoryFactoryFunc func(*resource.Info) inventory.Inventory
@@ -66,132 +57,19 @@ func NewPruneOptions(currentUids sets.String) *PruneOptions {
 	return po
 }
 
-func (po *PruneOptions) Initialize(factory util.Factory) error {
+func (po *PruneOptions) Initialize(factory util.Factory, invClient inventory.InventoryClient) error {
 	var err error
+	po.invClient = invClient
 	// Client/Builder fields from the Factory.
 	po.client, err = factory.DynamicClient()
 	if err != nil {
 		return err
 	}
-	po.builder = factory.NewBuilder()
 	po.mapper, err = factory.ToRESTMapper()
 	if err != nil {
 		return err
 	}
-	po.validator, err = factory.Validator(false)
-	if err != nil {
-		return err
-	}
-	// Initialize past inventory objects as empty.
-	po.pastInventoryObjects = []*resource.Info{}
-	po.retrievedInventoryObjects = false
 	return nil
-}
-
-// GetPreviousInventoryObjects returns the set of inventory objects
-// that have the same label as the current inventory object. Removes
-// the current inventory object from this set. Returns an error
-// if there is a problem retrieving the inventory objects.
-func (po *PruneOptions) GetPreviousInventoryObjects(currentInv *resource.Info) ([]inventory.Inventory, error) {
-	current, err := infoToObjMetadata(currentInv)
-	if err != nil {
-		return nil, err
-	}
-	label, err := inventory.RetrieveInventoryLabel(currentInv.Object)
-	if err != nil {
-		return nil, err
-	}
-	if _, err := po.retrievePreviousInventoryObjects(current, label); err != nil {
-		return nil, err
-	}
-	// Remove the current inventory info from the previous inventory infos.
-	pastInventoryInfos := []*resource.Info{}
-	pastInventories := []inventory.Inventory{}
-	for _, pastInfo := range po.pastInventoryObjects {
-		past, err := infoToObjMetadata(pastInfo)
-		if err != nil {
-			return nil, err
-		}
-		if !current.Equals(past) {
-			pastInv := po.InventoryFactoryFunc(pastInfo)
-			pastInventories = append(pastInventories, pastInv)
-			pastInventoryInfos = append(pastInventoryInfos, pastInfo)
-		}
-	}
-	po.pastInventoryObjects = pastInventoryInfos
-	return pastInventories, nil
-}
-
-// retrievePreviousInventoryObjects requests the previous inventory objects
-// using the inventory label from the current inventory object. Sets
-// the field "pastInventoryObjects". Returns an error if the inventory
-// label doesn't exist for the current currentInventoryObject does not
-// exist or if the call to retrieve the past inventory objects fails.
-func (po *PruneOptions) retrievePreviousInventoryObjects(current *object.ObjMetadata, label string) ([]*resource.Info, error) {
-	if po.retrievedInventoryObjects {
-		return po.pastInventoryObjects, nil
-	}
-	mapping, err := po.mapper.RESTMapping(current.GroupKind)
-	if err != nil {
-		return nil, err
-	}
-	groupResource := mapping.Resource.GroupResource().String()
-	namespace := current.Namespace
-	labelSelector := fmt.Sprintf("%s=%s", common.InventoryLabel, label)
-	klog.V(4).Infof("prune inventory object fetch: %s/%s/%s", groupResource, namespace, labelSelector)
-	retrievedInventoryInfos, err := po.builder.
-		Unstructured().
-		// TODO: Check if this validator is necessary.
-		Schema(po.validator).
-		ContinueOnError().
-		NamespaceParam(namespace).DefaultNamespace().
-		ResourceTypes(groupResource).
-		LabelSelectorParam(labelSelector).
-		Flatten().
-		Do().
-		Infos()
-	if err != nil {
-		return nil, err
-	}
-	po.pastInventoryObjects = retrievedInventoryInfos
-	po.retrievedInventoryObjects = true
-	klog.V(4).Infof("prune %d inventory objects found", len(po.pastInventoryObjects))
-	return retrievedInventoryInfos, nil
-}
-
-// infoToObjMetadata transforms the object represented by the passed "info"
-// into its Inventory representation. Returns error if the passed Info
-// is nil, or the Object in the Info is empty.
-func infoToObjMetadata(info *resource.Info) (*object.ObjMetadata, error) {
-	if info == nil || info.Object == nil {
-		return nil, fmt.Errorf("empty resource.Info can not calculate as inventory")
-	}
-	obj := info.Object
-	gk := obj.GetObjectKind().GroupVersionKind().GroupKind()
-	return object.CreateObjMetadata(info.Namespace, info.Name, gk)
-}
-
-// UnionPastObjs takes a set of inventory objects (infos), returning the
-// union of the objects referenced by these inventory objects.
-// Returns an error if any of the passed objects are not inventory
-// objects, or if unable to retrieve the referenced objects from any
-// inventory object.
-func UnionPastObjs(pastInvs []inventory.Inventory) ([]object.ObjMetadata, error) {
-	objSet := map[string]object.ObjMetadata{}
-	for _, inv := range pastInvs {
-		objs, err := inv.Load()
-		if err != nil {
-			return nil, err
-		}
-		for _, obj := range objs {
-			objSet[obj.String()] = obj // De-duping
-		}
-	}
-	pastObjs := make([]object.ObjMetadata, 0, len(objSet))
-	for _, obj := range objSet {
-		pastObjs = append(pastObjs, obj)
-	}
-	return pastObjs, nil
 }
 
 // Options defines a set of parameters that can be used to tune
@@ -213,17 +91,12 @@ func (po *PruneOptions) Prune(currentObjects []*resource.Info, eventChannel chan
 	if !found {
 		return fmt.Errorf("current inventory object not found during prune")
 	}
-	po.currentInventoryObject = currentInventoryObject
 	klog.V(7).Infof("prune current inventory object: %s/%s",
 		currentInventoryObject.Namespace, currentInventoryObject.Name)
 
 	// Retrieve previous inventory objects, and calculate the
 	// union of the previous applies as an inventory set.
-	pastInventories, err := po.GetPreviousInventoryObjects(currentInventoryObject)
-	if err != nil {
-		return err
-	}
-	pastObjs, err := UnionPastObjs(pastInventories)
+	pastObjs, err := po.invClient.GetStoredObjRefs(currentInventoryObject)
 	if err != nil {
 		return err
 	}
@@ -287,7 +160,11 @@ func (po *PruneOptions) Prune(currentObjects []*resource.Info, eventChannel chan
 		}
 	}
 	// Delete previous inventory objects.
-	for _, pastGroupInfo := range po.pastInventoryObjects {
+	pastInventories, err := po.invClient.GetPreviousInventoryObjects(currentInventoryObject)
+	if err != nil {
+		return err
+	}
+	for _, pastGroupInfo := range pastInventories {
 		if !o.DryRun {
 			klog.V(7).Infof("prune delete previous inventory object: %s/%s",
 				pastGroupInfo.Namespace, pastGroupInfo.Name)

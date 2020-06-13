@@ -9,7 +9,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/dynamic/fake"
@@ -17,7 +16,6 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
-	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
 var testNamespace = "test-inventory-namespace"
@@ -96,104 +94,6 @@ var pod3Info = &resource.Info{
 	Object:    &pod3,
 }
 
-var nilInfo = &resource.Info{
-	Namespace: testNamespace,
-	Name:      inventoryObjName,
-	Object:    nil,
-}
-
-var pod1Metadata = &object.ObjMetadata{
-	Namespace: testNamespace,
-	Name:      pod1Name,
-	GroupKind: schema.GroupKind{
-		Group: "",
-		Kind:  "Pod",
-	},
-}
-
-var pod2Metadata = &object.ObjMetadata{
-	Namespace: testNamespace,
-	Name:      pod2Name,
-	GroupKind: schema.GroupKind{
-		Group: "",
-		Kind:  "Pod",
-	},
-}
-
-var pod3Metadata = &object.ObjMetadata{
-	Namespace: testNamespace,
-	Name:      pod3Name,
-	GroupKind: schema.GroupKind{
-		Group: "",
-		Kind:  "Pod",
-	},
-}
-
-var invMetadata = &object.ObjMetadata{
-	Namespace: testNamespace,
-	Name:      inventoryObjName,
-	GroupKind: schema.GroupKind{
-		Group: "",
-		Kind:  "ConfigMap",
-	},
-}
-
-func copyInventoryInfo() *resource.Info {
-	inventoryObjCopy := inventoryObj.DeepCopy()
-	var inventoryInfo = &resource.Info{
-		Namespace: testNamespace,
-		Name:      inventoryObjName,
-		Object:    inventoryObjCopy,
-	}
-	return inventoryInfo
-}
-
-func TestInfoToObjMetadata(t *testing.T) {
-	tests := map[string]struct {
-		info     *resource.Info
-		expected *object.ObjMetadata
-		isError  bool
-	}{
-		"Nil info is an error": {
-			info:     nil,
-			expected: nil,
-			isError:  true,
-		},
-		"Nil info object is an error": {
-			info:     nilInfo,
-			expected: nil,
-			isError:  true,
-		},
-		"Pod 1 object becomes Pod 1 object metadata": {
-			info:     pod1Info,
-			expected: pod1Metadata,
-			isError:  false,
-		},
-		"Inventory object becomes inventory object metadata": {
-			info:     copyInventoryInfo(),
-			expected: invMetadata,
-			isError:  false,
-		},
-	}
-
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			actual, err := infoToObjMetadata(tc.info)
-			if tc.isError && err == nil {
-				t.Errorf("Did not receive expected error.\n")
-			}
-			if !tc.isError {
-				if err != nil {
-					t.Errorf("Receieved unexpected error: %s\n", err)
-				}
-				if !tc.expected.Equals(actual) {
-					t.Errorf("Expected ObjMetadata (%s), got (%s)\n", tc.expected, actual)
-				}
-			}
-		})
-	}
-}
-
 // Returns a inventory object with the inventory set from
 // the passed "children".
 func createInventoryInfo(name string, children ...*resource.Info) *resource.Info {
@@ -211,74 +111,6 @@ func createInventoryInfo(name string, children ...*resource.Info) *resource.Info
 	infos = append(infos, children...)
 	_ = inventory.AddObjsToInventory(infos)
 	return inventoryInfo
-}
-
-func TestUnionPastObjs(t *testing.T) {
-	tests := map[string]struct {
-		prevInventories []inventory.Inventory
-		expected        []object.ObjMetadata
-	}{
-		"Empty inventory objects = empty inventory": {
-			prevInventories: []inventory.Inventory{},
-			expected:        []object.ObjMetadata{},
-		},
-		"No children in inventory object, equals no inventory": {
-			prevInventories: []inventory.Inventory{inventory.WrapInventoryObj(createInventoryInfo("test-1"))},
-			expected:        []object.ObjMetadata{},
-		},
-		"Inventory object with Pod1 returns inventory with Pod1": {
-			prevInventories: []inventory.Inventory{inventory.WrapInventoryObj(createInventoryInfo("test-1", pod1Info))},
-			expected:        []object.ObjMetadata{*pod1Metadata},
-		},
-		"Inventory object with three pods returns inventory with three pods": {
-			prevInventories: []inventory.Inventory{
-				inventory.WrapInventoryObj(createInventoryInfo("test-1", pod1Info, pod2Info, pod3Info)),
-			},
-			expected: []object.ObjMetadata{*pod1Metadata, *pod2Metadata, *pod3Metadata},
-		},
-		"Two inventory objects with different pods returns inventory with both pods": {
-			prevInventories: []inventory.Inventory{
-				inventory.WrapInventoryObj(createInventoryInfo("test-1", pod1Info)),
-				inventory.WrapInventoryObj(createInventoryInfo("test-2", pod2Info)),
-			},
-			expected: []object.ObjMetadata{*pod1Metadata, *pod2Metadata},
-		},
-		"Two inventory objects with overlapping pods returns set of pods": {
-			prevInventories: []inventory.Inventory{
-				inventory.WrapInventoryObj(createInventoryInfo("test-1", pod1Info, pod2Info)),
-				inventory.WrapInventoryObj(createInventoryInfo("test-2", pod2Info, pod3Info)),
-			},
-			expected: []object.ObjMetadata{*pod1Metadata, *pod2Metadata, *pod3Metadata},
-		},
-	}
-
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			actual, err := UnionPastObjs(tc.prevInventories)
-			if err != nil {
-				t.Errorf("Unexpected error received: %s\n", err)
-			}
-			if len(tc.expected) != len(actual) {
-				t.Fatalf("Expected (%d) objects, got (%d)\n", len(tc.expected), len(actual))
-			}
-			for _, expectedObj := range tc.expected {
-				if !objInArray(expectedObj, actual) {
-					t.Fatalf("Expected object (%s), but not found\n", expectedObj)
-				}
-			}
-		})
-	}
-}
-
-// objInArray is a helper function that returns true if passed obj
-// is in array of objects; false otherwise.
-func objInArray(obj object.ObjMetadata, arr []object.ObjMetadata) bool {
-	for _, a := range arr {
-		if a == obj {
-			return true
-		}
-	}
-	return false
 }
 
 // preventDelete object contains the "on-remove:keep" lifecycle directive.
@@ -355,8 +187,7 @@ func TestPrune(t *testing.T) {
 			po.InventoryFactoryFunc = inventory.WrapInventoryObj
 			// Set up the previously applied objects.
 			pastInventoryInfo := createInventoryInfo("past-group", tc.pastInfos...)
-			po.pastInventoryObjects = []*resource.Info{pastInventoryInfo}
-			po.retrievedInventoryObjects = true
+			po.invClient = inventory.NewFakeInventoryClient([]*resource.Info{pastInventoryInfo})
 			// Set up the currently applied objects.
 			currentInventoryInfo := createInventoryInfo("current-group", tc.currentInfos...)
 			currentInfos := append(tc.currentInfos, currentInventoryInfo)

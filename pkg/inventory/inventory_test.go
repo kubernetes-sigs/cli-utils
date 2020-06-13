@@ -94,6 +94,33 @@ var pod3Info = &resource.Info{
 	Object:    &pod3,
 }
 
+var pod1Metadata = &object.ObjMetadata{
+	Namespace: testNamespace,
+	Name:      pod1Name,
+	GroupKind: schema.GroupKind{
+		Group: "",
+		Kind:  "Pod",
+	},
+}
+
+var pod2Metadata = &object.ObjMetadata{
+	Namespace: testNamespace,
+	Name:      pod2Name,
+	GroupKind: schema.GroupKind{
+		Group: "",
+		Kind:  "Pod",
+	},
+}
+
+var pod3Metadata = &object.ObjMetadata{
+	Namespace: testNamespace,
+	Name:      pod3Name,
+	GroupKind: schema.GroupKind{
+		Group: "",
+		Kind:  "Pod",
+	},
+}
+
 var nonUnstructuredInventoryObj = &corev1.ConfigMap{
 	ObjectMeta: metav1.ObjectMeta{
 		Namespace: testNamespace,
@@ -162,7 +189,7 @@ func TestRetrieveInventoryLabel(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		actual, err := RetrieveInventoryLabel(test.obj)
+		actual, err := retrieveInventoryLabel(test.obj)
 		if test.isError && err == nil {
 			t.Errorf("Did not receive expected error.\n")
 		}
@@ -578,6 +605,63 @@ func TestAddRetrieveObjsToFromInventory(t *testing.T) {
 	}
 }
 
+func TestUnionPastObjs(t *testing.T) {
+	tests := map[string]struct {
+		prevInventories []*resource.Info
+		expected        []object.ObjMetadata
+	}{
+		"Empty inventory objects = empty inventory": {
+			prevInventories: []*resource.Info{},
+			expected:        []object.ObjMetadata{},
+		},
+		"No children in inventory object, equals no inventory": {
+			prevInventories: []*resource.Info{createInventoryInfo("test-1")},
+			expected:        []object.ObjMetadata{},
+		},
+		"Inventory object with Pod1 returns inventory with Pod1": {
+			prevInventories: []*resource.Info{createInventoryInfo("test-1", pod1Info)},
+			expected:        []object.ObjMetadata{*pod1Metadata},
+		},
+		"Inventory object with three pods returns inventory with three pods": {
+			prevInventories: []*resource.Info{
+				createInventoryInfo("test-1", pod1Info, pod2Info, pod3Info),
+			},
+			expected: []object.ObjMetadata{*pod1Metadata, *pod2Metadata, *pod3Metadata},
+		},
+		"Two inventory objects with different pods returns inventory with both pods": {
+			prevInventories: []*resource.Info{
+				createInventoryInfo("test-1", pod1Info),
+				createInventoryInfo("test-2", pod2Info),
+			},
+			expected: []object.ObjMetadata{*pod1Metadata, *pod2Metadata},
+		},
+		"Two inventory objects with overlapping pods returns set of pods": {
+			prevInventories: []*resource.Info{
+				createInventoryInfo("test-1", pod1Info, pod2Info),
+				createInventoryInfo("test-2", pod2Info, pod3Info),
+			},
+			expected: []object.ObjMetadata{*pod1Metadata, *pod2Metadata, *pod3Metadata},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			actual, err := UnionPastObjs(tc.prevInventories)
+			if err != nil {
+				t.Errorf("Unexpected error received: %s\n", err)
+			}
+			if len(tc.expected) != len(actual) {
+				t.Fatalf("Expected (%d) objects, got (%d)\n", len(tc.expected), len(actual))
+			}
+			for _, expectedObj := range tc.expected {
+				if !objInArray(expectedObj, actual) {
+					t.Fatalf("Expected object (%s), but not found\n", expectedObj)
+				}
+			}
+		})
+	}
+}
+
 func TestAddSuffixToName(t *testing.T) {
 	tests := []struct {
 		info     *resource.Info
@@ -715,4 +799,34 @@ func copyInventoryInfo() *resource.Info {
 		Object:    inventoryObjCopy,
 	}
 	return inventoryInfo
+}
+
+// Returns a inventory object with the inventory set from
+// the passed "children".
+func createInventoryInfo(name string, children ...*resource.Info) *resource.Info {
+	inventoryName := inventoryObjName
+	if len(name) > 0 {
+		inventoryName = name
+	}
+	inventoryObjCopy := inventoryObj.DeepCopy()
+	var inventoryInfo = &resource.Info{
+		Namespace: testNamespace,
+		Name:      inventoryName,
+		Object:    inventoryObjCopy,
+	}
+	infos := []*resource.Info{inventoryInfo}
+	infos = append(infos, children...)
+	_ = AddObjsToInventory(infos)
+	return inventoryInfo
+}
+
+// objInArray is a helper function that returns true if passed obj
+// is in array of objects; false otherwise.
+func objInArray(obj object.ObjMetadata, arr []object.ObjMetadata) bool {
+	for _, a := range arr {
+		if a == obj {
+			return true
+		}
+	}
+	return false
 }

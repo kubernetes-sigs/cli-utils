@@ -38,10 +38,10 @@ type Inventory interface {
 	GetObject() (*resource.Info, error)
 }
 
-// RetrieveInventoryLabel returns the string value of the InventoryLabel
+// retrieveInventoryLabel returns the string value of the InventoryLabel
 // for the passed object. Returns error if the passed object is nil or
 // is not a inventory object.
-func RetrieveInventoryLabel(obj runtime.Object) (string, error) {
+func retrieveInventoryLabel(obj runtime.Object) (string, error) {
 	var inventoryLabel string
 	if obj == nil {
 		return "", fmt.Errorf("inventory object is nil")
@@ -64,7 +64,7 @@ func IsInventoryObject(obj runtime.Object) bool {
 	if obj == nil {
 		return false
 	}
-	inventoryLabel, err := RetrieveInventoryLabel(obj)
+	inventoryLabel, err := retrieveInventoryLabel(obj)
 	if err == nil && len(inventoryLabel) > 0 {
 		return true
 	}
@@ -221,6 +221,30 @@ func RetrieveObjsFromInventory(infos []*resource.Info) ([]*object.ObjMetadata, e
 		}
 	}
 	return objs, nil
+}
+
+// UnionPastObjs takes a set of inventory objects (infos), returning the
+// union of the objects referenced by these inventory objects.
+// Returns an error if any of the passed objects are not inventory
+// objects, or if unable to retrieve the referenced objects from any
+// inventory object.
+func UnionPastObjs(pastInvs []*resource.Info) ([]object.ObjMetadata, error) {
+	objSet := map[string]object.ObjMetadata{}
+	for _, inv := range pastInvs {
+		wrapped := WrapInventoryObj(inv)
+		objs, err := wrapped.Load()
+		if err != nil {
+			return nil, err
+		}
+		for _, obj := range objs {
+			objSet[obj.String()] = obj // De-duping
+		}
+	}
+	pastObjs := make([]object.ObjMetadata, 0, len(objSet))
+	for _, obj := range objSet {
+		pastObjs = append(pastObjs, obj)
+	}
+	return pastObjs, nil
 }
 
 // ClearInventoryObj finds the inventory object in the list of objects,

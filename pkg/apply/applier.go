@@ -45,7 +45,6 @@ func NewApplier(factory util.Factory, ioStreams genericclioptions.IOStreams) *Ap
 		factory:      factory,
 		ioStreams:    ioStreams,
 	}
-	a.previousInventoriesFunc = a.PruneOptions.GetPreviousInventoryObjects
 	a.infoHelperFactoryFunc = a.infoHelperFactory
 	a.InventoryFactoryFunc = inventory.WrapInventoryObj
 	a.PruneOptions.InventoryFactoryFunc = inventory.WrapInventoryObj
@@ -69,15 +68,8 @@ type Applier struct {
 	ApplyOptions *apply.ApplyOptions
 	PruneOptions *prune.PruneOptions
 	StatusPoller poller.Poller
+	invClient    inventory.InventoryClient
 
-	//TODO(mortent): See if we can come up with a better structure here
-	// so we don't need these functions to facilitate testing.
-	//
-	// previousInventoriesFunc is used to fetch the existing inventories
-	// from the apiserver, taking the current inventory object as the
-	// parameter. It is defined here so we can override it in
-	// unit tests.
-	previousInventoriesFunc func(*resource.Info) ([]inventory.Inventory, error)
 	// infoHelperFactoryFunc is used to create a new instance of the
 	// InfoHelper. It is defined here so we can override it in unit tests.
 	infoHelperFactoryFunc func() info.InfoHelper
@@ -99,7 +91,11 @@ func (a *Applier) Initialize(cmd *cobra.Command) error {
 		return errors.WrapPrefix(err, "error setting up ApplyOptions", 1)
 	}
 	a.ApplyOptions.PostProcessorFn = nil // Turn off the default kubectl pruning
-	err = a.PruneOptions.Initialize(a.factory)
+	a.invClient, err = inventory.NewInventoryClient(a.factory)
+	if err != nil {
+		return err
+	}
+	err = a.PruneOptions.Initialize(a.factory, a.invClient)
 	if err != nil {
 		return errors.WrapPrefix(err, "error setting up PruneOptions", 1)
 	}
@@ -181,7 +177,7 @@ func (a *Applier) prepareObjects(infos []*resource.Info) (*ResourceObjects, erro
 	}
 
 	// Fetch all previous inventories.
-	previousInventories, err := a.previousInventoriesFunc(inventoryObject)
+	previousInventories, err := a.invClient.GetPreviousInventoryObjects(inventoryObject)
 	if err != nil {
 		return nil, err
 	}
@@ -204,7 +200,7 @@ func (a *Applier) prepareObjects(infos []*resource.Info) (*ResourceObjects, erro
 // resources that should be pruned.
 type ResourceObjects struct {
 	CurrentInventory    *resource.Info
-	PreviousInventories []inventory.Inventory
+	PreviousInventories []*resource.Info
 	Resources           []*resource.Info
 }
 
@@ -228,7 +224,7 @@ func (r *ResourceObjects) IdsForApply() []object.ObjMetadata {
 // IdsForPrune returns the Ids for all resources that should
 // be pruned.
 func (r *ResourceObjects) IdsForPrune() []object.ObjMetadata {
-	inventory, _ := prune.UnionPastObjs(r.PreviousInventories)
+	inventory, _ := inventory.UnionPastObjs(r.PreviousInventories)
 
 	applyIds := make(map[object.ObjMetadata]bool)
 	for _, id := range r.IdsForApply() {
