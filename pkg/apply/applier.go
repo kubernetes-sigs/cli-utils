@@ -292,11 +292,18 @@ func (a *Applier) Run(ctx context.Context, objects []*resource.Info, options Opt
 			return
 		}
 
+		mapper, err := a.factory.ToRESTMapper()
+		if err != nil {
+			handleError(eventChannel, err)
+			return
+		}
+
 		// Fetch the queue (channel) of tasks that should be executed.
 		taskQueue := (&solver.TaskQueueSolver{
 			ApplyOptions: a.ApplyOptions,
 			PruneOptions: a.PruneOptions,
 			InfoHelper:   a.infoHelperFactoryFunc(),
+			Mapper:       mapper,
 		}).BuildTaskQueue(resourceObjects, solver.Options{
 			ReconcileTimeout:       options.ReconcileTimeout,
 			Prune:                  !options.NoPrune,

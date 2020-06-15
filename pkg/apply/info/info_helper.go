@@ -4,14 +4,10 @@
 package info
 
 import (
-	"fmt"
-	"reflect"
-
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/restmapper"
 	"k8s.io/kubectl/pkg/cmd/util"
 )
 
@@ -21,13 +17,6 @@ type InfoHelper interface {
 	// objects. This must be called at a time when all needed resource
 	// types are available in the RESTMapper.
 	UpdateInfos(infos []*resource.Info) error
-
-	// ResetRESTMapper resets the state of the RESTMapper so any
-	// added resource types in the cluster will be picked up.
-	ResetRESTMapper() error
-
-	// ToRESTMapper returns a RESTMapper
-	ToRESTMapper() (meta.RESTMapper, error)
 }
 
 func NewInfoHelper(factory util.Factory, namespace string) *infoHelper {
@@ -66,20 +55,6 @@ func (ih *infoHelper) UpdateInfos(infos []*resource.Info) error {
 
 func (ih *infoHelper) ToRESTMapper() (meta.RESTMapper, error) {
 	return ih.factory.ToRESTMapper()
-}
-
-func (ih *infoHelper) ResetRESTMapper() error {
-	mapper, err := ih.factory.ToRESTMapper()
-	if err != nil {
-		return err
-	}
-	fv := reflect.ValueOf(mapper).FieldByName("RESTMapper")
-	ddRESTMapper, ok := fv.Interface().(*restmapper.DeferredDiscoveryRESTMapper)
-	if !ok {
-		return fmt.Errorf("unexpected RESTMapper type")
-	}
-	ddRESTMapper.Reset()
-	return nil
 }
 
 func (ih *infoHelper) getClient(gv schema.GroupVersion) (*rest.RESTClient, error) {
