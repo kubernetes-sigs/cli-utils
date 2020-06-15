@@ -512,9 +512,7 @@ func TestReadAndPrepareObjects(t *testing.T) {
 			ioStreams, _, _, _ := genericclioptions.NewTestIOStreams() //nolint:dogsled
 			applier := NewApplier(tf, ioStreams)
 
-			applier.previousInventoriesFunc = func(currentInv *resource.Info) ([]inventory.Inventory, error) {
-				return []inventory.Inventory{}, nil
-			}
+			applier.invClient = inventory.NewFakeInventoryClient([]*resource.Info{})
 
 			resourceObjects, err := applier.prepareObjects(tc.resources)
 
