@@ -5,16 +5,66 @@ package config
 
 import (
 	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 )
 
 var ioStreams = genericclioptions.IOStreams{}
 
+// writeFile writes a file under the test directory
+func writeFile(t *testing.T, path string, value []byte) {
+	err := ioutil.WriteFile(path, value, 0600)
+	if !assert.NoError(t, err) {
+		assert.FailNow(t, err.Error())
+	}
+}
+
+var readFileA = []byte(`
+apiVersion: v1
+kind: Pod
+metadata:
+  name: objA
+  namespace: namespaceA
+`)
+
+var readFileB = []byte(`
+apiVersion: v1
+kind: Pod
+metadata:
+  name: objB
+  namespace: namespaceB
+`)
+
+var readFileC = []byte(`
+apiVersion: v1
+kind: Pod
+metadata:
+  name: objC
+`)
+
 func TestComplete(t *testing.T) {
+	d1, err := ioutil.TempDir("", "test-dir")
+	if !assert.NoError(t, err) {
+		assert.FailNow(t, err.Error())
+	}
+	defer os.RemoveAll(d1)
+	d2, err := ioutil.TempDir("", "test-dir")
+	if !assert.NoError(t, err) {
+		assert.FailNow(t, err.Error())
+	}
+	defer os.RemoveAll(d2)
+
+	writeFile(t, filepath.Join(d1, "a_test.yaml"), readFileA)
+	writeFile(t, filepath.Join(d1, "b_test.yaml"), readFileB)
+	writeFile(t, filepath.Join(d2, "b_test.yaml"), readFileC)
+
 	tests := map[string]struct {
 		args    []string
 		isError bool
@@ -31,8 +81,15 @@ func TestComplete(t *testing.T) {
 			args:    []string{"foo"},
 			isError: true,
 		},
+		"More than one namespace should fail": {
+			args:    []string{d1},
+			isError: true,
+		},
+		"No namespace set is fine": {
+			args:    []string{d2},
+			isError: false,
+		},
 	}
-
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			io := NewInitOptions(ioStreams)

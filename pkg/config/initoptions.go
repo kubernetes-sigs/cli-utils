@@ -11,11 +11,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-errors/errors"
+	"github.com/google/uuid"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"sigs.k8s.io/kustomize/kyaml/kio"
-
-	"github.com/google/uuid"
 )
 
 const manifestFilename = "inventory-template.yaml"
@@ -142,19 +142,25 @@ func calcPackageNamespace(packageDir string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	// Return the first non-empty namespace found. Cluster-scoped
+	// Return the non-empty unique namespace if found. Cluster-scoped
 	// resources do not have namespace set.
+	currentNamespace := metav1.NamespaceDefault
 	for _, node := range nodes {
 		rm, err := node.GetMeta()
-		if err != nil {
+		if err != nil || len(rm.ObjectMeta.Namespace) == 0 {
 			continue
 		}
-		if len(rm.ObjectMeta.Namespace) > 0 {
-			return rm.ObjectMeta.Namespace, nil
+		if currentNamespace == metav1.NamespaceDefault {
+			currentNamespace = rm.ObjectMeta.Namespace
+		}
+		if currentNamespace != rm.ObjectMeta.Namespace {
+			return "", errors.Errorf(
+				"resources belong to different namespaces, a namespace is required to create the resource " +
+					"used for keeping track of past apply operations. Please specify ---inv-namespace.")
 		}
 	}
 	// Return the default namespace if none found.
-	return metav1.NamespaceDefault, nil
+	return currentNamespace, nil
 }
 
 // defaultInventoryID returns a UUID string as a default unique
