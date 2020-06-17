@@ -17,6 +17,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/dynamic"
@@ -133,14 +134,7 @@ func (po *PruneOptions) Prune(currentObjects []*resource.Info, eventChannel chan
 		// Handle lifecycle directive preventing deletion.
 		if preventDeleteAnnotation(metadata.GetAnnotations()) {
 			klog.V(7).Infof("prune object lifecycle directive; do not prune: %s", uid)
-			eventChannel <- event.Event{
-				Type: event.PruneType,
-				PruneEvent: event.PruneEvent{
-					Type:      event.PruneEventResourceUpdate,
-					Operation: event.PruneSkipped,
-					Object:    obj,
-				},
-			}
+			eventChannel <- createPruneEvent(obj, event.PruneSkipped)
 			continue
 		}
 		if !o.DryRun {
@@ -150,14 +144,7 @@ func (po *PruneOptions) Prune(currentObjects []*resource.Info, eventChannel chan
 				return err
 			}
 		}
-		eventChannel <- event.Event{
-			Type: event.PruneType,
-			PruneEvent: event.PruneEvent{
-				Type:      event.PruneEventResourceUpdate,
-				Operation: event.Pruned,
-				Object:    obj,
-			},
-		}
+		eventChannel <- createPruneEvent(obj, event.Pruned)
 	}
 	// Delete previous inventory objects.
 	pastInventories, err := po.invClient.GetPreviousInventoryObjects(currentInventoryObject)
@@ -177,14 +164,7 @@ func (po *PruneOptions) Prune(currentObjects []*resource.Info, eventChannel chan
 				return err
 			}
 		}
-		eventChannel <- event.Event{
-			Type: event.PruneType,
-			PruneEvent: event.PruneEvent{
-				Type:      event.PruneEventResourceUpdate,
-				Operation: event.Pruned,
-				Object:    pastGroupInfo.Object,
-			},
-		}
+		eventChannel <- createPruneEvent(pastGroupInfo.Object, event.Pruned)
 	}
 	return nil
 }
@@ -200,4 +180,16 @@ func preventDeleteAnnotation(annotations map[string]string) bool {
 		}
 	}
 	return false
+}
+
+// createPruneEvent is a helper function to package a prune event.
+func createPruneEvent(obj runtime.Object, op event.PruneEventOperation) event.Event {
+	return event.Event{
+		Type: event.PruneType,
+		PruneEvent: event.PruneEvent{
+			Type:      event.PruneEventResourceUpdate,
+			Operation: op,
+			Object:    obj,
+		},
+	}
 }
