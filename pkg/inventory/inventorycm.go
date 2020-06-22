@@ -10,12 +10,9 @@ package inventory
 
 import (
 	"fmt"
-	"sort"
-	"strconv"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/cli-runtime/pkg/resource"
-	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
@@ -54,7 +51,7 @@ func (icm *InventoryConfigMap) Load() ([]object.ObjMetadata, error) {
 			if err != nil {
 				return objs, err
 			}
-			objs = append(objs, *obj)
+			objs = append(objs, obj)
 		}
 	}
 	return objs, nil
@@ -85,28 +82,14 @@ func (icm *InventoryConfigMap) GetObject() (*resource.Info, error) {
 
 	// Create the objMap of all the resources, and compute the hash.
 	objMap := buildObjMap(icm.objMetas)
-	invHashStr, err := computeInventoryHash(objMap)
-	if err != nil {
-		return nil, err
-	}
-	name := fmt.Sprintf("%s-%s", icm.inv.Name, invHashStr)
-
 	// Create the inventory object by copying the template.
 	invCopy := iot.DeepCopy()
-	invCopy.SetName(name)
 	// Adds the inventory map to the ConfigMap "data" section.
-	err = unstructured.SetNestedStringMap(invCopy.UnstructuredContent(),
+	err := unstructured.SetNestedStringMap(invCopy.UnstructuredContent(),
 		objMap, "data")
 	if err != nil {
 		return nil, err
 	}
-	annotations := invCopy.GetAnnotations()
-	if annotations == nil {
-		annotations = map[string]string{}
-	}
-	annotations[common.InventoryHash] = invHashStr
-	invCopy.SetAnnotations(annotations)
-
 	return &resource.Info{
 		Client:    icm.inv.Client,
 		Mapping:   icm.inv.Mapping,
@@ -123,28 +106,4 @@ func buildObjMap(objMetas []object.ObjMetadata) map[string]string {
 		objMap[objMetadata.String()] = ""
 	}
 	return objMap
-}
-
-func computeInventoryHash(objMap map[string]string) (string, error) {
-	objList := mapKeysToSlice(objMap)
-	sort.Strings(objList)
-	invHash, err := calcInventoryHash(objList)
-	if err != nil {
-		return "", err
-	}
-	// Compute the name of the inventory object. It is the name of the
-	// inventory object template that it is based on with an additional
-	// suffix which is based on the hash of the inventory.
-	return strconv.FormatUint(uint64(invHash), 16), nil
-}
-
-// mapKeysToSlice returns the map keys as a slice of strings.
-func mapKeysToSlice(m map[string]string) []string {
-	s := make([]string, len(m))
-	i := 0
-	for k := range m {
-		s[i] = k
-		i++
-	}
-	return s
 }

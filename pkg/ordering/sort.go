@@ -18,7 +18,15 @@ var _ sort.Interface = SortableInfos{}
 func (a SortableInfos) Len() int      { return len(a) }
 func (a SortableInfos) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
 func (a SortableInfos) Less(i, j int) bool {
-	return less(object.InfoToObjMeta(a[i]), object.InfoToObjMeta(a[j]))
+	first, err := object.InfoToObjMeta(a[i])
+	if err != nil {
+		return false
+	}
+	second, err := object.InfoToObjMeta(a[j])
+	if err != nil {
+		return false
+	}
+	return less(first, second)
 }
 
 type SortableMetas []object.ObjMetadata

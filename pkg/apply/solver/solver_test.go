@@ -24,8 +24,8 @@ var (
 	pruneOptions = &prune.PruneOptions{}
 
 	depInfo    = createInfo("apps/v1", "Deployment", "foo", "bar")
-	customInfo = createInfo("custom.io/v1", "Custom", "Foo", "")
-	crdInfo    = createInfo("apiextensions.k8s.io/v1", "CustomResourceDefinition", "CRD", "")
+	customInfo = createInfo("custom.io/v1", "Custom", "foo", "")
+	crdInfo    = createInfo("apiextensions.k8s.io/v1", "CustomResourceDefinition", "crd", "")
 )
 
 func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
@@ -74,8 +74,8 @@ func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 				&task.SendEventTask{},
 				taskrunner.NewWaitTask(
 					[]object.ObjMetadata{
-						object.InfoToObjMeta(depInfo),
-						object.InfoToObjMeta(customInfo),
+						ignoreErrInfoToObjMeta(depInfo),
+						ignoreErrInfoToObjMeta(customInfo),
 					},
 					taskrunner.AllCurrent, 1*time.Second),
 				&task.SendEventTask{},
@@ -100,8 +100,8 @@ func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 				&task.SendEventTask{},
 				taskrunner.NewWaitTask(
 					[]object.ObjMetadata{
-						object.InfoToObjMeta(depInfo),
-						object.InfoToObjMeta(customInfo),
+						ignoreErrInfoToObjMeta(depInfo),
+						ignoreErrInfoToObjMeta(customInfo),
 					},
 					taskrunner.AllCurrent, 1*time.Second),
 				&task.SendEventTask{},
@@ -147,7 +147,7 @@ func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 				},
 				taskrunner.NewWaitTask(
 					[]object.ObjMetadata{
-						object.InfoToObjMeta(crdInfo),
+						ignoreErrInfoToObjMeta(crdInfo),
 					},
 					taskrunner.AllCurrent, 1*time.Second),
 				&task.ResetRESTMapperTask{},
@@ -159,8 +159,8 @@ func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 				&task.SendEventTask{},
 				taskrunner.NewWaitTask(
 					[]object.ObjMetadata{
-						object.InfoToObjMeta(crdInfo),
-						object.InfoToObjMeta(depInfo),
+						ignoreErrInfoToObjMeta(crdInfo),
+						ignoreErrInfoToObjMeta(depInfo),
 					},
 					taskrunner.AllCurrent, 1*time.Second),
 				&task.SendEventTask{},
@@ -199,9 +199,13 @@ func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 				Mapper:       testutil.NewFakeRESTMapper(),
 			}
 
+			objs, err := object.InfosToObjMetas(tc.infos)
+			if err != nil {
+				t.Fatalf("unexpected error received: %s", err)
+			}
 			tq := tqs.BuildTaskQueue(&fakeResourceObjects{
 				infosForApply: tc.infos,
-				idsForApply:   object.InfosToObjMetas(tc.infos),
+				idsForApply:   objs,
 				idsForPrune:   nil,
 			}, tc.options)
 
@@ -218,7 +222,7 @@ func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 					assert.Equal(t, len(expTsk.Objects), len(actApplyTask.Objects))
 					for j, obj := range expTsk.Objects {
 						actObj := actApplyTask.Objects[j]
-						assert.Equal(t, object.InfoToObjMeta(obj), object.InfoToObjMeta(actObj))
+						assert.Equal(t, ignoreErrInfoToObjMeta(obj), ignoreErrInfoToObjMeta(actObj))
 					}
 				case *taskrunner.WaitTask:
 					actWaitTask := toWaitTask(t, actualTask)
@@ -255,6 +259,8 @@ func toApplyTask(t *testing.T, aTask taskrunner.Task) *task.ApplyTask {
 
 func createInfo(apiVersion, kind, name, namespace string) *resource.Info {
 	return &resource.Info{
+		Namespace: namespace,
+		Name:      name,
 		Object: &unstructured.Unstructured{
 			Object: map[string]interface{}{
 				"apiVersion": apiVersion,
@@ -294,10 +300,19 @@ func (f *fakeResourceObjects) InfosForApply() []*resource.Info {
 	return f.infosForApply
 }
 
+func (f *fakeResourceObjects) InfosForPrune() []*resource.Info {
+	return f.infosForApply
+}
+
 func (f *fakeResourceObjects) IdsForApply() []object.ObjMetadata {
 	return f.idsForApply
 }
 
 func (f *fakeResourceObjects) IdsForPrune() []object.ObjMetadata {
 	return f.idsForPrune
+}
+
+func ignoreErrInfoToObjMeta(info *resource.Info) object.ObjMetadata {
+	objMeta, _ := object.InfoToObjMeta(info)
+	return objMeta
 }

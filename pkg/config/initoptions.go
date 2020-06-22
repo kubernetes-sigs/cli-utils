@@ -5,6 +5,7 @@ package config
 
 import (
 	"fmt"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -18,8 +19,10 @@ import (
 	"sigs.k8s.io/kustomize/kyaml/kio"
 )
 
-const manifestFilename = "inventory-template.yaml"
-
+const (
+	manifestFilename = "inventory-template.yaml"
+	maxRandInt       = 100000000
+)
 const configMapTemplate = `# NOTE: auto-generated. Some fields should NOT be modified.
 # Date: <DATETIME>
 #
@@ -48,7 +51,7 @@ metadata:
   # NOTE: The name of the inventory object does NOT have
   # any impact on group-related functionality such as
   # deletion or pruning.
-  name: inventory
+  name: inventory-<RANDOMSUFFIX>
   labels:
     # DANGER: Do not change the value of this label.
     # Changing this value will cause a loss of continuity
@@ -208,9 +211,13 @@ func fileExists(path string) bool {
 func (i *InitOptions) fillInValues() string {
 	now := time.Now()
 	nowStr := now.Format("2006-01-02 15:04:05 MST")
+	rand.Seed(time.Now().UTC().UnixNano())
+	randomInt := rand.Intn(maxRandInt)
+	randomSuffix := fmt.Sprintf("%08d", randomInt)
 	manifestStr := configMapTemplate
 	manifestStr = strings.ReplaceAll(manifestStr, "<DATETIME>", nowStr)
 	manifestStr = strings.ReplaceAll(manifestStr, "<NAMESPACE>", i.Namespace)
+	manifestStr = strings.ReplaceAll(manifestStr, "<RANDOMSUFFIX>", randomSuffix)
 	manifestStr = strings.ReplaceAll(manifestStr, "<INVENTORYID>", i.InventoryID)
 	return manifestStr
 }

@@ -184,6 +184,13 @@ func TestFillInValues(t *testing.T) {
 			if !strings.Contains(actual, expectedNamespace) {
 				t.Errorf("\nExpected namespace (%s) not found in inventory object: %s\n", expectedNamespace, actual)
 			}
+			matched, err := regexp.MatchString(`name: inventory-\d{8}\n`, actual)
+			if err != nil {
+				t.Errorf("unexpected error parsing inventory name: %s", err)
+			}
+			if !matched {
+				t.Errorf("expected inventory name (e.g. inventory-12345678), got (%s)", actual)
+			}
 			if !strings.Contains(actual, "kind: ConfigMap") {
 				t.Errorf("\nExpected `kind: ConfigMap` not found in inventory object: %s\n", actual)
 			}
