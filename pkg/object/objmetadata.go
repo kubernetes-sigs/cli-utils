@@ -91,7 +91,7 @@ func (o *ObjMetadata) Equals(other *ObjMetadata) bool {
 func (o *ObjMetadata) String() string {
 	return fmt.Sprintf("%s%s%s%s%s%s%s",
 		o.Namespace, fieldSeparator,
-		o.Name, fieldSeparator,
+		strings.ReplaceAll(o.Name, ":", "_"), fieldSeparator,
 		o.GroupKind.Group, fieldSeparator,
 		o.GroupKind.Kind)
 }

@@ -37,6 +37,15 @@ func TestCreateObjMetadata(t *testing.T) {
 			expected: "test-namespace_test-name_apps_ReplicaSet",
 			isError:  false,
 		},
+		{
+			name: "psp:rook",
+			gk: schema.GroupKind{
+				Group: "rbac.authorization.k8s.io",
+				Kind:  "ClusterRole",
+			},
+			expected: "_psp_rook_rbac.authorization.k8s.io_ClusterRole",
+			isError:  false,
+		},
 		// Error with empty name.
 		{
 			namespace: "test-namespace ",
