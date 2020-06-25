@@ -3,7 +3,6 @@ module sigs.k8s.io/cli-utils
 go 1.13
 
 require (
-	github.com/ghodss/yaml v1.0.0
 	github.com/go-errors/errors v1.0.1
 	github.com/golang/groupcache v0.0.0-20190129154638-5b532d6fd5ef // indirect
 	github.com/google/uuid v1.1.1
@@ -25,5 +24,5 @@ require (
 	k8s.io/utils v0.0.0-20191114184206-e782cd3c129f
 	sigs.k8s.io/controller-runtime v0.4.0
 	sigs.k8s.io/kustomize/kyaml v0.1.4
-	sigs.k8s.io/yaml v1.1.0
+	sigs.k8s.io/yaml v1.2.0
 )
