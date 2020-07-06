@@ -18,6 +18,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/apply"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/manifestreader"
+	"sigs.k8s.io/kustomize/kyaml/setters2"
 )
 
 func GetApplyRunner(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *ApplyRunner {
@@ -85,6 +86,7 @@ type ApplyRunner struct {
 }
 
 func (r *ApplyRunner) RunE(cmd *cobra.Command, args []string) error {
+	cmdutil.CheckErr(setters2.CheckRequiredSettersSet())
 	prunePropPolicy, err := convertPropagationPolicy(r.prunePropagationPolicy)
 	if err != nil {
 		return err

@@ -15,6 +15,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/manifestreader"
+	"sigs.k8s.io/kustomize/kyaml/setters2"
 )
 
 var (
@@ -36,6 +37,7 @@ func NewCmdPreview(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *co
 		Short:                 i18n.T("Preview the apply of a configuration"),
 		Args:                  cobra.MaximumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
+			cmdutil.CheckErr(setters2.CheckRequiredSettersSet())
 			var ch <-chan event.Event
 			cmdutil.CheckErr(destroyer.Initialize(cmd, args))
 			// if destroy flag is set in preview, transmit it to destroyer DryRun flag
