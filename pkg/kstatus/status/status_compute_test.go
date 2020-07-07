@@ -10,9 +10,13 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/yaml"
 )
+
+var currentTime time.Time = time.Now().UTC().Truncate(time.Second)
+var currentTimeStr string = currentTime.Format(time.RFC3339)
 
 func y2u(t *testing.T, spec string) *unstructured.Unstructured {
 	j, err := yaml.YAMLToJSON([]byte(spec))
@@ -23,10 +27,11 @@ func y2u(t *testing.T, spec string) *unstructured.Unstructured {
 }
 
 type testSpec struct {
-	spec                 string
-	expectedStatus       Status
-	expectedConditions   []Condition
-	absentConditionTypes []ConditionType
+	spec                    string
+	expectedStatus          Status
+	expectedConditions      []Condition
+	absentConditionTypes    []ConditionType
+	checkLastTransitionTime bool
 }
 
 func runStatusTest(t *testing.T, tc testSpec) {
@@ -43,6 +48,9 @@ func runStatusTest(t *testing.T, tc testSpec) {
 			found = true
 			assert.Equal(t, expectedCondition.Status, condition.Status)
 			assert.Equal(t, expectedCondition.Reason, condition.Reason)
+			if tc.checkLastTransitionTime {
+				assert.True(t, expectedCondition.LastTransitionTime.Time.Equal(condition.LastTransitionTime.Time))
+			}
 		}
 		if !found {
 			t.Errorf("Expected condition of type %s, but didn't find it", expectedCondition.Type)
@@ -127,6 +135,23 @@ status:
       reason: Unschedulable
 `
 
+var podBeingScheduledWithLastTransitionTime = `
+apiVersion: v1
+kind: Pod
+metadata:
+   creationTimestamp: %s
+   generation: 1
+   name: test
+   namespace: qual
+status:
+   phase: Pending
+   conditions:
+    - type: PodScheduled 
+      status: "False"
+      reason: Unschedulable
+      lastTransitionTime: %s
+`
+
 var podUnschedulable = `
 apiVersion: v1
 kind: Pod
@@ -140,6 +165,22 @@ status:
     - type: PodScheduled 
       status: "False"
       reason: Unschedulable
+`
+
+var podUnschedulableWithLastTransitionTime = `
+apiVersion: v1
+kind: Pod
+metadata:
+   generation: 1
+   name: test
+   namespace: qual
+status:
+   phase: Pending
+   conditions:
+    - type: PodScheduled 
+      status: "False"
+      reason: Unschedulable
+      lastTransitionTime: %s
 `
 
 var podCrashLooping = `
@@ -205,32 +246,68 @@ func TestPodStatus(t *testing.T) {
 			},
 		},
 		"podBeingScheduled": {
-			spec:           fmt.Sprintf(podBeingScheduled, time.Now().Format(time.RFC3339)),
+			spec:           fmt.Sprintf(podBeingScheduled, currentTimeStr),
 			expectedStatus: InProgressStatus,
 			expectedConditions: []Condition{
 				{
-					Type:   ConditionReconciling,
-					Status: corev1.ConditionTrue,
-					Reason: "PodNotScheduled",
+					Type:               ConditionReconciling,
+					Status:             corev1.ConditionTrue,
+					Reason:             "PodNotScheduled",
+					LastTransitionTime: metav1.Time{},
 				},
 			},
 			absentConditionTypes: []ConditionType{
 				ConditionStalled,
 			},
+			checkLastTransitionTime: true,
+		},
+		"podBeingScheduledWithLastTransitionTime": {
+			spec:           fmt.Sprintf(podBeingScheduledWithLastTransitionTime, currentTimeStr, currentTimeStr),
+			expectedStatus: InProgressStatus,
+			expectedConditions: []Condition{
+				{
+					Type:               ConditionReconciling,
+					Status:             corev1.ConditionTrue,
+					Reason:             "PodNotScheduled",
+					LastTransitionTime: metav1.Time{Time: currentTime},
+				},
+			},
+			absentConditionTypes: []ConditionType{
+				ConditionStalled,
+			},
+			checkLastTransitionTime: true,
 		},
 		"podUnschedulable": {
 			spec:           podUnschedulable,
 			expectedStatus: FailedStatus,
 			expectedConditions: []Condition{
 				{
-					Type:   ConditionStalled,
-					Status: corev1.ConditionTrue,
-					Reason: "PodUnschedulable",
+					Type:               ConditionStalled,
+					Status:             corev1.ConditionTrue,
+					Reason:             "PodUnschedulable",
+					LastTransitionTime: metav1.Time{},
 				},
 			},
 			absentConditionTypes: []ConditionType{
 				ConditionReconciling,
 			},
+			checkLastTransitionTime: true,
+		},
+		"podUnschedulableWithLastTransitionTime": {
+			spec:           fmt.Sprintf(podUnschedulableWithLastTransitionTime, currentTimeStr),
+			expectedStatus: FailedStatus,
+			expectedConditions: []Condition{
+				{
+					Type:               ConditionStalled,
+					Status:             corev1.ConditionTrue,
+					Reason:             "PodUnschedulable",
+					LastTransitionTime: metav1.Time{Time: currentTime},
+				},
+			},
+			absentConditionTypes: []ConditionType{
+				ConditionReconciling,
+			},
+			checkLastTransitionTime: true,
 		},
 		"podCrashLooping": {
 			spec:           podCrashLooping,
@@ -698,6 +775,51 @@ status:
       status: "False"
 `
 
+var depProgressDeadlineExceeded = `
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+   name: test
+   generation: 1
+   namespace: qual
+status:
+   observedGeneration: 1
+   updatedReplicas: 1
+   readyReplicas: 1
+   availableReplicas: 1
+   replicas: 1
+   observedGeneration: 1
+   conditions:
+    - type: Progressing 
+      status: "True"
+      reason: ProgressDeadlineExceeded
+    - type: Available 
+      status: "False"
+`
+
+var depProgressDeadlineExceededWithLastTransitionTime = `
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+   name: test
+   generation: 1
+   namespace: qual
+status:
+   observedGeneration: 1
+   updatedReplicas: 1
+   readyReplicas: 1
+   availableReplicas: 1
+   replicas: 1
+   observedGeneration: 1
+   conditions:
+    - type: Progressing 
+      status: "True"
+      reason: ProgressDeadlineExceeded
+      lastTransitionTime: %s
+    - type: Available 
+      status: "False"
+`
+
 func TestDeploymentStatus(t *testing.T) {
 	testCases := map[string]testSpec{
 		"depNoStatus": {
@@ -746,13 +868,42 @@ func TestDeploymentStatus(t *testing.T) {
 			spec:           depNotAvailable,
 			expectedStatus: InProgressStatus,
 			expectedConditions: []Condition{{
-				Type:   ConditionReconciling,
-				Status: corev1.ConditionTrue,
-				Reason: "DeploymentNotAvailable",
+				Type:               ConditionReconciling,
+				Status:             corev1.ConditionTrue,
+				Reason:             "DeploymentNotAvailable",
+				LastTransitionTime: metav1.Time{},
 			}},
 			absentConditionTypes: []ConditionType{
 				ConditionStalled,
 			},
+		},
+		"depProgressDeadlineExceeded": {
+			spec:           depProgressDeadlineExceeded,
+			expectedStatus: FailedStatus,
+			expectedConditions: []Condition{{
+				Type:               ConditionStalled,
+				Status:             corev1.ConditionTrue,
+				Reason:             "ProgressDeadlineExceeded",
+				LastTransitionTime: metav1.Time{},
+			}},
+			absentConditionTypes: []ConditionType{
+				ConditionReconciling,
+			},
+			checkLastTransitionTime: true,
+		},
+		"depProgressDeadlineExceededWithLastTransitionTime": {
+			spec:           fmt.Sprintf(depProgressDeadlineExceededWithLastTransitionTime, currentTimeStr),
+			expectedStatus: FailedStatus,
+			expectedConditions: []Condition{{
+				Type:               ConditionStalled,
+				Status:             corev1.ConditionTrue,
+				Reason:             "ProgressDeadlineExceeded",
+				LastTransitionTime: metav1.Time{Time: currentTime},
+			}},
+			absentConditionTypes: []ConditionType{
+				ConditionReconciling,
+			},
+			checkLastTransitionTime: true,
 		},
 	}
 
@@ -863,6 +1014,27 @@ status:
       status: "True"
 `
 
+var rsReplicaFailureWithTransitionTime = `
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+   name: test
+   namespace: qual
+   generation: 1
+spec:
+   replicas: 4
+status:
+   observedGeneration: 1
+   replicas: 4
+   readyReplicas: 4
+   fullyLabeledReplicas: 4
+   availableReplicas: 4
+   conditions:
+    - type: ReplicaFailure
+      status: "True"
+      lastTransitionTime: %s
+`
+
 func TestReplicasetStatus(t *testing.T) {
 	testCases := map[string]testSpec{
 		"rsNoStatus": {
@@ -923,13 +1095,29 @@ func TestReplicasetStatus(t *testing.T) {
 			spec:           rsReplicaFailure,
 			expectedStatus: InProgressStatus,
 			expectedConditions: []Condition{{
-				Type:   ConditionReconciling,
-				Status: corev1.ConditionTrue,
-				Reason: "ReplicaFailure",
+				Type:               ConditionReconciling,
+				Status:             corev1.ConditionTrue,
+				Reason:             "ReplicaFailure",
+				LastTransitionTime: metav1.Time{},
 			}},
 			absentConditionTypes: []ConditionType{
 				ConditionStalled,
 			},
+			checkLastTransitionTime: true,
+		},
+		"rsReplicaFailureWithTransitionTime": {
+			spec:           fmt.Sprintf(rsReplicaFailureWithTransitionTime, currentTimeStr),
+			expectedStatus: InProgressStatus,
+			expectedConditions: []Condition{{
+				Type:               ConditionReconciling,
+				Status:             corev1.ConditionTrue,
+				Reason:             "ReplicaFailure",
+				LastTransitionTime: metav1.Time{Time: currentTime},
+			}},
+			absentConditionTypes: []ConditionType{
+				ConditionStalled,
+			},
+			checkLastTransitionTime: true,
 		},
 	}
 
@@ -1166,6 +1354,25 @@ status:
       reason: JobFailed
 `
 
+var jobFailedWithLastTransitionTime = `
+apiVersion: batch/v1
+kind: Job
+metadata:
+   name: test
+   namespace: qual
+   generation: 1
+spec:
+   completions: 4
+status:
+   succeeded: 3
+   failed: 1
+   conditions:
+    - type: Failed 
+      status: "True"
+      reason: JobFailed
+      lastTransitionTime: %s	  
+`
+
 var jobInProgress = `
 apiVersion: batch/v1
 kind: Job
@@ -1215,13 +1422,29 @@ func TestJobStatus(t *testing.T) {
 			spec:           jobFailed,
 			expectedStatus: FailedStatus,
 			expectedConditions: []Condition{{
-				Type:   ConditionStalled,
-				Status: corev1.ConditionTrue,
-				Reason: "JobFailed",
+				Type:               ConditionStalled,
+				Status:             corev1.ConditionTrue,
+				Reason:             "JobFailed",
+				LastTransitionTime: metav1.Time{},
 			}},
 			absentConditionTypes: []ConditionType{
 				ConditionReconciling,
 			},
+			checkLastTransitionTime: true,
+		},
+		"jobFailedWithLastTransitionTime": {
+			spec:           fmt.Sprintf(jobFailedWithLastTransitionTime, currentTimeStr),
+			expectedStatus: FailedStatus,
+			expectedConditions: []Condition{{
+				Type:               ConditionStalled,
+				Status:             corev1.ConditionTrue,
+				Reason:             "JobFailed",
+				LastTransitionTime: metav1.Time{Time: currentTime},
+			}},
+			absentConditionTypes: []ConditionType{
+				ConditionReconciling,
+			},
+			checkLastTransitionTime: true,
 		},
 		"jobInProgress": {
 			spec:               jobInProgress,
@@ -1418,6 +1641,19 @@ status:
       reason: SomeReason
 `
 
+var crdNamesNotAcceptedWithLastTransitionTime = `
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+   generation: 1
+status:
+   conditions:
+    - type: NamesAccepted
+      status: "False"
+      reason: SomeReason
+      lastTransitionTime: %s
+`
+
 var crdEstablished = `
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
@@ -1431,6 +1667,37 @@ status:
     - type: Established
       status: "True"
       reason: InitialNamesAccepted
+`
+
+var crdNotEstablished = `
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+   generation: 1
+status:
+   conditions:
+    - type: NamesAccepted
+      status: "True"
+      reason: NoConflicts
+    - type: Established
+      status: "False"
+      reason: Unknown
+`
+
+var crdNotEstablishedWithLastTransitionTime = `
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+   generation: 1
+status:
+   conditions:
+    - type: NamesAccepted
+      status: "True"
+      reason: NoConflicts
+    - type: Established
+      status: "False"
+      reason: Unknown
+      lastTransitionTime: %s
 `
 
 func TestCRDStatus(t *testing.T) {
@@ -1468,14 +1735,32 @@ func TestCRDStatus(t *testing.T) {
 			expectedStatus: FailedStatus,
 			expectedConditions: []Condition{
 				{
-					Type:   ConditionStalled,
-					Status: corev1.ConditionTrue,
-					Reason: "SomeReason",
+					Type:               ConditionStalled,
+					Status:             corev1.ConditionTrue,
+					Reason:             "SomeReason",
+					LastTransitionTime: metav1.Time{},
 				},
 			},
 			absentConditionTypes: []ConditionType{
 				ConditionReconciling,
 			},
+			checkLastTransitionTime: true,
+		},
+		"crdNamesNotAcceptedWithLastTransitionTime": {
+			spec:           fmt.Sprintf(crdNamesNotAcceptedWithLastTransitionTime, currentTimeStr),
+			expectedStatus: FailedStatus,
+			expectedConditions: []Condition{
+				{
+					Type:               ConditionStalled,
+					Status:             corev1.ConditionTrue,
+					Reason:             "SomeReason",
+					LastTransitionTime: metav1.Time{Time: currentTime},
+				},
+			},
+			absentConditionTypes: []ConditionType{
+				ConditionReconciling,
+			},
+			checkLastTransitionTime: true,
 		},
 		"crdEstablished": {
 			spec:               crdEstablished,
@@ -1485,6 +1770,39 @@ func TestCRDStatus(t *testing.T) {
 				ConditionReconciling,
 				ConditionStalled,
 			},
+		},
+		"crdNotEstablished": {
+			spec:           crdNotEstablished,
+			expectedStatus: FailedStatus,
+			expectedConditions: []Condition{
+				{
+					Type:               ConditionStalled,
+					Status:             corev1.ConditionTrue,
+					Reason:             "Unknown",
+					LastTransitionTime: metav1.Time{},
+				},
+			},
+			absentConditionTypes: []ConditionType{
+				ConditionReconciling,
+			},
+			checkLastTransitionTime: true,
+		},
+
+		"crdNotEstablishedWithLastTransitionTime": {
+			spec:           fmt.Sprintf(crdNotEstablishedWithLastTransitionTime, currentTimeStr),
+			expectedStatus: FailedStatus,
+			expectedConditions: []Condition{
+				{
+					Type:               ConditionStalled,
+					Status:             corev1.ConditionTrue,
+					Reason:             "Unknown",
+					LastTransitionTime: metav1.Time{Time: currentTime},
+				},
+			},
+			absentConditionTypes: []ConditionType{
+				ConditionReconciling,
+			},
+			checkLastTransitionTime: true,
 		},
 	}
 

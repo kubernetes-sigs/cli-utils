@@ -50,7 +50,19 @@ func checkGenericProperties(u *unstructured.Unstructured) (*Result, error) {
 
 	for _, cond := range objWithConditions.Status.Conditions {
 		if cond.Type == string(ConditionReconciling) && cond.Status == corev1.ConditionTrue {
-			return newInProgressStatus(cond.Reason, cond.Message), nil
+			return &Result{
+				Status:  InProgressStatus,
+				Message: cond.Message,
+				Conditions: []Condition{
+					{
+						Type:               ConditionReconciling,
+						Status:             corev1.ConditionTrue,
+						Reason:             cond.Reason,
+						Message:            cond.Message,
+						LastTransitionTime: cond.LastTransitionTime,
+					},
+				},
+			}, nil
 		}
 		if cond.Type == string(ConditionStalled) && cond.Status == corev1.ConditionTrue {
 			return &Result{
@@ -58,10 +70,11 @@ func checkGenericProperties(u *unstructured.Unstructured) (*Result, error) {
 				Message: cond.Message,
 				Conditions: []Condition{
 					{
-						Type:    ConditionStalled,
-						Status:  corev1.ConditionTrue,
-						Reason:  cond.Reason,
-						Message: cond.Message,
+						Type:               ConditionStalled,
+						Status:             corev1.ConditionTrue,
+						Reason:             cond.Reason,
+						Message:            cond.Message,
+						LastTransitionTime: cond.LastTransitionTime,
 					},
 				},
 			}, nil

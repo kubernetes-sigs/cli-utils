@@ -5,8 +5,10 @@ package status
 
 import (
 	"strings"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiunstructured "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -15,19 +17,21 @@ import (
 // reason and message.
 func newReconcilingCondition(reason, message string) Condition {
 	return Condition{
-		Type:    ConditionReconciling,
-		Status:  corev1.ConditionTrue,
-		Reason:  reason,
-		Message: message,
+		Type:               ConditionReconciling,
+		Status:             corev1.ConditionTrue,
+		Reason:             reason,
+		Message:            message,
+		LastTransitionTime: metav1.Time{Time: time.Now().UTC()},
 	}
 }
 
 func newStalledCondition(reason, message string) Condition {
 	return Condition{
-		Type:    ConditionStalled,
-		Status:  corev1.ConditionTrue,
-		Reason:  reason,
-		Message: message,
+		Type:               ConditionStalled,
+		Status:             corev1.ConditionTrue,
+		Reason:             reason,
+		Message:            message,
+		LastTransitionTime: metav1.Time{Time: time.Now().UTC()},
 	}
 }
 
@@ -73,6 +77,9 @@ type BasicCondition struct {
 	// Message human readable reason
 	// +optional
 	Message string `json:"message,omitempty" yaml:"message"`
+	// LastTransitionTime tracks the last time the condition transitioned from one status to another
+	// +optional
+	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty" yaml:"lastTransitionTime"`
 }
 
 // GetObjectWithConditions return typed object

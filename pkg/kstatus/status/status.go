@@ -9,6 +9,7 @@ import (
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
@@ -83,6 +84,8 @@ type Condition struct {
 	Reason string `json:"reason,omitempty"`
 	// Message Human readable reason string
 	Message string `json:"message,omitempty"`
+	// LastTransitionTime tracks the last time the condition transitioned from one status to another
+	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty"`
 }
 
 // Compute finds the status of a given unstructured resource. It does not
@@ -167,13 +170,23 @@ func checkReadyCondition(u *unstructured.Unstructured) (*Result, error) {
 				Message:    "Resource is Ready",
 				Conditions: []Condition{},
 			}, nil
-		case corev1.ConditionFalse:
-			return newInProgressStatus(cond.Reason, cond.Message), nil
-		case corev1.ConditionUnknown:
+		case corev1.ConditionFalse, corev1.ConditionUnknown:
 			// For now we just treat an unknown condition value as
 			// InProgress. We should consider if there are better ways
 			// to handle it.
-			return newInProgressStatus(cond.Reason, cond.Message), nil
+			return &Result{
+				Status:  InProgressStatus,
+				Message: cond.Message,
+				Conditions: []Condition{
+					{
+						Type:               ConditionReconciling,
+						Status:             corev1.ConditionTrue,
+						Reason:             cond.Reason,
+						Message:            cond.Message,
+						LastTransitionTime: cond.LastTransitionTime,
+					},
+				},
+			}, nil
 		default:
 			// Do nothing in this case.
 		}
@@ -228,7 +241,7 @@ func Augment(u *unstructured.Unstructured) error {
 		}
 		if !present {
 			conditions = append(conditions, map[string]interface{}{
-				"lastTransitionTime": currentTime,
+				"lastTransitionTime": resCondition.LastTransitionTime.UTC().Format(time.RFC3339),
 				"lastUpdateTime":     currentTime,
 				"message":            resCondition.Message,
 				"reason":             resCondition.Reason,

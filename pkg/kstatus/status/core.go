@@ -10,6 +10,7 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
@@ -183,9 +184,10 @@ func deploymentConditions(u *unstructured.Unstructured) (*Result, error) {
 			// https://github.com/kubernetes/kubernetes/blob/a3ccea9d8743f2ff82e41b6c2af6dc2c41dc7b10/pkg/controller/deployment/progress.go#L52
 			if c.Reason == "ProgressDeadlineExceeded" {
 				return &Result{
-					Status:     FailedStatus,
-					Message:    "Progress deadline exceeded",
-					Conditions: []Condition{{ConditionStalled, corev1.ConditionTrue, c.Reason, c.Message}},
+					Status:  FailedStatus,
+					Message: "Progress deadline exceeded",
+					Conditions: []Condition{{ConditionStalled, corev1.ConditionTrue, c.Reason, c.Message,
+						c.LastTransitionTime}},
 				}, nil
 			}
 			if c.Status == corev1.ConditionTrue && c.Reason == "NewReplicaSetAvailable" {
@@ -262,8 +264,14 @@ func replicasetConditions(u *unstructured.Unstructured) (*Result, error) {
 	for _, c := range objc.Status.Conditions {
 		// https://github.com/kubernetes/kubernetes/blob/a3ccea9d8743f2ff82e41b6c2af6dc2c41dc7b10/pkg/controller/replicaset/replica_set_utils.go
 		if c.Type == "ReplicaFailure" && c.Status == corev1.ConditionTrue {
+			reason := "ReplicaFailure"
 			message := "Replica Failure condition. Check Pods"
-			return newInProgressStatus("ReplicaFailure", message), nil
+			return &Result{
+				Status:  InProgressStatus,
+				Message: message,
+				Conditions: []Condition{{ConditionReconciling, corev1.ConditionTrue, reason, message,
+					c.LastTransitionTime}},
+			}, nil
 		}
 	}
 
@@ -409,11 +417,57 @@ func podConditions(u *unstructured.Unstructured) (*Result, error) {
 			if time.Now().Add(-scheduleWindow).Before(u.GetCreationTimestamp().Time) {
 				// We give the pod 15 seconds to be scheduled before we report it
 				// as unschedulable.
-				return newInProgressStatus("PodNotScheduled", "Pod has not been scheduled"), nil
+				reason := "PodNotScheduled"
+				message := "Pod has not been scheduled"
+				return &Result{
+					Status:  InProgressStatus,
+					Message: message,
+					Conditions: []Condition{
+						{
+							Type:               ConditionReconciling,
+							Status:             corev1.ConditionTrue,
+							Reason:             reason,
+							Message:            message,
+							LastTransitionTime: c.LastTransitionTime,
+						},
+					},
+				}, nil
 			}
-			return newFailedStatus("PodUnschedulable", "Pod could not be scheduled"), nil
+			reason := "PodUnschedulable"
+			message := "Pod could not be scheduled"
+			return &Result{
+				Status:  FailedStatus,
+				Message: message,
+				Conditions: []Condition{
+					{
+						Type:               ConditionStalled,
+						Status:             corev1.ConditionTrue,
+						Reason:             reason,
+						Message:            message,
+						LastTransitionTime: c.LastTransitionTime,
+					},
+				},
+			}, nil
 		}
-		return newInProgressStatus("PodPending", "Pod is in the Pending phase"), nil
+		reason := "PodPending"
+		message := "Pod is in the Pending phase"
+		lastTransitionTime := metav1.Time{Time: time.Now().UTC()}
+		if found {
+			lastTransitionTime = c.LastTransitionTime
+		}
+		return &Result{
+			Status:  InProgressStatus,
+			Message: message,
+			Conditions: []Condition{
+				{
+					Type:               ConditionReconciling,
+					Status:             corev1.ConditionTrue,
+					Reason:             reason,
+					Message:            message,
+					LastTransitionTime: lastTransitionTime,
+				},
+			},
+		}, nil
 	default:
 		// If the controller hasn't observed the pod yet, there is no phase. We consider this as it
 		// still being in progress.
@@ -517,8 +571,21 @@ func jobConditions(u *unstructured.Unstructured) (*Result, error) {
 			}
 		case "Failed":
 			if c.Status == corev1.ConditionTrue {
-				return newFailedStatus("JobFailed",
-					fmt.Sprintf("Job Failed. failed: %d/%d", failed, completions)), nil
+				reason := "JobFailed"
+				message := fmt.Sprintf("Job Failed. failed: %d/%d", failed, completions)
+				return &Result{
+					Status:  FailedStatus,
+					Message: message,
+					Conditions: []Condition{
+						{
+							Type:               ConditionStalled,
+							Status:             corev1.ConditionTrue,
+							Reason:             reason,
+							Message:            message,
+							LastTransitionTime: c.LastTransitionTime,
+						},
+					},
+				}, nil
 			}
 		}
 	}
@@ -566,11 +633,35 @@ func crdConditions(u *unstructured.Unstructured) (*Result, error) {
 
 	for _, c := range objc.Status.Conditions {
 		if c.Type == "NamesAccepted" && c.Status == corev1.ConditionFalse {
-			return newFailedStatus(c.Reason, c.Message), nil
+			return &Result{
+				Status:  FailedStatus,
+				Message: c.Message,
+				Conditions: []Condition{
+					{
+						Type:               ConditionStalled,
+						Status:             corev1.ConditionTrue,
+						Reason:             c.Reason,
+						Message:            c.Message,
+						LastTransitionTime: c.LastTransitionTime,
+					},
+				},
+			}, nil
 		}
 		if c.Type == "Established" {
 			if c.Status == corev1.ConditionFalse && c.Reason != "Installing" {
-				return newFailedStatus(c.Reason, c.Message), nil
+				return &Result{
+					Status:  FailedStatus,
+					Message: c.Message,
+					Conditions: []Condition{
+						{
+							Type:               ConditionStalled,
+							Status:             corev1.ConditionTrue,
+							Reason:             c.Reason,
+							Message:            c.Message,
+							LastTransitionTime: c.LastTransitionTime,
+						},
+					},
+				}, nil
 			}
 			if c.Status == corev1.ConditionTrue {
 				return &Result{
