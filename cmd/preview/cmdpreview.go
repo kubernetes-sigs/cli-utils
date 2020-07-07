@@ -101,7 +101,7 @@ func NewCmdPreview(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *co
 	_ = cmd.Flags().MarkHidden("validate")
 	// Server-side flags are hidden for now.
 	cmdutil.AddServerSideApplyFlags(cmd)
-	cmd.Flags().BoolVar(&applier.ApplyOptions.ServerDryRun, "server-dry-run", applier.ApplyOptions.ServerDryRun, "NOT USED")
+	cmd.Flags().BoolVar(&applier.ApplyOptions.ServerDryRun, "server-dry-run", applier.ApplyOptions.ServerDryRun, "If true, submits a server-side request without persisting the resources")
 	_ = cmd.Flags().MarkHidden("server-dry-run")
 	_ = cmd.Flags().MarkHidden("server-side")
 	_ = cmd.Flags().MarkHidden("force-conflicts")
