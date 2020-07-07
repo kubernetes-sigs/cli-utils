@@ -76,7 +76,7 @@ func NewCmdPreview(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *co
 				ch = applier.Run(ctx, infos, apply.Options{
 					EmitStatusEvents: false,
 					NoPrune:          noPrune,
-					DryRun:           true,
+					DryRun:           !applier.ApplyOptions.ServerDryRun,
 				})
 			} else {
 				ch = destroyer.Run()
@@ -92,7 +92,7 @@ func NewCmdPreview(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *co
 	cmdutil.CheckErr(applier.SetFlags(cmd))
 
 	// The following flags are added, but hidden because other code
-	// dependend on them when parsing flags. These flags are hidden and unused.
+	// depend on them when parsing flags. These flags are hidden and unused.
 	var unusedBool bool
 	cmd.Flags().BoolVar(&unusedBool, "dry-run", unusedBool, "NOT USED")
 	cmd.Flags().BoolVar(&destroyer.DryRun, "destroy", destroyer.DryRun, "If true, preview of destroy operations will be displayed.")
@@ -101,6 +101,8 @@ func NewCmdPreview(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *co
 	_ = cmd.Flags().MarkHidden("validate")
 	// Server-side flags are hidden for now.
 	cmdutil.AddServerSideApplyFlags(cmd)
+	cmd.Flags().BoolVar(&applier.ApplyOptions.ServerDryRun, "server-dry-run", applier.ApplyOptions.ServerDryRun, "NOT USED")
+	_ = cmd.Flags().MarkHidden("server-dry-run")
 	_ = cmd.Flags().MarkHidden("server-side")
 	_ = cmd.Flags().MarkHidden("force-conflicts")
 	_ = cmd.Flags().MarkHidden("field-manager")
