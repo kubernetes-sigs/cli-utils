@@ -56,13 +56,46 @@ func TestCreateObjMetadata(t *testing.T) {
 			expected:  "",
 			isError:   true,
 		},
+		// Error with invalid name characters "_".
+		{
+			namespace: "test-namespace",
+			name:      "test_name", // Invalid "_" character
+			gk: schema.GroupKind{
+				Group: "apps",
+				Kind:  "ReplicaSet",
+			},
+			expected: "",
+			isError:  true,
+		},
+		// Error name not starting with alphanumeric char
+		{
+			namespace: "test-namespace",
+			name:      "-test",
+			gk: schema.GroupKind{
+				Group: "apps",
+				Kind:  "ReplicaSet",
+			},
+			expected: "",
+			isError:  true,
+		},
+		// Error name not ending with alphanumeric char
+		{
+			namespace: "test-namespace",
+			name:      "test-",
+			gk: schema.GroupKind{
+				Group: "apps",
+				Kind:  "ReplicaSet",
+			},
+			expected: "",
+			isError:  true,
+		},
 	}
 
 	for _, test := range tests {
 		inv, err := CreateObjMetadata(test.namespace, test.name, test.gk)
 		if !test.isError {
 			if err != nil {
-				t.Errorf("Error creating inventory when it should have worked.")
+				t.Errorf("Error creating ObjMetadata when it should have worked.")
 			} else if test.expected != inv.String() {
 				t.Errorf("Expected inventory (%s) != created inventory(%s)\n", test.expected, inv.String())
 			}

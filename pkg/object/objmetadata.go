@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/cli-runtime/pkg/resource"
 )
 
@@ -45,10 +46,15 @@ func CreateObjMetadata(namespace string, name string, gk schema.GroupKind) (*Obj
 	// Namespace can be empty, but name cannot.
 	name = strings.TrimSpace(name)
 	if name == "" {
-		return nil, fmt.Errorf("empty name for inventory object")
+		return nil, fmt.Errorf("empty name for object")
+	}
+	// Manually validate name, since by the time k8s reports the error
+	// the invalid name has already been encoded into the inventory object.
+	if !validateNameChars(name) {
+		return nil, fmt.Errorf("invalid characters in object name: %s", name)
 	}
 	if gk.Empty() {
-		return nil, fmt.Errorf("empty GroupKind for inventory object")
+		return nil, fmt.Errorf("empty GroupKind for object")
 	}
 
 	return &ObjMetadata{
@@ -56,6 +62,23 @@ func CreateObjMetadata(namespace string, name string, gk schema.GroupKind) (*Obj
 		Name:      name,
 		GroupKind: gk,
 	}, nil
+}
+
+// validateNameChars returns false if the passed name string contains
+// any invalid characters; true otherwise. The allowed characters for
+// a Kubernetes resource name are:
+//
+//   Most resource types require a name that can be used as a DNS label name
+//   as defined in RFC 1123. This means the name must:
+//
+//   * contain no more than 253 characters
+//   * contain only lowercase alphanumeric characters, '-'
+//   * start with an alphanumeric character
+//   * end with an alphanumeric character
+//
+func validateNameChars(name string) bool {
+	errs := validation.IsDNS1123Subdomain(name)
+	return len(errs) == 0
 }
 
 // ParseObjMetadata takes a string, splits it into its five fields,
