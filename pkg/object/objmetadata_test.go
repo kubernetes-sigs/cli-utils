@@ -4,6 +4,7 @@
 package object
 
 import (
+	"strings"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -97,7 +98,22 @@ func TestCreateObjMetadata(t *testing.T) {
 			if err != nil {
 				t.Errorf("Error creating ObjMetadata when it should have worked.")
 			} else if test.expected != inv.String() {
-				t.Errorf("Expected inventory (%s) != created inventory(%s)\n", test.expected, inv.String())
+				t.Errorf("Expected inventory\n(%s) != created inventory\n(%s)\n", test.expected, inv.String())
+			}
+
+			// Parsing back the just created inventory string to ObjMetadata,
+			// so that tests will catch any change to CreateObjMetadata that
+			// would break ParseObjMetadata.
+			expectedObjMetadata := &ObjMetadata{
+				Namespace: strings.TrimSpace(test.namespace),
+				Name:      strings.TrimSpace(test.name),
+				GroupKind: test.gk,
+			}
+			actual, err := ParseObjMetadata(inv.String())
+			if err != nil {
+				t.Errorf("Error parsing back ObjMetadata, when it should have worked.")
+			} else if !expectedObjMetadata.Equals(actual) {
+				t.Errorf("Expected inventory (%s) != parsed inventory (%s)\n", expectedObjMetadata, actual)
 			}
 		}
 		if test.isError && err == nil {
