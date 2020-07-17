@@ -13,6 +13,7 @@ package prune
 
 import (
 	"fmt"
+	"sort"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -26,6 +27,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
+	"sigs.k8s.io/cli-utils/pkg/ordering"
 )
 
 // PruneOptions encapsulates the necessary information to
@@ -103,6 +105,11 @@ func (po *PruneOptions) Prune(currentObjects []*resource.Info, eventChannel chan
 	}
 	klog.V(4).Infof("prune %d currently applied objects", len(po.currentUids))
 	klog.V(4).Infof("prune %d previously applied objects", len(pastObjs))
+
+	// Sort the resources in reverse order using the same rules as is
+	// used for apply.
+	sort.Sort(sort.Reverse(ordering.SortableMetas(pastObjs)))
+
 	// Iterate through set of all previously applied objects.
 	for _, past := range pastObjs {
 		mapping, err := po.mapper.RESTMapping(past.GroupKind)

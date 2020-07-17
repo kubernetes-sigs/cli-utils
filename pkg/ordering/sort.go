@@ -1,30 +1,43 @@
 // Copyright 2020 The Kubernetes Authors.
 // SPDX-License-Identifier: Apache-2.0
 
-package apply
+package ordering
 
 import (
 	"sort"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/resource"
+	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
-type ResourceInfos []*resource.Info
+type SortableInfos []*resource.Info
 
-var _ sort.Interface = ResourceInfos{}
+var _ sort.Interface = SortableInfos{}
 
-func (a ResourceInfos) Len() int      { return len(a) }
-func (a ResourceInfos) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
-func (a ResourceInfos) Less(i, j int) bool {
-	x := a[i].Object.GetObjectKind().GroupVersionKind()
-	o := a[j].Object.GetObjectKind().GroupVersionKind()
-	if !Equals(x, o) {
-		return IsLessThan(x, o)
+func (a SortableInfos) Len() int      { return len(a) }
+func (a SortableInfos) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
+func (a SortableInfos) Less(i, j int) bool {
+	return less(object.InfoToObjMeta(a[i]), object.InfoToObjMeta(a[j]))
+}
+
+type SortableMetas []object.ObjMetadata
+
+var _ sort.Interface = SortableMetas{}
+
+func (a SortableMetas) Len() int      { return len(a) }
+func (a SortableMetas) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
+func (a SortableMetas) Less(i, j int) bool {
+	return less(a[i], a[j])
+}
+
+func less(i, j object.ObjMetadata) bool {
+	if !Equals(i.GroupKind, j.GroupKind) {
+		return IsLessThan(i.GroupKind, j.GroupKind)
 	}
 	// In case of tie, compare the namespace and name combination so that the output
 	// order is consistent irrespective of input order
-	return a[i].Namespace+a[i].Name < a[j].Namespace+a[j].Name
+	return i.Namespace+i.Name < j.Namespace+j.Name
 }
 
 // An attempt to order things to help k8s, e.g.
@@ -70,13 +83,11 @@ func getIndexByKind(kind string) int {
 	return m[kind]
 }
 
-// Equals returns true if the GVK's have equal fields.
-func Equals(x schema.GroupVersionKind, o schema.GroupVersionKind) bool {
-	return x.Group == o.Group && x.Version == o.Version && x.Kind == o.Kind
+func Equals(x schema.GroupKind, o schema.GroupKind) bool {
+	return x.Group == o.Group && x.Kind == o.Kind
 }
 
-// IsLessThan compares two GVK's as per orderFirst and orderLast, returns boolean result.
-func IsLessThan(x schema.GroupVersionKind, o schema.GroupVersionKind) bool {
+func IsLessThan(x schema.GroupKind, o schema.GroupKind) bool {
 	indexI := getIndexByKind(x.Kind)
 	indexJ := getIndexByKind(o.Kind)
 	if indexI != indexJ {
