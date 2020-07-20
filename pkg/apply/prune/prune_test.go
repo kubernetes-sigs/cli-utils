@@ -20,9 +20,9 @@ import (
 
 var testNamespace = "test-inventory-namespace"
 var inventoryObjName = "test-inventory-obj"
-var pod1Name = "pod-1"
-var pod2Name = "pod-2"
-var pod3Name = "pod-3"
+var namespaceName = "namespace"
+var pdbName = "pdb"
+var roleName = "role"
 
 var testInventoryLabel = "test-app-label"
 
@@ -40,58 +40,58 @@ var inventoryObj = unstructured.Unstructured{
 	},
 }
 
-var pod1 = unstructured.Unstructured{
+var namespace = unstructured.Unstructured{
 	Object: map[string]interface{}{
 		"apiVersion": "v1",
-		"kind":       "Pod",
+		"kind":       "Namespace",
 		"metadata": map[string]interface{}{
-			"name":      pod1Name,
+			"name":      namespaceName,
 			"namespace": testNamespace,
 			"uid":       "uid1",
 		},
 	},
 }
 
-var pod1Info = &resource.Info{
+var namespaceInfo = &resource.Info{
 	Namespace: testNamespace,
-	Name:      pod1Name,
-	Object:    &pod1,
+	Name:      namespaceName,
+	Object:    &namespace,
 }
 
-var pod2 = unstructured.Unstructured{
+var pdb = unstructured.Unstructured{
 	Object: map[string]interface{}{
-		"apiVersion": "v1",
-		"kind":       "Pod",
+		"apiVersion": "policy/v1beta1",
+		"kind":       "PodDisruptionBudget",
 		"metadata": map[string]interface{}{
-			"name":      pod2Name,
+			"name":      pdbName,
 			"namespace": testNamespace,
 			"uid":       "uid2",
 		},
 	},
 }
 
-var pod2Info = &resource.Info{
+var pdbInfo = &resource.Info{
 	Namespace: testNamespace,
-	Name:      pod2Name,
-	Object:    &pod2,
+	Name:      pdbName,
+	Object:    &pdb,
 }
 
-var pod3 = unstructured.Unstructured{
+var role = unstructured.Unstructured{
 	Object: map[string]interface{}{
-		"apiVersion": "v1",
-		"kind":       "Pod",
+		"apiVersion": "rbac.authorization.k8s.io/v1",
+		"kind":       "Role",
 		"metadata": map[string]interface{}{
-			"name":      pod3Name,
+			"name":      roleName,
 			"namespace": testNamespace,
 			"uid":       "uid3",
 		},
 	},
 }
 
-var pod3Info = &resource.Info{
+var roleInfo = &resource.Info{
 	Namespace: testNamespace,
-	Name:      pod3Name,
-	Object:    &pod3,
+	Name:      roleName,
+	Object:    &role,
 }
 
 // Returns a inventory object with the inventory set from
@@ -151,32 +151,32 @@ func TestPrune(t *testing.T) {
 			isError:      false,
 		},
 		"Past and current objects are the same; no pruned objects": {
-			pastInfos:    []*resource.Info{pod1Info, pod2Info},
-			currentInfos: []*resource.Info{pod2Info, pod1Info},
+			pastInfos:    []*resource.Info{namespaceInfo, pdbInfo},
+			currentInfos: []*resource.Info{pdbInfo, namespaceInfo},
 			prunedInfos:  []*resource.Info{},
 			isError:      false,
 		},
 		"No past objects; no pruned objects": {
 			pastInfos:    []*resource.Info{},
-			currentInfos: []*resource.Info{pod2Info, pod1Info},
+			currentInfos: []*resource.Info{pdbInfo, namespaceInfo},
 			prunedInfos:  []*resource.Info{},
 			isError:      false,
 		},
-		"No current objects; all previous objects pruned": {
-			pastInfos:    []*resource.Info{pod1Info, pod2Info, pod3Info},
+		"No current objects; all previous objects pruned in correct order": {
+			pastInfos:    []*resource.Info{namespaceInfo, pdbInfo, roleInfo},
 			currentInfos: []*resource.Info{},
-			prunedInfos:  []*resource.Info{pod1Info, pod2Info, pod3Info},
+			prunedInfos:  []*resource.Info{pdbInfo, roleInfo, namespaceInfo},
 			isError:      false,
 		},
 		"Omitted object is pruned": {
-			pastInfos:    []*resource.Info{pod1Info, pod2Info},
-			currentInfos: []*resource.Info{pod2Info, pod3Info},
-			prunedInfos:  []*resource.Info{pod1Info},
+			pastInfos:    []*resource.Info{namespaceInfo, pdbInfo},
+			currentInfos: []*resource.Info{pdbInfo, roleInfo},
+			prunedInfos:  []*resource.Info{namespaceInfo},
 			isError:      false,
 		},
 		"Prevent delete lifecycle annotation stops pruning": {
-			pastInfos:    []*resource.Info{preventDeleteInfo, pod2Info},
-			currentInfos: []*resource.Info{pod2Info, pod3Info},
+			pastInfos:    []*resource.Info{preventDeleteInfo, pdbInfo},
+			currentInfos: []*resource.Info{pdbInfo, roleInfo},
 			prunedInfos:  []*resource.Info{},
 			isError:      false,
 		},
@@ -191,29 +191,42 @@ func TestPrune(t *testing.T) {
 			// Set up the currently applied objects.
 			currentInventoryInfo := createInventoryInfo("current-group", tc.currentInfos...)
 			currentInfos := append(tc.currentInfos, currentInventoryInfo)
+			// Set up the fake dynamic client to recognize all objects, and the RESTMapper.
+			po.client = fake.NewSimpleDynamicClient(scheme.Scheme,
+				namespaceInfo.Object, pdbInfo.Object, roleInfo.Object)
+			po.mapper = testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme,
+				scheme.Scheme.PrioritizedVersionsAllGroups()...)
 			// The event channel can not block; make sure its bigger than all
 			// the events that can be put on it.
 			eventChannel := make(chan event.Event, len(tc.pastInfos)+1) // Add one for inventory object
-			defer close(eventChannel)
-			// Set up the fake dynamic client to recognize all objects, and the RESTMapper.
-			po.client = fake.NewSimpleDynamicClient(scheme.Scheme,
-				pod1Info.Object, pod2Info.Object, pod3Info.Object)
-			po.mapper = testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme,
-				scheme.Scheme.PrioritizedVersionsAllGroups()...)
-			// Run the prune and validate.
-			err := po.Prune(currentInfos, eventChannel, Options{
-				DryRun: true,
-			})
+			err := func() error {
+				defer close(eventChannel)
+				// Run the prune and validate.
+				return po.Prune(currentInfos, eventChannel, Options{
+					DryRun: true,
+				})
+			}()
+
 			if !tc.isError {
 				if err != nil {
 					t.Fatalf("Unexpected error during Prune(): %#v", err)
 				}
-				// Validate the prune events on the event channel.
-				expectedPruneEvents := len(tc.prunedInfos) + 1 // One extra for pruning inventory object
-				actualPruneEvents := len(eventChannel)
-				if expectedPruneEvents != actualPruneEvents {
-					t.Errorf("Expected (%d) prune events, got (%d)",
-						expectedPruneEvents, actualPruneEvents)
+
+				var actualPruneEvents []event.Event
+				for e := range eventChannel {
+					actualPruneEvents = append(actualPruneEvents, e)
+				}
+				if want, got := len(tc.prunedInfos)+1, len(actualPruneEvents); want != got {
+					t.Errorf("Expected (%d) prune events, got (%d)", want, got)
+				}
+
+				for i, info := range tc.prunedInfos {
+					e := actualPruneEvents[i]
+					expKind := info.Object.GetObjectKind().GroupVersionKind().Kind
+					actKind := e.PruneEvent.Object.GetObjectKind().GroupVersionKind().Kind
+					if expKind != actKind {
+						t.Errorf("Expected kind %s, got %s", expKind, actKind)
+					}
 				}
 			} else if err == nil {
 				t.Fatalf("Expected error during Prune() but received none")

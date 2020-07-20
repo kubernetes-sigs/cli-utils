@@ -26,6 +26,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling"
 	"sigs.k8s.io/cli-utils/pkg/object"
+	"sigs.k8s.io/cli-utils/pkg/ordering"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -182,7 +183,7 @@ func (a *Applier) prepareObjects(infos []*resource.Info) (*ResourceObjects, erro
 		return nil, err
 	}
 
-	sort.Sort(ResourceInfos(resources))
+	sort.Sort(ordering.SortableInfos(resources))
 
 	if !validateNamespace(resources) {
 		return nil, fmt.Errorf("objects have differing namespaces")

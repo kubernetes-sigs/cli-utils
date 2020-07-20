@@ -1,7 +1,7 @@
 // Copyright 2020 The Kubernetes Authors.
 // SPDX-License-Identifier: Apache-2.0
 
-package apply
+package ordering
 
 import (
 	"sort"
@@ -78,7 +78,7 @@ func TestResourceOrdering(t *testing.T) {
 	}
 
 	infos := []*resource.Info{&deploymentInfo, &configMapInfo, &namespaceInfo, &deploymentInfo2}
-	sort.Sort(ResourceInfos(infos))
+	sort.Sort(SortableInfos(infos))
 
 	assert.Equal(t, infos[0].Name, "testspace")
 	assert.Equal(t, infos[1].Name, "the-map")
@@ -92,33 +92,29 @@ func TestResourceOrdering(t *testing.T) {
 }
 
 func TestGvkLessThan(t *testing.T) {
-	gvk1 := schema.GroupVersionKind{
-		Group:   "",
-		Version: "v1",
-		Kind:    "Deployment",
+	gk1 := schema.GroupKind{
+		Group: "",
+		Kind:  "Deployment",
 	}
 
-	gvk2 := schema.GroupVersionKind{
-		Group:   "",
-		Version: "v1",
-		Kind:    "Namespace",
+	gk2 := schema.GroupKind{
+		Group: "",
+		Kind:  "Namespace",
 	}
 
-	assert.Equal(t, IsLessThan(gvk1, gvk2), false)
+	assert.Equal(t, IsLessThan(gk1, gk2), false)
 }
 
 func TestGvkEquals(t *testing.T) {
-	gvk1 := schema.GroupVersionKind{
-		Group:   "",
-		Version: "v1",
-		Kind:    "Deployment",
+	gk1 := schema.GroupKind{
+		Group: "",
+		Kind:  "Deployment",
 	}
 
-	gvk2 := schema.GroupVersionKind{
-		Group:   "",
-		Version: "v1",
-		Kind:    "Deployment",
+	gk2 := schema.GroupKind{
+		Group: "",
+		Kind:  "Deployment",
 	}
 
-	assert.Equal(t, Equals(gvk1, gvk2), true)
+	assert.Equal(t, Equals(gk1, gk2), true)
 }
