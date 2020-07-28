@@ -57,8 +57,10 @@ Use the kapply init command to generate the inventory template. This contains
 the namespace and inventory id used by apply to create inventory objects.
 <!-- @createInventoryTemplate @testE2EAgainstLatestRelease-->
 ```
-kapply init $BASE/mysql
-kapply init $BASE/wordpress
+kapply init $BASE/mysql > $OUTPUT/status
+expectedOutputLine "namespace: default is used for inventory object"
+kapply init $BASE/wordpress > $OUTPUT/status
+expectedOutputLine "namespace: default is used for inventory object"
 ```
 
 Delete any existing kind cluster and create a new one. By default the name of the cluster is "kind"

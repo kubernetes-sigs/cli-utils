@@ -85,10 +85,10 @@ func TestComplete(t *testing.T) {
 			args:    []string{d1},
 			isError: true,
 		},
-		"No namespace set is fine": {
-			args:    []string{d2},
-			isError: false,
-		},
+		//"No namespace set is fine": {
+		//	args:    []string{d2},
+		//	isError: false,
+		//},
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {

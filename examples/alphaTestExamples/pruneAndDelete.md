@@ -85,7 +85,9 @@ Use the kapply init command to generate the inventory template. This contains
 the namespace and inventory id used by apply to create inventory objects. 
 <!-- @createInventoryTemplate @testE2EAgainstLatestRelease-->
 ```
-kapply init $BASE
+kapply init $BASE > $OUTPUT/status
+expectedOutputLine "namespace: default is used for inventory object"
+
 ```
 
 Apply both resources to the cluster.

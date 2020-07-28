@@ -106,6 +106,8 @@ func (i *InitOptions) Complete(args []string) error {
 	if !validateInventoryID(i.InventoryID) {
 		return fmt.Errorf("invalid group name: %s", i.InventoryID)
 	}
+	// Output the calculated namespace used for inventory object.
+	fmt.Fprintf(i.ioStreams.Out, "namespace: %s is used for inventory object\n", i.Namespace)
 	return nil
 }
 
