@@ -25,5 +25,6 @@ func NewCmdInit(ioStreams genericclioptions.IOStreams) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&io.InventoryID, "inventory-id", "i", "", "Identifier for group of applied resources. Must be composed of valid label characters.")
+	cmd.Flags().StringVarP(&io.Namespace, "inventory-namespace", "", "", "namespace for the resources to be initialized")
 	return cmd
 }
