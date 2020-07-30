@@ -157,42 +157,38 @@ func (a *Applier) infoHelperFactory() info.InfoHelper {
 	return info.NewInfoHelper(a.factory, a.ApplyOptions.Namespace)
 }
 
-// prepareObjects handles ordering of resources and sets up the inventory object
-// based on the provided inventory object template.
+// prepareObjects merges the currently applied objects into the
+// set of stored objects in the cluster inventory. In the process, it
+// calculates the set of objects to be pruned (pruneIds), and orders the
+// resources for the subsequent apply. Returns the sorted resources to
+// apply as well as the objects for the prune, or an error if one occurred.
 func (a *Applier) prepareObjects(infos []*resource.Info) (*ResourceObjects, error) {
-	resources, invs := splitInfos(infos)
-
-	if len(invs) == 0 {
-		return nil, inventory.NoInventoryObjError{}
-	}
-	if len(invs) > 1 {
-		return nil, inventory.MultipleInventoryObjError{
-			InventoryObjectTemplates: invs,
-		}
-	}
-
-	inv := a.InventoryFactoryFunc(invs[0])
-	inventoryObject, err := inventory.CreateInventoryObj(inv, resources)
+	localInv, localInfos, err := inventory.SplitInfos(infos)
 	if err != nil {
 		return nil, err
 	}
-
-	// Fetch all previous inventories.
-	previousInventories, err := a.invClient.GetPreviousInventoryObjects(inventoryObject)
+	currentObjs, err := object.InfosToObjMetas(localInfos)
 	if err != nil {
 		return nil, err
 	}
-
-	sort.Sort(ordering.SortableInfos(resources))
-
-	if !validateNamespace(resources) {
+	// returns the objects (pruneIds) to prune after apply. The prune
+	// algorithm requires stopping if the merge is not successful. Otherwise,
+	// the stored objects in inventory could become inconsistent.
+	pruneIds, err := a.invClient.Merge(localInv, currentObjs)
+	if err != nil {
+		return nil, err
+	}
+	// Sort order for applied resources.
+	sort.Sort(ordering.SortableInfos(localInfos))
+	// TODO(seans3): Remove this single namespace requirement once we've
+	// implemented multi-namespace apply.
+	if !validateNamespace(localInfos) {
 		return nil, fmt.Errorf("objects have differing namespaces")
 	}
-
 	return &ResourceObjects{
-		CurrentInventory:    inventoryObject,
-		PreviousInventories: previousInventories,
-		Resources:           resources,
+		LocalInv:  localInv,
+		Resources: localInfos,
+		PruneIds:  pruneIds,
 	}, nil
 }
 
@@ -200,16 +196,20 @@ func (a *Applier) prepareObjects(infos []*resource.Info) (*ResourceObjects, erro
 // will be applied and the existing inventories used to determine
 // resources that should be pruned.
 type ResourceObjects struct {
-	CurrentInventory    *resource.Info
-	PreviousInventories []*resource.Info
-	Resources           []*resource.Info
+	LocalInv  *resource.Info
+	Resources []*resource.Info
+	PruneIds  []object.ObjMetadata
 }
 
 // InfosForApply returns the infos representation for all the resources
 // that should be applied, including the inventory object. The
 // resources will be in sorted order.
 func (r *ResourceObjects) InfosForApply() []*resource.Info {
-	return append([]*resource.Info{r.CurrentInventory}, r.Resources...)
+	return r.Resources
+}
+
+func (r *ResourceObjects) InfosForPrune() []*resource.Info {
+	return append([]*resource.Info{r.LocalInv}, r.Resources...)
 }
 
 // IdsForApply returns the Ids for all resources that should be applied,
@@ -217,7 +217,10 @@ func (r *ResourceObjects) InfosForApply() []*resource.Info {
 func (r *ResourceObjects) IdsForApply() []object.ObjMetadata {
 	var ids []object.ObjMetadata
 	for _, info := range r.InfosForApply() {
-		ids = append(ids, object.InfoToObjMeta(info))
+		id, err := object.InfoToObjMeta(info)
+		if err == nil {
+			ids = append(ids, id)
+		}
 	}
 	return ids
 }
@@ -225,44 +228,13 @@ func (r *ResourceObjects) IdsForApply() []object.ObjMetadata {
 // IdsForPrune returns the Ids for all resources that should
 // be pruned.
 func (r *ResourceObjects) IdsForPrune() []object.ObjMetadata {
-	inventory, _ := inventory.UnionPastObjs(r.PreviousInventories)
-
-	applyIds := make(map[object.ObjMetadata]bool)
-	for _, id := range r.IdsForApply() {
-		applyIds[id] = true
-	}
-
-	var ids []object.ObjMetadata
-	for _, id := range inventory {
-		if _, found := applyIds[id]; found {
-			continue
-		}
-		ids = append(ids, id)
-	}
-	return ids
+	return r.PruneIds
 }
 
 // AllIds returns the Ids for all resources that are relevant. This
 // includes resources that will be applied or pruned.
 func (r *ResourceObjects) AllIds() []object.ObjMetadata {
 	return append(r.IdsForApply(), r.IdsForPrune()...)
-}
-
-// splitInfos takes a slice of resource.Info objects and splits it
-// into one slice that contains the inventory object templates and
-// another one that contains the remaining resources.
-func splitInfos(infos []*resource.Info) ([]*resource.Info, []*resource.Info) {
-	inventoryObjectTemplates := make([]*resource.Info, 0)
-	resources := make([]*resource.Info, 0)
-
-	for _, info := range infos {
-		if inventory.IsInventoryObject(info.Object) {
-			inventoryObjectTemplates = append(inventoryObjectTemplates, info)
-		} else {
-			resources = append(resources, info)
-		}
-	}
-	return resources, inventoryObjectTemplates
 }
 
 // Run performs the Apply step. This happens asynchronously with updates
@@ -276,6 +248,7 @@ func splitInfos(infos []*resource.Info) ([]*resource.Info, []*resource.Info) {
 func (a *Applier) Run(ctx context.Context, objects []*resource.Info, options Options) <-chan event.Event {
 	eventChannel := make(chan event.Event)
 	setDefaults(&options)
+	a.invClient.SetDryRun(options.DryRun) // client shared with prune, so sets dry-run for prune too.
 
 	go func() {
 		defer close(eventChannel)

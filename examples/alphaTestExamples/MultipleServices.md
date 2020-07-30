@@ -59,6 +59,7 @@ the namespace and inventory id used by apply to create inventory objects.
 ```
 kapply init $BASE/mysql > $OUTPUT/status
 expectedOutputLine "namespace: default is used for inventory object"
+
 kapply init $BASE/wordpress > $OUTPUT/status
 expectedOutputLine "namespace: default is used for inventory object"
 ```
@@ -79,8 +80,6 @@ expectedOutputLine "deployment.apps/mysql is Current: Deployment is available. R
 
 expectedOutputLine "secret/mysql-pass is Current: Resource is always ready"
 
-expectedOutputLine "configmap/inventory-57005c71 is Current: Resource is always ready"
-
 expectedOutputLine "service/mysql is Current: Service is ready"
 
 # Verify that we have the mysql resources in the cluster.
@@ -96,8 +95,6 @@ And the apply the wordpress service
 <!-- @RunWordpress @testE2EAgainstLatestRelease -->
 ```
 kapply apply $BASE/wordpress --reconcile-timeout=120s > $OUTPUT/status;
-
-expectedOutputLine "configmap/inventory-2fbd5b91 is Current: Resource is always ready"
 
 expectedOutputLine "service/wordpress is Current: Service is ready"
 
@@ -116,8 +113,6 @@ kapply destroy $BASE/wordpress > $OUTPUT/status;
 expectedOutputLine "service/wordpress deleted"
 
 expectedOutputLine "deployment.apps/wordpress deleted"
-
-expectedOutputLine "configmap/inventory-2fbd5b91 deleted"
 
 # Verify that we still have the mysql resources in the cluster.
 kubectl get all --no-headers --selector=app=mysql | wc -l | xargs > $OUTPUT/status

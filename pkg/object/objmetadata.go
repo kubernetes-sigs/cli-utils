@@ -17,9 +17,11 @@ package object
 
 import (
 	"fmt"
+	"hash/fnv"
+	"sort"
+	"strconv"
 	"strings"
 
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/cli-runtime/pkg/resource"
@@ -42,22 +44,21 @@ type ObjMetadata struct {
 // CreateObjMetadata returns a pointer to an ObjMetadata struct filled
 // with the passed values. This function normalizes and validates the
 // passed fields and returns an error for bad parameters.
-func CreateObjMetadata(namespace string, name string, gk schema.GroupKind) (*ObjMetadata, error) {
+func CreateObjMetadata(namespace string, name string, gk schema.GroupKind) (ObjMetadata, error) {
 	// Namespace can be empty, but name cannot.
 	name = strings.TrimSpace(name)
 	if name == "" {
-		return nil, fmt.Errorf("empty name for object")
+		return ObjMetadata{}, fmt.Errorf("empty name for object")
 	}
 	// Manually validate name, since by the time k8s reports the error
 	// the invalid name has already been encoded into the inventory object.
 	if !validateNameChars(name) {
-		return nil, fmt.Errorf("invalid characters in object name: %s", name)
+		return ObjMetadata{}, fmt.Errorf("invalid characters in object name: %s", name)
 	}
 	if gk.Empty() {
-		return nil, fmt.Errorf("empty GroupKind for object")
+		return ObjMetadata{}, fmt.Errorf("empty GroupKind for object")
 	}
-
-	return &ObjMetadata{
+	return ObjMetadata{
 		Namespace: strings.TrimSpace(namespace),
 		Name:      name,
 		GroupKind: gk,
@@ -89,7 +90,7 @@ func validateNameChars(name string) bool {
 //
 // Returns an error if unable to parse and create the ObjMetadata
 // struct.
-func ParseObjMetadata(inv string) (*ObjMetadata, error) {
+func ParseObjMetadata(inv string) (ObjMetadata, error) {
 	parts := strings.Split(inv, fieldSeparator)
 	if len(parts) == 4 {
 		gk := schema.GroupKind{
@@ -98,7 +99,7 @@ func ParseObjMetadata(inv string) (*ObjMetadata, error) {
 		}
 		return CreateObjMetadata(parts[0], parts[1], gk)
 	}
-	return nil, fmt.Errorf("unable to decode inventory: %s", inv)
+	return ObjMetadata{}, fmt.Errorf("unable to decode inventory: %s", inv)
 }
 
 // Equals compares two ObjMetadata and returns true if they are equal. This does
@@ -119,24 +120,116 @@ func (o *ObjMetadata) String() string {
 		o.GroupKind.Kind)
 }
 
-// InfoToObjMeta takes information from the provided info and
-// returns an ObjMetadata that identifies the resource.
-func InfoToObjMeta(info *resource.Info) ObjMetadata {
-	u := info.Object.(*unstructured.Unstructured)
-	return ObjMetadata{
-		GroupKind: u.GroupVersionKind().GroupKind(),
-		Name:      u.GetName(),
-		Namespace: u.GetNamespace(),
+// BuildObjectMetadata returns object metadata (ObjMetadata) for the
+// passed objects (infos).
+func InfosToObjMetas(infos []*resource.Info) ([]ObjMetadata, error) {
+	objMetas := []ObjMetadata{}
+	for _, info := range infos {
+		objMeta, err := InfoToObjMeta(info)
+		if err != nil {
+			return nil, err
+		}
+		objMetas = append(objMetas, objMeta)
 	}
+	return objMetas, nil
 }
 
-// infosToObjMetas takes a slice of infos and extract the
-// GroupKind, name and namespace for each resource and returns
-// it as a slice of ObjMetadata.
-func InfosToObjMetas(infos []*resource.Info) []ObjMetadata {
-	var objMetas []ObjMetadata
-	for _, info := range infos {
-		objMetas = append(objMetas, InfoToObjMeta(info))
+// InfoToObjMeta takes information from the provided info and
+// returns an ObjMetadata that identifies the resource.
+func InfoToObjMeta(info *resource.Info) (ObjMetadata, error) {
+	if info == nil || info.Object == nil {
+		return ObjMetadata{}, fmt.Errorf("attempting to transform info, but it is empty")
 	}
-	return objMetas
+	obj := info.Object
+	gk := obj.GetObjectKind().GroupVersionKind().GroupKind()
+	return CreateObjMetadata(info.Namespace, info.Name, gk)
+}
+
+// CalcHash returns a hash of the sorted strings from
+// the object metadata, or an error if one occurred.
+func Hash(objs []ObjMetadata) (string, error) {
+	objStrs := []string{}
+	for _, obj := range objs {
+		objStrs = append(objStrs, obj.String())
+	}
+	hashInt, err := calcHash(objStrs)
+	if err != nil {
+		return "", err
+	}
+	return strconv.FormatUint(uint64(hashInt), 16), nil
+}
+
+// calcHash returns an unsigned int32 representing the hash
+// of the obj metadata strings. If there is an error writing bytes to
+// the hash, then the error is returned; nil is returned otherwise.
+// Used to quickly identify the set of resources in the inventory object.
+func calcHash(objs []string) (uint32, error) {
+	sort.Strings(objs)
+	h := fnv.New32a()
+	for _, obj := range objs {
+		_, err := h.Write([]byte(obj))
+		if err != nil {
+			return uint32(0), err
+		}
+	}
+	return h.Sum32(), nil
+}
+
+// SetDiff returns the slice of objects that exist in "a", but
+// do not exist in "b" (A - B).
+func SetDiff(setA []ObjMetadata, setB []ObjMetadata) []ObjMetadata {
+	// Create a map of the elements of A
+	m := map[string]ObjMetadata{}
+	for _, a := range setA {
+		m[a.String()] = a
+	}
+	// Remove from A each element of B
+	for _, b := range setB {
+		delete(m, b.String()) // OK to delete even if b not in m
+	}
+	// Create/return slice from the map of remaining items
+	diff := []ObjMetadata{}
+	for _, r := range m {
+		diff = append(diff, r)
+	}
+	return diff
+}
+
+// Union returns the slice of objects that is the set of unique
+// items of the merging of set A and set B.
+func Union(setA []ObjMetadata, setB []ObjMetadata) []ObjMetadata {
+	m := map[string]ObjMetadata{}
+	for _, a := range setA {
+		m[a.String()] = a
+	}
+	for _, b := range setB {
+		m[b.String()] = b
+	}
+	union := []ObjMetadata{}
+	for _, u := range m {
+		union = append(union, u)
+	}
+	return union
+}
+
+// SetEquals returns true if the slice of objects in setA equals
+// the slice of objects in setB.
+func SetEquals(setA []ObjMetadata, setB []ObjMetadata) bool {
+	mapA := map[string]bool{}
+	for _, a := range setA {
+		mapA[a.String()] = true
+	}
+	mapB := map[string]bool{}
+	for _, b := range setB {
+		mapB[b.String()] = true
+	}
+	if len(mapA) != len(mapB) {
+		return false
+	}
+	for b := range mapB {
+		if _, exists := mapA[b]; !exists {
+			return false
+		}
+	}
+	return true
 }

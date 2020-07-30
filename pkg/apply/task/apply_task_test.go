@@ -253,7 +253,11 @@ func TestApplyTask_DryRun(t *testing.T) {
 
 			assert.Equal(t, len(tc.expectedObjects), len(applyOptions.objects))
 			for i, obj := range applyOptions.objects {
-				assert.Equal(t, tc.expectedObjects[i], object.InfoToObjMeta(obj))
+				actual, err := object.InfoToObjMeta(obj)
+				if err != nil {
+					continue
+				}
+				assert.Equal(t, tc.expectedObjects[i], actual)
 			}
 
 			assert.Equal(t, len(tc.expectedEvents), len(events))
@@ -277,6 +281,8 @@ func toInfos(rss []resourceInfo) []*resource.Info {
 
 	for _, rs := range rss {
 		infos = append(infos, &resource.Info{
+			Name:      rs.name,
+			Namespace: rs.namespace,
 			Object: &unstructured.Unstructured{
 				Object: map[string]interface{}{
 					"apiVersion": rs.apiVersion,

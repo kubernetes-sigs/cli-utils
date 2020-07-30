@@ -162,7 +162,7 @@ Run preview to check which commands will be executed
 ```
 kapply preview $BASE > $OUTPUT/status
 
-expectedOutputLine "4 resource(s) applied. 4 created, 0 unchanged, 0 configured (preview)"
+expectedOutputLine "3 resource(s) applied. 3 created, 0 unchanged, 0 configured (preview)"
 
 # Verify that preview didn't create any resources.
 kubectl get all -n hellospace > $OUTPUT/status 2>&1
@@ -177,8 +177,6 @@ kapply apply $BASE --reconcile-timeout=1m > $OUTPUT/status
 expectedOutputLine "deployment.apps/the-deployment is Current: Deployment is available. Replicas: 3"
 
 expectedOutputLine "service/the-service is Current: Service is ready"
-
-expectedOutputLine "configmap/inventory-5fe947f is Current: Resource is always ready"
 
 expectedOutputLine "configmap/the-map1 is Current: Resource is always ready"
 
@@ -210,13 +208,9 @@ expectedOutputLine "deployment.apps/the-deployment is Current: Deployment is ava
 
 expectedOutputLine "service/the-service is Current: Service is ready"
 
-expectedOutputLine "configmap/inventory-db36ed56 is Current: Resource is always ready"
-
 expectedOutputLine "configmap/the-map2 is Current: Resource is always ready"
 
 expectedOutputLine "configmap/the-map1 pruned"
-
-expectedOutputLine "configmap/inventory-5fe947f pruned"
 
 # Verify that the new configmap has been created and the old one pruned.
 kubectl get cm -n hellospace --no-headers | awk '{print $1}' > $OUTPUT/status
@@ -235,12 +229,9 @@ expectedOutputLine "configmap/the-map2 deleted (preview)"
 
 expectedOutputLine "service/the-service deleted (preview)"
 
-expectedOutputLine "configmap/inventory-db36ed56 deleted (preview)"
-
 # Verify that preview all resources are still there after running preview.
 kubectl get --no-headers all -n hellospace | wc -l | xargs > $OUTPUT/status
 expectedOutputLine "6"
-
 
 kapply destroy $BASE > $OUTPUT/status;
 
@@ -249,8 +240,6 @@ expectedOutputLine "deployment.apps/the-deployment deleted"
 expectedOutputLine "configmap/the-map2 deleted"
 
 expectedOutputLine "service/the-service deleted"
-
-expectedOutputLine "configmap/inventory-db36ed56 deleted"
 
 kind delete cluster;
 ```

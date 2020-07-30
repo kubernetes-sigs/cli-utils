@@ -16,6 +16,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
+	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
 var testNamespace = "test-inventory-namespace"
@@ -107,9 +108,15 @@ func createInventoryInfo(name string, children ...*resource.Info) *resource.Info
 		Name:      inventoryName,
 		Object:    inventoryObjCopy,
 	}
-	infos := []*resource.Info{inventoryInfo}
-	infos = append(infos, children...)
-	_ = inventory.AddObjsToInventory(infos)
+	wrappedInv := inventory.WrapInventoryObj(inventoryInfo)
+	objs, err := object.InfosToObjMetas(children)
+	if err != nil {
+		return nil
+	}
+	if err = wrappedInv.Store(objs); err != nil {
+		return nil
+	}
+	inventoryInfo, _ = wrappedInv.GetObject()
 	return inventoryInfo
 }
 
@@ -186,8 +193,8 @@ func TestPrune(t *testing.T) {
 			po := NewPruneOptions(populateObjectIds(tc.currentInfos, t))
 			po.InventoryFactoryFunc = inventory.WrapInventoryObj
 			// Set up the previously applied objects.
-			pastInventoryInfo := createInventoryInfo("past-group", tc.pastInfos...)
-			po.invClient = inventory.NewFakeInventoryClient([]*resource.Info{pastInventoryInfo})
+			clusterObjs, _ := object.InfosToObjMetas(tc.pastInfos)
+			po.InvClient = inventory.NewFakeInventoryClient(clusterObjs)
 			// Set up the currently applied objects.
 			currentInventoryInfo := createInventoryInfo("current-group", tc.currentInfos...)
 			currentInfos := append(tc.currentInfos, currentInventoryInfo)
@@ -206,7 +213,6 @@ func TestPrune(t *testing.T) {
 					DryRun: true,
 				})
 			}()
-
 			if !tc.isError {
 				if err != nil {
 					t.Fatalf("Unexpected error during Prune(): %#v", err)
@@ -216,7 +222,7 @@ func TestPrune(t *testing.T) {
 				for e := range eventChannel {
 					actualPruneEvents = append(actualPruneEvents, e)
 				}
-				if want, got := len(tc.prunedInfos)+1, len(actualPruneEvents); want != got {
+				if want, got := len(tc.prunedInfos), len(actualPruneEvents); want != got {
 					t.Errorf("Expected (%d) prune events, got (%d)", want, got)
 				}
 

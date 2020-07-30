@@ -50,6 +50,7 @@ type Options struct {
 
 type resourceObjects interface {
 	InfosForApply() []*resource.Info
+	InfosForPrune() []*resource.Info
 	IdsForApply() []object.ObjMetadata
 	IdsForPrune() []object.ObjMetadata
 }
@@ -73,8 +74,9 @@ func (t *TaskQueueSolver) BuildTaskQueue(ro resourceObjects,
 			Mapper:       t.Mapper,
 		})
 		if !o.DryRun {
+			objs, _ := object.InfosToObjMetas(crdSplitRes.crds)
 			tasks = append(tasks, taskrunner.NewWaitTask(
-				object.InfosToObjMetas(crdSplitRes.crds),
+				objs,
 				taskrunner.AllCurrent,
 				1*time.Minute),
 				&task.ResetRESTMapperTask{
@@ -123,7 +125,7 @@ func (t *TaskQueueSolver) BuildTaskQueue(ro resourceObjects,
 	if o.Prune {
 		tasks = append(tasks,
 			&task.PruneTask{
-				Objects:           ro.InfosForApply(),
+				Objects:           ro.InfosForPrune(),
 				PruneOptions:      t.PruneOptions,
 				PropagationPolicy: o.PrunePropagationPolicy,
 				DryRun:            o.DryRun,

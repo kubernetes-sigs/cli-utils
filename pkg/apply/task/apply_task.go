@@ -109,10 +109,18 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 		// applied.
 		//TODO: This isn't really needed if we are doing dry-run.
 		for _, obj := range objects {
-			id := object.InfoToObjMeta(obj)
-			acc, _ := meta.Accessor(obj.Object)
-			gen := acc.GetGeneration()
-			taskContext.ResourceApplied(id, gen)
+			id, err := object.InfoToObjMeta(obj)
+			if err != nil {
+				continue
+			}
+			if obj.Object != nil {
+				acc, err := meta.Accessor(obj.Object)
+				if err != nil {
+					continue
+				}
+				gen := acc.GetGeneration()
+				taskContext.ResourceApplied(id, gen)
+			}
 		}
 		a.sendTaskResult(taskContext, nil)
 	}()

@@ -7,12 +7,9 @@ import (
 	"fmt"
 	"testing"
 
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/resource"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/object"
@@ -40,6 +37,15 @@ var inventoryObj = unstructured.Unstructured{
 	},
 }
 
+var invInfo = &resource.Info{
+	Namespace: testNamespace,
+	Name:      inventoryObjName,
+	Mapping: &meta.RESTMapping{
+		Scope: meta.RESTScopeNamespace,
+	},
+	Object: &inventoryObj,
+}
+
 var pod1 = unstructured.Unstructured{
 	Object: map[string]interface{}{
 		"apiVersion": "v1",
@@ -55,7 +61,10 @@ var pod1 = unstructured.Unstructured{
 var pod1Info = &resource.Info{
 	Namespace: testNamespace,
 	Name:      pod1Name,
-	Object:    &pod1,
+	Mapping: &meta.RESTMapping{
+		Scope: meta.RESTScopeNamespace,
+	},
+	Object: &pod1,
 }
 
 var pod2 = unstructured.Unstructured{
@@ -73,7 +82,10 @@ var pod2 = unstructured.Unstructured{
 var pod2Info = &resource.Info{
 	Namespace: testNamespace,
 	Name:      pod2Name,
-	Object:    &pod2,
+	Mapping: &meta.RESTMapping{
+		Scope: meta.RESTScopeNamespace,
+	},
+	Object: &pod2,
 }
 
 var pod3 = unstructured.Unstructured{
@@ -91,56 +103,19 @@ var pod3 = unstructured.Unstructured{
 var pod3Info = &resource.Info{
 	Namespace: testNamespace,
 	Name:      pod3Name,
-	Object:    &pod3,
-}
-
-var pod1Metadata = &object.ObjMetadata{
-	Namespace: testNamespace,
-	Name:      pod1Name,
-	GroupKind: schema.GroupKind{
-		Group: "",
-		Kind:  "Pod",
+	Mapping: &meta.RESTMapping{
+		Scope: meta.RESTScopeNamespace,
 	},
-}
-
-var pod2Metadata = &object.ObjMetadata{
-	Namespace: testNamespace,
-	Name:      pod2Name,
-	GroupKind: schema.GroupKind{
-		Group: "",
-		Kind:  "Pod",
-	},
-}
-
-var pod3Metadata = &object.ObjMetadata{
-	Namespace: testNamespace,
-	Name:      pod3Name,
-	GroupKind: schema.GroupKind{
-		Group: "",
-		Kind:  "Pod",
-	},
-}
-
-var nonUnstructuredInventoryObj = &corev1.ConfigMap{
-	ObjectMeta: metav1.ObjectMeta{
-		Namespace: testNamespace,
-		Name:      inventoryObjName,
-		Labels: map[string]string{
-			common.InventoryLabel: "true",
-		},
-	},
-}
-
-var nonUnstructuredInventoryInfo = &resource.Info{
-	Namespace: testNamespace,
-	Name:      inventoryObjName,
-	Object:    nonUnstructuredInventoryObj,
+	Object: &pod3,
 }
 
 var nilInfo = &resource.Info{
 	Namespace: testNamespace,
 	Name:      inventoryObjName,
-	Object:    nil,
+	Mapping: &meta.RESTMapping{
+		Scope: meta.RESTScopeNamespace,
+	},
+	Object: nil,
 }
 
 var inventoryObjLabelWithSpace = unstructured.Unstructured{
@@ -157,39 +132,132 @@ var inventoryObjLabelWithSpace = unstructured.Unstructured{
 	},
 }
 
+var invInfoLabelWithSpace = &resource.Info{
+	Namespace: testNamespace,
+	Name:      inventoryObjName,
+	Mapping: &meta.RESTMapping{
+		Scope: meta.RESTScopeNamespace,
+	},
+	Object: &inventoryObjLabelWithSpace,
+}
+
+func TestFindInventoryObj(t *testing.T) {
+	tests := map[string]struct {
+		infos  []*resource.Info
+		exists bool
+		name   string
+	}{
+		"No inventory object is false": {
+			infos:  []*resource.Info{},
+			exists: false,
+			name:   "",
+		},
+		"Nil inventory object is false": {
+			infos:  []*resource.Info{nil},
+			exists: false,
+			name:   "",
+		},
+		"Only inventory object is true": {
+			infos:  []*resource.Info{copyInventoryInfo()},
+			exists: true,
+			name:   inventoryObjName,
+		},
+		"Missing inventory object is false": {
+			infos:  []*resource.Info{pod1Info},
+			exists: false,
+			name:   "",
+		},
+		"Multiple non-inventory objects is false": {
+			infos:  []*resource.Info{pod1Info, pod2Info, pod3Info},
+			exists: false,
+			name:   "",
+		},
+		"Inventory object with multiple others is true": {
+			infos:  []*resource.Info{pod1Info, pod2Info, copyInventoryInfo(), pod3Info},
+			exists: true,
+			name:   inventoryObjName,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			inventoryObj := FindInventoryObj(tc.infos)
+			if tc.exists && inventoryObj == nil {
+				t.Errorf("Should have found inventory object")
+			}
+			if !tc.exists && inventoryObj != nil {
+				t.Errorf("Inventory object found, but it does not exist: %#v", inventoryObj)
+			}
+			if tc.exists && inventoryObj != nil && tc.name != inventoryObj.Name {
+				t.Errorf("Inventory object name does not match: %s/%s", tc.name, inventoryObj.Name)
+			}
+		})
+	}
+}
+
+func TestIsInventoryObject(t *testing.T) {
+	tests := []struct {
+		invInfo     *resource.Info
+		isInventory bool
+	}{
+		{
+			invInfo:     nil,
+			isInventory: false,
+		},
+		{
+			invInfo:     invInfo,
+			isInventory: true,
+		},
+		{
+			invInfo:     pod2Info,
+			isInventory: false,
+		},
+	}
+
+	for _, test := range tests {
+		inventory := IsInventoryObject(test.invInfo)
+		if test.isInventory && !inventory {
+			t.Errorf("Inventory object not identified: %#v", test.invInfo)
+		}
+		if !test.isInventory && inventory {
+			t.Errorf("Non-inventory object identifed as inventory obj: %#v", test.invInfo)
+		}
+	}
+}
+
 func TestRetrieveInventoryLabel(t *testing.T) {
 	tests := []struct {
-		obj            runtime.Object
+		inventoryInfo  *resource.Info
 		inventoryLabel string
 		isError        bool
 	}{
 		// Nil inventory object throws error.
 		{
-			obj:            nil,
+			inventoryInfo:  nil,
 			inventoryLabel: "",
 			isError:        true,
 		},
 		// Pod is not a inventory object.
 		{
-			obj:            &pod2,
+			inventoryInfo:  pod2Info,
 			inventoryLabel: "",
 			isError:        true,
 		},
 		// Retrieves label without preceding/trailing whitespace.
 		{
-			obj:            &inventoryObjLabelWithSpace,
+			inventoryInfo:  invInfoLabelWithSpace,
 			inventoryLabel: "inventory-label",
 			isError:        false,
 		},
 		{
-			obj:            &inventoryObj,
+			inventoryInfo:  invInfo,
 			inventoryLabel: testInventoryLabel,
 			isError:        false,
 		},
 	}
 
 	for _, test := range tests {
-		actual, err := retrieveInventoryLabel(test.obj)
+		actual, err := retrieveInventoryLabel(test.inventoryInfo)
 		if test.isError && err == nil {
 			t.Errorf("Did not receive expected error.\n")
 		}
@@ -204,458 +272,122 @@ func TestRetrieveInventoryLabel(t *testing.T) {
 	}
 }
 
-func TestIsInventoryObject(t *testing.T) {
-	tests := []struct {
-		obj         runtime.Object
-		isInventory bool
-	}{
-		{
-			obj:         nil,
-			isInventory: false,
-		},
-		{
-			obj:         &inventoryObj,
-			isInventory: true,
-		},
-		{
-			obj:         &pod2,
-			isInventory: false,
-		},
-	}
-
-	for _, test := range tests {
-		inventory := IsInventoryObject(test.obj)
-		if test.isInventory && !inventory {
-			t.Errorf("Inventory object not identified: %#v", test.obj)
-		}
-		if !test.isInventory && inventory {
-			t.Errorf("Non-inventory object identifed as inventory obj: %#v", test.obj)
-		}
-	}
-}
-
-func TestCreateInventoryObject(t *testing.T) {
-	testCases := map[string]struct {
-		inventoryObjectTemplate *resource.Info
-		resources               []*resource.Info
-
-		expectedError     bool
-		expectedInventory []*object.ObjMetadata
-	}{
-		"inventory object template has nil object": {
-			inventoryObjectTemplate: nilInfo,
-			expectedError:           true,
-		},
-		"inventory object template is not unstructured": {
-			inventoryObjectTemplate: nonUnstructuredInventoryInfo,
-			expectedError:           true,
-		},
-		"no resources": {
-			inventoryObjectTemplate: copyInventoryInfo(),
-			resources:               []*resource.Info{},
-			expectedInventory:       []*object.ObjMetadata{},
-		},
-		"single resource": {
-			inventoryObjectTemplate: copyInventoryInfo(),
-			resources:               []*resource.Info{pod1Info},
-			expectedInventory: []*object.ObjMetadata{
-				{
-					Namespace: testNamespace,
-					Name:      pod1Name,
-					GroupKind: schema.GroupKind{
-						Group: "",
-						Kind:  "Pod",
-					},
-				},
-			},
-		},
-		"multiple resources": {
-			inventoryObjectTemplate: copyInventoryInfo(),
-			resources: []*resource.Info{pod1Info, pod2Info,
-				pod3Info},
-			expectedInventory: []*object.ObjMetadata{
-				{
-					Namespace: testNamespace,
-					Name:      pod1Name,
-					GroupKind: schema.GroupKind{
-						Group: "",
-						Kind:  "Pod",
-					},
-				},
-				{
-					Namespace: testNamespace,
-					Name:      pod2Name,
-					GroupKind: schema.GroupKind{
-						Group: "",
-						Kind:  "Pod",
-					},
-				},
-				{
-					Namespace: testNamespace,
-					Name:      pod3Name,
-					GroupKind: schema.GroupKind{
-						Group: "",
-						Kind:  "Pod",
-					},
-				},
-			},
-		},
-		"resource has nil object": {
-			inventoryObjectTemplate: copyInventoryInfo(),
-			resources:               []*resource.Info{nilInfo},
-			expectedError:           true,
-		},
-	}
-
-	for tn, tc := range testCases {
-		t.Run(tn, func(t *testing.T) {
-			invConfigMap := WrapInventoryObj(tc.inventoryObjectTemplate)
-			inventoryObj, err := CreateInventoryObj(invConfigMap, tc.resources)
-			if tc.expectedError {
-				if err == nil {
-					t.Errorf("expected error, but didn't get one")
-				}
-				return
-			}
-
-			if !tc.expectedError && err != nil {
-				t.Errorf("didn't expect error, but got %v", err)
-				return
-			}
-
-			accessor, err := meta.Accessor(inventoryObj.Object)
-			if err != nil {
-				t.Error(err)
-			}
-
-			if accessor.GetName() != inventoryObj.Name {
-				t.Errorf("expected info and unstructured to have the same name, but they didn't")
-			}
-			if accessor.GetNamespace() != inventoryObj.Namespace {
-				t.Errorf("expected info and unstructured to have the same namespace, but they didn't")
-			}
-
-			inv, err := RetrieveObjsFromInventory([]*resource.Info{inventoryObj})
-			if err != nil {
-				t.Error(err)
-			}
-
-			if want, got := len(tc.resources), len(inv); want != got {
-				t.Errorf("expected %d resources in inventory, but got %d",
-					want, got)
-			}
-		})
-	}
-}
-
-func TestFindInventoryObj(t *testing.T) {
-	tests := []struct {
-		infos  []*resource.Info
-		exists bool
-		name   string
-	}{
-		{
-			infos:  []*resource.Info{},
-			exists: false,
-			name:   "",
-		},
-		{
-			infos:  []*resource.Info{nil},
-			exists: false,
-			name:   "",
-		},
-		{
-			infos:  []*resource.Info{copyInventoryInfo()},
-			exists: true,
-			name:   inventoryObjName,
-		},
-		{
-			infos:  []*resource.Info{pod1Info},
-			exists: false,
-			name:   "",
-		},
-		{
-			infos:  []*resource.Info{pod1Info, pod2Info, pod3Info},
-			exists: false,
-			name:   "",
-		},
-		{
-			infos:  []*resource.Info{pod1Info, pod2Info, copyInventoryInfo(), pod3Info},
-			exists: true,
-			name:   inventoryObjName,
-		},
-	}
-
-	for _, test := range tests {
-		inventoryObj, found := FindInventoryObj(test.infos)
-		if test.exists && !found {
-			t.Errorf("Should have found inventory object")
-		}
-		if !test.exists && found {
-			t.Errorf("Inventory object found, but it does not exist: %#v", inventoryObj)
-		}
-		if test.exists && found && test.name != inventoryObj.Name {
-			t.Errorf("Inventory object name does not match: %s/%s", test.name, inventoryObj.Name)
-		}
-	}
-}
-
-func TestAddRetrieveObjsToFromInventory(t *testing.T) {
-	tests := []struct {
-		infos    []*resource.Info
-		expected []*object.ObjMetadata
-		isError  bool
-	}{
-		// No inventory object is an error.
-		{
-			infos:   []*resource.Info{},
-			isError: true,
-		},
-		// No inventory object is an error.
-		{
-			infos:   []*resource.Info{pod1Info, pod2Info},
-			isError: true,
-		},
-		// Inventory object without other objects is OK.
-		{
-			infos:   []*resource.Info{copyInventoryInfo(), nilInfo},
-			isError: true,
-		},
-		{
-			infos:   []*resource.Info{nonUnstructuredInventoryInfo},
-			isError: true,
-		},
-		{
-			infos:    []*resource.Info{copyInventoryInfo()},
-			expected: []*object.ObjMetadata{},
-			isError:  false,
-		},
-		// More than one inventory object is an error.
-		{
-			infos:    []*resource.Info{copyInventoryInfo(), copyInventoryInfo()},
-			expected: []*object.ObjMetadata{},
-			isError:  true,
-		},
-		// More than one inventory object is an error.
-		{
-			infos:    []*resource.Info{copyInventoryInfo(), pod1Info, copyInventoryInfo()},
-			expected: []*object.ObjMetadata{},
-			isError:  true,
-		},
-		// Basic test case: one inventory object, one pod.
-		{
-			infos: []*resource.Info{copyInventoryInfo(), pod1Info},
-			expected: []*object.ObjMetadata{
-				{
-					Namespace: testNamespace,
-					Name:      pod1Name,
-					GroupKind: schema.GroupKind{
-						Group: "",
-						Kind:  "Pod",
-					},
-				},
-			},
-			isError: false,
-		},
-		{
-			infos: []*resource.Info{pod1Info, copyInventoryInfo()},
-			expected: []*object.ObjMetadata{
-				{
-					Namespace: testNamespace,
-					Name:      pod1Name,
-					GroupKind: schema.GroupKind{
-						Group: "",
-						Kind:  "Pod",
-					},
-				},
-			},
-			isError: false,
-		},
-		{
-			infos: []*resource.Info{pod1Info, pod2Info, copyInventoryInfo(), pod3Info},
-			expected: []*object.ObjMetadata{
-				{
-					Namespace: testNamespace,
-					Name:      pod1Name,
-					GroupKind: schema.GroupKind{
-						Group: "",
-						Kind:  "Pod",
-					},
-				},
-				{
-					Namespace: testNamespace,
-					Name:      pod2Name,
-					GroupKind: schema.GroupKind{
-						Group: "",
-						Kind:  "Pod",
-					},
-				},
-				{
-					Namespace: testNamespace,
-					Name:      pod3Name,
-					GroupKind: schema.GroupKind{
-						Group: "",
-						Kind:  "Pod",
-					},
-				},
-			},
-			isError: false,
-		},
-		{
-			infos: []*resource.Info{pod1Info, pod2Info, pod3Info, copyInventoryInfo()},
-			expected: []*object.ObjMetadata{
-				{
-					Namespace: testNamespace,
-					Name:      pod1Name,
-					GroupKind: schema.GroupKind{
-						Group: "",
-						Kind:  "Pod",
-					},
-				},
-				{
-					Namespace: testNamespace,
-					Name:      pod2Name,
-					GroupKind: schema.GroupKind{
-						Group: "",
-						Kind:  "Pod",
-					},
-				},
-				{
-					Namespace: testNamespace,
-					Name:      pod3Name,
-					GroupKind: schema.GroupKind{
-						Group: "",
-						Kind:  "Pod",
-					},
-				},
-			},
-			isError: false,
-		},
-		{
-			infos: []*resource.Info{copyInventoryInfo(), pod1Info, pod2Info, pod3Info},
-			expected: []*object.ObjMetadata{
-				{
-					Namespace: testNamespace,
-					Name:      pod1Name,
-					GroupKind: schema.GroupKind{
-						Group: "",
-						Kind:  "Pod",
-					},
-				},
-				{
-					Namespace: testNamespace,
-					Name:      pod2Name,
-					GroupKind: schema.GroupKind{
-						Group: "",
-						Kind:  "Pod",
-					},
-				},
-				{
-					Namespace: testNamespace,
-					Name:      pod3Name,
-					GroupKind: schema.GroupKind{
-						Group: "",
-						Kind:  "Pod",
-					},
-				},
-			},
-			isError: false,
-		},
-	}
-
-	for _, test := range tests {
-		err := AddObjsToInventory(test.infos)
-		if test.isError && err == nil {
-			t.Errorf("Should have produced an error, but returned none.")
-		}
-		if !test.isError {
-			if err != nil {
-				t.Fatalf("Received error when expecting none (%s)\n", err)
-			}
-			retrieved, err := RetrieveObjsFromInventory(test.infos)
-			if err != nil {
-				t.Fatalf("Error retrieving inventory: %s\n", err)
-			}
-			if len(test.expected) != len(retrieved) {
-				t.Errorf("Expected inventory for %d resources, actual %d",
-					len(test.expected), len(retrieved))
-			}
-			for _, expected := range test.expected {
-				found := false
-				for _, actual := range retrieved {
-					if expected.Equals(actual) {
-						found = true
-						continue
-					}
-				}
-				if !found {
-					t.Errorf("Expected inventory (%s) not found", expected)
-				}
-			}
-			// If the inventory object has an inventory, check the
-			// inventory object has an inventory hash.
-			inventoryInfo, exists := FindInventoryObj(test.infos)
-			if exists && len(test.expected) > 0 {
-				invHash := retrieveInventoryHash(inventoryInfo)
-				if len(invHash) == 0 {
-					t.Errorf("Inventory object missing inventory hash")
-				}
-			}
-		}
-	}
-}
-
-func TestUnionPastObjs(t *testing.T) {
+func TestSplitInfos(t *testing.T) {
 	tests := map[string]struct {
-		prevInventories []*resource.Info
-		expected        []object.ObjMetadata
+		infos   []*resource.Info
+		inv     *resource.Info
+		objs    []*resource.Info
+		isError bool
 	}{
-		"Empty inventory objects = empty inventory": {
-			prevInventories: []*resource.Info{},
-			expected:        []object.ObjMetadata{},
+		"No objects is an error": {
+			infos:   []*resource.Info{},
+			inv:     nil,
+			objs:    []*resource.Info{},
+			isError: true,
 		},
-		"No children in inventory object, equals no inventory": {
-			prevInventories: []*resource.Info{createInventoryInfo("test-1")},
-			expected:        []object.ObjMetadata{},
+		"Nil object is an error": {
+			infos:   []*resource.Info{nilInfo},
+			inv:     nil,
+			objs:    []*resource.Info{},
+			isError: true,
 		},
-		"Inventory object with Pod1 returns inventory with Pod1": {
-			prevInventories: []*resource.Info{createInventoryInfo("test-1", pod1Info)},
-			expected:        []object.ObjMetadata{*pod1Metadata},
+		"Only inventory object is true": {
+			infos:   []*resource.Info{invInfo},
+			inv:     invInfo,
+			objs:    []*resource.Info{},
+			isError: false,
 		},
-		"Inventory object with three pods returns inventory with three pods": {
-			prevInventories: []*resource.Info{
-				createInventoryInfo("test-1", pod1Info, pod2Info, pod3Info),
-			},
-			expected: []object.ObjMetadata{*pod1Metadata, *pod2Metadata, *pod3Metadata},
+		"Missing inventory object is false": {
+			infos:   []*resource.Info{pod1Info},
+			inv:     nil,
+			objs:    []*resource.Info{pod1Info},
+			isError: true,
 		},
-		"Two inventory objects with different pods returns inventory with both pods": {
-			prevInventories: []*resource.Info{
-				createInventoryInfo("test-1", pod1Info),
-				createInventoryInfo("test-2", pod2Info),
-			},
-			expected: []object.ObjMetadata{*pod1Metadata, *pod2Metadata},
+		"Multiple non-inventory objects is false": {
+			infos:   []*resource.Info{pod1Info, pod2Info, pod3Info},
+			inv:     nil,
+			objs:    []*resource.Info{pod1Info, pod2Info, pod3Info},
+			isError: true,
 		},
-		"Two inventory objects with overlapping pods returns set of pods": {
-			prevInventories: []*resource.Info{
-				createInventoryInfo("test-1", pod1Info, pod2Info),
-				createInventoryInfo("test-2", pod2Info, pod3Info),
-			},
-			expected: []object.ObjMetadata{*pod1Metadata, *pod2Metadata, *pod3Metadata},
+		"Inventory object with multiple others is true": {
+			infos:   []*resource.Info{pod1Info, pod2Info, invInfo, pod3Info},
+			inv:     invInfo,
+			objs:    []*resource.Info{pod1Info, pod2Info, pod3Info},
+			isError: false,
 		},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			actual, err := UnionPastObjs(tc.prevInventories)
-			if err != nil {
-				t.Errorf("Unexpected error received: %s\n", err)
+			inv, infos, err := SplitInfos(tc.infos)
+			if !tc.isError && err != nil {
+				t.Fatalf("unexpected error received: %s", err)
 			}
-			if len(tc.expected) != len(actual) {
-				t.Fatalf("Expected (%d) objects, got (%d)\n", len(tc.expected), len(actual))
+			if tc.isError {
+				if err == nil {
+					t.Fatalf("expected error not received")
+				}
+				return
 			}
-			for _, expectedObj := range tc.expected {
-				if !objInArray(expectedObj, actual) {
-					t.Fatalf("Expected object (%s), but not found\n", expectedObj)
+			if *tc.inv != *inv {
+				t.Errorf("expected inventory (%v); got (%v)", *tc.inv, *inv)
+			}
+			if len(tc.objs) != len(infos) {
+				t.Errorf("expected %d objects; got %d", len(tc.objs), len(infos))
+			}
+		})
+	}
+}
+
+func TestClearInventoryObject(t *testing.T) {
+	pod1 := ignoreErrInfoToObjMeta(pod1Info)
+	pod3 := ignoreErrInfoToObjMeta(pod3Info)
+	inv := storeObjsInInventory(invInfo, []object.ObjMetadata{pod1, pod3})
+	tests := map[string]struct {
+		invInfo *resource.Info
+		isError bool
+	}{
+		"Nil info should error": {
+			invInfo: nil,
+			isError: true,
+		},
+		"Info with nil Object should error": {
+			invInfo: nilInfo,
+			isError: true,
+		},
+		"Single non-inventory object should error": {
+			invInfo: pod1Info,
+			isError: true,
+		},
+		"Single inventory object without data should stay cleared": {
+			invInfo: invInfo,
+			isError: false,
+		},
+		"Single inventory object with data should be cleared": {
+			invInfo: inv,
+			isError: false,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			invInfo, err := ClearInventoryObj(tc.invInfo)
+			if tc.isError {
+				if err == nil {
+					t.Errorf("Should have produced an error, but returned none.")
+				}
+			}
+			if !tc.isError {
+				if err != nil {
+					t.Fatalf("Received unexpected error: %s", err)
+				}
+				wrapped := WrapInventoryObj(invInfo)
+				objs, err := wrapped.Load()
+				if err != nil {
+					t.Fatalf("Received unexpected error: %s", err)
+				}
+				if len(objs) > 0 {
+					t.Errorf("Inventory object inventory not cleared: %#v\n", objs)
 				}
 			}
 		})
@@ -699,7 +431,6 @@ func TestAddSuffixToName(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		//t.Errorf("%#v [%s]", test.info, test.suffix)
 		err := addSuffixToName(test.info, test.suffix)
 		if test.isError {
 			if err == nil {
@@ -724,65 +455,6 @@ func TestAddSuffixToName(t *testing.T) {
 	}
 }
 
-func TestClearInventoryObject(t *testing.T) {
-	tests := map[string]struct {
-		infos   []*resource.Info
-		isError bool
-	}{
-		"Empty infos should error": {
-			infos:   []*resource.Info{},
-			isError: true,
-		},
-		"Non-Unstructured inventory object should error": {
-			infos:   []*resource.Info{nonUnstructuredInventoryInfo},
-			isError: true,
-		},
-		"Info with nil Object should error": {
-			infos:   []*resource.Info{nilInfo},
-			isError: true,
-		},
-		"Single inventory object should work": {
-			infos:   []*resource.Info{copyInventoryInfo()},
-			isError: false,
-		},
-		"Single non-inventory object should error": {
-			infos:   []*resource.Info{pod1Info},
-			isError: true,
-		},
-		"Multiple non-inventory objects should error": {
-			infos:   []*resource.Info{pod1Info, pod2Info},
-			isError: true,
-		},
-		"Inventory object with single inventory object should work": {
-			infos:   []*resource.Info{copyInventoryInfo(), pod1Info},
-			isError: false,
-		},
-	}
-
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			err := ClearInventoryObj(tc.infos)
-			if tc.isError {
-				if err == nil {
-					t.Errorf("Should have produced an error, but returned none.")
-				}
-			}
-			if !tc.isError {
-				if err != nil {
-					t.Fatalf("Received unexpected error: %#v", err)
-				}
-				objMetadata, err := RetrieveObjsFromInventory(tc.infos)
-				if err != nil {
-					t.Fatalf("Received unexpected error: %#v", err)
-				}
-				if len(objMetadata) > 0 {
-					t.Errorf("Inventory object inventory not cleared: %#v\n", objMetadata)
-				}
-			}
-		})
-	}
-}
-
 func getObjectName(obj runtime.Object) (string, error) {
 	u, ok := obj.(*unstructured.Unstructured)
 	if !ok {
@@ -801,32 +473,9 @@ func copyInventoryInfo() *resource.Info {
 	return inventoryInfo
 }
 
-// Returns a inventory object with the inventory set from
-// the passed "children".
-func createInventoryInfo(name string, children ...*resource.Info) *resource.Info {
-	inventoryName := inventoryObjName
-	if len(name) > 0 {
-		inventoryName = name
-	}
-	inventoryObjCopy := inventoryObj.DeepCopy()
-	var inventoryInfo = &resource.Info{
-		Namespace: testNamespace,
-		Name:      inventoryName,
-		Object:    inventoryObjCopy,
-	}
-	infos := []*resource.Info{inventoryInfo}
-	infos = append(infos, children...)
-	_ = AddObjsToInventory(infos)
-	return inventoryInfo
-}
-
-// objInArray is a helper function that returns true if passed obj
-// is in array of objects; false otherwise.
-func objInArray(obj object.ObjMetadata, arr []object.ObjMetadata) bool {
-	for _, a := range arr {
-		if a == obj {
-			return true
-		}
-	}
-	return false
+func storeObjsInInventory(inv *resource.Info, objs []object.ObjMetadata) *resource.Info {
+	wrapped := WrapInventoryObj(inv)
+	_ = wrapped.Store(objs)
+	inv, _ = wrapped.GetObject()
+	return inv
 }

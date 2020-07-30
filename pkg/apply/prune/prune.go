@@ -12,7 +12,6 @@
 package prune
 
 import (
-	"fmt"
 	"sort"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -27,13 +26,14 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
+	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/ordering"
 )
 
 // PruneOptions encapsulates the necessary information to
 // implement the prune functionality.
 type PruneOptions struct {
-	invClient inventory.InventoryClient
+	InvClient inventory.InventoryClient
 	client    dynamic.Interface
 	mapper    meta.RESTMapper
 	// Stores the UID for each of the currently applied objects.
@@ -62,7 +62,6 @@ func NewPruneOptions(currentUids sets.String) *PruneOptions {
 
 func (po *PruneOptions) Initialize(factory util.Factory, invClient inventory.InventoryClient) error {
 	var err error
-	po.invClient = invClient
 	// Client/Builder fields from the Factory.
 	po.client, err = factory.DynamicClient()
 	if err != nil {
@@ -72,6 +71,7 @@ func (po *PruneOptions) Initialize(factory util.Factory, invClient inventory.Inv
 	if err != nil {
 		return err
 	}
+	po.InvClient = invClient
 	return nil
 }
 
@@ -89,35 +89,28 @@ type Options struct {
 // (retrieved from previous inventory objects) but omitted in
 // the current apply. Prune also delete all previous inventory
 // objects. Returns an error if there was a problem.
-func (po *PruneOptions) Prune(currentObjects []*resource.Info, eventChannel chan<- event.Event, o Options) error {
-	currentInventoryObject, found := inventory.FindInventoryObj(currentObjects)
-	if !found {
-		return fmt.Errorf("current inventory object not found during prune")
+func (po *PruneOptions) Prune(localInfos []*resource.Info, eventChannel chan<- event.Event, o Options) error {
+	localInv, localInfos, err := inventory.SplitInfos(localInfos)
+	if err != nil {
+		return err
 	}
-	klog.V(7).Infof("prune current inventory object: %s/%s",
-		currentInventoryObject.Namespace, currentInventoryObject.Name)
-
-	// Retrieve previous inventory objects, and calculate the
-	// union of the previous applies as an inventory set.
-	pastObjs, err := po.invClient.GetStoredObjRefs(currentInventoryObject)
+	klog.V(4).Infof("prune local inventory object: %s/%s", localInv.Namespace, localInv.Name)
+	clusterObjs, err := po.InvClient.GetClusterObjs(localInv)
 	if err != nil {
 		return err
 	}
 	klog.V(4).Infof("prune %d currently applied objects", len(po.currentUids))
-	klog.V(4).Infof("prune %d previously applied objects", len(pastObjs))
-
+	klog.V(4).Infof("prune %d previously applied objects", len(clusterObjs))
 	// Sort the resources in reverse order using the same rules as is
 	// used for apply.
-	sort.Sort(sort.Reverse(ordering.SortableMetas(pastObjs)))
-
-	// Iterate through set of all previously applied objects.
-	for _, past := range pastObjs {
-		mapping, err := po.mapper.RESTMapping(past.GroupKind)
+	sort.Sort(sort.Reverse(ordering.SortableMetas(clusterObjs)))
+	for _, clusterObj := range clusterObjs {
+		mapping, err := po.mapper.RESTMapping(clusterObj.GroupKind)
 		if err != nil {
 			return err
 		}
-		namespacedClient := po.client.Resource(mapping.Resource).Namespace(past.Namespace)
-		obj, err := namespacedClient.Get(past.Name, metav1.GetOptions{})
+		namespacedClient := po.client.Resource(mapping.Resource).Namespace(clusterObj.Namespace)
+		obj, err := namespacedClient.Get(clusterObj.Name, metav1.GetOptions{})
 		if err != nil {
 			// Object not found in cluster, so no need to delete it; skip to next object.
 			if apierrors.IsNotFound(err) {
@@ -129,9 +122,9 @@ func (po *PruneOptions) Prune(currentObjects []*resource.Info, eventChannel chan
 		if err != nil {
 			return err
 		}
-		// If this previously applied object is not also a currently applied
-		// object, then it has been omitted--prune it. If the previously
-		// applied object is part of the current apply set, skip it.
+		// If this cluster object is not also a currently applied
+		// object, then it has been omitted--prune it. If the cluster
+		// object is part of the local apply set, skip it.
 		uid := string(metadata.GetUID())
 		klog.V(7).Infof("prune previously applied object UID: %s", uid)
 		if po.currentUids.Has(uid) {
@@ -145,35 +138,19 @@ func (po *PruneOptions) Prune(currentObjects []*resource.Info, eventChannel chan
 			continue
 		}
 		if !o.DryRun {
-			klog.V(7).Infof("prune object delete: %s/%s", past.Namespace, past.Name)
-			err = namespacedClient.Delete(past.Name, &metav1.DeleteOptions{})
+			klog.V(4).Infof("prune object delete: %s/%s", clusterObj.Namespace, clusterObj.Name)
+			err = namespacedClient.Delete(clusterObj.Name, &metav1.DeleteOptions{})
 			if err != nil {
 				return err
 			}
 		}
 		eventChannel <- createPruneEvent(obj, event.Pruned)
 	}
-	// Delete previous inventory objects.
-	pastInventories, err := po.invClient.GetPreviousInventoryObjects(currentInventoryObject)
+	localObjs, err := object.InfosToObjMetas(localInfos)
 	if err != nil {
 		return err
 	}
-	for _, pastGroupInfo := range pastInventories {
-		if !o.DryRun {
-			klog.V(7).Infof("prune delete previous inventory object: %s/%s",
-				pastGroupInfo.Namespace, pastGroupInfo.Name)
-			err = po.client.Resource(pastGroupInfo.Mapping.Resource).
-				Namespace(pastGroupInfo.Namespace).
-				Delete(pastGroupInfo.Name, &metav1.DeleteOptions{
-					PropagationPolicy: &o.PropagationPolicy,
-				})
-			if err != nil {
-				return err
-			}
-		}
-		eventChannel <- createPruneEvent(pastGroupInfo.Object, event.Pruned)
-	}
-	return nil
+	return po.InvClient.Replace(localInv, localObjs)
 }
 
 // preventDeleteAnnotation returns true if the "onRemove:keep"

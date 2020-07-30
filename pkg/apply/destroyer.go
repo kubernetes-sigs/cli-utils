@@ -11,6 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/kubectl/pkg/cmd/apply"
 	"k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
@@ -62,7 +63,7 @@ func (d *Destroyer) Initialize(cmd *cobra.Command, paths []string) error {
 	}
 	invClient, err := inventory.NewInventoryClient(d.factory)
 	if err != nil {
-		return err
+		return errors.WrapPrefix(err, "error creating inventory client", 1)
 	}
 	err = d.PruneOptions.Initialize(d.factory, invClient)
 	if err != nil {
@@ -95,7 +96,18 @@ func (d *Destroyer) Run() <-chan event.Event {
 		// so the prune will calculate the prune set as all the objects,
 		// deleting everything. We can ignore the error, since the Prune
 		// will catch the same problems.
-		_ = inventory.ClearInventoryObj(infos)
+		invInfo, nonInvInfos, _ := inventory.SplitInfos(infos)
+		invInfo, err = inventory.ClearInventoryObj(invInfo)
+		if err != nil {
+			ch <- event.Event{
+				Type: event.ErrorType,
+				ErrorEvent: event.ErrorEvent{
+					Err: errors.WrapPrefix(err, "error clearing inventory object", 1),
+				},
+			}
+			return
+		}
+		infos = append([]*resource.Info{invInfo}, nonInvInfos...)
 
 		// Start the event transformer goroutine so we can transform
 		// the Prune events emitted from the Prune function to Delete
@@ -106,6 +118,13 @@ func (d *Destroyer) Run() <-chan event.Event {
 			DryRun:            d.DryRun,
 			PropagationPolicy: metav1.DeletePropagationBackground,
 		})
+		// Now delete the inventory object as well.
+		inv := inventory.FindInventoryObj(infos)
+		if inv != nil {
+			d.PruneOptions.InvClient.SetDryRun(d.DryRun)
+			_ = d.PruneOptions.InvClient.DeleteInventoryObj(inv)
+		}
+
 		// Close the tempChannel to signal to the event transformer that
 		// it should terminate.
 		close(tempChannel)

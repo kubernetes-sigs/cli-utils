@@ -124,10 +124,6 @@ func TestApplier(t *testing.T) {
 				},
 				{
 					eventType:      event.ApplyType,
-					applyEventType: event.ApplyEventResourceUpdate,
-				},
-				{
-					eventType:      event.ApplyType,
 					applyEventType: event.ApplyEventCompleted,
 				},
 			},
@@ -187,10 +183,6 @@ func TestApplier(t *testing.T) {
 				},
 				{
 					eventType:      event.ApplyType,
-					applyEventType: event.ApplyEventResourceUpdate,
-				},
-				{
-					eventType:      event.ApplyType,
 					applyEventType: event.ApplyEventCompleted,
 				},
 				{
@@ -237,6 +229,7 @@ func TestApplier(t *testing.T) {
 			if !assert.NoError(t, err) {
 				return
 			}
+			applier.invClient = inventory.NewFakeInventoryClient([]object.ObjMetadata{})
 
 			poller := &fakePoller{
 				events: tc.statusEvents,
@@ -472,76 +465,100 @@ func TestValidateNamespace(t *testing.T) {
 
 func TestReadAndPrepareObjects(t *testing.T) {
 	testCases := map[string]struct {
-		resources     []*resource.Info
-		expectedError bool
+		// locally read resources input into applier.prepareObjects
+		resources []*resource.Info
+		// objects already stored in the cluster inventory
+		clusterObjs []*resource.Info
+		// expected returned local inventory object
+		localInv *resource.Info
+		// expected returned local objects to apply (in order)
+		localInfos []*resource.Info
+		// expected calculated prune objects
+		pruneIds []*resource.Info
+		// expected error
+		isError bool
 	}{
 		"no inventory object": {
-			resources:     []*resource.Info{obj1Info},
-			expectedError: true,
+			resources: []*resource.Info{obj1Info},
+			isError:   true,
 		},
 		"multiple inventory objects": {
-			resources:     []*resource.Info{inventoryObjInfo, inventoryObjInfo},
-			expectedError: true,
+			resources: []*resource.Info{inventoryObjInfo, inventoryObjInfo},
+			isError:   true,
 		},
 		"only inventory object": {
-			resources:     []*resource.Info{inventoryObjInfo},
-			expectedError: false,
+			resources: []*resource.Info{inventoryObjInfo},
+			localInv:  inventoryObjInfo,
+			isError:   false,
+		},
+		"only inventory object, prune one object": {
+			resources:   []*resource.Info{inventoryObjInfo},
+			clusterObjs: []*resource.Info{obj1Info},
+			localInv:    inventoryObjInfo,
+			pruneIds:    []*resource.Info{obj1Info},
+			isError:     false,
 		},
 		"inventory object already at the beginning": {
 			resources: []*resource.Info{inventoryObjInfo, obj1Info,
 				clusterScopedObjInfo},
-			expectedError: false,
+			localInv:   inventoryObjInfo,
+			localInfos: []*resource.Info{obj1Info, clusterScopedObjInfo},
+			isError:    false,
+		},
+		"inventory object already at the beginning, prune one": {
+			resources: []*resource.Info{inventoryObjInfo, obj1Info,
+				clusterScopedObjInfo},
+			clusterObjs: []*resource.Info{obj2Info},
+			localInv:    inventoryObjInfo,
+			localInfos:  []*resource.Info{obj1Info, clusterScopedObjInfo},
+			pruneIds:    []*resource.Info{obj2Info},
+			isError:     false,
 		},
 		"inventory object not at the beginning": {
 			resources: []*resource.Info{obj1Info, obj2Info, inventoryObjInfo,
 				clusterScopedObjInfo},
-			expectedError: false,
+			clusterObjs: []*resource.Info{obj2Info},
+			localInv:    inventoryObjInfo,
+			localInfos:  []*resource.Info{obj1Info, obj2Info, clusterScopedObjInfo},
+			pruneIds:    []*resource.Info{},
+			isError:     false,
 		},
 		"objects can not be in different namespaces": {
 			resources: []*resource.Info{obj1Info, obj2Info,
 				inventoryObjInfo, obj3Info},
-			expectedError: true,
+			isError: true,
 		},
 	}
 
-	for tn, tc := range testCases {
-		t.Run(tn, func(t *testing.T) {
-			tf := cmdtesting.NewTestFactory().WithNamespace("namespace")
-			defer tf.Cleanup()
-
-			ioStreams, _, _, _ := genericclioptions.NewTestIOStreams() //nolint:dogsled
-			applier := NewApplier(tf, ioStreams)
-
-			applier.invClient = inventory.NewFakeInventoryClient([]*resource.Info{})
-
-			resourceObjects, err := applier.prepareObjects(tc.resources)
-
-			if tc.expectedError {
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			// Set up objects already stored in cluster inventory.
+			clusterObjs, _ := object.InfosToObjMetas(tc.clusterObjs)
+			fakeInvClient := inventory.NewFakeInventoryClient(clusterObjs)
+			// Create applier with fake inventory client, and call prepareObjects
+			applier := &Applier{invClient: fakeInvClient}
+			resourceObjs, err := applier.prepareObjects(tc.resources)
+			if !tc.isError && err != nil {
+				t.Fatalf("unexpected error received: %s", err)
+			}
+			if tc.isError {
 				if err == nil {
-					t.Errorf("expected error, but didn't get one")
+					t.Fatalf("expected error, but received none")
 				}
 				return
 			}
-
-			if !tc.expectedError && err != nil {
-				t.Errorf("didn't expect error, but got %v", err)
-				return
+			// Validate the returned ResourceObjs
+			if *tc.localInv != *resourceObjs.LocalInv {
+				t.Errorf("expected local inventory (%v), got (%v)",
+					tc.localInv, resourceObjs.LocalInv)
 			}
-
-			inventoryObj := resourceObjects.CurrentInventory
-			if !inventory.IsInventoryObject(inventoryObj.Object) {
-				t.Errorf(
-					"expected first item to be inventory object, but it wasn't")
+			if !infoSetsEqual(tc.localInfos, resourceObjs.Resources) {
+				t.Errorf("expected local infos (%v), got (%v)",
+					tc.localInfos, resourceObjs.Resources)
 			}
-
-			pastObjs, err := inventory.RetrieveObjsFromInventory(
-				[]*resource.Info{inventoryObj})
-			if err != nil {
-				t.Error(err)
-			}
-
-			if want, got := len(tc.resources)-1, len(pastObjs); want != got {
-				t.Errorf("expected %d resources in inventory, got %d", want, got)
+			if len(tc.pruneIds) != len(resourceObjs.PruneIds) {
+				t.Errorf("expected prune ids (%v), got (%v)",
+					tc.pruneIds, resourceObjs.PruneIds)
 			}
 		})
 	}
@@ -798,4 +815,30 @@ func (f *fakeInfoHelper) getClient(gv schema.GroupVersion) (resource.RESTClient,
 		return f.factory.UnstructuredClient, nil
 	}
 	return f.factory.Client, nil
+}
+
+// infoSetEquals returns true if the set of Infos in setA equals the
+// set of Infos in setB (ordering does not matter); false otherwise.
+func infoSetsEqual(setA []*resource.Info, setB []*resource.Info) bool {
+	if len(setA) != len(setB) {
+		return false
+	}
+	mapA := map[string]bool{}
+	objMetasA, err := object.InfosToObjMetas(setA)
+	if err != nil {
+		return false
+	}
+	for _, objMetaA := range objMetasA {
+		mapA[objMetaA.String()] = true
+	}
+	objMetasB, err := object.InfosToObjMetas(setB)
+	if err != nil {
+		return false
+	}
+	for _, objMetaB := range objMetasB {
+		if _, ok := mapA[objMetaB.String()]; !ok {
+			return false
+		}
+	}
+	return true
 }
