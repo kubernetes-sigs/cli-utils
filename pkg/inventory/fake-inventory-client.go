@@ -5,6 +5,7 @@ package inventory
 
 import (
 	"k8s.io/cli-runtime/pkg/resource"
+	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
@@ -62,7 +63,7 @@ func (fic *FakeInventoryClient) DeleteInventoryObj(inv *resource.Info) error {
 	return nil
 }
 
-func (fic *FakeInventoryClient) SetDryRun(dryRun bool) {}
+func (fic *FakeInventoryClient) SetDryRunStrategy(drs common.DryRunStrategy) {}
 
 // SetError forces an error on the subsequent client call if it returns an error.
 func (fic *FakeInventoryClient) SetError(err error) {

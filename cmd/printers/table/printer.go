@@ -10,6 +10,7 @@ import (
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
+	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/print/table"
 )
 
@@ -17,7 +18,7 @@ type Printer struct {
 	IOStreams genericclioptions.IOStreams
 }
 
-func (t *Printer) Print(ch <-chan event.Event, _ bool) {
+func (t *Printer) Print(ch <-chan event.Event, _ common.DryRunStrategy) {
 	// Wait for the init event that will give us the set of
 	// resources.
 	var initEvent event.InitEvent

@@ -19,7 +19,9 @@ import (
 )
 
 var (
-	noPrune = false
+	noPrune        = false
+	serverDryRun   = false
+	previewDestroy = false
 )
 
 // NewCmdPreview creates the `preview` command
@@ -40,9 +42,19 @@ func NewCmdPreview(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *co
 			cmdutil.CheckErr(setters2.CheckRequiredSettersSet())
 			var ch <-chan event.Event
 			cmdutil.CheckErr(destroyer.Initialize(cmd, args))
-			// if destroy flag is set in preview, transmit it to destroyer DryRun flag
+
+			drs := common.DryRunClient
+			if serverDryRun {
+				drs = common.DryRunServer
+			}
+
+			if previewDestroy {
+				destroyer.DryRunStrategy = drs
+			}
+
+			// if destroy flag is set in preview, transmit it to destroyer DryRunStrategy flag
 			// and pivot execution to destroy with dry-run
-			if !destroyer.DryRun {
+			if !destroyer.DryRunStrategy.ClientOrServerDryRun() {
 				cmdutil.CheckErr(applier.Initialize(cmd))
 
 				// Create a context
@@ -76,7 +88,7 @@ func NewCmdPreview(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *co
 				ch = applier.Run(ctx, infos, apply.Options{
 					EmitStatusEvents: false,
 					NoPrune:          noPrune,
-					DryRun:           true,
+					DryRunStrategy:   drs,
 				})
 			} else {
 				ch = destroyer.Run()
@@ -84,24 +96,25 @@ func NewCmdPreview(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *co
 
 			// The printer will print updates from the channel. It will block
 			// until the channel is closed.
-			printer.Print(ch, true)
+			printer.Print(ch, drs)
 		},
 	}
 
 	cmd.Flags().BoolVar(&noPrune, "no-prune", noPrune, "If true, do not prune previously applied objects.")
+	cmd.Flags().BoolVar(&serverDryRun, "server-side", serverDryRun, "If true, preview runs in the server instead of the client.")
 	cmdutil.CheckErr(applier.SetFlags(cmd))
 
 	// The following flags are added, but hidden because other code
 	// dependend on them when parsing flags. These flags are hidden and unused.
 	var unusedBool bool
 	cmd.Flags().BoolVar(&unusedBool, "dry-run", unusedBool, "NOT USED")
-	cmd.Flags().BoolVar(&destroyer.DryRun, "destroy", destroyer.DryRun, "If true, preview of destroy operations will be displayed.")
+	cmd.Flags().BoolVar(&previewDestroy, "destroy", previewDestroy, "If true, preview of destroy operations will be displayed.")
 	_ = cmd.Flags().MarkHidden("dry-run")
 	cmdutil.AddValidateFlags(cmd)
 	_ = cmd.Flags().MarkHidden("validate")
-	// Server-side flags are hidden for now.
-	cmdutil.AddServerSideApplyFlags(cmd)
-	_ = cmd.Flags().MarkHidden("server-side")
+	cmd.Flags().Bool("force-conflicts", false, "If true, server-side apply will force the changes against conflicts.")
+	cmd.Flags().String("field-manager", "kubectl", "Name of the manager used to track field ownership.")
+	// hide unwanted server-side flags
 	_ = cmd.Flags().MarkHidden("force-conflicts")
 	_ = cmd.Flags().MarkHidden("field-manager")
 

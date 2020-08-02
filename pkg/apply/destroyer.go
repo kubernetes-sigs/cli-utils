@@ -40,12 +40,11 @@ func NewDestroyer(factory util.Factory, ioStreams genericclioptions.IOStreams) *
 // Destroyer performs the step of grabbing all the previous inventory objects and
 // prune them. This also deletes all the previous inventory objects
 type Destroyer struct {
-	factory      util.Factory
-	ioStreams    genericclioptions.IOStreams
-	ApplyOptions *apply.ApplyOptions
-	PruneOptions *prune.PruneOptions
-
-	DryRun bool
+	factory        util.Factory
+	ioStreams      genericclioptions.IOStreams
+	ApplyOptions   *apply.ApplyOptions
+	PruneOptions   *prune.PruneOptions
+	DryRunStrategy common.DryRunStrategy
 }
 
 // Initialize sets up the Destroyer for actually doing an destroy against
@@ -71,7 +70,8 @@ func (d *Destroyer) Initialize(cmd *cobra.Command, paths []string) error {
 	}
 
 	// Propagate dry-run flags.
-	d.ApplyOptions.DryRun = d.DryRun
+	d.ApplyOptions.DryRun = d.DryRunStrategy.ClientDryRun()
+	d.ApplyOptions.ServerDryRun = d.DryRunStrategy.ServerDryRun()
 	return nil
 }
 
@@ -115,13 +115,13 @@ func (d *Destroyer) Run() <-chan event.Event {
 		// implementation detail and the events should not be Prune events.
 		tempChannel, completedChannel := runPruneEventTransformer(ch)
 		err = d.PruneOptions.Prune(infos, tempChannel, prune.Options{
-			DryRun:            d.DryRun,
+			DryRunStrategy:    d.DryRunStrategy,
 			PropagationPolicy: metav1.DeletePropagationBackground,
 		})
 		// Now delete the inventory object as well.
 		inv := inventory.FindInventoryObj(infos)
 		if inv != nil {
-			d.PruneOptions.InvClient.SetDryRun(d.DryRun)
+			d.PruneOptions.InvClient.SetDryRunStrategy(d.DryRunStrategy)
 			_ = d.PruneOptions.InvClient.DeleteInventoryObj(inv)
 		}
 

@@ -23,6 +23,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/apply/prune"
 	"sigs.k8s.io/cli-utils/pkg/apply/solver"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
+	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling"
 	"sigs.k8s.io/cli-utils/pkg/object"
@@ -248,8 +249,7 @@ func (r *ResourceObjects) AllIds() []object.ObjMetadata {
 func (a *Applier) Run(ctx context.Context, objects []*resource.Info, options Options) <-chan event.Event {
 	eventChannel := make(chan event.Event)
 	setDefaults(&options)
-	a.invClient.SetDryRun(options.DryRun) // client shared with prune, so sets dry-run for prune too.
-
+	a.invClient.SetDryRunStrategy(options.DryRunStrategy) // client shared with prune, so sets dry-run for prune too.
 	go func() {
 		defer close(eventChannel)
 
@@ -277,7 +277,7 @@ func (a *Applier) Run(ctx context.Context, objects []*resource.Info, options Opt
 		}).BuildTaskQueue(resourceObjects, solver.Options{
 			ReconcileTimeout:       options.ReconcileTimeout,
 			Prune:                  !options.NoPrune,
-			DryRun:                 options.DryRun,
+			DryRunStrategy:         options.DryRunStrategy,
 			PrunePropagationPolicy: options.PrunePropagationPolicy,
 			PruneTimeout:           options.PruneTimeout,
 		})
@@ -332,9 +332,9 @@ type Options struct {
 	// objects should happen after apply.
 	NoPrune bool
 
-	// DryRun defines whether changes should actually be performed,
+	// DryRunStrategy defines whether changes should actually be performed,
 	// or if it is just talk and no action.
-	DryRun bool
+	DryRunStrategy common.DryRunStrategy
 
 	// PrunePropagationPolicy defines the deletion propagation policy
 	// that should be used for pruning. If this is not provided, the

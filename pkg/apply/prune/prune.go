@@ -78,9 +78,9 @@ func (po *PruneOptions) Initialize(factory util.Factory, invClient inventory.Inv
 // Options defines a set of parameters that can be used to tune
 // the behavior of the pruner.
 type Options struct {
-	// DryRun defines whether objects should actually be pruned or if
+	// DryRunStrategy defines whether objects should actually be pruned or if
 	// we should just print what would happen without actually doing it.
-	DryRun bool
+	DryRunStrategy common.DryRunStrategy
 
 	PropagationPolicy metav1.DeletionPropagation
 }
@@ -137,7 +137,7 @@ func (po *PruneOptions) Prune(localInfos []*resource.Info, eventChannel chan<- e
 			eventChannel <- createPruneEvent(obj, event.PruneSkipped)
 			continue
 		}
-		if !o.DryRun {
+		if !o.DryRunStrategy.ClientOrServerDryRun() {
 			klog.V(4).Infof("prune object delete: %s/%s", clusterObj.Namespace, clusterObj.Name)
 			err = namespacedClient.Delete(clusterObj.Name, &metav1.DeleteOptions{})
 			if err != nil {

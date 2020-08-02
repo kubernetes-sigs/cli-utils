@@ -8,6 +8,7 @@ import (
 	"k8s.io/cli-runtime/pkg/resource"
 	"sigs.k8s.io/cli-utils/pkg/apply/prune"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
+	"sigs.k8s.io/cli-utils/pkg/common"
 )
 
 // PruneTask prunes objects from the cluster
@@ -16,7 +17,7 @@ import (
 type PruneTask struct {
 	PruneOptions      *prune.PruneOptions
 	Objects           []*resource.Info
-	DryRun            bool
+	DryRunStrategy    common.DryRunStrategy
 	PropagationPolicy metav1.DeletionPropagation
 }
 
@@ -28,7 +29,7 @@ func (p *PruneTask) Start(taskContext *taskrunner.TaskContext) {
 	go func() {
 		err := p.PruneOptions.Prune(p.Objects, taskContext.EventChannel(),
 			prune.Options{
-				DryRun:            p.DryRun,
+				DryRunStrategy:    p.DryRunStrategy,
 				PropagationPolicy: p.PropagationPolicy,
 			})
 		taskContext.TaskChannel() <- taskrunner.TaskResult{

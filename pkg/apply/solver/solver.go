@@ -29,6 +29,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/apply/prune"
 	"sigs.k8s.io/cli-utils/pkg/apply/task"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
+	"sigs.k8s.io/cli-utils/pkg/common"
 	pollevent "sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
@@ -43,7 +44,7 @@ type TaskQueueSolver struct {
 type Options struct {
 	ReconcileTimeout       time.Duration
 	Prune                  bool
-	DryRun                 bool
+	DryRunStrategy         common.DryRunStrategy
 	PrunePropagationPolicy metav1.DeletionPropagation
 	PruneTimeout           time.Duration
 }
@@ -66,14 +67,14 @@ func (t *TaskQueueSolver) BuildTaskQueue(ro resourceObjects,
 	crdSplitRes, hasCRDs := splitAfterCRDs(remainingInfos)
 	if hasCRDs {
 		tasks = append(tasks, &task.ApplyTask{
-			Objects:      append(crdSplitRes.before, crdSplitRes.crds...),
-			CRDs:         crdSplitRes.crds,
-			ApplyOptions: t.ApplyOptions,
-			DryRun:       o.DryRun,
-			InfoHelper:   t.InfoHelper,
-			Mapper:       t.Mapper,
+			Objects:        append(crdSplitRes.before, crdSplitRes.crds...),
+			CRDs:           crdSplitRes.crds,
+			ApplyOptions:   t.ApplyOptions,
+			DryRunStrategy: o.DryRunStrategy,
+			InfoHelper:     t.InfoHelper,
+			Mapper:         t.Mapper,
 		})
-		if !o.DryRun {
+		if !o.DryRunStrategy.ClientOrServerDryRun() {
 			objs, _ := object.InfosToObjMetas(crdSplitRes.crds)
 			tasks = append(tasks, taskrunner.NewWaitTask(
 				objs,
@@ -88,12 +89,12 @@ func (t *TaskQueueSolver) BuildTaskQueue(ro resourceObjects,
 
 	tasks = append(tasks,
 		&task.ApplyTask{
-			Objects:      remainingInfos,
-			CRDs:         crdSplitRes.crds,
-			ApplyOptions: t.ApplyOptions,
-			DryRun:       o.DryRun,
-			InfoHelper:   t.InfoHelper,
-			Mapper:       t.Mapper,
+			Objects:        remainingInfos,
+			CRDs:           crdSplitRes.crds,
+			ApplyOptions:   t.ApplyOptions,
+			DryRunStrategy: o.DryRunStrategy,
+			InfoHelper:     t.InfoHelper,
+			Mapper:         t.Mapper,
 		},
 		&task.SendEventTask{
 			Event: event.Event{
@@ -105,7 +106,7 @@ func (t *TaskQueueSolver) BuildTaskQueue(ro resourceObjects,
 		},
 	)
 
-	if !o.DryRun && o.ReconcileTimeout != time.Duration(0) {
+	if !o.DryRunStrategy.ClientOrServerDryRun() && o.ReconcileTimeout != time.Duration(0) {
 		tasks = append(tasks,
 			taskrunner.NewWaitTask(
 				ro.IdsForApply(),
@@ -128,7 +129,7 @@ func (t *TaskQueueSolver) BuildTaskQueue(ro resourceObjects,
 				Objects:           ro.InfosForPrune(),
 				PruneOptions:      t.PruneOptions,
 				PropagationPolicy: o.PrunePropagationPolicy,
-				DryRun:            o.DryRun,
+				DryRunStrategy:    o.DryRunStrategy,
 			},
 			&task.SendEventTask{
 				Event: event.Event{
@@ -140,7 +141,7 @@ func (t *TaskQueueSolver) BuildTaskQueue(ro resourceObjects,
 			},
 		)
 
-		if !o.DryRun && o.PruneTimeout != time.Duration(0) {
+		if !o.DryRunStrategy.ClientOrServerDryRun() && o.PruneTimeout != time.Duration(0) {
 			tasks = append(tasks,
 				taskrunner.NewWaitTask(
 					ro.IdsForPrune(),

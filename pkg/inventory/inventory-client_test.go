@@ -14,6 +14,7 @@ import (
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
+	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
@@ -155,30 +156,33 @@ func TestMerge(t *testing.T) {
 	defer tf.Cleanup()
 
 	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			// Create the local inventory object storing "tc.localObjs"
-			invClient, _ := NewInventoryClient(tf)
-			invClient.SetDryRun(true)
-			// Create a fake builder to return "tc.clusterObjs" from
-			// the cluster inventory object.
-			fakeBuilder := FakeBuilder{}
-			fakeBuilder.SetInventoryObjs(tc.clusterObjs)
-			invClient.builderFunc = fakeBuilder.GetBuilder()
-			// Call "Merge" to create the union of clusterObjs and localObjs.
-			pruneObjs, err := invClient.Merge(tc.localInv, tc.localObjs)
-			if tc.isError {
-				if err == nil {
-					t.Fatalf("expected error but received none")
+		for i := range common.Strategies {
+			drs := common.Strategies[i]
+			t.Run(name, func(t *testing.T) {
+				// Create the local inventory object storing "tc.localObjs"
+				invClient, _ := NewInventoryClient(tf)
+				invClient.SetDryRunStrategy(drs)
+				// Create a fake builder to return "tc.clusterObjs" from
+				// the cluster inventory object.
+				fakeBuilder := FakeBuilder{}
+				fakeBuilder.SetInventoryObjs(tc.clusterObjs)
+				invClient.builderFunc = fakeBuilder.GetBuilder()
+				// Call "Merge" to create the union of clusterObjs and localObjs.
+				pruneObjs, err := invClient.Merge(tc.localInv, tc.localObjs)
+				if tc.isError {
+					if err == nil {
+						t.Fatalf("expected error but received none")
+					}
+					return
 				}
-				return
-			}
-			if !tc.isError && err != nil {
-				t.Fatalf("unexpected error: %s", err)
-			}
-			if !object.SetEquals(tc.pruneObjs, pruneObjs) {
-				t.Errorf("expected (%v) prune objs; got (%v)", tc.pruneObjs, pruneObjs)
-			}
-		})
+				if !tc.isError && err != nil {
+					t.Fatalf("unexpected error: %s", err)
+				}
+				if !object.SetEquals(tc.pruneObjs, pruneObjs) {
+					t.Errorf("expected (%v) prune objs; got (%v)", tc.pruneObjs, pruneObjs)
+				}
+			})
+		}
 	}
 }
 
@@ -315,26 +319,29 @@ func TestReplace(t *testing.T) {
 	defer tf.Cleanup()
 
 	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			invClient, _ := NewInventoryClient(tf)
-			invClient.SetDryRun(true)
-			// Create fake builder returning the cluster inventory object
-			// storing the "tc.clusterObjs" objects.
-			fakeBuilder := FakeBuilder{}
-			fakeBuilder.SetInventoryObjs(tc.clusterObjs)
-			invClient.builderFunc = fakeBuilder.GetBuilder()
-			// Call "Replace", passing in the new local inventory objects
-			err := invClient.Replace(tc.localInv, tc.localObjs)
-			if tc.isError {
-				if err == nil {
-					t.Fatalf("expected error but received none")
+		for i := range common.Strategies {
+			drs := common.Strategies[i]
+			t.Run(name, func(t *testing.T) {
+				invClient, _ := NewInventoryClient(tf)
+				invClient.SetDryRunStrategy(drs)
+				// Create fake builder returning the cluster inventory object
+				// storing the "tc.clusterObjs" objects.
+				fakeBuilder := FakeBuilder{}
+				fakeBuilder.SetInventoryObjs(tc.clusterObjs)
+				invClient.builderFunc = fakeBuilder.GetBuilder()
+				// Call "Replace", passing in the new local inventory objects
+				err := invClient.Replace(tc.localInv, tc.localObjs)
+				if tc.isError {
+					if err == nil {
+						t.Fatalf("expected error but received none")
+					}
+					return
 				}
-				return
-			}
-			if !tc.isError && err != nil {
-				t.Fatalf("unexpected error received: %s", err)
-			}
-		})
+				if !tc.isError && err != nil {
+					t.Fatalf("unexpected error received: %s", err)
+				}
+			})
+		}
 	}
 }
 
@@ -447,18 +454,21 @@ func TestDeleteInventoryObj(t *testing.T) {
 	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
 	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			invClient, _ := NewInventoryClient(tf)
-			invClient.SetDryRun(true)
-			inv := tc.inv
-			if inv != nil {
-				inv = storeObjsInInventory(tc.inv, tc.localObjs)
-			}
-			err := invClient.DeleteInventoryObj(inv)
-			if err != nil {
-				t.Fatalf("unexpected error received: %s", err)
-			}
-		})
+		for i := range common.Strategies {
+			drs := common.Strategies[i]
+			t.Run(name, func(t *testing.T) {
+				invClient, _ := NewInventoryClient(tf)
+				invClient.SetDryRunStrategy(drs)
+				inv := tc.inv
+				if inv != nil {
+					inv = storeObjsInInventory(tc.inv, tc.localObjs)
+				}
+				err := invClient.DeleteInventoryObj(inv)
+				if err != nil {
+					t.Fatalf("unexpected error received: %s", err)
+				}
+			})
+		}
 	}
 }
 
@@ -542,24 +552,27 @@ func TestMergeInventoryObjs(t *testing.T) {
 	defer tf.Cleanup()
 
 	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			invClient, _ := NewInventoryClient(tf)
-			invClient.SetDryRun(true)
-			inventories := []*resource.Info{}
-			for _, i := range tc.invs {
-				inv := storeObjsInInventory(i.inv, i.invObjs)
-				inventories = append(inventories, inv)
-			}
-			retained, err := invClient.mergeClusterInventory(inventories)
-			if err != nil {
-				t.Fatalf("unexpected error: %s", err)
-			}
-			wrapped := WrapInventoryObj(retained)
-			mergedObjs, _ := wrapped.Load()
-			if !object.SetEquals(tc.expected, mergedObjs) {
-				t.Errorf("expected merged inventory objects (%v), got (%v)", tc.expected, mergedObjs)
-			}
-		})
+		for i := range common.Strategies {
+			drs := common.Strategies[i]
+			t.Run(name, func(t *testing.T) {
+				invClient, _ := NewInventoryClient(tf)
+				invClient.SetDryRunStrategy(drs)
+				inventories := []*resource.Info{}
+				for _, i := range tc.invs {
+					inv := storeObjsInInventory(i.inv, i.invObjs)
+					inventories = append(inventories, inv)
+				}
+				retained, err := invClient.mergeClusterInventory(inventories)
+				if err != nil {
+					t.Fatalf("unexpected error: %s", err)
+				}
+				wrapped := WrapInventoryObj(retained)
+				mergedObjs, _ := wrapped.Load()
+				if !object.SetEquals(tc.expected, mergedObjs) {
+					t.Errorf("expected merged inventory objects (%v), got (%v)", tc.expected, mergedObjs)
+				}
+			})
+		}
 	}
 }
 
