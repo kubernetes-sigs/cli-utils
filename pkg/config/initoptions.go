@@ -5,7 +5,6 @@ package config
 
 import (
 	"fmt"
-	"math/rand"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -16,12 +15,12 @@ import (
 	"github.com/google/uuid"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/kustomize/kyaml/kio"
 )
 
 const (
 	manifestFilename = "inventory-template.yaml"
-	maxRandInt       = 100000000
 )
 const configMapTemplate = `# NOTE: auto-generated. Some fields should NOT be modified.
 # Date: <DATETIME>
@@ -211,9 +210,7 @@ func fileExists(path string) bool {
 func (i *InitOptions) fillInValues() string {
 	now := time.Now()
 	nowStr := now.Format("2006-01-02 15:04:05 MST")
-	rand.Seed(time.Now().UTC().UnixNano())
-	randomInt := rand.Intn(maxRandInt)
-	randomSuffix := fmt.Sprintf("%08d", randomInt)
+	randomSuffix := common.RandomStr(now.UTC().UnixNano())
 	manifestStr := configMapTemplate
 	manifestStr = strings.ReplaceAll(manifestStr, "<DATETIME>", nowStr)
 	manifestStr = strings.ReplaceAll(manifestStr, "<NAMESPACE>", i.Namespace)

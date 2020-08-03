@@ -14,12 +14,17 @@ package inventory
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/cli-runtime/pkg/resource"
+	"k8s.io/klog"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
+
+// The default inventory name stored in the inventory template.
+const legacyInvName = "inventory"
 
 // Inventory describes methods necessary for an object which
 // can persist the object metadata for pruning and other group
@@ -146,5 +151,28 @@ func addSuffixToName(info *resource.Info, suffix string) error {
 	accessor.SetName(name)
 	info.Name = name
 
+	return nil
+}
+
+// fixLegacyInventoryName modifies the inventory name if it is
+// the legacy default name (i.e. inventory) by adding a random suffix.
+// This fixes a problem where inventory object names collide if
+// they are created in the same namespace.
+func fixLegacyInventoryName(info *resource.Info) error {
+	if info == nil || info.Object == nil {
+		return fmt.Errorf("invalid inventory object is nil or info.Object is nil")
+	}
+	obj := info.Object
+	accessor, err := meta.Accessor(obj)
+	if err != nil {
+		return err
+	}
+	name := accessor.GetName()
+	if info.Name == legacyInvName || name == legacyInvName {
+		klog.V(4).Infof("renaming legacy inventory name")
+		seed := time.Now().UTC().UnixNano()
+		randomSuffix := common.RandomStr(seed)
+		return addSuffixToName(info, randomSuffix)
+	}
 	return nil
 }
