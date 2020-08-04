@@ -5,6 +5,7 @@ package inventory
 
 import (
 	"fmt"
+	"regexp"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -29,6 +30,20 @@ var inventoryObj = unstructured.Unstructured{
 		"kind":       "ConfigMap",
 		"metadata": map[string]interface{}{
 			"name":      inventoryObjName,
+			"namespace": testNamespace,
+			"labels": map[string]interface{}{
+				common.InventoryLabel: testInventoryLabel,
+			},
+		},
+	},
+}
+
+var legacyInvObj = unstructured.Unstructured{
+	Object: map[string]interface{}{
+		"apiVersion": "v1",
+		"kind":       "ConfigMap",
+		"metadata": map[string]interface{}{
+			"name":      legacyInvName,
 			"namespace": testNamespace,
 			"labels": map[string]interface{}{
 				common.InventoryLabel: testInventoryLabel,
@@ -452,6 +467,96 @@ func TestAddSuffixToName(t *testing.T) {
 				t.Errorf("Expected name (%s), got (%s)\n", test.expected, actualName)
 			}
 		}
+	}
+}
+
+func TestLegacyInventoryName(t *testing.T) {
+	tests := map[string]struct {
+		info       *resource.Info
+		invName    string // Expected inventory name (if not modified)
+		isModified bool   // Should inventory name be changed
+		isError    bool   // Should an error be thrown
+	}{
+		"Nil info is an error": {
+			info:       nil,
+			isModified: false,
+			isError:    true,
+		},
+		"Nil info.Object is an error": {
+			info: &resource.Info{
+				Namespace: testNamespace,
+				Name:      inventoryObjName,
+				Object:    nil,
+			},
+			invName:    inventoryObjName,
+			isModified: false,
+			isError:    true,
+		},
+		"Info name differs from object name should return error": {
+			info: &resource.Info{
+				Namespace: testNamespace,
+				Name:      inventoryObjName,
+				Object:    &legacyInvObj,
+			},
+			invName:    inventoryObjName,
+			isModified: false,
+			isError:    true,
+		},
+		"Legacy inventory name gets random suffix": {
+			info: &resource.Info{
+				Namespace: testNamespace,
+				Name:      legacyInvName,
+				Object:    &legacyInvObj,
+			},
+			invName:    legacyInvName,
+			isModified: true,
+			isError:    false,
+		},
+		"Non-legacy inventory name does not get modified": {
+			info: &resource.Info{
+				Namespace: testNamespace,
+				Name:      inventoryObjName,
+				Object:    &inventoryObj,
+			},
+			invName:    inventoryObjName,
+			isModified: false,
+			isError:    false,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			err := fixLegacyInventoryName(tc.info)
+			if tc.isError {
+				if err == nil {
+					t.Fatalf("Should have produced an error, but returned none.")
+				}
+				return
+			}
+			if !tc.isError && err != nil {
+				t.Fatalf("Received error when expecting none (%s)\n", err)
+			}
+			actualName, err := getObjectName(tc.info.Object)
+			if err != nil {
+				t.Fatalf("Error getting object name: %s", err)
+			}
+			if actualName != tc.info.Name {
+				t.Errorf("Object name and info name differ: %s/%s", actualName, tc.info.Name)
+			}
+			if !tc.isModified {
+				if tc.invName != tc.info.Name {
+					t.Fatalf("expected non-modified name (%s), got (%s)", tc.invName, tc.info.Name)
+				}
+				return
+			}
+			matched, err := regexp.MatchString(`inventory-\d{8}`, actualName)
+			if err != nil {
+				t.Errorf("unexpected error parsing inventory name: %s", err)
+			}
+			if !matched {
+				t.Errorf("expected inventory name with random suffix, got (%s)", actualName)
+			}
+		})
 	}
 }
 

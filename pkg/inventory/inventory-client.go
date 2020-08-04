@@ -325,6 +325,12 @@ func (cic *ClusterInventoryClient) createInventoryObj(info *resource.Info) error
 	if info == nil {
 		return fmt.Errorf("attempting create a nil inventory object")
 	}
+	// Default inventory name gets random suffix. Fixes problem where legacy
+	// inventory templates within same namespace will collide on name.
+	err := fixLegacyInventoryName(info)
+	if err != nil {
+		return err
+	}
 	obj, err := object.InfoToObjMeta(info)
 	if err != nil {
 		return err

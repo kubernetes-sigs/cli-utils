@@ -3,6 +3,11 @@
 
 package common
 
+import (
+	"fmt"
+	"math/rand"
+)
+
 const (
 	// InventoryLabel is the label stored on the ConfigMap
 	// inventory object. The value of the label is a unique
@@ -22,4 +27,14 @@ const (
 	OnRemoveAnnotation = "cli-utils.sigs.k8s.io/on-remove"
 	// Resource lifecycle annotation value to prevent deletion.
 	OnRemoveKeep = "keep"
+	// Maximum random number, non-inclusive, eight digits.
+	maxRandInt = 100000000
 )
+
+// RandomStr returns an eight-digit (with leading zeros) string of a
+// random number seeded with the parameter.
+func RandomStr(seed int64) string {
+	rand.Seed(seed)
+	randomInt := rand.Intn(maxRandInt)
+	return fmt.Sprintf("%08d", randomInt)
+}
