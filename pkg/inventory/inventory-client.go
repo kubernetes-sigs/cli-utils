@@ -34,18 +34,18 @@ type InventoryClient interface {
 	Replace(inv *resource.Info, objs []object.ObjMetadata) error
 	// DeleteInventoryObj deletes the passed inventory object from the APIServer.
 	DeleteInventoryObj(inv *resource.Info) error
-	// SetDryRun sets the boolean on whether this we actually mutate.
-	SetDryRun(dryRun bool)
+	// SetDryRunStrategy sets the dry run strategy on whether this we actually mutate.
+	SetDryRunStrategy(drs common.DryRunStrategy)
 }
 
 // ClusterInventoryClient is a concrete implementation of the
 // InventoryClient interface.
 type ClusterInventoryClient struct {
-	builderFunc func() *resource.Builder
-	mapper      meta.RESTMapper
-	validator   validation.Schema
-	clientFunc  func(*meta.RESTMapping) (resource.RESTClient, error)
-	dryRun      bool
+	builderFunc    func() *resource.Builder
+	mapper         meta.RESTMapper
+	validator      validation.Schema
+	clientFunc     func(*meta.RESTMapping) (resource.RESTClient, error)
+	dryRunStrategy common.DryRunStrategy
 }
 
 var _ InventoryClient = &ClusterInventoryClient{}
@@ -64,11 +64,11 @@ func NewInventoryClient(factory cmdutil.Factory) (*ClusterInventoryClient, error
 	}
 	builderFunc := factory.NewBuilder
 	clusterInventoryClient := ClusterInventoryClient{
-		builderFunc: builderFunc,
-		mapper:      mapper,
-		validator:   validator,
-		clientFunc:  factory.UnstructuredClientForMapping,
-		dryRun:      false,
+		builderFunc:    builderFunc,
+		mapper:         mapper,
+		validator:      validator,
+		clientFunc:     factory.UnstructuredClientForMapping,
+		dryRunStrategy: common.DryRunNone,
 	}
 	return &clusterInventoryClient, nil
 }
@@ -118,7 +118,7 @@ func (cic *ClusterInventoryClient) Merge(localInv *resource.Info, objs []object.
 		if err = wrappedInv.Store(unionObjs); err != nil {
 			return pruneIds, err
 		}
-		if !cic.dryRun {
+		if !cic.dryRunStrategy.ClientOrServerDryRun() {
 			clusterInv, err = wrappedInv.GetObject()
 			if err != nil {
 				return pruneIds, err
@@ -152,7 +152,7 @@ func (cic *ClusterInventoryClient) Replace(localInv *resource.Info, objs []objec
 	if err = wrappedInv.Store(objs); err != nil {
 		return err
 	}
-	if !cic.dryRun {
+	if !cic.dryRunStrategy.ClientOrServerDryRun() {
 		clusterInv, err = wrappedInv.GetObject()
 		if err != nil {
 			return err
@@ -298,7 +298,7 @@ func (cic *ClusterInventoryClient) mergeClusterInventory(invInfos []*resource.In
 
 // applyInventoryObj applies the passed inventory object to the APIServer.
 func (cic *ClusterInventoryClient) applyInventoryObj(info *resource.Info) error {
-	if cic.dryRun {
+	if cic.dryRunStrategy.ClientOrServerDryRun() {
 		klog.V(4).Infof("dry-run apply inventory object: not applied")
 		return nil
 	}
@@ -318,7 +318,7 @@ func (cic *ClusterInventoryClient) applyInventoryObj(info *resource.Info) error 
 
 // createInventoryObj creates the passed inventory object on the APIServer.
 func (cic *ClusterInventoryClient) createInventoryObj(info *resource.Info) error {
-	if cic.dryRun {
+	if cic.dryRunStrategy.ClientOrServerDryRun() {
 		klog.V(4).Infof("dry-run create inventory object: not created")
 		return nil
 	}
@@ -357,7 +357,7 @@ func (cic *ClusterInventoryClient) createInventoryObj(info *resource.Info) error
 // DeleteInventoryObj deletes the passed inventory object from the APIServer, or
 // an error if one occurs.
 func (cic *ClusterInventoryClient) DeleteInventoryObj(info *resource.Info) error {
-	if cic.dryRun {
+	if cic.dryRunStrategy.ClientOrServerDryRun() {
 		klog.V(4).Infof("dry-run delete inventory object: not deleted")
 		return nil
 	}
@@ -384,6 +384,6 @@ func (cic *ClusterInventoryClient) DeleteInventoryObj(info *resource.Info) error
 
 // SetDryRun sets whether the inventory client will mutate the inventory
 // object in the cluster.
-func (cic *ClusterInventoryClient) SetDryRun(dryRun bool) {
-	cic.dryRun = dryRun
+func (cic *ClusterInventoryClient) SetDryRunStrategy(drs common.DryRunStrategy) {
+	cic.dryRunStrategy = drs
 }

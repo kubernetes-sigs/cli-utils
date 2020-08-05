@@ -14,6 +14,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
+	"sigs.k8s.io/cli-utils/pkg/common"
 	pollevent "sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
@@ -95,8 +96,8 @@ func (sc *statusCollector) updateStatus(id object.ObjMetadata, se pollevent.Even
 // format on StdOut. As we support other printer implementations
 // this should probably be an interface.
 // This function will block until the channel is closed.
-func (b *BasicPrinter) Print(ch <-chan event.Event, preview bool) {
-	printFunc := b.getPrintFunc(preview)
+func (b *BasicPrinter) Print(ch <-chan event.Event, previewStrategy common.DryRunStrategy) {
+	printFunc := b.getPrintFunc(previewStrategy)
 	applyStats := &applyStats{}
 	statusCollector := &statusCollector{
 		latestStatus: make(map[object.ObjMetadata]pollevent.Event),
@@ -248,10 +249,12 @@ func resourceIDToString(gk schema.GroupKind, name string) string {
 
 type printFunc func(format string, a ...interface{})
 
-func (b *BasicPrinter) getPrintFunc(preview bool) printFunc {
+func (b *BasicPrinter) getPrintFunc(previewStrategy common.DryRunStrategy) printFunc {
 	return func(format string, a ...interface{}) {
-		if preview {
+		if previewStrategy.ClientDryRun() {
 			format += " (preview)"
+		} else if previewStrategy.ServerDryRun() {
+			format += " (preview-server)"
 		}
 		fmt.Fprintf(b.IOStreams.Out, format+"\n", a...)
 	}

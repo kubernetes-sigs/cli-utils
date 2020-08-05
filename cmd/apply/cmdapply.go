@@ -141,7 +141,7 @@ func (r *ApplyRunner) RunE(cmd *cobra.Command, args []string) error {
 		// emit the events.
 		EmitStatusEvents:       emitStatusEvents,
 		NoPrune:                r.noPrune,
-		DryRun:                 false,
+		DryRunStrategy:         common.DryRunNone,
 		PrunePropagationPolicy: prunePropPolicy,
 		PruneTimeout:           r.pruneTimeout,
 	})
@@ -149,7 +149,7 @@ func (r *ApplyRunner) RunE(cmd *cobra.Command, args []string) error {
 	// The printer will print updates from the channel. It will block
 	// until the channel is closed.
 	printer := printers.GetPrinter(r.output, r.ioStreams)
-	printer.Print(ch, false)
+	printer.Print(ch, common.DryRunNone)
 	return nil
 }
 

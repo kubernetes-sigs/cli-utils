@@ -13,6 +13,7 @@ import (
 	"k8s.io/cli-runtime/pkg/resource"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
+	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/testutil"
 )
@@ -211,60 +212,63 @@ func TestApplyTask_DryRun(t *testing.T) {
 	}
 
 	for tn, tc := range testCases {
-		t.Run(tn, func(t *testing.T) {
-			eventChannel := make(chan event.Event)
-			taskContext := taskrunner.NewTaskContext(eventChannel)
+		for i := range common.Strategies {
+			drs := common.Strategies[i]
+			t.Run(tn, func(t *testing.T) {
+				eventChannel := make(chan event.Event)
+				taskContext := taskrunner.NewTaskContext(eventChannel)
 
-			restMapper := testutil.NewFakeRESTMapper(schema.GroupVersionKind{
-				Group:   "apps",
-				Version: "v1",
-				Kind:    "Deployment",
-			}, schema.GroupVersionKind{
-				Group:   "anothercustom.io",
-				Version: "v2",
-				Kind:    "AnotherCustom",
+				restMapper := testutil.NewFakeRESTMapper(schema.GroupVersionKind{
+					Group:   "apps",
+					Version: "v1",
+					Kind:    "Deployment",
+				}, schema.GroupVersionKind{
+					Group:   "anothercustom.io",
+					Version: "v2",
+					Kind:    "AnotherCustom",
+				})
+
+				applyOptions := &fakeApplyOptions{}
+
+				applyTask := &ApplyTask{
+					ApplyOptions:   applyOptions,
+					Objects:        tc.infos,
+					InfoHelper:     &fakeInfoHelper{},
+					Mapper:         restMapper,
+					DryRunStrategy: drs,
+					CRDs:           tc.crds,
+				}
+
+				var events []event.Event
+				var wg sync.WaitGroup
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					for msg := range eventChannel {
+						events = append(events, msg)
+					}
+				}()
+
+				applyTask.Start(taskContext)
+				<-taskContext.TaskChannel()
+				close(eventChannel)
+				wg.Wait()
+
+				assert.Equal(t, len(tc.expectedObjects), len(applyOptions.objects))
+				for i, obj := range applyOptions.objects {
+					actual, err := object.InfoToObjMeta(obj)
+					if err != nil {
+						continue
+					}
+					assert.Equal(t, tc.expectedObjects[i], actual)
+				}
+
+				assert.Equal(t, len(tc.expectedEvents), len(events))
+				for i, e := range events {
+					assert.Equal(t, tc.expectedEvents[i].Type, e.Type)
+				}
 			})
-
-			applyOptions := &fakeApplyOptions{}
-
-			applyTask := &ApplyTask{
-				ApplyOptions: applyOptions,
-				Objects:      tc.infos,
-				InfoHelper:   &fakeInfoHelper{},
-				Mapper:       restMapper,
-				DryRun:       true,
-				CRDs:         tc.crds,
-			}
-
-			var events []event.Event
-			var wg sync.WaitGroup
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				for msg := range eventChannel {
-					events = append(events, msg)
-				}
-			}()
-
-			applyTask.Start(taskContext)
-			<-taskContext.TaskChannel()
-			close(eventChannel)
-			wg.Wait()
-
-			assert.Equal(t, len(tc.expectedObjects), len(applyOptions.objects))
-			for i, obj := range applyOptions.objects {
-				actual, err := object.InfoToObjMeta(obj)
-				if err != nil {
-					continue
-				}
-				assert.Equal(t, tc.expectedObjects[i], actual)
-			}
-
-			assert.Equal(t, len(tc.expectedEvents), len(events))
-			for i, e := range events {
-				assert.Equal(t, tc.expectedEvents[i].Type, e.Type)
-			}
-		})
+		}
 	}
 }
 

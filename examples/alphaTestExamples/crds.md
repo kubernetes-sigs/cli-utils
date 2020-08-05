@@ -133,4 +133,6 @@ expectedOutputLine "foos.custom.io"
 
 kubectl get foos.custom.io --no-headers | awk '{print $1}' > $OUTPUT/status
 expectedOutputLine "example-foo"
+
+kind delete cluster
 ```

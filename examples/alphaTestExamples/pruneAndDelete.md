@@ -155,4 +155,6 @@ expectedOutputLine "configmap/secondmap prune skipped"
 
 kubectl get cm --no-headers | awk '{print $1}' > $OUTPUT/status
 expectedOutputLine "secondmap"
+
+kind delete cluster;
 ```

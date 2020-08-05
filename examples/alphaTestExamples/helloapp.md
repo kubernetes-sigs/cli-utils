@@ -106,6 +106,7 @@ spec:
         name: the-container
         ports:
         - containerPort: 8080
+          protocol: TCP
 EOF
 ```
 
@@ -163,6 +164,10 @@ Run preview to check which commands will be executed
 kapply preview $BASE > $OUTPUT/status
 
 expectedOutputLine "3 resource(s) applied. 3 created, 0 unchanged, 0 configured (preview)"
+
+kapply preview $BASE --server-side > $OUTPUT/status
+
+expectedOutputLine "3 resource(s) applied. 0 created, 0 unchanged, 0 configured, 3 serverside applied (preview-server)"
 
 # Verify that preview didn't create any resources.
 kubectl get all -n hellospace > $OUTPUT/status 2>&1
@@ -228,6 +233,14 @@ expectedOutputLine "deployment.apps/the-deployment deleted (preview)"
 expectedOutputLine "configmap/the-map2 deleted (preview)"
 
 expectedOutputLine "service/the-service deleted (preview)"
+
+kapply preview $BASE --destroy --server-side > $OUTPUT/status;
+
+expectedOutputLine "deployment.apps/the-deployment deleted (preview-server)"
+
+expectedOutputLine "configmap/the-map2 deleted (preview-server)"
+
+expectedOutputLine "service/the-service deleted (preview-server)"
 
 # Verify that preview all resources are still there after running preview.
 kubectl get --no-headers all -n hellospace | wc -l | xargs > $OUTPUT/status

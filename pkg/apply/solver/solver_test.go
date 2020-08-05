@@ -15,6 +15,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/apply/prune"
 	"sigs.k8s.io/cli-utils/pkg/apply/task"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
+	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/testutil"
 )
@@ -117,7 +118,29 @@ func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 			options: Options{
 				ReconcileTimeout: time.Minute,
 				Prune:            true,
-				DryRun:           true,
+				DryRunStrategy:   common.DryRunClient,
+			},
+			expectedTasks: []taskrunner.Task{
+				&task.ApplyTask{
+					Objects: []*resource.Info{
+						depInfo,
+						customInfo,
+					},
+				},
+				&task.SendEventTask{},
+				&task.PruneTask{},
+				&task.SendEventTask{},
+			},
+		},
+		"multiple resources with wait, prune and server-dryrun": {
+			infos: []*resource.Info{
+				depInfo,
+				customInfo,
+			},
+			options: Options{
+				ReconcileTimeout: time.Minute,
+				Prune:            true,
+				DryRunStrategy:   common.DryRunServer,
 			},
 			expectedTasks: []taskrunner.Task{
 				&task.ApplyTask{
@@ -173,7 +196,7 @@ func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 			},
 			options: Options{
 				ReconcileTimeout: time.Minute,
-				DryRun:           true,
+				DryRunStrategy:   common.DryRunClient,
 			},
 			expectedTasks: []taskrunner.Task{
 				&task.ApplyTask{

@@ -189,55 +189,58 @@ func TestPrune(t *testing.T) {
 		},
 	}
 	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			po := NewPruneOptions(populateObjectIds(tc.currentInfos, t))
-			po.InventoryFactoryFunc = inventory.WrapInventoryObj
-			// Set up the previously applied objects.
-			clusterObjs, _ := object.InfosToObjMetas(tc.pastInfos)
-			po.InvClient = inventory.NewFakeInventoryClient(clusterObjs)
-			// Set up the currently applied objects.
-			currentInventoryInfo := createInventoryInfo("current-group", tc.currentInfos...)
-			currentInfos := append(tc.currentInfos, currentInventoryInfo)
-			// Set up the fake dynamic client to recognize all objects, and the RESTMapper.
-			po.client = fake.NewSimpleDynamicClient(scheme.Scheme,
-				namespaceInfo.Object, pdbInfo.Object, roleInfo.Object)
-			po.mapper = testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme,
-				scheme.Scheme.PrioritizedVersionsAllGroups()...)
-			// The event channel can not block; make sure its bigger than all
-			// the events that can be put on it.
-			eventChannel := make(chan event.Event, len(tc.pastInfos)+1) // Add one for inventory object
-			err := func() error {
-				defer close(eventChannel)
-				// Run the prune and validate.
-				return po.Prune(currentInfos, eventChannel, Options{
-					DryRun: true,
-				})
-			}()
-			if !tc.isError {
-				if err != nil {
-					t.Fatalf("Unexpected error during Prune(): %#v", err)
-				}
-
-				var actualPruneEvents []event.Event
-				for e := range eventChannel {
-					actualPruneEvents = append(actualPruneEvents, e)
-				}
-				if want, got := len(tc.prunedInfos), len(actualPruneEvents); want != got {
-					t.Errorf("Expected (%d) prune events, got (%d)", want, got)
-				}
-
-				for i, info := range tc.prunedInfos {
-					e := actualPruneEvents[i]
-					expKind := info.Object.GetObjectKind().GroupVersionKind().Kind
-					actKind := e.PruneEvent.Object.GetObjectKind().GroupVersionKind().Kind
-					if expKind != actKind {
-						t.Errorf("Expected kind %s, got %s", expKind, actKind)
+		for i := range common.Strategies {
+			drs := common.Strategies[i]
+			t.Run(name, func(t *testing.T) {
+				po := NewPruneOptions(populateObjectIds(tc.currentInfos, t))
+				po.InventoryFactoryFunc = inventory.WrapInventoryObj
+				// Set up the previously applied objects.
+				clusterObjs, _ := object.InfosToObjMetas(tc.pastInfos)
+				po.InvClient = inventory.NewFakeInventoryClient(clusterObjs)
+				// Set up the currently applied objects.
+				currentInventoryInfo := createInventoryInfo("current-group", tc.currentInfos...)
+				currentInfos := append(tc.currentInfos, currentInventoryInfo)
+				// Set up the fake dynamic client to recognize all objects, and the RESTMapper.
+				po.client = fake.NewSimpleDynamicClient(scheme.Scheme,
+					namespaceInfo.Object, pdbInfo.Object, roleInfo.Object)
+				po.mapper = testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme,
+					scheme.Scheme.PrioritizedVersionsAllGroups()...)
+				// The event channel can not block; make sure its bigger than all
+				// the events that can be put on it.
+				eventChannel := make(chan event.Event, len(tc.pastInfos)+1) // Add one for inventory object
+				err := func() error {
+					defer close(eventChannel)
+					// Run the prune and validate.
+					return po.Prune(currentInfos, eventChannel, Options{
+						DryRunStrategy: drs,
+					})
+				}()
+				if !tc.isError {
+					if err != nil {
+						t.Fatalf("Unexpected error during Prune(): %#v", err)
 					}
+
+					var actualPruneEvents []event.Event
+					for e := range eventChannel {
+						actualPruneEvents = append(actualPruneEvents, e)
+					}
+					if want, got := len(tc.prunedInfos), len(actualPruneEvents); want != got {
+						t.Errorf("Expected (%d) prune events, got (%d)", want, got)
+					}
+
+					for i, info := range tc.prunedInfos {
+						e := actualPruneEvents[i]
+						expKind := info.Object.GetObjectKind().GroupVersionKind().Kind
+						actKind := e.PruneEvent.Object.GetObjectKind().GroupVersionKind().Kind
+						if expKind != actKind {
+							t.Errorf("Expected kind %s, got %s", expKind, actKind)
+						}
+					}
+				} else if err == nil {
+					t.Fatalf("Expected error during Prune() but received none")
 				}
-			} else if err == nil {
-				t.Fatalf("Expected error during Prune() but received none")
-			}
-		})
+			})
+		}
 	}
 }
 

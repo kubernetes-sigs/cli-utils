@@ -12,18 +12,19 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/info"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
+	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
 // ApplyTask applies the given Objects to the cluster
 // by using the ApplyOptions.
 type ApplyTask struct {
-	ApplyOptions applyOptions
-	InfoHelper   info.InfoHelper
-	Mapper       meta.RESTMapper
-	Objects      []*resource.Info
-	CRDs         []*resource.Info
-	DryRun       bool
+	ApplyOptions   applyOptions
+	InfoHelper     info.InfoHelper
+	Mapper         meta.RESTMapper
+	Objects        []*resource.Info
+	CRDs           []*resource.Info
+	DryRunStrategy common.DryRunStrategy
 }
 
 // applyOptions defines the two key functions on the ApplyOptions
@@ -57,7 +58,7 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 		// If this is a dry run, we need to handle situations where
 		// we have a CRD and a CR in the same resource set, but the CRD
 		// will not actually have been applied when we reach the CR.
-		if a.DryRun {
+		if a.DryRunStrategy.ClientOrServerDryRun() {
 			// Find all resources in the set that doesn't exist in the
 			// RESTMapper, but where we do have the CRD for the type in
 			// the resource set.
@@ -134,7 +135,8 @@ func (a *ApplyTask) sendTaskResult(taskContext *taskrunner.TaskContext, err erro
 
 func (a *ApplyTask) setApplyOptionsFields(eventChannel chan event.Event) {
 	if ao, ok := a.ApplyOptions.(*apply.ApplyOptions); ok {
-		ao.DryRun = a.DryRun
+		ao.DryRun = a.DryRunStrategy.ClientDryRun()
+		ao.ServerDryRun = a.DryRunStrategy.ServerDryRun()
 		adapter := &KubectlPrinterAdapter{
 			ch: eventChannel,
 		}
