@@ -20,6 +20,11 @@ const multipleInventoryErrorStr = `Package has multiple inventory object templat
 The package should have one and only one inventory object template.
 `
 
+const inventoryNamespaceInSet = `Inventory use namespace defined in package.
+
+The inventory cannot use a namespace that is defined in the package.
+`
+
 type NoInventoryObjError struct{}
 
 func (g NoInventoryObjError) Error() string {
@@ -32,4 +37,12 @@ type MultipleInventoryObjError struct {
 
 func (g MultipleInventoryObjError) Error() string {
 	return multipleInventoryErrorStr
+}
+
+type InventoryNamespaceInSet struct {
+	Namespace string
+}
+
+func (g InventoryNamespaceInSet) Error() string {
+	return inventoryNamespaceInSet
 }

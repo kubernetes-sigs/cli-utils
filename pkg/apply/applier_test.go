@@ -356,24 +356,6 @@ var obj3Info = &resource.Info{
 	},
 }
 
-var defaultObjInfo = &resource.Info{
-	Namespace: metav1.NamespaceDefault,
-	Name:      "default-obj",
-	Mapping: &meta.RESTMapping{
-		Scope: meta.RESTScopeNamespace,
-	},
-	Object: &unstructured.Unstructured{
-		Object: map[string]interface{}{
-			"apiVersion": "v1",
-			"kind":       "Pod",
-			"metadata": map[string]interface{}{
-				"name":      "default-obj",
-				"namespace": metav1.NamespaceDefault,
-			},
-		},
-	},
-}
-
 var clusterScopedObjInfo = &resource.Info{
 	Name: "cluster-scoped-1",
 	Mapping: &meta.RESTMapping{
@@ -390,75 +372,55 @@ var clusterScopedObjInfo = &resource.Info{
 	},
 }
 
-var clusterScopedObj2Info = &resource.Info{
-	Name: "cluster-scoped-2",
-	Mapping: &meta.RESTMapping{
-		Scope: meta.RESTScopeRoot,
-	},
-	Object: &unstructured.Unstructured{
-		Object: map[string]interface{}{
-			"apiVersion": "rbac.authorization.k8s.io/v1",
-			"kind":       "ClusterRoleBinding",
-			"metadata": map[string]interface{}{
-				"name": "cluster-scoped-2",
+func createNamespaceInfo(ns string) *resource.Info {
+	return &resource.Info{
+		Name: ns,
+		Object: &unstructured.Unstructured{
+			Object: map[string]interface{}{
+				"apiVersion": "v1",
+				"kind":       "Namespace",
+				"metadata": map[string]interface{}{
+					"name": ns,
+				},
 			},
 		},
-	},
+	}
 }
 
 func TestValidateNamespace(t *testing.T) {
 	tests := map[string]struct {
 		objects []*resource.Info
-		isValid bool
+		err     error
 	}{
 		"No resources is valid": {
 			objects: []*resource.Info{},
-			isValid: true,
+			err:     nil,
 		},
-		"One resource is valid": {
-			objects: []*resource.Info{obj1Info},
-			isValid: true,
-		},
-		"Two resources with same namespace is valid": {
+		"Resources other than namespace is valid": {
 			objects: []*resource.Info{obj1Info, obj2Info},
-			isValid: true,
+			err:     nil,
 		},
-		"Two resources with same namespace and cluster-scoped obj is valid": {
-			objects: []*resource.Info{obj1Info, clusterScopedObjInfo, obj2Info},
-			isValid: true,
+		"Different namespace resource is valid": {
+			objects: []*resource.Info{createNamespaceInfo("foo")},
+			err:     nil,
 		},
-		"Single cluster-scoped obj is valid": {
-			objects: []*resource.Info{clusterScopedObjInfo},
-			isValid: true,
-		},
-		"Multiple cluster-scoped objs is valid": {
-			objects: []*resource.Info{clusterScopedObjInfo, clusterScopedObj2Info},
-			isValid: true,
-		},
-		"Two resources with differing namespaces is not valid": {
-			objects: []*resource.Info{obj1Info, obj3Info},
-			isValid: false,
-		},
-		"Two resources with differing namespaces and cluster-scoped obj is not valid": {
-			objects: []*resource.Info{clusterScopedObjInfo, obj1Info, obj3Info},
-			isValid: false,
-		},
-		"Three resources, one with differing namespace is not valid": {
-			objects: []*resource.Info{obj1Info, obj2Info, obj3Info},
-			isValid: false,
-		},
-		"Default namespace not equal to other namespaces": {
-			objects: []*resource.Info{obj3Info, defaultObjInfo},
-			isValid: false,
+		"Same namespace resource is not valid": {
+			objects: []*resource.Info{obj1Info, createNamespaceInfo(namespace)},
+			err: inventory.InventoryNamespaceInSet{
+				Namespace: namespace,
+			},
 		},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			actualValid := validateNamespace(tc.objects)
-			if tc.isValid != actualValid {
-				t.Errorf("Expected valid namespace (%t), got (%t)", tc.isValid, actualValid)
+			err := validateNamespace(inventoryObjInfo, tc.objects)
+
+			if tc.err != nil {
+				assert.IsType(t, &inventory.InventoryNamespaceInSet{}, err)
+				return
 			}
+			assert.NoError(t, err)
 		})
 	}
 }
@@ -523,9 +485,9 @@ func TestReadAndPrepareObjects(t *testing.T) {
 			pruneIds:    []*resource.Info{},
 			isError:     false,
 		},
-		"objects can not be in different namespaces": {
+		"namespace resource for the namespace used in inventory is not allowed": {
 			resources: []*resource.Info{obj1Info, obj2Info,
-				inventoryObjInfo, obj3Info},
+				inventoryObjInfo, obj3Info, createNamespaceInfo(namespace)},
 			isError: true,
 		},
 	}
