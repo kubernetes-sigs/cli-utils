@@ -354,61 +354,6 @@ func TestSplitInfos(t *testing.T) {
 	}
 }
 
-func TestClearInventoryObject(t *testing.T) {
-	pod1 := ignoreErrInfoToObjMeta(pod1Info)
-	pod3 := ignoreErrInfoToObjMeta(pod3Info)
-	inv := storeObjsInInventory(invInfo, []object.ObjMetadata{pod1, pod3})
-	tests := map[string]struct {
-		invInfo *resource.Info
-		isError bool
-	}{
-		"Nil info should error": {
-			invInfo: nil,
-			isError: true,
-		},
-		"Info with nil Object should error": {
-			invInfo: nilInfo,
-			isError: true,
-		},
-		"Single non-inventory object should error": {
-			invInfo: pod1Info,
-			isError: true,
-		},
-		"Single inventory object without data should stay cleared": {
-			invInfo: invInfo,
-			isError: false,
-		},
-		"Single inventory object with data should be cleared": {
-			invInfo: inv,
-			isError: false,
-		},
-	}
-
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			invInfo, err := ClearInventoryObj(tc.invInfo)
-			if tc.isError {
-				if err == nil {
-					t.Errorf("Should have produced an error, but returned none.")
-				}
-			}
-			if !tc.isError {
-				if err != nil {
-					t.Fatalf("Received unexpected error: %s", err)
-				}
-				wrapped := WrapInventoryObj(invInfo)
-				objs, err := wrapped.Load()
-				if err != nil {
-					t.Fatalf("Received unexpected error: %s", err)
-				}
-				if len(objs) > 0 {
-					t.Errorf("Inventory object inventory not cleared: %#v\n", objs)
-				}
-			}
-		})
-	}
-}
-
 func TestAddSuffixToName(t *testing.T) {
 	tests := []struct {
 		info     *resource.Info
