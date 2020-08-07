@@ -5,12 +5,13 @@ package apply
 
 import (
 	"context"
-	"fmt"
 	"sort"
 	"time"
 
 	"github.com/go-errors/errors"
 	"github.com/spf13/cobra"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
@@ -168,6 +169,13 @@ func (a *Applier) prepareObjects(infos []*resource.Info) (*ResourceObjects, erro
 	if err != nil {
 		return nil, err
 	}
+
+	// Verify that the set of resources does not include the namespace
+	// in which we will place the inventory.
+	if err := validateNamespace(localInv, localInfos); err != nil {
+		return nil, err
+	}
+
 	currentObjs, err := object.InfosToObjMetas(localInfos)
 	if err != nil {
 		return nil, err
@@ -181,11 +189,7 @@ func (a *Applier) prepareObjects(infos []*resource.Info) (*ResourceObjects, erro
 	}
 	// Sort order for applied resources.
 	sort.Sort(ordering.SortableInfos(localInfos))
-	// TODO(seans3): Remove this single namespace requirement once we've
-	// implemented multi-namespace apply.
-	if !validateNamespace(localInfos) {
-		return nil, fmt.Errorf("objects have differing namespaces")
-	}
+
 	return &ResourceObjects{
 		LocalInv:  localInv,
 		Resources: localInfos,
@@ -367,22 +371,23 @@ func handleError(eventChannel chan event.Event, err error) {
 	}
 }
 
+var coreV1Namespace = v1.SchemeGroupVersion.WithKind("Namespace")
+
 // validateNamespace returns true if all the objects in the passed
 // infos parameter have the same namespace; false otherwise. Ignores
 // cluster-scoped resources.
-func validateNamespace(infos []*resource.Info) bool {
-	currentNamespace := metav1.NamespaceNone
+func validateNamespace(inv *resource.Info, infos []*resource.Info) error {
+	invAcc, _ := meta.Accessor(inv.Object)
+	invNamespace := invAcc.GetNamespace()
+
 	for _, info := range infos {
-		// Ignore cluster-scoped resources.
-		if info.Namespaced() {
-			// If the current namespace has not been set--then set it.
-			if currentNamespace == metav1.NamespaceNone {
-				currentNamespace = info.Namespace
-			}
-			if currentNamespace != info.Namespace {
-				return false
+		acc, _ := meta.Accessor(info.Object)
+		gvk := info.Object.GetObjectKind().GroupVersionKind()
+		if gvk == coreV1Namespace && acc.GetName() == invNamespace {
+			return &inventory.InventoryNamespaceInSet{
+				Namespace: invNamespace,
 			}
 		}
 	}
-	return true
+	return nil
 }
