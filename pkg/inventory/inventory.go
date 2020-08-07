@@ -38,6 +38,10 @@ type Inventory interface {
 	GetObject() (*resource.Info, error)
 }
 
+// InventoryFactoryFunc creates the object which implements the Inventory
+// interface from the passed info object.
+type InventoryFactoryFunc func(*resource.Info) Inventory
+
 // FindInventoryObj returns the "Inventory" object (ConfigMap with
 // inventory label) if it exists, or nil if it does not exist.
 func FindInventoryObj(infos []*resource.Info) *resource.Info {
@@ -106,22 +110,6 @@ func SplitInfos(infos []*resource.Info) (*resource.Info, []*resource.Info, error
 		}
 	}
 	return invs[0], resources, nil
-}
-
-// ClearInventoryObj finds the inventory object in the list of objects,
-// and sets an empty inventory. Returns an error if once occurred.
-func ClearInventoryObj(invInfo *resource.Info) (*resource.Info, error) {
-	if invInfo == nil {
-		return nil, fmt.Errorf("clearing nil inventory object")
-	}
-	if !IsInventoryObject(invInfo) {
-		return nil, fmt.Errorf("attempting to clear non-inventory object")
-	}
-	wrapped := WrapInventoryObj(invInfo)
-	if err := wrapped.Store([]object.ObjMetadata{}); err != nil {
-		return nil, err
-	}
-	return wrapped.GetObject()
 }
 
 // addSuffixToName adds the passed suffix (usually a hash) as a suffix

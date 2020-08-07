@@ -44,6 +44,7 @@ type Destroyer struct {
 	ioStreams      genericclioptions.IOStreams
 	ApplyOptions   *apply.ApplyOptions
 	PruneOptions   *prune.PruneOptions
+	invClient      inventory.InventoryClient
 	DryRunStrategy common.DryRunStrategy
 }
 
@@ -64,6 +65,7 @@ func (d *Destroyer) Initialize(cmd *cobra.Command, paths []string) error {
 	if err != nil {
 		return errors.WrapPrefix(err, "error creating inventory client", 1)
 	}
+	d.invClient = invClient
 	err = d.PruneOptions.Initialize(d.factory, invClient)
 	if err != nil {
 		return errors.WrapPrefix(err, "error setting up PruneOptions", 1)
@@ -97,7 +99,7 @@ func (d *Destroyer) Run() <-chan event.Event {
 		// deleting everything. We can ignore the error, since the Prune
 		// will catch the same problems.
 		invInfo, nonInvInfos, _ := inventory.SplitInfos(infos)
-		invInfo, err = inventory.ClearInventoryObj(invInfo)
+		invInfo, err = d.invClient.ClearInventoryObj(invInfo)
 		if err != nil {
 			ch <- event.Event{
 				Type: event.ErrorType,
@@ -121,8 +123,8 @@ func (d *Destroyer) Run() <-chan event.Event {
 		// Now delete the inventory object as well.
 		inv := inventory.FindInventoryObj(infos)
 		if inv != nil {
-			d.PruneOptions.InvClient.SetDryRunStrategy(d.DryRunStrategy)
-			_ = d.PruneOptions.InvClient.DeleteInventoryObj(inv)
+			d.invClient.SetDryRunStrategy(d.DryRunStrategy)
+			_ = d.invClient.DeleteInventoryObj(inv)
 		}
 
 		// Close the tempChannel to signal to the event transformer that

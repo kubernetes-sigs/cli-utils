@@ -34,6 +34,9 @@ type InventoryClient interface {
 	Replace(inv *resource.Info, objs []object.ObjMetadata) error
 	// DeleteInventoryObj deletes the passed inventory object from the APIServer.
 	DeleteInventoryObj(inv *resource.Info) error
+	// ClearInventoryObj clears all obj references from the passed inventory object,
+	// returning the cleared inventory object or an error.
+	ClearInventoryObj(inv *resource.Info) (*resource.Info, error)
 	// SetDryRunStrategy sets the dry run strategy on whether this we actually mutate.
 	SetDryRunStrategy(drs common.DryRunStrategy)
 }
@@ -41,11 +44,12 @@ type InventoryClient interface {
 // ClusterInventoryClient is a concrete implementation of the
 // InventoryClient interface.
 type ClusterInventoryClient struct {
-	builderFunc    func() *resource.Builder
-	mapper         meta.RESTMapper
-	validator      validation.Schema
-	clientFunc     func(*meta.RESTMapping) (resource.RESTClient, error)
-	dryRunStrategy common.DryRunStrategy
+	builderFunc          func() *resource.Builder
+	mapper               meta.RESTMapper
+	validator            validation.Schema
+	clientFunc           func(*meta.RESTMapping) (resource.RESTClient, error)
+	dryRunStrategy       common.DryRunStrategy
+	InventoryFactoryFunc InventoryFactoryFunc
 }
 
 var _ InventoryClient = &ClusterInventoryClient{}
@@ -64,11 +68,12 @@ func NewInventoryClient(factory cmdutil.Factory) (*ClusterInventoryClient, error
 	}
 	builderFunc := factory.NewBuilder
 	clusterInventoryClient := ClusterInventoryClient{
-		builderFunc:    builderFunc,
-		mapper:         mapper,
-		validator:      validator,
-		clientFunc:     factory.UnstructuredClientForMapping,
-		dryRunStrategy: common.DryRunNone,
+		builderFunc:          builderFunc,
+		mapper:               mapper,
+		validator:            validator,
+		clientFunc:           factory.UnstructuredClientForMapping,
+		dryRunStrategy:       common.DryRunNone,
+		InventoryFactoryFunc: WrapInventoryObj,
 	}
 	return &clusterInventoryClient, nil
 }
@@ -88,7 +93,7 @@ func (cic *ClusterInventoryClient) Merge(localInv *resource.Info, objs []object.
 	}
 	if clusterInv == nil {
 		// Wrap inventory object and store the inventory in it.
-		inv := WrapInventoryObj(localInv)
+		inv := cic.InventoryFactoryFunc(localInv)
 		if err := inv.Store(objs); err != nil {
 			return nil, err
 		}
@@ -114,7 +119,7 @@ func (cic *ClusterInventoryClient) Merge(localInv *resource.Info, objs []object.
 		unionObjs := object.Union(clusterObjs, objs)
 		klog.V(4).Infof("num objects to prune: %d", len(pruneIds))
 		klog.V(4).Infof("num merged objects to store in inventory: %d", len(unionObjs))
-		wrappedInv := WrapInventoryObj(clusterInv)
+		wrappedInv := cic.InventoryFactoryFunc(clusterInv)
 		if err = wrappedInv.Store(unionObjs); err != nil {
 			return pruneIds, err
 		}
@@ -148,7 +153,7 @@ func (cic *ClusterInventoryClient) Replace(localInv *resource.Info, objs []objec
 	if err != nil {
 		return err
 	}
-	wrappedInv := WrapInventoryObj(clusterInv)
+	wrappedInv := cic.InventoryFactoryFunc(clusterInv)
 	if err = wrappedInv.Store(objs); err != nil {
 		return err
 	}
@@ -178,7 +183,7 @@ func (cic *ClusterInventoryClient) GetClusterObjs(localInv *resource.Info) ([]ob
 	if clusterInv == nil {
 		return []object.ObjMetadata{}, nil
 	}
-	wrapped := WrapInventoryObj(clusterInv)
+	wrapped := cic.InventoryFactoryFunc(clusterInv)
 	return wrapped.Load()
 }
 
@@ -254,7 +259,7 @@ func (cic *ClusterInventoryClient) mergeClusterInventory(invInfos []*resource.In
 	// choosing the first inventory object as the one to retain.
 	sort.Sort(ordering.SortableInfos(invInfos))
 	retained := invInfos[0]
-	wrapRetained := WrapInventoryObj(retained)
+	wrapRetained := cic.InventoryFactoryFunc(retained)
 	retainedObjs, err := wrapRetained.Load()
 	if err != nil {
 		return nil, err
@@ -263,7 +268,7 @@ func (cic *ClusterInventoryClient) mergeClusterInventory(invInfos []*resource.In
 	// the retained objects.
 	for i := 1; i < len(invInfos); i++ {
 		merge := invInfos[i]
-		wrapMerge := WrapInventoryObj(merge)
+		wrapMerge := cic.InventoryFactoryFunc(merge)
 		mergeObjs, err := wrapMerge.Load()
 		if err != nil {
 			return nil, err
@@ -380,6 +385,22 @@ func (cic *ClusterInventoryClient) DeleteInventoryObj(info *resource.Info) error
 	klog.V(4).Infof("deleting inventory object: %s/%s", info.Namespace, info.Name)
 	_, err = helper.Delete(info.Namespace, info.Name)
 	return err
+}
+
+// ClearInventoryObj sets an empty inventory, which is used in destroy. Returns the
+// cleared inventory or an error if one occurred.
+func (cic *ClusterInventoryClient) ClearInventoryObj(invInfo *resource.Info) (*resource.Info, error) {
+	if invInfo == nil {
+		return nil, fmt.Errorf("clearing nil inventory object")
+	}
+	if !IsInventoryObject(invInfo) {
+		return nil, fmt.Errorf("attempting to clear non-inventory object")
+	}
+	wrapped := cic.InventoryFactoryFunc(invInfo)
+	if err := wrapped.Store([]object.ObjMetadata{}); err != nil {
+		return nil, err
+	}
+	return wrapped.GetObject()
 }
 
 // SetDryRun sets whether the inventory client will mutate the inventory
