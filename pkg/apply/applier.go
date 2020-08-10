@@ -50,7 +50,6 @@ func NewApplier(factory util.Factory, ioStreams genericclioptions.IOStreams) *Ap
 	}
 	a.infoHelperFactoryFunc = a.infoHelperFactory
 	a.InventoryFactoryFunc = inventory.WrapInventoryObj
-	a.PruneOptions.InventoryFactoryFunc = inventory.WrapInventoryObj
 	return a
 }
 
@@ -98,6 +97,8 @@ func (a *Applier) Initialize(cmd *cobra.Command) error {
 	if err != nil {
 		return err
 	}
+	// Propagate inventory factory function to inventory client
+	a.invClient.SetInventoryFactoryFunc(a.InventoryFactoryFunc)
 	err = a.PruneOptions.Initialize(a.factory, a.invClient)
 	if err != nil {
 		return errors.WrapPrefix(err, "error setting up PruneOptions", 1)

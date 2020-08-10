@@ -41,14 +41,6 @@ type PruneOptions struct {
 	// structure is shared. IMPORTANT: the apply task must
 	// always complete before this prune is run.
 	currentUids sets.String
-	// The set of retrieved inventory objects (as Infos) selected
-	// by the inventory label. This set should also include the
-	// current inventory object. Stored here to make testing
-	// easier by manually setting the retrieved inventory infos.
-
-	// InventoryFactoryFunc wraps and returns an interface for the
-	// object which will load and store the inventory.
-	InventoryFactoryFunc func(*resource.Info) inventory.Inventory
 }
 
 // NewPruneOptions returns a struct (PruneOptions) encapsulating the necessary
@@ -56,7 +48,6 @@ type PruneOptions struct {
 // gathering this information.
 func NewPruneOptions(currentUids sets.String) *PruneOptions {
 	po := &PruneOptions{currentUids: currentUids}
-	po.InventoryFactoryFunc = inventory.WrapInventoryObj
 	return po
 }
 
