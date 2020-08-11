@@ -70,6 +70,8 @@ func (fic *FakeInventoryClient) ClearInventoryObj(inv *resource.Info) (*resource
 
 func (fic *FakeInventoryClient) SetDryRunStrategy(drs common.DryRunStrategy) {}
 
+func (fic *FakeInventoryClient) SetInventoryFactoryFunc(fn InventoryFactoryFunc) {}
+
 // SetError forces an error on the subsequent client call if it returns an error.
 func (fic *FakeInventoryClient) SetError(err error) {
 	fic.err = err

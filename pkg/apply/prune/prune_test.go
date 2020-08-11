@@ -193,7 +193,6 @@ func TestPrune(t *testing.T) {
 			drs := common.Strategies[i]
 			t.Run(name, func(t *testing.T) {
 				po := NewPruneOptions(populateObjectIds(tc.currentInfos, t))
-				po.InventoryFactoryFunc = inventory.WrapInventoryObj
 				// Set up the previously applied objects.
 				clusterObjs, _ := object.InfosToObjMetas(tc.pastInfos)
 				po.InvClient = inventory.NewFakeInventoryClient(clusterObjs)
