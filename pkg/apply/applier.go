@@ -113,12 +113,12 @@ func (a *Applier) Initialize(cmd *cobra.Command) error {
 // SetFlags configures the command line flags needed for apply and
 // status. This is a temporary solution as we should separate the configuration
 // of cobra flags from the Applier.
-func (a *Applier) SetFlags(cmd *cobra.Command) error {
+func (a *Applier) SetFlags(cmd *cobra.Command) {
 	a.ApplyOptions.DeleteFlags.AddFlags(cmd)
 	for _, flag := range []string{"kustomize", "filename", "recursive"} {
 		err := cmd.Flags().MarkHidden(flag)
 		if err != nil {
-			return err
+			panic(err)
 		}
 	}
 	a.ApplyOptions.RecordFlags.AddFlags(cmd)
@@ -129,7 +129,6 @@ func (a *Applier) SetFlags(cmd *cobra.Command) error {
 	_ = cmd.Flags().MarkHidden("timeout")
 	_ = cmd.Flags().MarkHidden("wait")
 	a.ApplyOptions.Overwrite = true
-	return nil
 }
 
 // infoHelperFactory returns a new instance of the InfoHelper.

@@ -34,7 +34,7 @@ func GetApplyRunner(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *A
 		RunE:                  r.RunE,
 	}
 
-	cmdutil.CheckErr(r.Applier.SetFlags(cmd))
+	r.Applier.SetFlags(cmd)
 
 	// The following flags are added, but hidden because other code
 	// depend on them when parsing flags. These flags are hidden and unused.
@@ -86,13 +86,17 @@ type ApplyRunner struct {
 }
 
 func (r *ApplyRunner) RunE(cmd *cobra.Command, args []string) error {
-	cmdutil.CheckErr(setters2.CheckRequiredSettersSet())
+	if err := setters2.CheckRequiredSettersSet(); err != nil {
+		return err
+	}
 	prunePropPolicy, err := convertPropagationPolicy(r.prunePropagationPolicy)
 	if err != nil {
 		return err
 	}
 
-	cmdutil.CheckErr(r.Applier.Initialize(cmd))
+	if err := r.Applier.Initialize(cmd); err != nil {
+		return err
+	}
 
 	// Only emit status events if we are waiting for status.
 	//TODO: This is not the right way to do this. There are situations where
@@ -149,8 +153,7 @@ func (r *ApplyRunner) RunE(cmd *cobra.Command, args []string) error {
 	// The printer will print updates from the channel. It will block
 	// until the channel is closed.
 	printer := printers.GetPrinter(r.output, r.ioStreams)
-	printer.Print(ch, common.DryRunNone)
-	return nil
+	return printer.Print(ch, common.DryRunNone)
 }
 
 // convertPropagationPolicy converts a propagationPolicy described as a

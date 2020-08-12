@@ -5,7 +5,6 @@ package apply
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -13,15 +12,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
-	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	pollevent "sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/object"
-)
-
-const (
-	defaultExitErrorCode int = 1
-	timeoutExitErrorCode int = 3
 )
 
 // BasicPrinter is a simple implementation that just prints the events
@@ -96,7 +89,7 @@ func (sc *statusCollector) updateStatus(id object.ObjMetadata, se pollevent.Even
 // format on StdOut. As we support other printer implementations
 // this should probably be an interface.
 // This function will block until the channel is closed.
-func (b *BasicPrinter) Print(ch <-chan event.Event, previewStrategy common.DryRunStrategy) {
+func (b *BasicPrinter) Print(ch <-chan event.Event, previewStrategy common.DryRunStrategy) error {
 	printFunc := b.getPrintFunc(previewStrategy)
 	applyStats := &applyStats{}
 	statusCollector := &statusCollector{
@@ -108,7 +101,7 @@ func (b *BasicPrinter) Print(ch <-chan event.Event, previewStrategy common.DryRu
 	for e := range ch {
 		switch e.Type {
 		case event.ErrorType:
-			b.processErrorEvent(e.ErrorEvent, statusCollector, printFunc)
+			return e.ErrorEvent.Err
 		case event.ApplyType:
 			b.processApplyEvent(e.ApplyEvent, applyStats, statusCollector, printFunc)
 		case event.StatusType:
@@ -119,27 +112,7 @@ func (b *BasicPrinter) Print(ch <-chan event.Event, previewStrategy common.DryRu
 			b.processDeleteEvent(e.DeleteEvent, deleteStats, printFunc)
 		}
 	}
-}
-
-func (b *BasicPrinter) processErrorEvent(ee event.ErrorEvent, c *statusCollector,
-	p printFunc) {
-	p("\nFatal error: %s", ee.Err.Error())
-
-	if timeoutErr, ok := taskrunner.IsTimeoutError(ee.Err); ok {
-		for _, id := range timeoutErr.Identifiers {
-			ls, found := c.latestStatus[id]
-			if !found {
-				continue
-			}
-			if timeoutErr.Condition.Meets(ls.Resource.Status) {
-				continue
-			}
-			p("%s/%s %s %s", id.GroupKind.Kind,
-				id.Name, ls.Resource.Status, ls.Resource.Message)
-		}
-		os.Exit(timeoutExitErrorCode)
-	}
-	os.Exit(defaultExitErrorCode)
+	return nil
 }
 
 func (b *BasicPrinter) processApplyEvent(ae event.ApplyEvent, as *applyStats,

@@ -12,6 +12,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/apply/poller"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling"
 	pollevent "sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
+	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
@@ -205,6 +206,7 @@ func (b *baseRunner) run(ctx context.Context, taskQueue chan Task,
 		case msg := <-taskContext.TaskChannel():
 			currentTask.ClearTimeout()
 			if msg.Err != nil {
+				b.amendTimeoutError(msg.Err)
 				return msg.Err
 			}
 			if abort {
@@ -224,6 +226,27 @@ func (b *baseRunner) run(ctx context.Context, taskQueue chan Task,
 			abort = true
 			completeIfWaitTask(currentTask, taskContext)
 		}
+	}
+}
+
+func (b *baseRunner) amendTimeoutError(err error) {
+	if timeoutErr, ok := err.(*TimeoutError); ok {
+		var timedOutResources []TimedOutResource
+		for _, id := range timeoutErr.Identifiers {
+			ls, found := b.collector.resourceMap[id]
+			if !found {
+				continue
+			}
+			if timeoutErr.Condition.Meets(ls.CurrentStatus) {
+				continue
+			}
+			timedOutResources = append(timedOutResources, TimedOutResource{
+				Identifier: id,
+				Status:     ls.CurrentStatus,
+				Message:    ls.Message,
+			})
+		}
+		timeoutErr.TimedOutResources = timedOutResources
 	}
 }
 
@@ -287,6 +310,16 @@ type TimeoutError struct {
 
 	// Condition defines the criteria for which the task was waiting.
 	Condition Condition
+
+	TimedOutResources []TimedOutResource
+}
+
+type TimedOutResource struct {
+	Identifier object.ObjMetadata
+
+	Status status.Status
+
+	Message string
 }
 
 func (te TimeoutError) Error() string {
@@ -296,9 +329,9 @@ func (te TimeoutError) Error() string {
 
 // IsTimeoutError checks whether a given error is
 // a TimeoutError.
-func IsTimeoutError(err error) (TimeoutError, bool) {
-	if e, ok := err.(TimeoutError); ok {
+func IsTimeoutError(err error) (*TimeoutError, bool) {
+	if e, ok := err.(*TimeoutError); ok {
 		return e, true
 	}
-	return TimeoutError{}, false
+	return &TimeoutError{}, false
 }

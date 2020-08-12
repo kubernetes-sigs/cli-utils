@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	pollevent "sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
@@ -38,11 +39,13 @@ var (
 
 func TestBaseRunner(t *testing.T) {
 	testCases := map[string]struct {
-		identifiers        []object.ObjMetadata
-		tasks              []Task
-		statusEventsDelay  time.Duration
-		statusEvents       []pollevent.Event
-		expectedEventTypes []event.Type
+		identifiers               []object.ObjMetadata
+		tasks                     []Task
+		statusEventsDelay         time.Duration
+		statusEvents              []pollevent.Event
+		expectedEventTypes        []event.Type
+		expectedError             error
+		expectedTimedOutResources []TimedOutResource
 	}{
 		"wait task runs until condition is met": {
 			identifiers: []object.ObjMetadata{depID, cmID},
@@ -84,6 +87,33 @@ func TestBaseRunner(t *testing.T) {
 				event.StatusType,
 				event.StatusType,
 				event.PruneType,
+			},
+		},
+		"wait task times out eventually": {
+			identifiers: []object.ObjMetadata{depID, cmID},
+			tasks: []Task{
+				NewWaitTask([]object.ObjMetadata{depID, cmID}, AllCurrent,
+					2*time.Second),
+			},
+			statusEventsDelay: time.Second,
+			statusEvents: []pollevent.Event{
+				{
+					EventType: pollevent.ResourceUpdateEvent,
+					Resource: &pollevent.ResourceStatus{
+						Identifier: cmID,
+						Status:     status.CurrentStatus,
+					},
+				},
+			},
+			expectedEventTypes: []event.Type{
+				event.StatusType,
+			},
+			expectedError: &TimeoutError{},
+			expectedTimedOutResources: []TimedOutResource{
+				{
+					Identifier: depID,
+					Status:     status.UnknownStatus,
+				},
 			},
 		},
 		"tasks run in order": {
@@ -165,7 +195,14 @@ func TestBaseRunner(t *testing.T) {
 			close(eventChannel)
 			wg.Wait()
 
-			if err != nil {
+			if tc.expectedError != nil {
+				assert.IsType(t, tc.expectedError, err)
+				if timeoutError, ok := err.(*TimeoutError); ok {
+					assert.ElementsMatch(t, tc.expectedTimedOutResources,
+						timeoutError.TimedOutResources)
+				}
+				return
+			} else if err != nil {
 				t.Errorf("expected no error, but got %v", err)
 			}
 

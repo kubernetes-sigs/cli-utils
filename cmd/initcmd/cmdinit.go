@@ -6,7 +6,6 @@ package initcmd
 import (
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"sigs.k8s.io/cli-utils/pkg/config"
 )
@@ -19,9 +18,12 @@ func NewCmdInit(ioStreams genericclioptions.IOStreams) *cobra.Command {
 		Use:                   "init DIRECTORY",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Create a prune manifest ConfigMap as a inventory object"),
-		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(io.Complete(args))
-			cmdutil.CheckErr(io.Run())
+		RunE: func(cmd *cobra.Command, args []string) error {
+			err := io.Complete(args)
+			if err != nil {
+				return err
+			}
+			return io.Run()
 		},
 	}
 	cmd.Flags().StringVarP(&io.InventoryID, "inventory-id", "i", "", "Identifier for group of applied resources. Must be composed of valid label characters.")

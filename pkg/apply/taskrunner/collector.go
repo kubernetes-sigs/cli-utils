@@ -36,6 +36,7 @@ type resourceStatusCollector struct {
 type resourceStatus struct {
 	Identifier    object.ObjMetadata
 	CurrentStatus status.Status
+	Message       string
 	Generation    int64
 }
 
@@ -44,6 +45,7 @@ type resourceStatus struct {
 func (a *resourceStatusCollector) resourceStatus(r *event.ResourceStatus) {
 	if ri, found := a.resourceMap[r.Identifier]; found {
 		ri.CurrentStatus = r.Status
+		ri.Message = r.Message
 		ri.Generation = getGeneration(r)
 		a.resourceMap[r.Identifier] = ri
 	}
