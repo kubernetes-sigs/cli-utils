@@ -11,9 +11,15 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/config"
 )
 
-// NewCmdInit creates the `init` command, which generates the
-// inventory object template ConfigMap for a package.
-func NewCmdInit(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+// InitRunner encapsulates the structures for the init command.
+type InitRunner struct {
+	Command     *cobra.Command
+	InitOptions *config.InitOptions
+}
+
+// GetInitRunner builds and returns the InitRunner. Connects the InitOptions.Run
+// to the cobra command.
+func GetInitRunner(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *InitRunner {
 	io := config.NewInitOptions(f, ioStreams)
 	cmd := &cobra.Command{
 		Use:                   "init DIRECTORY",
@@ -28,5 +34,14 @@ func NewCmdInit(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra
 		},
 	}
 	cmd.Flags().StringVarP(&io.InventoryID, "inventory-id", "i", "", "Identifier for group of applied resources. Must be composed of valid label characters.")
-	return cmd
+	i := &InitRunner{
+		Command:     cmd,
+		InitOptions: io,
+	}
+	return i
+}
+
+// NewCmdInit returns the cobra command for the init command.
+func NewCmdInit(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+	return GetInitRunner(f, ioStreams).Command
 }
