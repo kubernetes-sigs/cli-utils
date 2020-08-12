@@ -120,9 +120,8 @@ func (d *Destroyer) Run() <-chan event.Event {
 			PropagationPolicy: metav1.DeletePropagationBackground,
 		})
 		// Now delete the inventory object as well.
-		inv := inventory.FindInventoryObj(infos)
-		if inv != nil {
-			_ = d.invClient.DeleteInventoryObj(inv)
+		if invInfo != nil {
+			_ = d.invClient.DeleteInventoryObj(invInfo)
 		}
 
 		// Close the tempChannel to signal to the event transformer that
