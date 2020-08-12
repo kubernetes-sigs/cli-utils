@@ -84,6 +84,7 @@ func (d *Destroyer) Run() <-chan event.Event {
 
 	go func() {
 		defer close(ch)
+		d.invClient.SetDryRunStrategy(d.DryRunStrategy)
 		infos, err := d.ApplyOptions.GetObjects()
 		if err != nil {
 			ch <- event.Event{
@@ -94,12 +95,10 @@ func (d *Destroyer) Run() <-chan event.Event {
 			}
 			return
 		}
-		// Clear the data/inventory section of the inventory object configmap,
-		// so the prune will calculate the prune set as all the objects,
-		// deleting everything. We can ignore the error, since the Prune
-		// will catch the same problems.
-		invInfo, nonInvInfos, _ := inventory.SplitInfos(infos)
-		invInfo, err = d.invClient.ClearInventoryObj(invInfo)
+		// Force a pruning of all cluster resources by clearing out the
+		// local resources, and sending only the inventory object to the
+		// prune.
+		invInfo, _, err := inventory.SplitInfos(infos)
 		if err != nil {
 			ch <- event.Event{
 				Type: event.ErrorType,
@@ -109,7 +108,7 @@ func (d *Destroyer) Run() <-chan event.Event {
 			}
 			return
 		}
-		infos = append([]*resource.Info{invInfo}, nonInvInfos...)
+		infos = []*resource.Info{invInfo}
 
 		// Start the event transformer goroutine so we can transform
 		// the Prune events emitted from the Prune function to Delete
@@ -123,7 +122,6 @@ func (d *Destroyer) Run() <-chan event.Event {
 		// Now delete the inventory object as well.
 		inv := inventory.FindInventoryObj(infos)
 		if inv != nil {
-			d.invClient.SetDryRunStrategy(d.DryRunStrategy)
 			_ = d.invClient.DeleteInventoryObj(inv)
 		}
 
