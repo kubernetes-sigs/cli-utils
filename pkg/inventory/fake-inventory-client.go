@@ -63,11 +63,6 @@ func (fic *FakeInventoryClient) DeleteInventoryObj(inv *resource.Info) error {
 	return nil
 }
 
-// ClearInventoryObj implements InventoryClient interface function. It does nothing for now.
-func (fic *FakeInventoryClient) ClearInventoryObj(inv *resource.Info) (*resource.Info, error) {
-	return inv, nil
-}
-
 func (fic *FakeInventoryClient) SetDryRunStrategy(drs common.DryRunStrategy) {}
 
 func (fic *FakeInventoryClient) SetInventoryFactoryFunc(fn InventoryFactoryFunc) {}

@@ -34,9 +34,6 @@ type InventoryClient interface {
 	Replace(inv *resource.Info, objs []object.ObjMetadata) error
 	// DeleteInventoryObj deletes the passed inventory object from the APIServer.
 	DeleteInventoryObj(inv *resource.Info) error
-	// ClearInventoryObj clears all obj references from the passed inventory object,
-	// returning the cleared inventory object or an error.
-	ClearInventoryObj(inv *resource.Info) (*resource.Info, error)
 	// SetDryRunStrategy sets the dry run strategy on whether this we actually mutate.
 	SetDryRunStrategy(drs common.DryRunStrategy)
 	// Sets the function to create the Inventory object.
@@ -387,22 +384,6 @@ func (cic *ClusterInventoryClient) DeleteInventoryObj(info *resource.Info) error
 	klog.V(4).Infof("deleting inventory object: %s/%s", info.Namespace, info.Name)
 	_, err = helper.Delete(info.Namespace, info.Name)
 	return err
-}
-
-// ClearInventoryObj sets an empty inventory, which is used in destroy. Returns the
-// cleared inventory or an error if one occurred.
-func (cic *ClusterInventoryClient) ClearInventoryObj(invInfo *resource.Info) (*resource.Info, error) {
-	if invInfo == nil {
-		return nil, fmt.Errorf("clearing nil inventory object")
-	}
-	if !IsInventoryObject(invInfo) {
-		return nil, fmt.Errorf("attempting to clear non-inventory object")
-	}
-	wrapped := cic.InventoryFactoryFunc(invInfo)
-	if err := wrapped.Store([]object.ObjMetadata{}); err != nil {
-		return nil, err
-	}
-	return wrapped.GetObject()
 }
 
 // SetDryRun sets whether the inventory client will mutate the inventory
