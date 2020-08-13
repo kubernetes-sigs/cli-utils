@@ -6,42 +6,25 @@ package destroy
 import (
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/kubectl/pkg/cmd/util"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"sigs.k8s.io/cli-utils/pkg/apply"
 )
 
-// NewCmdDestroy creates the `destroy` command
-func NewCmdDestroy(f util.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
-	destroyer := apply.NewDestroyer(f, ioStreams)
-	printer := &apply.BasicPrinter{
-		IOStreams: ioStreams,
+// GetDestroyRunner creates and returns the DestroyRunner which stores the cobra command.
+func GetDestroyRunner(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *DestroyRunner {
+	r := &DestroyRunner{
+		Destroyer: apply.NewDestroyer(f, ioStreams),
+		ioStreams: ioStreams,
 	}
-
 	cmd := &cobra.Command{
 		Use:                   "destroy (DIRECTORY | STDIN)",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Destroy all the resources related to configuration"),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			paths := args
-			err := destroyer.Initialize(cmd, paths)
-			if err != nil {
-				return err
-			}
-
-			// Run the destroyer. It will return a channel where we can receive updates
-			// to keep track of progress and any issues.
-			ch := destroyer.Run()
-
-			// The printer will print updates from the channel. It will block
-			// until the channel is closed.
-			err = printer.Print(ch, destroyer.DryRunStrategy)
-			return err
-		},
+		RunE:                  r.RunE,
 	}
 
-	destroyer.SetFlags(cmd)
+	r.Destroyer.SetFlags(cmd)
 
 	// The following flags are added, but hidden because other code
 	// dependencies when parsing flags. These flags are hidden and unused.
@@ -55,5 +38,36 @@ func NewCmdDestroy(f util.Factory, ioStreams genericclioptions.IOStreams) *cobra
 	_ = cmd.Flags().MarkHidden("force-conflicts")
 	_ = cmd.Flags().MarkHidden("field-manager")
 
-	return cmd
+	r.Command = cmd
+	return r
+}
+
+// DestroyCommand creates the DestroyRunner, returning the cobra command associated with it.
+func DestroyCommand(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+	return GetDestroyRunner(f, ioStreams).Command
+}
+
+// DestroyRunner encapsulates data necessary to run the destroy command.
+type DestroyRunner struct {
+	Command   *cobra.Command
+	ioStreams genericclioptions.IOStreams
+	Destroyer *apply.Destroyer
+}
+
+func (r *DestroyRunner) RunE(cmd *cobra.Command, args []string) error {
+	err := r.Destroyer.Initialize(cmd, args)
+	if err != nil {
+		return err
+	}
+
+	// Run the destroyer. It will return a channel where we can receive updates
+	// to keep track of progress and any issues.
+	ch := r.Destroyer.Run()
+
+	// The printer will print updates from the channel. It will block
+	// until the channel is closed.
+	printer := &apply.BasicPrinter{
+		IOStreams: r.ioStreams,
+	}
+	return printer.Print(ch, r.Destroyer.DryRunStrategy)
 }
