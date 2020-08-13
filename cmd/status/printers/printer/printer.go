@@ -1,7 +1,13 @@
 // Copyright 2020 The Kubernetes Authors.
 // SPDX-License-Identifier: Apache-2.0
 
-package print
+package printer
+
+import (
+	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/collector"
+	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
+	"sigs.k8s.io/cli-utils/pkg/object"
+)
 
 // Printer defines an interface for outputting information about status of
 // resources. Different implementations allow output formats tailored to
@@ -15,5 +21,5 @@ type Printer interface {
 	// needs to, and that it has completed shutting down. The latter is important
 	// to make sure the printer has a chance to output all data before the
 	// program terminates.
-	Print(stop <-chan struct{}) <-chan struct{}
+	Print(ch <-chan event.Event, identifiers []object.ObjMetadata, cancelFunc collector.ObserverFunc)
 }

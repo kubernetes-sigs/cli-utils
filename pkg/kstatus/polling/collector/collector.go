@@ -32,15 +32,15 @@ func NewResourceStatusCollector(identifiers []object.ObjMetadata) *ResourceStatu
 // goroutine holds the lock, so any processing in the callback
 // must be done quickly.
 type Observer interface {
-	Notify(*ResourceStatusCollector)
+	Notify(*ResourceStatusCollector, event.Event)
 }
 
 // ObserverFunc is a function implementation of the Observer
 // interface.
-type ObserverFunc func(*ResourceStatusCollector)
+type ObserverFunc func(*ResourceStatusCollector, event.Event)
 
-func (o ObserverFunc) Notify(rsc *ResourceStatusCollector) {
-	o(rsc)
+func (o ObserverFunc) Notify(rsc *ResourceStatusCollector, e event.Event) {
+	o(rsc, e)
 }
 
 // ResourceStatusCollector is for use by clients of the polling library and provides
@@ -78,7 +78,7 @@ func (o *ResourceStatusCollector) ListenWithObserver(eventChannel <-chan event.E
 		for e := range eventChannel {
 			o.processEvent(e)
 			if observer != nil {
-				observer.Notify(o)
+				observer.Notify(o, e)
 			}
 		}
 	}()
