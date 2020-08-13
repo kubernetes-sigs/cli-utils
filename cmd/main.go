@@ -59,7 +59,7 @@ func main() {
 	updateHelp(names, initCmd)
 	applyCmd := apply.ApplyCommand(f, ioStreams)
 	updateHelp(names, applyCmd)
-	previewCmd := preview.NewCmdPreview(f, ioStreams)
+	previewCmd := preview.PreviewCommand(f, ioStreams)
 	updateHelp(names, previewCmd)
 	diffCmd := diff.NewCmdDiff(f, ioStreams)
 	updateHelp(names, diffCmd)
