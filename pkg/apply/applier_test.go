@@ -219,7 +219,7 @@ func TestApplier(t *testing.T) {
 			applier := NewApplier(tf, ioStreams)
 
 			cmd := &cobra.Command{}
-			_ = applier.SetFlags(cmd)
+			applier.SetFlags(cmd)
 			var notUsedFlag bool
 			// This flag needs to be set as there is a dependency on it.
 			cmd.Flags().BoolVar(&notUsedFlag, "dry-run", notUsedFlag, "")

@@ -18,6 +18,7 @@ import (
 	"sigs.k8s.io/cli-utils/cmd/initcmd"
 	"sigs.k8s.io/cli-utils/cmd/preview"
 	"sigs.k8s.io/cli-utils/cmd/status"
+	"sigs.k8s.io/cli-utils/pkg/errors"
 	"sigs.k8s.io/cli-utils/pkg/util/factory"
 
 	// This is here rather than in the libraries because of
@@ -29,6 +30,10 @@ var cmd = &cobra.Command{
 	Use:   "kapply",
 	Short: "Perform cluster operations using declarative configuration",
 	Long:  "Perform cluster operations using declarative configuration",
+	// We silence error reporting from Cobra here since we want to improve
+	// the error messages coming from the commands.
+	SilenceErrors: true,
+	SilenceUsage:  true,
 }
 
 func main() {
@@ -69,7 +74,7 @@ func main() {
 	defer logs.FlushLogs()
 
 	if err := cmd.Execute(); err != nil {
-		os.Exit(1)
+		errors.CheckErr(cmd.ErrOrStderr(), err, "kapply")
 	}
 }
 

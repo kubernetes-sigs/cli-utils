@@ -83,7 +83,7 @@ func (w *WaitTask) setTimer(taskContext *TaskContext) {
 		// to the token first.
 		case <-w.token:
 			taskContext.TaskChannel() <- TaskResult{
-				Err: TimeoutError{
+				Err: &TimeoutError{
 					Identifiers: w.Identifiers,
 					Timeout:     w.Timeout,
 					Condition:   w.Condition,

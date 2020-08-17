@@ -91,12 +91,6 @@ func (t *BaseTablePrinter) PrintTable(rs ResourceStates,
 		linePrintCount += t.printSubTable(resource.SubResources(), "")
 	}
 
-	// If we have encountered an error, print that below the table.
-	if rs.Error() != nil {
-		lineCount := t.printError(rs.Error())
-		linePrintCount += lineCount
-	}
-
 	return linePrintCount
 }
 
@@ -141,14 +135,6 @@ func (t *BaseTablePrinter) printSubTable(resources []Resource,
 		linePrintCount += t.printSubTable(resource.SubResources(), prefix)
 	}
 	return linePrintCount
-}
-
-//TODO: This should be able to return the correct number of printed lines,
-// even if the error message has line breaks or is so long that it needs to
-// be wrapped over multiple lines.
-func (t *BaseTablePrinter) printError(err error) int {
-	t.printOrDie("\nFatal error: %v\n", err)
-	return 2 // This is the number of lines printed.
 }
 
 func (t *BaseTablePrinter) printOrDie(format string, a ...interface{}) {

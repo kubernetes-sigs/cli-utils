@@ -38,10 +38,16 @@ func NewCmdPreview(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *co
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Preview the apply of a configuration"),
 		Args:                  cobra.MaximumNArgs(1),
-		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(setters2.CheckRequiredSettersSet())
+		RunE: func(cmd *cobra.Command, args []string) error {
+			err := setters2.CheckRequiredSettersSet()
+			if err != nil {
+				return err
+			}
 			var ch <-chan event.Event
-			cmdutil.CheckErr(destroyer.Initialize(cmd, args))
+			err = destroyer.Initialize(cmd, args)
+			if err != nil {
+				return err
+			}
 
 			drs := common.DryRunClient
 			if serverDryRun {
@@ -55,13 +61,18 @@ func NewCmdPreview(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *co
 			// if destroy flag is set in preview, transmit it to destroyer DryRunStrategy flag
 			// and pivot execution to destroy with dry-run
 			if !destroyer.DryRunStrategy.ClientOrServerDryRun() {
-				cmdutil.CheckErr(applier.Initialize(cmd))
+				err = applier.Initialize(cmd)
+				if err != nil {
+					return err
+				}
 
 				// Create a context
 				ctx := context.Background()
 
 				_, err := common.DemandOneDirectory(args)
-				cmdutil.CheckErr(err)
+				if err != nil {
+					return err
+				}
 
 				var reader manifestreader.ManifestReader
 				readerOptions := manifestreader.ReaderOptions{
@@ -81,7 +92,9 @@ func NewCmdPreview(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *co
 					}
 				}
 				infos, err := reader.Read()
-				cmdutil.CheckErr(err)
+				if err != nil {
+					return err
+				}
 
 				// Run the applier. It will return a channel where we can receive updates
 				// to keep track of progress and any issues.
@@ -96,13 +109,13 @@ func NewCmdPreview(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *co
 
 			// The printer will print updates from the channel. It will block
 			// until the channel is closed.
-			printer.Print(ch, drs)
+			return printer.Print(ch, drs)
 		},
 	}
 
 	cmd.Flags().BoolVar(&noPrune, "no-prune", noPrune, "If true, do not prune previously applied objects.")
 	cmd.Flags().BoolVar(&serverDryRun, "server-side", serverDryRun, "If true, preview runs in the server instead of the client.")
-	cmdutil.CheckErr(applier.SetFlags(cmd))
+	applier.SetFlags(cmd)
 
 	// The following flags are added, but hidden because other code
 	// dependend on them when parsing flags. These flags are hidden and unused.

@@ -18,7 +18,7 @@ type Printer struct {
 	IOStreams genericclioptions.IOStreams
 }
 
-func (t *Printer) Print(ch <-chan event.Event, _ common.DryRunStrategy) {
+func (t *Printer) Print(ch <-chan event.Event, _ common.DryRunStrategy) error {
 	// Wait for the init event that will give us the set of
 	// resources.
 	var initEvent event.InitEvent
@@ -30,8 +30,7 @@ func (t *Printer) Print(ch <-chan event.Event, _ common.DryRunStrategy) {
 		// If we get an error event, we just print it and
 		// exit. The error event signals a fatal error.
 		if e.Type == event.ErrorType {
-			_, _ = fmt.Fprintf(t.IOStreams.Out, "Fatal error: %v\n", e.ErrorEvent.Err)
-			return
+			return e.ErrorEvent.Err
 		}
 	}
 	// Create a new collector and initialize it with the resources
@@ -49,7 +48,10 @@ func (t *Printer) Print(ch <-chan event.Event, _ common.DryRunStrategy) {
 
 	// Block until all the collector has shut down. This means the
 	// eventChannel has been closed and all events have been processed.
-	<-done
+	var err error
+	for msg := range done {
+		err = msg.err
+	}
 
 	// Close the stop channel to notify the print goroutine that it should
 	// shut down.
@@ -59,6 +61,7 @@ func (t *Printer) Print(ch <-chan event.Event, _ common.DryRunStrategy) {
 	// the printer has updated the UI with the latest state and
 	// exited from the goroutine.
 	<-printCompleted
+	return err
 }
 
 // columns defines the columns we want to print
@@ -135,6 +138,7 @@ func (t *Printer) runPrintLoop(coll *ResourceStateCollector, stop chan struct{})
 				ticker.Stop()
 				latestState := coll.LatestState()
 				linesPrinted = baseTablePrinter.PrintTable(latestState, linesPrinted)
+				_, _ = fmt.Fprint(t.IOStreams.Out, "\n")
 				return
 			case <-ticker.C:
 				latestState := coll.LatestState()

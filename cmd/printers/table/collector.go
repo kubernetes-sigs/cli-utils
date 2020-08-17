@@ -4,15 +4,12 @@
 package table
 
 import (
-	"bytes"
-	"fmt"
 	"sort"
 	"sync"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
-	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
 	pe "sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
 	"sigs.k8s.io/cli-utils/pkg/object"
@@ -148,31 +145,39 @@ func (r *SubResourceInfo) SubResources() []table.Resource {
 // The function returns a channel. When this channel is closed, the
 // goroutine has processed all events in the eventChannel and
 // exited.
-func (r *ResourceStateCollector) Listen(eventChannel <-chan event.Event) <-chan struct{} {
-	completed := make(chan struct{})
+func (r *ResourceStateCollector) Listen(eventChannel <-chan event.Event) <-chan listenerResult {
+	completed := make(chan listenerResult)
 	go func() {
 		defer close(completed)
-		for e := range eventChannel {
-			r.processEvent(e)
+		for ev := range eventChannel {
+			if err := r.processEvent(ev); err != nil {
+				completed <- listenerResult{err: err}
+				return
+			}
 		}
 	}()
 	return completed
 }
 
+type listenerResult struct {
+	err error
+}
+
 // processEvent processes an event and updates the state.
-func (r *ResourceStateCollector) processEvent(e event.Event) {
+func (r *ResourceStateCollector) processEvent(ev event.Event) error {
 	r.mux.Lock()
 	defer r.mux.Unlock()
-	switch e.Type {
+	switch ev.Type {
 	case event.StatusType:
-		r.processStatusEvent(e.StatusEvent)
+		r.processStatusEvent(ev.StatusEvent)
 	case event.ApplyType:
-		r.processApplyEvent(e.ApplyEvent)
+		r.processApplyEvent(ev.ApplyEvent)
 	case event.PruneType:
-		r.processPruneEvent(e.PruneEvent)
+		r.processPruneEvent(ev.PruneEvent)
 	case event.ErrorType:
-		r.processErrorEvent(e.ErrorEvent.Err)
+		return ev.ErrorEvent.Err
 	}
+	return nil
 }
 
 // processStatusEvent handles events pertaining to a status
@@ -215,38 +220,7 @@ func (r *ResourceStateCollector) processPruneEvent(e event.PruneEvent) {
 
 // processErrorEvent handles events for errors.
 func (r *ResourceStateCollector) processErrorEvent(err error) {
-	if timeoutErr, ok := taskrunner.IsTimeoutError(err); ok {
-		r.err = r.handleTimeoutError(timeoutErr)
-		return
-	}
 	r.err = err
-}
-
-// handleTimeoutError transforms a TimeoutError into a new error which includes
-// information about which resources failed to reach the desired status.
-func (r *ResourceStateCollector) handleTimeoutError(timeoutErr taskrunner.TimeoutError) error {
-	var errInfo ResourceInfos
-	for _, id := range timeoutErr.Identifiers {
-		ri, ok := r.resourceInfos[id]
-		if !ok {
-			continue
-		}
-		if timeoutErr.Condition.Meets(ri.resourceStatus.Status) {
-			continue
-		}
-		errInfo = append(errInfo, ri)
-	}
-	sort.Sort(errInfo)
-	var b bytes.Buffer
-	_, _ = fmt.Fprint(&b, timeoutErr.Error()+"\n")
-	for i, ri := range errInfo {
-		_, _ = fmt.Fprintf(&b, "%s/%s %s %s", ri.identifier.GroupKind.Kind,
-			ri.identifier.Name, ri.resourceStatus.Status, ri.resourceStatus.Message)
-		if i != len(errInfo)-1 {
-			_, _ = fmt.Fprint(&b, "\n")
-		}
-	}
-	return fmt.Errorf(b.String())
 }
 
 // toIdentifier extracts the identifying information from an

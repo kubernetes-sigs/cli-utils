@@ -23,9 +23,12 @@ func NewCmdDestroy(f util.Factory, ioStreams genericclioptions.IOStreams) *cobra
 		Use:                   "destroy (DIRECTORY | STDIN)",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Destroy all the resources related to configuration"),
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			paths := args
-			cmdutil.CheckErr(destroyer.Initialize(cmd, paths))
+			err := destroyer.Initialize(cmd, paths)
+			if err != nil {
+				return err
+			}
 
 			// Run the destroyer. It will return a channel where we can receive updates
 			// to keep track of progress and any issues.
@@ -33,11 +36,12 @@ func NewCmdDestroy(f util.Factory, ioStreams genericclioptions.IOStreams) *cobra
 
 			// The printer will print updates from the channel. It will block
 			// until the channel is closed.
-			printer.Print(ch, destroyer.DryRunStrategy)
+			err = printer.Print(ch, destroyer.DryRunStrategy)
+			return err
 		},
 	}
 
-	cmdutil.CheckErr(destroyer.SetFlags(cmd))
+	destroyer.SetFlags(cmd)
 
 	// The following flags are added, but hidden because other code
 	// dependencies when parsing flags. These flags are hidden and unused.

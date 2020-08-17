@@ -155,12 +155,12 @@ func (d *Destroyer) Run() <-chan event.Event {
 // SetFlags configures the command line flags needed for destroy
 // This is a temporary solution as we should separate the configuration
 // of cobra flags from the Destroyer.
-func (d *Destroyer) SetFlags(cmd *cobra.Command) error {
+func (d *Destroyer) SetFlags(cmd *cobra.Command) {
 	d.ApplyOptions.DeleteFlags.AddFlags(cmd)
 	for _, flag := range []string{"kustomize", "filename", "recursive"} {
 		err := cmd.Flags().MarkHidden(flag)
 		if err != nil {
-			return err
+			panic(err)
 		}
 	}
 	d.ApplyOptions.RecordFlags.AddFlags(cmd)
@@ -171,7 +171,6 @@ func (d *Destroyer) SetFlags(cmd *cobra.Command) error {
 	_ = cmd.Flags().MarkHidden("timeout")
 	_ = cmd.Flags().MarkHidden("wait")
 	d.ApplyOptions.Overwrite = true
-	return nil
 }
 
 // runPruneEventTransformer creates a channel for events and
