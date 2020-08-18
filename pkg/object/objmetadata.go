@@ -22,15 +22,30 @@ import (
 	"strconv"
 	"strings"
 
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/cli-runtime/pkg/resource"
 )
 
-// Separates inventory fields. This string is allowable as a
-// ConfigMap key, but it is not allowed as a character in
-// resource name.
-const fieldSeparator = "_"
+const (
+	// Separates inventory fields. This string is allowable as a
+	// ConfigMap key, but it is not allowed as a character in
+	// resource name.
+	fieldSeparator = "_"
+	// Transform colons in the RBAC resource names to double
+	// underscore.
+	colonTranscoded = "__"
+)
+
+// RBACGroupKind is a map of the RBAC resources. Needed since name validation
+// is different than other k8s resources.
+var RBACGroupKind = map[schema.GroupKind]bool{
+	{Group: rbacv1.GroupName, Kind: "Role"}:               true,
+	{Group: rbacv1.GroupName, Kind: "ClusterRole"}:        true,
+	{Group: rbacv1.GroupName, Kind: "RoleBinding"}:        true,
+	{Group: rbacv1.GroupName, Kind: "ClusterRoleBinding"}: true,
+}
 
 // ObjMetadata organizes and stores the indentifying information
 // for an object. This struct (as a string) is stored in a
@@ -52,7 +67,7 @@ func CreateObjMetadata(namespace string, name string, gk schema.GroupKind) (ObjM
 	}
 	// Manually validate name, since by the time k8s reports the error
 	// the invalid name has already been encoded into the inventory object.
-	if !validateNameChars(name) {
+	if !validateNameChars(name, gk) {
 		return ObjMetadata{}, fmt.Errorf("invalid characters in object name: %s", name)
 	}
 	if gk.Empty() {
@@ -65,9 +80,9 @@ func CreateObjMetadata(namespace string, name string, gk schema.GroupKind) (ObjM
 	}, nil
 }
 
-// validateNameChars returns false if the passed name string contains
-// any invalid characters; true otherwise. The allowed characters for
-// a Kubernetes resource name are:
+// validateNameChars returns false if the passed name is not a valid
+// resource name; true otherwise. For almost all resources, the following
+// characters are allowed:
 //
 //   Most resource types require a name that can be used as a DNS label name
 //   as defined in RFC 1123. This means the name must:
@@ -77,29 +92,56 @@ func CreateObjMetadata(namespace string, name string, gk schema.GroupKind) (ObjM
 //   * start with an alphanumeric character
 //   * end with an alphanumeric character
 //
-func validateNameChars(name string) bool {
+// For RBAC resources we also allow the colon character.
+func validateNameChars(name string, gk schema.GroupKind) bool {
+	if _, exists := RBACGroupKind[gk]; exists {
+		name = strings.ReplaceAll(name, ":", "")
+	}
 	errs := validation.IsDNS1123Subdomain(name)
 	return len(errs) == 0
 }
 
-// ParseObjMetadata takes a string, splits it into its five fields,
-// and returns a pointer to an ObjMetadata struct storing the
-// five fields. Example inventory string:
+// ParseObjMetadata takes a string, splits it into its four fields,
+// and returns an ObjMetadata struct storing the four fields.
+// Example inventory string:
 //
 //   test-namespace_test-name_apps_ReplicaSet
 //
 // Returns an error if unable to parse and create the ObjMetadata
 // struct.
-func ParseObjMetadata(inv string) (ObjMetadata, error) {
-	parts := strings.Split(inv, fieldSeparator)
-	if len(parts) == 4 {
-		gk := schema.GroupKind{
-			Group: strings.TrimSpace(parts[2]),
-			Kind:  strings.TrimSpace(parts[3]),
-		}
-		return CreateObjMetadata(parts[0], parts[1], gk)
+//
+// NOTE: name field can contain double underscore (__), which represents
+// a colon. RBAC resources can have this additional character (:) in their name.
+func ParseObjMetadata(s string) (ObjMetadata, error) {
+	// Parse first field namespace
+	index := strings.Index(s, fieldSeparator)
+	if index == -1 {
+		return ObjMetadata{}, fmt.Errorf("unable to parse stored object metadata: %s", s)
 	}
-	return ObjMetadata{}, fmt.Errorf("unable to decode inventory: %s", inv)
+	namespace := s[:index]
+	s = s[index+1:]
+	// Next, parse last field kind
+	index = strings.LastIndex(s, fieldSeparator)
+	if index == -1 {
+		return ObjMetadata{}, fmt.Errorf("unable to parse stored object metadata: %s", s)
+	}
+	kind := s[index+1:]
+	s = s[:index]
+	// Next, parse next to last field group
+	index = strings.LastIndex(s, fieldSeparator)
+	if index == -1 {
+		return ObjMetadata{}, fmt.Errorf("unable to parse stored object metadata: %s", s)
+	}
+	group := s[index+1:]
+	// Finally, second field name. Name may contain colon transcoded as double underscore.
+	name := s[:index]
+	name = strings.ReplaceAll(name, colonTranscoded, ":")
+	// Create the ObjMetadata object from the four parsed fields.
+	gk := schema.GroupKind{
+		Group: strings.TrimSpace(group),
+		Kind:  strings.TrimSpace(kind),
+	}
+	return CreateObjMetadata(namespace, name, gk)
 }
 
 // Equals compares two ObjMetadata and returns true if they are equal. This does
@@ -111,11 +153,17 @@ func (o *ObjMetadata) Equals(other *ObjMetadata) bool {
 	return *o == *other
 }
 
-// String create a string version of the ObjMetadata struct.
+// String create a string version of the ObjMetadata struct. For RBAC resources,
+// the "name" field transcodes ":" into double underscore for valid storing
+// as the label of a ConfigMap.
 func (o *ObjMetadata) String() string {
+	name := o.Name
+	if _, exists := RBACGroupKind[o.GroupKind]; exists {
+		name = strings.ReplaceAll(name, ":", colonTranscoded)
+	}
 	return fmt.Sprintf("%s%s%s%s%s%s%s",
 		o.Namespace, fieldSeparator,
-		o.Name, fieldSeparator,
+		name, fieldSeparator,
 		o.GroupKind.Group, fieldSeparator,
 		o.GroupKind.Kind)
 }

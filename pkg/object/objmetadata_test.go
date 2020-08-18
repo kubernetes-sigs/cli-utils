@@ -7,18 +7,19 @@ import (
 	"strings"
 	"testing"
 
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 func TestCreateObjMetadata(t *testing.T) {
-	tests := []struct {
+	tests := map[string]struct {
 		namespace string
 		name      string
 		gk        schema.GroupKind
 		expected  string
 		isError   bool
 	}{
-		{
+		"Namespace with only whitespace": {
 			namespace: "  \n",
 			name:      " test-name\t",
 			gk: schema.GroupKind{
@@ -28,7 +29,7 @@ func TestCreateObjMetadata(t *testing.T) {
 			expected: "_test-name_apps_ReplicaSet",
 			isError:  false,
 		},
-		{
+		"Name with leading/trailing whitespace": {
 			namespace: "test-namespace ",
 			name:      " test-name\t",
 			gk: schema.GroupKind{
@@ -38,8 +39,7 @@ func TestCreateObjMetadata(t *testing.T) {
 			expected: "test-namespace_test-name_apps_ReplicaSet",
 			isError:  false,
 		},
-		// Error with empty name.
-		{
+		"Empty name is an error": {
 			namespace: "test-namespace ",
 			name:      " \t",
 			gk: schema.GroupKind{
@@ -49,16 +49,14 @@ func TestCreateObjMetadata(t *testing.T) {
 			expected: "",
 			isError:  true,
 		},
-		// Error with empty GroupKind.
-		{
+		"Empty GroupKind is an error": {
 			namespace: "test-namespace",
 			name:      "test-name",
 			gk:        schema.GroupKind{},
 			expected:  "",
 			isError:   true,
 		},
-		// Error with invalid name characters "_".
-		{
+		"Underscore is invalid name character": {
 			namespace: "test-namespace",
 			name:      "test_name", // Invalid "_" character
 			gk: schema.GroupKind{
@@ -68,8 +66,7 @@ func TestCreateObjMetadata(t *testing.T) {
 			expected: "",
 			isError:  true,
 		},
-		// Error name not starting with alphanumeric char
-		{
+		"Name not starting with alphanumeric character is error": {
 			namespace: "test-namespace",
 			name:      "-test",
 			gk: schema.GroupKind{
@@ -79,8 +76,7 @@ func TestCreateObjMetadata(t *testing.T) {
 			expected: "",
 			isError:  true,
 		},
-		// Error name not ending with alphanumeric char
-		{
+		"Name not ending with alphanumeric character is error": {
 			namespace: "test-namespace",
 			name:      "test-",
 			gk: schema.GroupKind{
@@ -90,34 +86,56 @@ func TestCreateObjMetadata(t *testing.T) {
 			expected: "",
 			isError:  true,
 		},
+		"Colon is allowed in the name for RBAC resources": {
+			namespace: "test-namespace",
+			name:      "system::kube-scheduler",
+			gk: schema.GroupKind{
+				Group: rbacv1.GroupName,
+				Kind:  "Role",
+			},
+			expected: "test-namespace_system____kube-scheduler_rbac.authorization.k8s.io_Role",
+			isError:  false,
+		},
+		"Colon is not allowed in the name for non-RBAC resources": {
+			namespace: "test-namespace",
+			name:      "system::kube-scheduler",
+			gk: schema.GroupKind{
+				Group: "",
+				Kind:  "Pod",
+			},
+			expected: "",
+			isError:  true,
+		},
 	}
 
-	for _, test := range tests {
-		inv, err := CreateObjMetadata(test.namespace, test.name, test.gk)
-		if !test.isError {
-			if err != nil {
-				t.Errorf("Error creating ObjMetadata when it should have worked.")
-			} else if test.expected != inv.String() {
-				t.Errorf("Expected inventory\n(%s) != created inventory\n(%s)\n", test.expected, inv.String())
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			inv, err := CreateObjMetadata(tc.namespace, tc.name, tc.gk)
+			if !tc.isError {
+				if err != nil {
+					t.Errorf("Error creating ObjMetadata when it should have worked.")
+				} else if tc.expected != inv.String() {
+					t.Errorf("Expected inventory\n(%s) != created inventory\n(%s)\n", tc.expected, inv.String())
+				}
+				// Parsing back the just created inventory string to ObjMetadata,
+				// so that tests will catch any change to CreateObjMetadata that
+				// would break ParseObjMetadata.
+				expectedObjMetadata := &ObjMetadata{
+					Namespace: strings.TrimSpace(tc.namespace),
+					Name:      strings.TrimSpace(tc.name),
+					GroupKind: tc.gk,
+				}
+				actual, err := ParseObjMetadata(inv.String())
+				if err != nil {
+					t.Errorf("Error parsing back ObjMetadata, when it should have worked.")
+				} else if !expectedObjMetadata.Equals(&actual) {
+					t.Errorf("Expected inventory (%s) != parsed inventory (%s)\n", expectedObjMetadata, actual)
+				}
 			}
-			// Parsing back the just created inventory string to ObjMetadata,
-			// so that tests will catch any change to CreateObjMetadata that
-			// would break ParseObjMetadata.
-			expectedObjMetadata := &ObjMetadata{
-				Namespace: strings.TrimSpace(test.namespace),
-				Name:      strings.TrimSpace(test.name),
-				GroupKind: test.gk,
+			if tc.isError && err == nil {
+				t.Errorf("Should have returned an error in CreateObjMetadata()")
 			}
-			actual, err := ParseObjMetadata(inv.String())
-			if err != nil {
-				t.Errorf("Error parsing back ObjMetadata, when it should have worked.")
-			} else if !expectedObjMetadata.Equals(&actual) {
-				t.Errorf("Expected inventory (%s) != parsed inventory (%s)\n", expectedObjMetadata, actual)
-			}
-		}
-		if test.isError && err == nil {
-			t.Errorf("Should have returned an error in CreateObjMetadata()")
-		}
+		})
 	}
 }
 
@@ -206,12 +224,12 @@ func TestObjMetadataEquals(t *testing.T) {
 }
 
 func TestParseObjMetadata(t *testing.T) {
-	tests := []struct {
+	tests := map[string]struct {
 		invStr    string
 		inventory *ObjMetadata
 		isError   bool
 	}{
-		{
+		"Simple inventory string parse with empty namespace and whitespace": {
 			invStr: "_test-name_apps_ReplicaSet\t",
 			inventory: &ObjMetadata{
 				Name: "test-name",
@@ -222,7 +240,7 @@ func TestParseObjMetadata(t *testing.T) {
 			},
 			isError: false,
 		},
-		{
+		"Basic inventory string parse": {
 			invStr: "test-namespace_test-name_apps_Deployment",
 			inventory: &ObjMetadata{
 				Namespace: "test-namespace",
@@ -234,32 +252,85 @@ func TestParseObjMetadata(t *testing.T) {
 			},
 			isError: false,
 		},
-		// Not enough fields -- error
-		{
+		"RBAC resources can have colon (double underscore) in their name": {
+			invStr: "test-namespace_kubeadm__nodes-kubeadm-config_rbac.authorization.k8s.io_Role",
+			inventory: &ObjMetadata{
+				Namespace: "test-namespace",
+				Name:      "kubeadm:nodes-kubeadm-config",
+				GroupKind: schema.GroupKind{
+					Group: rbacv1.GroupName,
+					Kind:  "Role",
+				},
+			},
+			isError: false,
+		},
+		"RBAC resources can have double colon (double underscore) in their name": {
+			invStr: "test-namespace_system____leader-locking-kube-scheduler_rbac.authorization.k8s.io_Role",
+			inventory: &ObjMetadata{
+				Namespace: "test-namespace",
+				Name:      "system::leader-locking-kube-scheduler",
+				GroupKind: schema.GroupKind{
+					Group: rbacv1.GroupName,
+					Kind:  "Role",
+				},
+			},
+			isError: false,
+		},
+		"Test double underscore (colon) at beginning of name": {
+			invStr: "test-namespace___leader-locking-kube-scheduler_rbac.authorization.k8s.io_ClusterRole",
+			inventory: &ObjMetadata{
+				Namespace: "test-namespace",
+				Name:      ":leader-locking-kube-scheduler",
+				GroupKind: schema.GroupKind{
+					Group: rbacv1.GroupName,
+					Kind:  "ClusterRole",
+				},
+			},
+			isError: false,
+		},
+		"Test double underscore (colon) at end of name": {
+			invStr: "test-namespace_leader-locking-kube-scheduler___rbac.authorization.k8s.io_RoleBinding",
+			inventory: &ObjMetadata{
+				Namespace: "test-namespace",
+				Name:      "leader-locking-kube-scheduler:",
+				GroupKind: schema.GroupKind{
+					Group: rbacv1.GroupName,
+					Kind:  "RoleBinding",
+				},
+			},
+			isError: false,
+		},
+		"Not enough fields -- error": {
 			invStr:    "_test-name_apps",
 			inventory: &ObjMetadata{},
 			isError:   true,
 		},
-		// Too many fields
-		{
+		"Only one field (no separators) -- error": {
+			invStr:    "test-namespacetest-nametest-grouptest-kind",
+			inventory: &ObjMetadata{},
+			isError:   true,
+		},
+		"Too many fields": {
 			invStr:    "test-namespace_test-name_apps_foo_Deployment",
 			inventory: &ObjMetadata{},
 			isError:   true,
 		},
 	}
 
-	for _, test := range tests {
-		actual, err := ParseObjMetadata(test.invStr)
-		if !test.isError {
-			if err != nil {
-				t.Errorf("Error parsing inventory when it should have worked.")
-			} else if !test.inventory.Equals(&actual) {
-				t.Errorf("Expected inventory (%s) != parsed inventory (%s)\n", test.inventory, actual)
+	for tn, tc := range tests {
+		t.Run(tn, func(t *testing.T) {
+			actual, err := ParseObjMetadata(tc.invStr)
+			if !tc.isError {
+				if err != nil {
+					t.Errorf("Error parsing inventory when it should have worked: %s", err)
+				} else if !tc.inventory.Equals(&actual) {
+					t.Errorf("Expected inventory (%s) != parsed inventory (%s)\n", tc.inventory, actual)
+				}
 			}
-		}
-		if test.isError && err == nil {
-			t.Errorf("Should have returned an error in ParseObjMetadata()")
-		}
+			if tc.isError && err == nil {
+				t.Errorf("Should have returned an error in ParseObjMetadata()")
+			}
+		})
 	}
 }
 
