@@ -31,7 +31,7 @@ The library currently defines the following statuses for resource:
 * __InProgress__: The actual state of the resource has not yet reached the desired state as specified in the
 resource manifest, i.e. the resource reconcile has not yet completed. Newly created resources will usually 
 start with this status, although some resources like ConfigMaps are Current immediately.
-* __Failed__: The process of reconciling the actual state with the desired state has encountered and error
+* __Failed__: The process of reconciling the actual state with the desired state has encountered an error
 or it has made insufficient progress.
 * __Current__: The actual state of the resource matches the desired state. The reconcile process is considered
 complete until there are changes to either the desired or the actual state.
