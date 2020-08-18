@@ -160,7 +160,7 @@ func calcPackageNamespace(packageDir string) (string, error) {
 		if currentNamespace != rm.ObjectMeta.Namespace {
 			return "", errors.Errorf(
 				"resources belong to different namespaces, a namespace is required to create the resource " +
-					"used for keeping track of past apply operations. Please specify ---inv-namespace.")
+					"used for keeping track of past apply operations. Please specify ---inventory-namespace.")
 		}
 	}
 	// Return the default namespace if none found.
