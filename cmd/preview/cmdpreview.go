@@ -24,98 +24,26 @@ var (
 	previewDestroy = false
 )
 
-// NewCmdPreview creates the `preview` command
-func NewCmdPreview(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
-	applier := apply.NewApplier(f, ioStreams)
-	destroyer := apply.NewDestroyer(f, ioStreams)
-
-	printer := &apply.BasicPrinter{
-		IOStreams: ioStreams,
+// GetPreviewRunner creates and returns the PreviewRunner which stores the cobra command.
+func GetPreviewRunner(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *PreviewRunner {
+	r := &PreviewRunner{
+		Applier:   apply.NewApplier(f, ioStreams),
+		Destroyer: apply.NewDestroyer(f, ioStreams),
+		ioStreams: ioStreams,
+		factory:   f,
 	}
-
 	cmd := &cobra.Command{
 		Use:                   "preview (DIRECTORY | STDIN)",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Preview the apply of a configuration"),
 		Args:                  cobra.MaximumNArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			err := setters2.CheckRequiredSettersSet()
-			if err != nil {
-				return err
-			}
-			var ch <-chan event.Event
-			err = destroyer.Initialize(cmd, args)
-			if err != nil {
-				return err
-			}
-
-			drs := common.DryRunClient
-			if serverDryRun {
-				drs = common.DryRunServer
-			}
-
-			if previewDestroy {
-				destroyer.DryRunStrategy = drs
-			}
-
-			// if destroy flag is set in preview, transmit it to destroyer DryRunStrategy flag
-			// and pivot execution to destroy with dry-run
-			if !destroyer.DryRunStrategy.ClientOrServerDryRun() {
-				err = applier.Initialize(cmd)
-				if err != nil {
-					return err
-				}
-
-				// Create a context
-				ctx := context.Background()
-
-				_, err := common.DemandOneDirectory(args)
-				if err != nil {
-					return err
-				}
-
-				var reader manifestreader.ManifestReader
-				readerOptions := manifestreader.ReaderOptions{
-					Factory:   f,
-					Namespace: metav1.NamespaceDefault,
-				}
-				if len(args) == 0 {
-					reader = &manifestreader.StreamManifestReader{
-						ReaderName:    "stdin",
-						Reader:        cmd.InOrStdin(),
-						ReaderOptions: readerOptions,
-					}
-				} else {
-					reader = &manifestreader.PathManifestReader{
-						Path:          args[0],
-						ReaderOptions: readerOptions,
-					}
-				}
-				infos, err := reader.Read()
-				if err != nil {
-					return err
-				}
-
-				// Run the applier. It will return a channel where we can receive updates
-				// to keep track of progress and any issues.
-				ch = applier.Run(ctx, infos, apply.Options{
-					EmitStatusEvents: false,
-					NoPrune:          noPrune,
-					DryRunStrategy:   drs,
-				})
-			} else {
-				ch = destroyer.Run()
-			}
-
-			// The printer will print updates from the channel. It will block
-			// until the channel is closed.
-			return printer.Print(ch, drs)
-		},
+		RunE:                  r.RunE,
 	}
+
+	r.Applier.SetFlags(cmd)
 
 	cmd.Flags().BoolVar(&noPrune, "no-prune", noPrune, "If true, do not prune previously applied objects.")
 	cmd.Flags().BoolVar(&serverDryRun, "server-side", serverDryRun, "If true, preview runs in the server instead of the client.")
-	applier.SetFlags(cmd)
 
 	// The following flags are added, but hidden because other code
 	// dependend on them when parsing flags. These flags are hidden and unused.
@@ -131,5 +59,98 @@ func NewCmdPreview(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *co
 	_ = cmd.Flags().MarkHidden("force-conflicts")
 	_ = cmd.Flags().MarkHidden("field-manager")
 
-	return cmd
+	r.Command = cmd
+	return r
+}
+
+// PreviewCommand creates the PreviewRunner, returning the cobra command associated with it.
+func PreviewCommand(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+	return GetPreviewRunner(f, ioStreams).Command
+}
+
+// PreviewRunner encapsulates data necessary to run the preview command.
+type PreviewRunner struct {
+	Command   *cobra.Command
+	ioStreams genericclioptions.IOStreams
+	Applier   *apply.Applier
+	Destroyer *apply.Destroyer
+	factory   cmdutil.Factory
+}
+
+// RunE is the function run from the cobra command.
+func (r *PreviewRunner) RunE(cmd *cobra.Command, args []string) error {
+	err := setters2.CheckRequiredSettersSet()
+	if err != nil {
+		return err
+	}
+	var ch <-chan event.Event
+	err = r.Destroyer.Initialize(cmd, args)
+	if err != nil {
+		return err
+	}
+
+	drs := common.DryRunClient
+	if serverDryRun {
+		drs = common.DryRunServer
+	}
+
+	if previewDestroy {
+		r.Destroyer.DryRunStrategy = drs
+	}
+
+	// if destroy flag is set in preview, transmit it to destroyer DryRunStrategy flag
+	// and pivot execution to destroy with dry-run
+	if !r.Destroyer.DryRunStrategy.ClientOrServerDryRun() {
+		err = r.Applier.Initialize(cmd)
+		if err != nil {
+			return err
+		}
+
+		// Create a context
+		ctx := context.Background()
+
+		_, err := common.DemandOneDirectory(args)
+		if err != nil {
+			return err
+		}
+
+		var reader manifestreader.ManifestReader
+		readerOptions := manifestreader.ReaderOptions{
+			Factory:   r.factory,
+			Namespace: metav1.NamespaceDefault,
+		}
+		if len(args) == 0 {
+			reader = &manifestreader.StreamManifestReader{
+				ReaderName:    "stdin",
+				Reader:        cmd.InOrStdin(),
+				ReaderOptions: readerOptions,
+			}
+		} else {
+			reader = &manifestreader.PathManifestReader{
+				Path:          args[0],
+				ReaderOptions: readerOptions,
+			}
+		}
+		infos, err := reader.Read()
+		if err != nil {
+			return err
+		}
+
+		// Run the applier. It will return a channel where we can receive updates
+		// to keep track of progress and any issues.
+		ch = r.Applier.Run(ctx, infos, apply.Options{
+			EmitStatusEvents: false,
+			NoPrune:          noPrune,
+			DryRunStrategy:   drs,
+		})
+	} else {
+		ch = r.Destroyer.Run()
+	}
+
+	// The printer will print updates from the channel. It will block
+	// until the channel is closed.
+	printer := &apply.BasicPrinter{
+		IOStreams: r.ioStreams,
+	}
+	return printer.Print(ch, drs)
 }
