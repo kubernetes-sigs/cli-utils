@@ -76,7 +76,10 @@ func CheckErr(w io.Writer, err error, cmdNameBase string) {
 
 // textForError looks up the error message based on the type of the error.
 func textForError(baseErr error, cmdNameBase string) (string, bool) {
-	errType := findErrType(baseErr)
+	errType, found := findErrType(baseErr)
+	if !found {
+		return "", false
+	}
 	tmplText, found := errorMsgForType[errType]
 	if !found {
 		return "", false
@@ -102,23 +105,26 @@ func textForError(baseErr error, cmdNameBase string) (string, bool) {
 
 // findErrType finds the type of the error. It returns the real type in the
 // event the error is actually a pointer to a type.
-func findErrType(err error) reflect.Type {
+func findErrType(err error) (reflect.Type, bool) {
 	switch reflect.ValueOf(err).Kind() {
 	case reflect.Ptr:
 		// If the value of the interface is a pointer, we use the type
 		// of the real value.
-		return reflect.ValueOf(err).Elem().Type()
+		return reflect.ValueOf(err).Elem().Type(), true
 	case reflect.Struct:
-		return reflect.TypeOf(err)
+		return reflect.TypeOf(err), true
 	default:
-		panic("unexpected error type")
+		return nil, false
 	}
 }
 
 // findErrExitCode looks up if there is a defined error code for the provided
 // error type.
 func findErrExitCode(err error) int {
-	errType := findErrType(err)
+	errType, found := findErrType(err)
+	if !found {
+		return DefaultErrorExitCode
+	}
 	if exitStatus, found := statusCodeForType[errType]; found {
 		return exitStatus
 	}
