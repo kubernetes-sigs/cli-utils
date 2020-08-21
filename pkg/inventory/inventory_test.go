@@ -437,16 +437,6 @@ func TestLegacyInventoryName(t *testing.T) {
 			isModified: false,
 			isError:    true,
 		},
-		"Info name differs from object name should return error": {
-			info: &resource.Info{
-				Namespace: testNamespace,
-				Name:      inventoryObjName,
-				Object:    &legacyInvObj,
-			},
-			invName:    inventoryObjName,
-			isModified: false,
-			isError:    true,
-		},
 		"Legacy inventory name gets random suffix": {
 			info: &resource.Info{
 				Namespace: testNamespace,
