@@ -47,6 +47,11 @@ func TestTextForError(t *testing.T) {
 			cmdNameBase: "kapply",
 			expectFound: false,
 		},
+		"unknown error type": {
+			err:         sliceError{},
+			cmdNameBase: "kapply",
+			expectFound: false,
+		},
 		"timeout error": {
 			err: &taskrunner.TimeoutError{
 				Timeout: 2 * time.Second,
@@ -92,9 +97,13 @@ Deployment/foo InProgress
 			}
 
 			assert.True(t, found)
-
-			fmt.Printf("%s\n", errText)
 			assert.Contains(t, errText, strings.TrimSpace(tc.expectedErrText))
 		})
 	}
+}
+
+type sliceError []string
+
+func (s sliceError) Error() string {
+	return "this is a test"
 }
