@@ -117,10 +117,21 @@ func (r *ApplyRunner) RunE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	// Fetch the namespace from the configloader. The source of this
+	// either the namespace flag or the context. If the namespace is provided
+	// with the flag, enforceNamespace will be true. In this case, it is
+	// an error if any of the resources in the package has a different
+	// namespace set.
+	namespace, enforceNamespace, err := r.provider.Factory().ToRawKubeConfigLoader().Namespace()
+	if err != nil {
+		return err
+	}
+
 	var reader manifestreader.ManifestReader
 	readerOptions := manifestreader.ReaderOptions{
-		Factory:   r.provider.Factory(),
-		Namespace: metav1.NamespaceDefault,
+		Factory:          r.provider.Factory(),
+		Namespace:        namespace,
+		EnforceNamespace: enforceNamespace,
 	}
 	if len(args) == 0 {
 		reader = &manifestreader.StreamManifestReader{

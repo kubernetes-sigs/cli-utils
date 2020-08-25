@@ -11,6 +11,7 @@ import (
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/cli-utils/pkg/apply/solver"
+	"sigs.k8s.io/cli-utils/pkg/inventory"
 )
 
 // ManifestReader defines the interface for reading a set
@@ -53,6 +54,13 @@ func setNamespaces(factory util.Factory, infos []*resource.Info,
 
 	for _, inf := range infos {
 		accessor, _ := meta.Accessor(inf.Object)
+
+		// Exclude any inventory objects here since we don't want to change
+		// their namespace.
+		if inventory.IsInventoryObject(inf) {
+			continue
+		}
+
 		// if the resource already has the namespace set, we don't
 		// need to do anything
 		if ns := accessor.GetNamespace(); ns != "" {

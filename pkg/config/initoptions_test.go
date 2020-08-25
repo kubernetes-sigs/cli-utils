@@ -14,9 +14,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 )
-
-var ioStreams = genericclioptions.IOStreams{}
 
 // writeFile writes a file under the test directory
 func writeFile(t *testing.T, path string, value []byte) {
@@ -42,50 +41,171 @@ metadata:
   namespace: namespaceB
 `)
 
+var readFileC = []byte(`
+apiVersion: v1
+kind: Pod
+metadata:
+  name: objC
+`)
+
 func TestComplete(t *testing.T) {
-	d1, err := ioutil.TempDir("", "test-dir")
-	if !assert.NoError(t, err) {
-		assert.FailNow(t, err.Error())
-	}
-	defer os.RemoveAll(d1)
-
-	writeFile(t, filepath.Join(d1, "a_test.yaml"), readFileA)
-	writeFile(t, filepath.Join(d1, "b_test.yaml"), readFileB)
-
 	tests := map[string]struct {
-		args    []string
-		isError bool
+		args               []string
+		files              map[string][]byte
+		isError            bool
+		expectedErrMessage string
+		expectedNamespace  string
 	}{
 		"Empty args returns error": {
-			args:    []string{},
-			isError: true,
+			args:               []string{},
+			isError:            true,
+			expectedErrMessage: "need one 'directory' arg; have 0",
 		},
 		"More than one argument should fail": {
-			args:    []string{"foo", "bar"},
-			isError: true,
+			args:               []string{"foo", "bar"},
+			isError:            true,
+			expectedErrMessage: "need one 'directory' arg; have 2",
 		},
 		"Non-directory arg should fail": {
-			args:    []string{"foo"},
-			isError: true,
+			args:               []string{"foo"},
+			isError:            true,
+			expectedErrMessage: "invalid directory argument: foo",
 		},
 		"More than one namespace should fail": {
-			args:    []string{d1},
-			isError: true,
+			args: []string{},
+			files: map[string][]byte{
+				"a_test.yaml": readFileA,
+				"b_test.yaml": readFileB,
+			},
+			isError:            true,
+			expectedErrMessage: "resources belong to different namespaces",
+		},
+		"If at least one resource doesn't have namespace, it should use the default": {
+			args: []string{},
+			files: map[string][]byte{
+				"b_test.yaml": readFileB,
+				"c_test.yaml": readFileC,
+			},
+			isError:           false,
+			expectedNamespace: "foo",
+		},
+		"No resources without namespace should use the default namespace": {
+			args: []string{},
+			files: map[string][]byte{
+				"c_test.yaml": readFileC,
+			},
+			isError:           false,
+			expectedNamespace: "foo",
 		},
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			io := NewInitOptions(ioStreams)
-			err := io.Complete(tc.args)
-			if tc.isError && err == nil {
-				t.Errorf("Expected error, but did not receive one")
+			var err error
+			dir, err := ioutil.TempDir("", "test-dir")
+			if !assert.NoError(t, err) {
+				assert.FailNow(t, err.Error())
 			}
+			defer os.RemoveAll(dir)
+
+			for fileName, fileContent := range tc.files {
+				writeFile(t, filepath.Join(dir, fileName), fileContent)
+			}
+			if len(tc.files) > 0 {
+				tc.args = append(tc.args, dir)
+			}
+
+			tf := cmdtesting.NewTestFactory().WithNamespace("foo")
+			defer tf.Cleanup()
+			ioStreams, _, out, _ := genericclioptions.NewTestIOStreams()
+			io := NewInitOptions(tf, ioStreams)
+			err = io.Complete(tc.args)
+
+			if err != nil {
+				if !tc.isError {
+					t.Errorf("Expected error, but did not receive one")
+					return
+				}
+				assert.Contains(t, err.Error(), tc.expectedErrMessage)
+				return
+			}
+			assert.Contains(t, out.String(), tc.expectedNamespace)
 		})
 	}
 }
 
+func TestFindNamespace(t *testing.T) {
+	testCases := map[string]struct {
+		namespace         string
+		enforceNamespace  bool
+		files             map[string][]byte
+		expectedNamespace string
+	}{
+		"fallback to default": {
+			namespace:        "foo",
+			enforceNamespace: false,
+			files: map[string][]byte{
+				"a_test.yaml": readFileA,
+				"b_test.yaml": readFileB,
+			},
+			expectedNamespace: "foo",
+		},
+		"enforce namespace": {
+			namespace:        "bar",
+			enforceNamespace: true,
+			files: map[string][]byte{
+				"a_test.yaml": readFileA,
+			},
+			expectedNamespace: "bar",
+		},
+		"use namespace from resource if all the same": {
+			namespace:        "bar",
+			enforceNamespace: false,
+			files: map[string][]byte{
+				"a_test.yaml": readFileA,
+			},
+			expectedNamespace: "namespaceA",
+		},
+	}
+
+	for tn, tc := range testCases {
+		t.Run(tn, func(t *testing.T) {
+			var err error
+			dir, err := ioutil.TempDir("", "test-dir")
+			if !assert.NoError(t, err) {
+				assert.FailNow(t, err.Error())
+			}
+			defer os.RemoveAll(dir)
+
+			for fileName, fileContent := range tc.files {
+				writeFile(t, filepath.Join(dir, fileName), fileContent)
+			}
+
+			fakeLoader := &fakeNamespaceLoader{
+				namespace:        tc.namespace,
+				enforceNamespace: tc.enforceNamespace,
+			}
+
+			namespace, err := findNamespace(fakeLoader, dir)
+			assert.NoError(t, err)
+			assert.Equal(t, tc.expectedNamespace, namespace)
+		})
+	}
+}
+
+type fakeNamespaceLoader struct {
+	namespace        string
+	enforceNamespace bool
+}
+
+func (f *fakeNamespaceLoader) Namespace() (string, bool, error) {
+	return f.namespace, f.enforceNamespace, nil
+}
+
 func TestDefaultInventoryID(t *testing.T) {
-	io := NewInitOptions(ioStreams)
+	tf := cmdtesting.NewTestFactory().WithNamespace("foo")
+	defer tf.Cleanup()
+	ioStreams, _, _, _ := genericclioptions.NewTestIOStreams() //nolint:dogsled
+	io := NewInitOptions(tf, ioStreams)
 	actual, err := io.defaultInventoryID()
 	if err != nil {
 		t.Errorf("Unxpected error during UUID generation: %v", err)
@@ -172,7 +292,10 @@ func TestFillInValues(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			io := NewInitOptions(ioStreams)
+			tf := cmdtesting.NewTestFactory().WithNamespace("foo")
+			defer tf.Cleanup()
+			ioStreams, _, _, _ := genericclioptions.NewTestIOStreams() //nolint:dogsled
+			io := NewInitOptions(tf, ioStreams)
 			io.Namespace = tc.namespace
 			io.InventoryID = tc.inventoryID
 			actual := io.fillInValues()

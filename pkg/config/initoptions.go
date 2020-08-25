@@ -11,10 +11,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-errors/errors"
 	"github.com/google/uuid"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/kustomize/kyaml/kio"
 )
@@ -62,6 +61,8 @@ metadata:
 // InitOptions contains the fields necessary to generate a
 // inventory object template ConfigMap.
 type InitOptions struct {
+	factory cmdutil.Factory
+
 	ioStreams genericclioptions.IOStreams
 	// Package directory argument; must be valid directory.
 	Dir string
@@ -71,8 +72,9 @@ type InitOptions struct {
 	InventoryID string
 }
 
-func NewInitOptions(ioStreams genericclioptions.IOStreams) *InitOptions {
+func NewInitOptions(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *InitOptions {
 	return &InitOptions{
+		factory:   f,
 		ioStreams: ioStreams,
 	}
 }
@@ -89,14 +91,13 @@ func (i *InitOptions) Complete(args []string) error {
 		return err
 	}
 	i.Dir = dir
-	if len(i.Namespace) == 0 {
-		// Returns default namespace if no namespace found.
-		namespace, err := calcPackageNamespace(i.Dir)
-		if err != nil {
-			return err
-		}
-		i.Namespace = namespace
+
+	ns, err := findNamespace(i.factory.ToRawKubeConfigLoader(), i.Dir)
+	if err != nil {
+		return err
 	}
+	i.Namespace = ns
+
 	// Set the default inventory label if one does not exist.
 	if len(i.InventoryID) == 0 {
 		inventoryID, err := i.defaultInventoryID()
@@ -111,6 +112,35 @@ func (i *InitOptions) Complete(args []string) error {
 	// Output the calculated namespace used for inventory object.
 	fmt.Fprintf(i.ioStreams.Out, "namespace: %s is used for inventory object\n", i.Namespace)
 	return nil
+}
+
+type namespaceLoader interface {
+	Namespace() (string, bool, error)
+}
+
+// findNamespace looks up the namespace that should be used for the
+// inventory template of the package. If the namespace is specified with
+// the --namespace flag, it will be used no matter what. If not, this
+// will look at all the resource, and if all belong in the same namespace,
+// it will return that namespace. Otherwise, it will return the namespace
+// set in the context.
+func findNamespace(loader namespaceLoader, dir string) (string, error) {
+	namespace, enforceNamespace, err := loader.Namespace()
+	if err != nil {
+		return "", err
+	}
+	if enforceNamespace {
+		return namespace, nil
+	}
+
+	ns, allInSameNs, err := allInSameNamespace(dir)
+	if err != nil {
+		return "", err
+	}
+	if allInSameNs {
+		return ns, nil
+	}
+	return namespace, nil
 }
 
 // normalizeDir returns full absolute directory path of the
@@ -136,35 +166,36 @@ func isDirectory(path string) bool {
 	return false
 }
 
-// calcPackageNamespace returns the namespace of the package
-// config files. Assumes all namespaced resources are in the
-// same namespace. Returns the default namespace if none of the
-// config files has a namespace.
-func calcPackageNamespace(packageDir string) (string, error) {
+// allInSameNamespace goes through all resources in the package and
+// checks the namespace for all of them. If they all have the namespace
+// set and they all have the same value, this will return that namespace
+// and the second return value will be true. Otherwise, it will not return
+// a namespace and the second return value will be false.
+func allInSameNamespace(packageDir string) (string, bool, error) {
 	r := kio.LocalPackageReader{PackagePath: packageDir}
 	nodes, err := r.Read()
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
-	// Return the non-empty unique namespace if found. Cluster-scoped
-	// resources do not have namespace set.
-	currentNamespace := metav1.NamespaceDefault
+	var ns string
 	for _, node := range nodes {
 		rm, err := node.GetMeta()
-		if err != nil || len(rm.ObjectMeta.Namespace) == 0 {
-			continue
+		if err != nil {
+			return "", false, err
 		}
-		if currentNamespace == metav1.NamespaceDefault {
-			currentNamespace = rm.ObjectMeta.Namespace
+		if rm.Namespace == "" {
+			return "", false, nil
 		}
-		if currentNamespace != rm.ObjectMeta.Namespace {
-			return "", errors.Errorf(
-				"resources belong to different namespaces, a namespace is required to create the resource " +
-					"used for keeping track of past apply operations. Please specify ---inventory-namespace.")
+		if ns == "" {
+			ns = rm.Namespace
+		} else if rm.Namespace != ns {
+			return "", false, nil
 		}
 	}
-	// Return the default namespace if none found.
-	return currentNamespace, nil
+	if ns != "" {
+		return ns, true, nil
+	}
+	return "", false, nil
 }
 
 // defaultInventoryID returns a UUID string as a default unique

@@ -6,14 +6,15 @@ package initcmd
 import (
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"sigs.k8s.io/cli-utils/pkg/config"
 )
 
 // NewCmdInit creates the `init` command, which generates the
 // inventory object template ConfigMap for a package.
-func NewCmdInit(ioStreams genericclioptions.IOStreams) *cobra.Command {
-	io := config.NewInitOptions(ioStreams)
+func NewCmdInit(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+	io := config.NewInitOptions(f, ioStreams)
 	cmd := &cobra.Command{
 		Use:                   "init DIRECTORY",
 		DisableFlagsInUseLine: true,
@@ -27,6 +28,5 @@ func NewCmdInit(ioStreams genericclioptions.IOStreams) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&io.InventoryID, "inventory-id", "i", "", "Identifier for group of applied resources. Must be composed of valid label characters.")
-	cmd.Flags().StringVarP(&io.Namespace, "inventory-namespace", "", "", "namespace for the resources to be initialized")
 	return cmd
 }
