@@ -37,6 +37,7 @@ import (
 	pollevent "sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
 	"sigs.k8s.io/cli-utils/pkg/object"
+	"sigs.k8s.io/cli-utils/pkg/provider"
 )
 
 var (
@@ -216,7 +217,8 @@ func TestApplier(t *testing.T) {
 			tf.UnstructuredClient = newFakeRESTClient(t, tc.handlers)
 
 			ioStreams, _, _, _ := genericclioptions.NewTestIOStreams() //nolint:dogsled
-			applier := NewApplier(tf, ioStreams)
+			cf := provider.NewProvider(tf, nil)                        // nil InventoryFactoryFunc since not needed
+			applier := NewApplier(cf, ioStreams)
 
 			cmd := &cobra.Command{}
 			applier.SetFlags(cmd)

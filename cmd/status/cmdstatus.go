@@ -23,14 +23,15 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
 	"sigs.k8s.io/cli-utils/pkg/manifestreader"
+	"sigs.k8s.io/cli-utils/pkg/provider"
 	"sigs.k8s.io/cli-utils/pkg/util/factory"
 )
 
 func GetStatusRunner(f cmdutil.Factory) *StatusRunner {
+	provider := provider.NewProvider(f, inventory.WrapInventoryObj)
 	r := &StatusRunner{
-		factory:              f,
-		invClientFactoryFunc: inventoryClientFactoryFunc,
-		pollerFactoryFunc:    pollerFactoryFunc,
+		provider:          provider,
+		pollerFactoryFunc: pollerFactoryFunc,
 	}
 	c := &cobra.Command{
 		Use:  "status (DIRECTORY | STDIN)",
@@ -55,16 +56,15 @@ func StatusCommand(f cmdutil.Factory) *cobra.Command {
 // StatusRunner captures the parameters for the command and contains
 // the run function.
 type StatusRunner struct {
-	command *cobra.Command
-	factory cmdutil.Factory
+	command  *cobra.Command
+	provider provider.Provider
 
 	period    time.Duration
 	pollUntil string
 	timeout   time.Duration
 	output    string
 
-	invClientFactoryFunc func(cmdutil.Factory) (inventory.InventoryClient, error)
-	pollerFactoryFunc    func(cmdutil.Factory) (poller.Poller, error)
+	pollerFactoryFunc func(cmdutil.Factory) (poller.Poller, error)
 }
 
 // runE implements the logic of the command and will delegate to the
@@ -78,7 +78,7 @@ func (r *StatusRunner) runE(cmd *cobra.Command, args []string) error {
 
 	var reader manifestreader.ManifestReader
 	readerOptions := manifestreader.ReaderOptions{
-		Factory:   r.factory,
+		Factory:   r.provider.Factory(),
 		Namespace: metav1.NamespaceDefault,
 	}
 	if len(args) == 0 {
@@ -104,7 +104,7 @@ func (r *StatusRunner) runE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	invClient, err := r.invClientFactoryFunc(r.factory)
+	invClient, err := r.provider.InventoryClient()
 	if err != nil {
 		return err
 	}
@@ -122,7 +122,7 @@ func (r *StatusRunner) runE(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	statusPoller, err := r.pollerFactoryFunc(r.factory)
+	statusPoller, err := r.pollerFactoryFunc(r.provider.Factory())
 	if err != nil {
 		return err
 	}
@@ -207,8 +207,4 @@ func allKnownNotifierFunc(cancelFunc context.CancelFunc) collector.ObserverFunc 
 
 func pollerFactoryFunc(f cmdutil.Factory) (poller.Poller, error) {
 	return factory.NewStatusPoller(f)
-}
-
-func inventoryClientFactoryFunc(f cmdutil.Factory) (inventory.InventoryClient, error) {
-	return inventory.NewInventoryClient(f)
 }

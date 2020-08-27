@@ -36,8 +36,6 @@ type InventoryClient interface {
 	DeleteInventoryObj(inv *resource.Info) error
 	// SetDryRunStrategy sets the dry run strategy on whether this we actually mutate.
 	SetDryRunStrategy(drs common.DryRunStrategy)
-	// Sets the function to create the Inventory object.
-	SetInventoryFactoryFunc(fn InventoryFactoryFunc)
 }
 
 // ClusterInventoryClient is a concrete implementation of the
@@ -55,7 +53,7 @@ var _ InventoryClient = &ClusterInventoryClient{}
 
 // NewInventoryClient returns a concrete implementation of the
 // InventoryClient interface or an error.
-func NewInventoryClient(factory cmdutil.Factory) (*ClusterInventoryClient, error) {
+func NewInventoryClient(factory cmdutil.Factory, invFunc InventoryFactoryFunc) (*ClusterInventoryClient, error) {
 	var err error
 	mapper, err := factory.ToRESTMapper()
 	if err != nil {
@@ -72,7 +70,7 @@ func NewInventoryClient(factory cmdutil.Factory) (*ClusterInventoryClient, error
 		validator:            validator,
 		clientFunc:           factory.UnstructuredClientForMapping,
 		dryRunStrategy:       common.DryRunNone,
-		InventoryFactoryFunc: WrapInventoryObj,
+		InventoryFactoryFunc: invFunc,
 	}
 	return &clusterInventoryClient, nil
 }
@@ -390,10 +388,4 @@ func (cic *ClusterInventoryClient) DeleteInventoryObj(info *resource.Info) error
 // object in the cluster.
 func (cic *ClusterInventoryClient) SetDryRunStrategy(drs common.DryRunStrategy) {
 	cic.dryRunStrategy = drs
-}
-
-// SetDryRun sets whether the inventory client will mutate the inventory
-// object in the cluster.
-func (cic *ClusterInventoryClient) SetInventoryFactoryFunc(fn InventoryFactoryFunc) {
-	cic.InventoryFactoryFunc = fn
 }

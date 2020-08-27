@@ -9,12 +9,15 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"sigs.k8s.io/cli-utils/pkg/apply"
+	"sigs.k8s.io/cli-utils/pkg/inventory"
+	"sigs.k8s.io/cli-utils/pkg/provider"
 )
 
 // GetDestroyRunner creates and returns the DestroyRunner which stores the cobra command.
 func GetDestroyRunner(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *DestroyRunner {
+	provider := provider.NewProvider(f, inventory.WrapInventoryObj)
 	r := &DestroyRunner{
-		Destroyer: apply.NewDestroyer(f, ioStreams),
+		Destroyer: apply.NewDestroyer(provider, ioStreams),
 		ioStreams: ioStreams,
 	}
 	cmd := &cobra.Command{

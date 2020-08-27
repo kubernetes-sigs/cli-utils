@@ -14,7 +14,9 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/apply"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/common"
+	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/manifestreader"
+	"sigs.k8s.io/cli-utils/pkg/provider"
 	"sigs.k8s.io/kustomize/kyaml/setters2"
 )
 
@@ -26,11 +28,12 @@ var (
 
 // GetPreviewRunner creates and returns the PreviewRunner which stores the cobra command.
 func GetPreviewRunner(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *PreviewRunner {
+	provider := provider.NewProvider(f, inventory.WrapInventoryObj)
 	r := &PreviewRunner{
-		Applier:   apply.NewApplier(f, ioStreams),
-		Destroyer: apply.NewDestroyer(f, ioStreams),
+		Applier:   apply.NewApplier(provider, ioStreams),
+		Destroyer: apply.NewDestroyer(provider, ioStreams),
 		ioStreams: ioStreams,
-		factory:   f,
+		provider:  provider,
 	}
 	cmd := &cobra.Command{
 		Use:                   "preview (DIRECTORY | STDIN)",
@@ -74,7 +77,7 @@ type PreviewRunner struct {
 	ioStreams genericclioptions.IOStreams
 	Applier   *apply.Applier
 	Destroyer *apply.Destroyer
-	factory   cmdutil.Factory
+	provider  provider.Provider
 }
 
 // RunE is the function run from the cobra command.
@@ -116,7 +119,7 @@ func (r *PreviewRunner) RunE(cmd *cobra.Command, args []string) error {
 
 		var reader manifestreader.ManifestReader
 		readerOptions := manifestreader.ReaderOptions{
-			Factory:   r.factory,
+			Factory:   r.provider.Factory(),
 			Namespace: metav1.NamespaceDefault,
 		}
 		if len(args) == 0 {
