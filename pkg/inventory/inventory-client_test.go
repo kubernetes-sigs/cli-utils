@@ -56,7 +56,7 @@ func TestGetClusterInventoryInfo(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			invClient, _ := NewInventoryClient(tf)
+			invClient, _ := NewInventoryClient(tf, WrapInventoryObj)
 			fakeBuilder := FakeBuilder{}
 			fakeBuilder.SetInventoryObjs(tc.localObjs)
 			invClient.builderFunc = fakeBuilder.GetBuilder()
@@ -160,7 +160,7 @@ func TestMerge(t *testing.T) {
 			drs := common.Strategies[i]
 			t.Run(name, func(t *testing.T) {
 				// Create the local inventory object storing "tc.localObjs"
-				invClient, _ := NewInventoryClient(tf)
+				invClient, _ := NewInventoryClient(tf, WrapInventoryObj)
 				invClient.SetDryRunStrategy(drs)
 				// Create a fake builder to return "tc.clusterObjs" from
 				// the cluster inventory object.
@@ -246,7 +246,7 @@ func TestCreateInventory(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			invClient, _ := NewInventoryClient(tf)
+			invClient, _ := NewInventoryClient(tf, WrapInventoryObj)
 			inv := tc.inv
 			if inv != nil {
 				inv = storeObjsInInventory(tc.inv, tc.localObjs)
@@ -322,7 +322,7 @@ func TestReplace(t *testing.T) {
 		for i := range common.Strategies {
 			drs := common.Strategies[i]
 			t.Run(name, func(t *testing.T) {
-				invClient, _ := NewInventoryClient(tf)
+				invClient, _ := NewInventoryClient(tf, WrapInventoryObj)
 				invClient.SetDryRunStrategy(drs)
 				// Create fake builder returning the cluster inventory object
 				// storing the "tc.clusterObjs" objects.
@@ -378,7 +378,7 @@ func TestGetClusterObjs(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			invClient, _ := NewInventoryClient(tf)
+			invClient, _ := NewInventoryClient(tf, WrapInventoryObj)
 			// Create fake builder returning "tc.clusterObjs" from cluster inventory.
 			fakeBuilder := FakeBuilder{}
 			fakeBuilder.SetInventoryObjs(tc.clusterObjs)
@@ -457,7 +457,7 @@ func TestDeleteInventoryObj(t *testing.T) {
 		for i := range common.Strategies {
 			drs := common.Strategies[i]
 			t.Run(name, func(t *testing.T) {
-				invClient, _ := NewInventoryClient(tf)
+				invClient, _ := NewInventoryClient(tf, WrapInventoryObj)
 				invClient.SetDryRunStrategy(drs)
 				inv := tc.inv
 				if inv != nil {
@@ -555,7 +555,7 @@ func TestMergeInventoryObjs(t *testing.T) {
 		for i := range common.Strategies {
 			drs := common.Strategies[i]
 			t.Run(name, func(t *testing.T) {
-				invClient, _ := NewInventoryClient(tf)
+				invClient, _ := NewInventoryClient(tf, WrapInventoryObj)
 				invClient.SetDryRunStrategy(drs)
 				inventories := []*resource.Info{}
 				for _, i := range tc.invs {

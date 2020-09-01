@@ -17,15 +17,18 @@ import (
 	"sigs.k8s.io/cli-utils/cmd/printers"
 	"sigs.k8s.io/cli-utils/pkg/apply"
 	"sigs.k8s.io/cli-utils/pkg/common"
+	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/manifestreader"
+	"sigs.k8s.io/cli-utils/pkg/provider"
 	"sigs.k8s.io/kustomize/kyaml/setters2"
 )
 
 func GetApplyRunner(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *ApplyRunner {
+	provider := provider.NewProvider(f, inventory.WrapInventoryObj)
 	r := &ApplyRunner{
-		Applier:   apply.NewApplier(f, ioStreams),
+		Applier:   apply.NewApplier(provider, ioStreams),
 		ioStreams: ioStreams,
-		factory:   f,
+		provider:  provider,
 	}
 	cmd := &cobra.Command{
 		Use:                   "apply (DIRECTORY | STDIN)",
@@ -75,7 +78,7 @@ type ApplyRunner struct {
 	Command   *cobra.Command
 	ioStreams genericclioptions.IOStreams
 	Applier   *apply.Applier
-	factory   cmdutil.Factory
+	provider  provider.Provider
 
 	output                 string
 	period                 time.Duration
@@ -116,7 +119,7 @@ func (r *ApplyRunner) RunE(cmd *cobra.Command, args []string) error {
 
 	var reader manifestreader.ManifestReader
 	readerOptions := manifestreader.ReaderOptions{
-		Factory:   r.factory,
+		Factory:   r.provider.Factory(),
 		Namespace: metav1.NamespaceDefault,
 	}
 	if len(args) == 0 {

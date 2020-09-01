@@ -16,7 +16,6 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/kubectl/pkg/cmd/apply"
-	"k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/info"
 	"sigs.k8s.io/cli-utils/pkg/apply/poller"
@@ -27,6 +26,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/ordering"
+	"sigs.k8s.io/cli-utils/pkg/provider"
 	"sigs.k8s.io/cli-utils/pkg/util/factory"
 )
 
@@ -36,18 +36,17 @@ import (
 // the ApplyOptions were responsible for printing progress. This is now
 // handled by a separate printer with the KubectlPrinterAdapter bridging
 // between the two.
-func NewApplier(factory util.Factory, ioStreams genericclioptions.IOStreams) *Applier {
+func NewApplier(provider provider.Provider, ioStreams genericclioptions.IOStreams) *Applier {
 	applyOptions := apply.NewApplyOptions(ioStreams)
 	a := &Applier{
 		ApplyOptions: applyOptions,
 		// VisitedUids keeps track of the unique identifiers for all
 		// currently applied objects. Used to calculate prune set.
 		PruneOptions: prune.NewPruneOptions(applyOptions.VisitedUids),
-		factory:      factory,
+		provider:     provider,
 		ioStreams:    ioStreams,
 	}
 	a.infoHelperFactoryFunc = a.infoHelperFactory
-	a.InventoryFactoryFunc = inventory.WrapInventoryObj
 	return a
 }
 
@@ -62,7 +61,7 @@ func NewApplier(factory util.Factory, ioStreams genericclioptions.IOStreams) *Ap
 // parameters and/or the set of resources that needs to be applied to the
 // cluster, different sets of tasks might be needed.
 type Applier struct {
-	factory   util.Factory
+	provider  provider.Provider
 	ioStreams genericclioptions.IOStreams
 
 	ApplyOptions *apply.ApplyOptions
@@ -73,9 +72,6 @@ type Applier struct {
 	// infoHelperFactoryFunc is used to create a new instance of the
 	// InfoHelper. It is defined here so we can override it in unit tests.
 	infoHelperFactoryFunc func() info.InfoHelper
-	// InventoryFactoryFunc wraps and returns an interface for the
-	// object which will load and store the inventory.
-	InventoryFactoryFunc func(*resource.Info) inventory.Inventory
 }
 
 // Initialize sets up the Applier for actually doing an apply against
@@ -86,23 +82,21 @@ func (a *Applier) Initialize(cmd *cobra.Command) error {
 	a.ApplyOptions.DeleteFlags.FileNameFlags = &genericclioptions.FileNameFlags{
 		Filenames: &[]string{"-"},
 	}
-	err := a.ApplyOptions.Complete(a.factory, cmd)
+	err := a.ApplyOptions.Complete(a.provider.Factory(), cmd)
 	if err != nil {
 		return errors.WrapPrefix(err, "error setting up ApplyOptions", 1)
 	}
 	a.ApplyOptions.PostProcessorFn = nil // Turn off the default kubectl pruning
-	a.invClient, err = inventory.NewInventoryClient(a.factory)
+	a.invClient, err = a.provider.InventoryClient()
 	if err != nil {
 		return err
 	}
-	// Propagate inventory factory function to inventory client
-	a.invClient.SetInventoryFactoryFunc(a.InventoryFactoryFunc)
-	err = a.PruneOptions.Initialize(a.factory, a.invClient)
+	err = a.PruneOptions.Initialize(a.provider.Factory(), a.invClient)
 	if err != nil {
 		return errors.WrapPrefix(err, "error setting up PruneOptions", 1)
 	}
 
-	statusPoller, err := factory.NewStatusPoller(a.factory)
+	statusPoller, err := factory.NewStatusPoller(a.provider.Factory())
 	if err != nil {
 		return errors.WrapPrefix(err, "error creating resolver", 1)
 	}
@@ -133,7 +127,7 @@ func (a *Applier) SetFlags(cmd *cobra.Command) {
 
 // infoHelperFactory returns a new instance of the InfoHelper.
 func (a *Applier) infoHelperFactory() info.InfoHelper {
-	return info.NewInfoHelper(a.factory, a.ApplyOptions.Namespace)
+	return info.NewInfoHelper(a.provider.Factory(), a.ApplyOptions.Namespace)
 }
 
 // prepareObjects merges the currently applied objects into the
@@ -243,7 +237,7 @@ func (a *Applier) Run(ctx context.Context, objects []*resource.Info, options Opt
 			return
 		}
 
-		mapper, err := a.factory.ToRESTMapper()
+		mapper, err := a.provider.ToRESTMapper()
 		if err != nil {
 			handleError(eventChannel, err)
 			return

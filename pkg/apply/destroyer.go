@@ -13,11 +13,11 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/kubectl/pkg/cmd/apply"
-	"k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/prune"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
+	"sigs.k8s.io/cli-utils/pkg/provider"
 )
 
 // NewDestroyer returns a new destroyer. It will set up the ApplyOptions and
@@ -26,13 +26,13 @@ import (
 // the ApplyOptions were responsible for printing progress. This is now
 // handled by a separate printer with the KubectlPrinterAdapter bridging
 // between the two.
-func NewDestroyer(factory util.Factory, ioStreams genericclioptions.IOStreams) *Destroyer {
+func NewDestroyer(provider provider.Provider, ioStreams genericclioptions.IOStreams) *Destroyer {
 	return &Destroyer{
 		ApplyOptions: apply.NewApplyOptions(ioStreams),
 		// Create and maintain an empty set of UID's. This empty UID set
 		// is used during prune calculation to prune every object.
 		PruneOptions: prune.NewPruneOptions(sets.NewString()),
-		factory:      factory,
+		provider:     provider,
 		ioStreams:    ioStreams,
 	}
 }
@@ -40,7 +40,7 @@ func NewDestroyer(factory util.Factory, ioStreams genericclioptions.IOStreams) *
 // Destroyer performs the step of grabbing all the previous inventory objects and
 // prune them. This also deletes all the previous inventory objects
 type Destroyer struct {
-	factory        util.Factory
+	provider       provider.Provider
 	ioStreams      genericclioptions.IOStreams
 	ApplyOptions   *apply.ApplyOptions
 	PruneOptions   *prune.PruneOptions
@@ -57,16 +57,16 @@ func (d *Destroyer) Initialize(cmd *cobra.Command, paths []string) error {
 		return err
 	}
 	d.ApplyOptions.DeleteFlags.FileNameFlags = &fileNameFlags
-	err = d.ApplyOptions.Complete(d.factory, cmd)
+	err = d.ApplyOptions.Complete(d.provider.Factory(), cmd)
 	if err != nil {
 		return errors.WrapPrefix(err, "error setting up ApplyOptions", 1)
 	}
-	invClient, err := inventory.NewInventoryClient(d.factory)
+	invClient, err := d.provider.InventoryClient()
 	if err != nil {
 		return errors.WrapPrefix(err, "error creating inventory client", 1)
 	}
 	d.invClient = invClient
-	err = d.PruneOptions.Initialize(d.factory, invClient)
+	err = d.PruneOptions.Initialize(d.provider.Factory(), invClient)
 	if err != nil {
 		return errors.WrapPrefix(err, "error setting up PruneOptions", 1)
 	}
