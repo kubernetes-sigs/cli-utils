@@ -15,11 +15,11 @@ import (
 )
 
 // GetDestroyRunner creates and returns the DestroyRunner which stores the cobra command.
-func GetDestroyRunner(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *DestroyRunner {
-	provider := provider.NewProvider(f, inventory.WrapInventoryObj)
+func GetDestroyRunner(provider provider.Provider, ioStreams genericclioptions.IOStreams) *DestroyRunner {
 	r := &DestroyRunner{
 		Destroyer: apply.NewDestroyer(provider, ioStreams),
 		ioStreams: ioStreams,
+		provider:  provider,
 	}
 	cmd := &cobra.Command{
 		Use:                   "destroy (DIRECTORY | STDIN)",
@@ -48,7 +48,8 @@ func GetDestroyRunner(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) 
 
 // DestroyCommand creates the DestroyRunner, returning the cobra command associated with it.
 func DestroyCommand(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
-	return GetDestroyRunner(f, ioStreams).Command
+	provider := provider.NewProvider(f, inventory.WrapInventoryObj)
+	return GetDestroyRunner(provider, ioStreams).Command
 }
 
 // DestroyRunner encapsulates data necessary to run the destroy command.
@@ -56,6 +57,7 @@ type DestroyRunner struct {
 	Command   *cobra.Command
 	ioStreams genericclioptions.IOStreams
 	Destroyer *apply.Destroyer
+	provider  provider.Provider
 }
 
 func (r *DestroyRunner) RunE(cmd *cobra.Command, args []string) error {
@@ -64,9 +66,20 @@ func (r *DestroyRunner) RunE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	// Retrieve the inventory object.
+	reader := r.provider.ManifestReader(cmd.InOrStdin(), args)
+	infos, err := reader.Read()
+	if err != nil {
+		return err
+	}
+	inv, _, err := inventory.SplitInfos(infos)
+	if err != nil {
+		return err
+	}
+
 	// Run the destroyer. It will return a channel where we can receive updates
 	// to keep track of progress and any issues.
-	ch := r.Destroyer.Run()
+	ch := r.Destroyer.Run(inv)
 
 	// The printer will print updates from the channel. It will block
 	// until the channel is closed.

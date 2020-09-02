@@ -15,7 +15,6 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
-	"sigs.k8s.io/cli-utils/pkg/manifestreader"
 	"sigs.k8s.io/cli-utils/pkg/provider"
 	"sigs.k8s.io/kustomize/kyaml/setters2"
 )
@@ -27,8 +26,7 @@ var (
 )
 
 // GetPreviewRunner creates and returns the PreviewRunner which stores the cobra command.
-func GetPreviewRunner(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *PreviewRunner {
-	provider := provider.NewProvider(f, inventory.WrapInventoryObj)
+func GetPreviewRunner(provider provider.Provider, ioStreams genericclioptions.IOStreams) *PreviewRunner {
 	r := &PreviewRunner{
 		Applier:   apply.NewApplier(provider, ioStreams),
 		Destroyer: apply.NewDestroyer(provider, ioStreams),
@@ -68,7 +66,8 @@ func GetPreviewRunner(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) 
 
 // PreviewCommand creates the PreviewRunner, returning the cobra command associated with it.
 func PreviewCommand(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
-	return GetPreviewRunner(f, ioStreams).Command
+	provider := provider.NewProvider(f, inventory.WrapInventoryObj)
+	return GetPreviewRunner(provider, ioStreams).Command
 }
 
 // PreviewRunner encapsulates data necessary to run the preview command.
@@ -101,6 +100,12 @@ func (r *PreviewRunner) RunE(cmd *cobra.Command, args []string) error {
 		r.Destroyer.DryRunStrategy = drs
 	}
 
+	reader := r.provider.ManifestReader(cmd.InOrStdin(), args)
+	infos, err := reader.Read()
+	if err != nil {
+		return err
+	}
+
 	// if destroy flag is set in preview, transmit it to destroyer DryRunStrategy flag
 	// and pivot execution to destroy with dry-run
 	if !r.Destroyer.DryRunStrategy.ClientOrServerDryRun() {
@@ -117,39 +122,6 @@ func (r *PreviewRunner) RunE(cmd *cobra.Command, args []string) error {
 			return err
 		}
 
-		// Fetch the namespace from the configloader. The source of this
-		// either the namespace flag or the context. If the namespace is provided
-		// with the flag, enforceNamespace will be true. In this case, it is
-		// an error if any of the resources in the package has a different
-		// namespace set.
-		namespace, enforceNamespace, err := r.provider.Factory().ToRawKubeConfigLoader().Namespace()
-		if err != nil {
-			return err
-		}
-
-		var reader manifestreader.ManifestReader
-		readerOptions := manifestreader.ReaderOptions{
-			Factory:          r.provider.Factory(),
-			Namespace:        namespace,
-			EnforceNamespace: enforceNamespace,
-		}
-		if len(args) == 0 {
-			reader = &manifestreader.StreamManifestReader{
-				ReaderName:    "stdin",
-				Reader:        cmd.InOrStdin(),
-				ReaderOptions: readerOptions,
-			}
-		} else {
-			reader = &manifestreader.PathManifestReader{
-				Path:          args[0],
-				ReaderOptions: readerOptions,
-			}
-		}
-		infos, err := reader.Read()
-		if err != nil {
-			return err
-		}
-
 		// Run the applier. It will return a channel where we can receive updates
 		// to keep track of progress and any issues.
 		ch = r.Applier.Run(ctx, infos, apply.Options{
@@ -158,7 +130,11 @@ func (r *PreviewRunner) RunE(cmd *cobra.Command, args []string) error {
 			DryRunStrategy:   drs,
 		})
 	} else {
-		ch = r.Destroyer.Run()
+		inv, _, err := inventory.SplitInfos(infos)
+		if err != nil {
+			return err
+		}
+		ch = r.Destroyer.Run(inv)
 	}
 
 	// The printer will print updates from the channel. It will block

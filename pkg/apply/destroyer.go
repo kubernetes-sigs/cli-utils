@@ -78,51 +78,50 @@ func (d *Destroyer) Initialize(cmd *cobra.Command, paths []string) error {
 	return nil
 }
 
-// Run performs the destroy step. This happens asynchronously
-// on progress and any errors are reported back on the event channel.
-func (d *Destroyer) Run() <-chan event.Event {
+// Run performs the destroy step. Passes the inventory object. This
+// happens asynchronously on progress and any errors are reported
+// back on the event channel.
+func (d *Destroyer) Run(inv *resource.Info) <-chan event.Event {
 	ch := make(chan event.Event)
 
 	go func() {
 		defer close(ch)
 		d.invClient.SetDryRunStrategy(d.DryRunStrategy)
-		infos, err := d.ApplyOptions.GetObjects()
-		if err != nil {
-			ch <- event.Event{
-				Type: event.ErrorType,
-				ErrorEvent: event.ErrorEvent{
-					Err: errors.WrapPrefix(err, "error reading resource manifests", 1),
-				},
-			}
-			return
-		}
+
 		// Force a pruning of all cluster resources by clearing out the
 		// local resources, and sending only the inventory object to the
 		// prune.
-		invInfo, _, err := inventory.SplitInfos(infos)
-		if err != nil {
-			ch <- event.Event{
-				Type: event.ErrorType,
-				ErrorEvent: event.ErrorEvent{
-					Err: errors.WrapPrefix(err, "error clearing inventory object", 1),
-				},
-			}
-			return
-		}
-		infos = []*resource.Info{invInfo}
+		infos := []*resource.Info{inv}
 
 		// Start the event transformer goroutine so we can transform
 		// the Prune events emitted from the Prune function to Delete
 		// Events. That we use Prune to implement destroy is an
 		// implementation detail and the events should not be Prune events.
 		tempChannel, completedChannel := runPruneEventTransformer(ch)
-		err = d.PruneOptions.Prune(infos, tempChannel, prune.Options{
+		err := d.PruneOptions.Prune(infos, tempChannel, prune.Options{
 			DryRunStrategy:    d.DryRunStrategy,
 			PropagationPolicy: metav1.DeletePropagationBackground,
 		})
+		if err != nil {
+			ch <- event.Event{
+				Type: event.ErrorType,
+				ErrorEvent: event.ErrorEvent{
+					Err: errors.WrapPrefix(err, "error pruning resources in cluster", 1),
+				},
+			}
+			return
+		}
+
 		// Now delete the inventory object as well.
-		if invInfo != nil {
-			_ = d.invClient.DeleteInventoryObj(invInfo)
+		err = d.invClient.DeleteInventoryObj(inv)
+		if err != nil {
+			ch <- event.Event{
+				Type: event.ErrorType,
+				ErrorEvent: event.ErrorEvent{
+					Err: errors.WrapPrefix(err, "error deleting inventory object", 1),
+				},
+			}
+			return
 		}
 
 		// Close the tempChannel to signal to the event transformer that
