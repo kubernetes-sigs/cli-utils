@@ -5,14 +5,17 @@ package printers
 
 import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"sigs.k8s.io/cli-utils/cmd/printers/events"
+	"sigs.k8s.io/cli-utils/cmd/printers/json"
 	"sigs.k8s.io/cli-utils/cmd/printers/printer"
 	"sigs.k8s.io/cli-utils/cmd/printers/table"
-	"sigs.k8s.io/cli-utils/pkg/apply"
+	"sigs.k8s.io/cli-utils/pkg/print/list"
 )
 
 const (
 	EventsPrinter = "events"
 	TablePrinter  = "table"
+	JSONPrinter   = "json"
 )
 
 func GetPrinter(printerType string, ioStreams genericclioptions.IOStreams) printer.Printer {
@@ -21,15 +24,18 @@ func GetPrinter(printerType string, ioStreams genericclioptions.IOStreams) print
 		return &table.Printer{
 			IOStreams: ioStreams,
 		}
-	default:
-		return &apply.BasicPrinter{
-			IOStreams: ioStreams,
+	case JSONPrinter:
+		return &list.BaseListPrinter{
+			IOStreams:        ioStreams,
+			FormatterFactory: json.NewFormatter,
 		}
+	default:
+		return events.NewPrinter(ioStreams)
 	}
 }
 
 func SupportedPrinters() []string {
-	return []string{EventsPrinter, TablePrinter}
+	return []string{EventsPrinter, TablePrinter, JSONPrinter}
 }
 
 func DefaultPrinter() string {
