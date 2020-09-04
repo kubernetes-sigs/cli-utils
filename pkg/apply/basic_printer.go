@@ -157,9 +157,6 @@ func (b *BasicPrinter) processStatusEvent(se pollevent.Event, sc *statusCollecto
 	case pollevent.CompletedEvent:
 		sc.printStatus = false
 		p("all resources has reached the Current status")
-	case pollevent.AbortedEvent:
-		sc.printStatus = false
-		p("resources failed to the reached Current status")
 	}
 }
 
