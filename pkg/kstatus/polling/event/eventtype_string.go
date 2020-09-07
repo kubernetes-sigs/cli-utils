@@ -13,13 +13,12 @@ func _() {
 	var x [1]struct{}
 	_ = x[ResourceUpdateEvent-0]
 	_ = x[CompletedEvent-1]
-	_ = x[AbortedEvent-2]
-	_ = x[ErrorEvent-3]
+	_ = x[ErrorEvent-2]
 }
 
-const _EventType_name = "ResourceUpdateEventCompletedEventAbortedEventErrorEvent"
+const _EventType_name = "ResourceUpdateEventCompletedEventErrorEvent"
 
-var _EventType_index = [...]uint8{0, 19, 33, 45, 55}
+var _EventType_index = [...]uint8{0, 19, 33, 43}
 
 func (i EventType) String() string {
 	if i < 0 || i >= EventType(len(_EventType_index)-1) {
