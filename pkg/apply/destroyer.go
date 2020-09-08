@@ -70,6 +70,7 @@ func (d *Destroyer) Initialize(cmd *cobra.Command, paths []string) error {
 	if err != nil {
 		return errors.WrapPrefix(err, "error setting up PruneOptions", 1)
 	}
+	d.PruneOptions.Destroy = true
 
 	// Propagate dry-run flags.
 	d.ApplyOptions.DryRun = d.DryRunStrategy.ClientDryRun()

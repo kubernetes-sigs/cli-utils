@@ -389,40 +389,47 @@ func createNamespaceInfo(ns string) *resource.Info {
 	}
 }
 
-func TestValidateNamespace(t *testing.T) {
+func TestInventoryNamespaceInSet(t *testing.T) {
+	inventoryNamespace := createNamespaceInfo(namespace)
+
 	tests := map[string]struct {
-		objects []*resource.Info
-		err     error
+		inv       *resource.Info
+		objects   []*resource.Info
+		namespace *resource.Info
 	}{
-		"No resources is valid": {
-			objects: []*resource.Info{},
-			err:     nil,
+		"Nil inventory object, no resources returns nil namespace": {
+			inv:       nil,
+			objects:   []*resource.Info{},
+			namespace: nil,
 		},
-		"Resources other than namespace is valid": {
-			objects: []*resource.Info{obj1Info, obj2Info},
-			err:     nil,
+		"Inventory object, but no resources returns nil namespace": {
+			inv:       inventoryObjInfo,
+			objects:   []*resource.Info{},
+			namespace: nil,
 		},
-		"Different namespace resource is valid": {
-			objects: []*resource.Info{createNamespaceInfo("foo")},
-			err:     nil,
+		"Inventory object, resources with no namespace returns nil namespace": {
+			inv:       inventoryObjInfo,
+			objects:   []*resource.Info{obj1Info, obj2Info},
+			namespace: nil,
 		},
-		"Same namespace resource is not valid": {
-			objects: []*resource.Info{obj1Info, createNamespaceInfo(namespace)},
-			err: inventory.InventoryNamespaceInSet{
-				Namespace: namespace,
-			},
+		"Inventory object, different namespace returns nil namespace": {
+			inv:       inventoryObjInfo,
+			objects:   []*resource.Info{createNamespaceInfo("foo")},
+			namespace: nil,
+		},
+		"Inventory object, inventory namespace returns inventory namespace": {
+			inv:       inventoryObjInfo,
+			objects:   []*resource.Info{obj1Info, inventoryNamespace, obj3Info},
+			namespace: inventoryNamespace,
 		},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			err := validateNamespace(inventoryObjInfo, tc.objects)
-
-			if tc.err != nil {
-				assert.IsType(t, &inventory.InventoryNamespaceInSet{}, err)
-				return
+			actualNamespace := inventoryNamespaceInSet(tc.inv, tc.objects)
+			if tc.namespace != actualNamespace {
+				t.Fatalf("expected namespace (%v), got (%v)", tc.namespace, actualNamespace)
 			}
-			assert.NoError(t, err)
 		})
 	}
 }
@@ -486,11 +493,6 @@ func TestReadAndPrepareObjects(t *testing.T) {
 			localInfos:  []*resource.Info{obj1Info, obj2Info, clusterScopedObjInfo},
 			pruneIds:    []*resource.Info{},
 			isError:     false,
-		},
-		"namespace resource for the namespace used in inventory is not allowed": {
-			resources: []*resource.Info{obj1Info, obj2Info,
-				inventoryObjInfo, obj3Info, createNamespaceInfo(namespace)},
-			isError: true,
 		},
 	}
 

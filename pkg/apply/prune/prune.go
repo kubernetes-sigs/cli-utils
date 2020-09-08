@@ -41,13 +41,19 @@ type PruneOptions struct {
 	// structure is shared. IMPORTANT: the apply task must
 	// always complete before this prune is run.
 	currentUids sets.String
+	// True if we are destroying, which deletes the inventory object
+	// as well (possibly) the inventory namespace.
+	Destroy bool
 }
 
 // NewPruneOptions returns a struct (PruneOptions) encapsulating the necessary
 // information to run the prune. Returns an error if an error occurs
 // gathering this information.
 func NewPruneOptions(currentUids sets.String) *PruneOptions {
-	po := &PruneOptions{currentUids: currentUids}
+	po := &PruneOptions{
+		currentUids: currentUids,
+		Destroy:     false,
+	}
 	return po
 }
 
@@ -85,7 +91,8 @@ func (po *PruneOptions) Prune(localInfos []*resource.Info, eventChannel chan<- e
 	if err != nil {
 		return err
 	}
-	klog.V(4).Infof("prune local inventory object: %s/%s", localInv.Namespace, localInv.Name)
+	invNamespace := localInv.Namespace
+	klog.V(4).Infof("prune local inventory object: %s/%s", invNamespace, localInv.Name)
 	clusterObjs, err := po.InvClient.GetClusterObjs(localInv)
 	if err != nil {
 		return err
@@ -127,6 +134,15 @@ func (po *PruneOptions) Prune(localInfos []*resource.Info, eventChannel chan<- e
 			klog.V(7).Infof("prune object lifecycle directive; do not prune: %s", uid)
 			eventChannel <- createPruneEvent(obj, event.PruneSkipped)
 			continue
+		}
+		// If regular pruning (not destroying), skip deleting inventory namespace.
+		if !po.Destroy {
+			if clusterObj.GroupKind == object.CoreV1Namespace.GroupKind() &&
+				clusterObj.Name == invNamespace {
+				klog.V(7).Infof("skip pruning inventory namespace: %s", obj)
+				eventChannel <- createPruneEvent(obj, event.PruneSkipped)
+				continue
+			}
 		}
 		if !o.DryRunStrategy.ClientOrServerDryRun() {
 			klog.V(4).Infof("prune object delete: %s/%s", clusterObj.Namespace, clusterObj.Name)

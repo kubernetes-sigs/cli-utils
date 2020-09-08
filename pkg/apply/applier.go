@@ -10,7 +10,6 @@ import (
 
 	"github.com/go-errors/errors"
 	"github.com/spf13/cobra"
-	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -141,10 +140,11 @@ func (a *Applier) prepareObjects(infos []*resource.Info) (*ResourceObjects, erro
 		return nil, err
 	}
 
-	// Verify that the set of resources does not include the namespace
-	// in which we will place the inventory.
-	if err := validateNamespace(localInv, localInfos); err != nil {
-		return nil, err
+	// Ensures the namespace exists before applying the inventory object into it.
+	if invNamespace := inventoryNamespaceInSet(localInv, localInfos); invNamespace != nil {
+		if err = a.invClient.ApplyInventoryNamespace(invNamespace); err != nil {
+			return nil, err
+		}
 	}
 
 	currentObjs, err := object.InfosToObjMetas(localInfos)
@@ -342,22 +342,21 @@ func handleError(eventChannel chan event.Event, err error) {
 	}
 }
 
-var coreV1Namespace = v1.SchemeGroupVersion.WithKind("Namespace")
-
-// validateNamespace returns true if all the objects in the passed
-// infos parameter have the same namespace; false otherwise. Ignores
-// cluster-scoped resources.
-func validateNamespace(inv *resource.Info, infos []*resource.Info) error {
+// inventoryNamespaceInSet returns the the namespace the passed inventory
+// object will be applied to, or nil if this namespace object does not exist
+// in the passed slice "infos" or the inventory object is cluster-scoped.
+func inventoryNamespaceInSet(inv *resource.Info, infos []*resource.Info) *resource.Info {
+	if inv == nil || inv.Object == nil {
+		return nil
+	}
 	invAcc, _ := meta.Accessor(inv.Object)
 	invNamespace := invAcc.GetNamespace()
 
 	for _, info := range infos {
 		acc, _ := meta.Accessor(info.Object)
 		gvk := info.Object.GetObjectKind().GroupVersionKind()
-		if gvk == coreV1Namespace && acc.GetName() == invNamespace {
-			return &inventory.InventoryNamespaceInSet{
-				Namespace: invNamespace,
-			}
+		if gvk == object.CoreV1Namespace && acc.GetName() == invNamespace {
+			return info
 		}
 	}
 	return nil

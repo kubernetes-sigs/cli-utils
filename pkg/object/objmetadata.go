@@ -22,6 +22,7 @@ import (
 	"strconv"
 	"strings"
 
+	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -46,6 +47,9 @@ var RBACGroupKind = map[schema.GroupKind]bool{
 	{Group: rbacv1.GroupName, Kind: "RoleBinding"}:        true,
 	{Group: rbacv1.GroupName, Kind: "ClusterRoleBinding"}: true,
 }
+
+// CoreV1Namespace is Namespace GVK.
+var CoreV1Namespace = corev1.SchemeGroupVersion.WithKind("Namespace")
 
 // ObjMetadata organizes and stores the indentifying information
 // for an object. This struct (as a string) is stored in a
