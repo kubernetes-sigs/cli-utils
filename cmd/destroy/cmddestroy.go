@@ -8,6 +8,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/i18n"
+	"sigs.k8s.io/cli-utils/cmd/printers"
 	"sigs.k8s.io/cli-utils/pkg/apply"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/provider"
@@ -69,8 +70,6 @@ func (r *DestroyRunner) RunE(cmd *cobra.Command, args []string) error {
 
 	// The printer will print updates from the channel. It will block
 	// until the channel is closed.
-	printer := &apply.BasicPrinter{
-		IOStreams: r.ioStreams,
-	}
+	printer := printers.GetPrinter(printers.EventsPrinter, r.ioStreams)
 	return printer.Print(ch, r.Destroyer.DryRunStrategy)
 }
