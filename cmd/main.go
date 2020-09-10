@@ -55,7 +55,7 @@ func main() {
 	}
 
 	names := []string{"init", "apply", "preview", "diff", "destroy", "status"}
-	initCmd := initcmd.NewCmdInit(ioStreams)
+	initCmd := initcmd.NewCmdInit(f, ioStreams)
 	updateHelp(names, initCmd)
 	applyCmd := apply.ApplyCommand(f, ioStreams)
 	updateHelp(names, applyCmd)
