@@ -7,10 +7,13 @@ import (
 	"fmt"
 	"sort"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/klog"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/util"
 	"k8s.io/kubectl/pkg/validation"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/object"
@@ -36,6 +39,7 @@ type InventoryClient interface {
 	DeleteInventoryObj(inv *resource.Info) error
 	// SetDryRunStrategy sets the dry run strategy on whether this we actually mutate.
 	SetDryRunStrategy(drs common.DryRunStrategy)
+	ApplyInventoryNamespace(invNamespace *resource.Info) error
 }
 
 // ClusterInventoryClient is a concrete implementation of the
@@ -333,21 +337,12 @@ func (cic *ClusterInventoryClient) createInventoryObj(info *resource.Info) error
 	if err != nil {
 		return err
 	}
-	obj, err := object.InfoToObjMeta(info)
+	helper, err := cic.helperFromInfo(info)
 	if err != nil {
 		return err
 	}
-	mapping, err := cic.mapper.RESTMapping(obj.GroupKind)
-	if err != nil {
-		return err
-	}
-	client, err := cic.clientFunc(mapping)
-	if err != nil {
-		return err
-	}
-	helper := resource.NewHelper(client, mapping)
 	klog.V(4).Infof("creating inventory object: %s/%s", info.Namespace, info.Name)
-	var clearResourceVersion = true
+	var clearResourceVersion = false
 	createdObj, err := helper.Create(info.Namespace, clearResourceVersion, info.Object, nil)
 	if err != nil {
 		return err
@@ -366,19 +361,10 @@ func (cic *ClusterInventoryClient) DeleteInventoryObj(info *resource.Info) error
 	if info == nil {
 		return fmt.Errorf("attempting delete a nil inventory object")
 	}
-	obj, err := object.InfoToObjMeta(info)
+	helper, err := cic.helperFromInfo(info)
 	if err != nil {
 		return err
 	}
-	mapping, err := cic.mapper.RESTMapping(obj.GroupKind)
-	if err != nil {
-		return err
-	}
-	client, err := cic.clientFunc(mapping)
-	if err != nil {
-		return err
-	}
-	helper := resource.NewHelper(client, mapping)
 	klog.V(4).Infof("deleting inventory object: %s/%s", info.Namespace, info.Name)
 	_, err = helper.Delete(info.Namespace, info.Name)
 	return err
@@ -388,4 +374,49 @@ func (cic *ClusterInventoryClient) DeleteInventoryObj(info *resource.Info) error
 // object in the cluster.
 func (cic *ClusterInventoryClient) SetDryRunStrategy(drs common.DryRunStrategy) {
 	cic.dryRunStrategy = drs
+}
+
+// ApplyInventoryNamespace creates the passed namespace if it does not already
+// exist, or returns an error if one happened. NOTE: No error if already exists.
+func (cic *ClusterInventoryClient) ApplyInventoryNamespace(info *resource.Info) error {
+	if cic.dryRunStrategy.ClientOrServerDryRun() {
+		klog.V(4).Infof("dry-run apply inventory namespace (%s): not applied", info.Name)
+		return nil
+	}
+	helper, err := cic.helperFromInfo(info)
+	if err != nil {
+		return err
+	}
+	klog.V(4).Infof("applying inventory namespace: %s", info.Name)
+	if err := util.CreateApplyAnnotation(info.Object, unstructured.UnstructuredJSONScheme); err != nil {
+		return err
+	}
+	var clearResourceVersion = false
+	createdObj, err := helper.Create(info.Namespace, clearResourceVersion, info.Object, nil)
+	if err != nil {
+		if !apierrors.IsAlreadyExists(err) {
+			return err
+		}
+		return nil
+	}
+	var ignoreError = true
+	return info.Refresh(createdObj, ignoreError)
+}
+
+// helperFromInfo returns the resource.Helper to talk to the APIServer based
+// on the information from the passed "info", or an error if one occurred.
+func (cic *ClusterInventoryClient) helperFromInfo(info *resource.Info) (*resource.Helper, error) {
+	obj, err := object.InfoToObjMeta(info)
+	if err != nil {
+		return nil, err
+	}
+	mapping, err := cic.mapper.RESTMapping(obj.GroupKind)
+	if err != nil {
+		return nil, err
+	}
+	client, err := cic.clientFunc(mapping)
+	if err != nil {
+		return nil, err
+	}
+	return resource.NewHelper(client, mapping), nil
 }

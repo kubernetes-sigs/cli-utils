@@ -65,6 +65,13 @@ func (fic *FakeInventoryClient) DeleteInventoryObj(inv *resource.Info) error {
 
 func (fic *FakeInventoryClient) SetDryRunStrategy(drs common.DryRunStrategy) {}
 
+func (fic *FakeInventoryClient) ApplyInventoryNamespace(info *resource.Info) error {
+	if fic.Err != nil {
+		return fic.Err
+	}
+	return nil
+}
+
 // SetError forces an error on the subsequent client call if it returns an error.
 func (fic *FakeInventoryClient) SetError(err error) {
 	fic.Err = err
