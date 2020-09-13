@@ -4,6 +4,7 @@
 package manifestreader
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -14,6 +15,8 @@ import (
 	"k8s.io/cli-runtime/pkg/resource"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	"k8s.io/kubectl/pkg/scheme"
+	"sigs.k8s.io/cli-utils/pkg/object"
+	"sigs.k8s.io/kustomize/kyaml/kio/filters"
 )
 
 func TestSetNamespaces(t *testing.T) {
@@ -154,6 +157,78 @@ func TestSetNamespaces(t *testing.T) {
 	}
 }
 
+var (
+	depID = object.ObjMetadata{
+		GroupKind: schema.GroupKind{
+			Group: "apps",
+			Kind:  "Deployment",
+		},
+		Namespace: "default",
+		Name:      "foo",
+	}
+
+	clusterRoleID = object.ObjMetadata{
+		GroupKind: schema.GroupKind{
+			Group: "rbac.authorization.k8s.io",
+			Kind:  "ClusterRole",
+		},
+		Name: "bar",
+	}
+)
+
+func TestFilterLocalConfigs(t *testing.T) {
+	testCases := map[string]struct {
+		input    []*resource.Info
+		expected []string
+	}{
+		"don't filter if no annotation": {
+			input: []*resource.Info{
+				objMetaToInfo(depID),
+				objMetaToInfo(clusterRoleID),
+			},
+			expected: []string{
+				depID.Name,
+				clusterRoleID.Name,
+			},
+		},
+		"filter all if all have annotation": {
+			input: []*resource.Info{
+				addAnnotation(t, objMetaToInfo(depID), filters.LocalConfigAnnotation, "true"),
+				addAnnotation(t, objMetaToInfo(clusterRoleID), filters.LocalConfigAnnotation, "false"),
+			},
+			expected: []string{},
+		},
+		"filter even if resource have other annotations": {
+			input: []*resource.Info{
+				addAnnotation(t,
+					addAnnotation(
+						t, objMetaToInfo(depID),
+						filters.LocalConfigAnnotation, "true"),
+					"my-annotation", "foo"),
+			},
+			expected: []string{},
+		},
+	}
+
+	for tn, tc := range testCases {
+		t.Run(tn, func(t *testing.T) {
+			res := filterLocalConfig(tc.input)
+
+			var names []string
+			for _, inf := range res {
+				names = append(names, inf.Name)
+			}
+
+			// Avoid test failures due to nil slice and empty slice
+			// not being equal.
+			if len(tc.expected) == 0 && len(names) == 0 {
+				return
+			}
+			assert.Equal(t, tc.expected, names)
+		})
+	}
+}
+
 func toInfo(gvk schema.GroupVersionKind, namespace string) *resource.Info {
 	return &resource.Info{
 		Namespace: namespace,
@@ -186,4 +261,38 @@ func toCRDInfo(gvk schema.GroupVersionKind, gk schema.GroupKind,
 			},
 		},
 	}
+}
+
+func objMetaToInfo(id object.ObjMetadata) *resource.Info {
+	return &resource.Info{
+		Namespace: id.Namespace,
+		Name:      id.Name,
+		Object: &unstructured.Unstructured{
+			Object: map[string]interface{}{
+				"apiVersion": fmt.Sprintf("%s/v1", id.GroupKind.Group),
+				"kind":       id.GroupKind.Kind,
+				"metadata": map[string]interface{}{
+					"namespace": id.Namespace,
+					"name":      id.Name,
+				},
+			},
+		},
+	}
+}
+
+func addAnnotation(t *testing.T, info *resource.Info, name, val string) *resource.Info {
+	u := info.Object.(*unstructured.Unstructured)
+	annos, found, err := unstructured.NestedStringMap(u.Object, "metadata", "annotations")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !found {
+		annos = make(map[string]string)
+	}
+	annos[name] = val
+	err = unstructured.SetNestedStringMap(u.Object, annos, "metadata", "annotations")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return info
 }
