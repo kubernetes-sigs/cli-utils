@@ -48,6 +48,16 @@ metadata:
   name: objC
 `)
 
+var readFileD = []byte(`
+apiVersion: v1
+kind: Pod
+metadata:
+  name: objD
+  namespace: namespaceD
+  annotations:
+    config.kubernetes.io/local-config: "true"
+`)
+
 func TestComplete(t *testing.T) {
 	tests := map[string]struct {
 		args               []string
@@ -93,6 +103,23 @@ func TestComplete(t *testing.T) {
 			args: []string{},
 			files: map[string][]byte{
 				"c_test.yaml": readFileC,
+			},
+			isError:           false,
+			expectedNamespace: "foo",
+		},
+		"Resources with the LocalConfig annotation should be ignored": {
+			args: []string{},
+			files: map[string][]byte{
+				"b_test.yaml": readFileB,
+				"d_test.yaml": readFileD,
+			},
+			isError:           false,
+			expectedNamespace: "namespaceB",
+		},
+		"If all resources have the LocalConfig annotation use the default namespace": {
+			args: []string{},
+			files: map[string][]byte{
+				"d_test.yaml": readFileD,
 			},
 			isError:           false,
 			expectedNamespace: "foo",

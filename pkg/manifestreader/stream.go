@@ -42,6 +42,7 @@ func (r *StreamManifestReader) Read() ([]*resource.Info, error) {
 	if err != nil {
 		return nil, err
 	}
+	infos = filterLocalConfig(infos)
 
 	err = setNamespaces(r.Factory, infos, r.Namespace, r.EnforceNamespace)
 	if err != nil {

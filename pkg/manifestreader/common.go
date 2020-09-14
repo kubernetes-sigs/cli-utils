@@ -12,6 +12,7 @@ import (
 	"k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/cli-utils/pkg/apply/solver"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
+	"sigs.k8s.io/kustomize/kyaml/kio/filters"
 )
 
 // ManifestReader defines the interface for reading a set
@@ -121,4 +122,20 @@ func setNamespaces(factory util.Factory, infos []*resource.Info,
 	}
 
 	return nil
+}
+
+// filterLocalConfig returns a new slice of infos where all resources
+// with the LocalConfig annotation is filtered out.
+func filterLocalConfig(infos []*resource.Info) []*resource.Info {
+	var filterInfos []*resource.Info
+	for _, inf := range infos {
+		acc, _ := meta.Accessor(inf.Object)
+		// Ignoring the value of the LocalConfigAnnotation here. This is to be
+		// consistent with the behavior in the kyaml library:
+		// https://github.com/kubernetes-sigs/kustomize/blob/30b58e90a39485bc5724b2278651c5d26b815cb2/kyaml/kio/filters/local.go#L29
+		if _, found := acc.GetAnnotations()[filters.LocalConfigAnnotation]; !found {
+			filterInfos = append(filterInfos, inf)
+		}
+	}
+	return filterInfos
 }

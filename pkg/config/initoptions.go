@@ -16,6 +16,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/kustomize/kyaml/kio"
+	"sigs.k8s.io/kustomize/kyaml/kio/filters"
 )
 
 const (
@@ -177,6 +178,13 @@ func allInSameNamespace(packageDir string) (string, bool, error) {
 	if err != nil {
 		return "", false, err
 	}
+
+	// Filter out any resources with the LocalConfig annotation
+	nodes, err = (&filters.IsLocalConfig{}).Filter(nodes)
+	if err != nil {
+		return "", false, err
+	}
+
 	var ns string
 	for _, node := range nodes {
 		rm, err := node.GetMeta()
