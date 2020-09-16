@@ -15,6 +15,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/cli-utils/pkg/common"
+	"sigs.k8s.io/cli-utils/pkg/inventory/configmap"
 	"sigs.k8s.io/kustomize/kyaml/kio"
 	"sigs.k8s.io/kustomize/kyaml/kio/filters"
 )
@@ -22,42 +23,6 @@ import (
 const (
 	manifestFilename = "inventory-template.yaml"
 )
-const configMapTemplate = `# NOTE: auto-generated. Some fields should NOT be modified.
-# Date: <DATETIME>
-#
-# Contains the "inventory object" template ConfigMap.
-# When this object is applied, it is handled specially,
-# storing the metadata of all the other objects applied.
-# This object and its stored inventory is subsequently
-# used to calculate the set of objects to automatically
-# delete (prune), when an object is omitted from further
-# applies. When applied, this "inventory object" is also
-# used to identify the entire set of objects to delete.
-#
-# NOTE: The name of this inventory template file
-# (e.g. ` + manifestFilename + `) does NOT have any
-# impact on group-related functionality such as deletion
-# or pruning.
-#
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  # DANGER: Do not change the inventory object namespace.
-  # Changing the namespace will cause a loss of continuity
-  # with previously applied grouped objects. Set deletion
-  # and pruning functionality will be impaired.
-  namespace: <NAMESPACE>
-  # NOTE: The name of the inventory object does NOT have
-  # any impact on group-related functionality such as
-  # deletion or pruning.
-  name: inventory-<RANDOMSUFFIX>
-  labels:
-    # DANGER: Do not change the value of this label.
-    # Changing this value will cause a loss of continuity
-    # with previously applied grouped objects. Set deletion
-    # and pruning functionality will be impaired.
-    cli-utils.sigs.k8s.io/inventory-id: <INVENTORYID>
-`
 
 // InitOptions contains the fields necessary to generate a
 // inventory object template ConfigMap.
@@ -65,6 +30,8 @@ type InitOptions struct {
 	factory cmdutil.Factory
 
 	ioStreams genericclioptions.IOStreams
+	// Template string; must be a valid k8s resource.
+	Template string
 	// Package directory argument; must be valid directory.
 	Dir string
 	// Namespace for inventory object; can not be empty.
@@ -77,6 +44,7 @@ func NewInitOptions(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *I
 	return &InitOptions{
 		factory:   f,
 		ioStreams: ioStreams,
+		Template:  configmap.ConfigMapTemplate,
 	}
 }
 
@@ -250,7 +218,7 @@ func (i *InitOptions) fillInValues() string {
 	now := time.Now()
 	nowStr := now.Format("2006-01-02 15:04:05 MST")
 	randomSuffix := common.RandomStr(now.UTC().UnixNano())
-	manifestStr := configMapTemplate
+	manifestStr := i.Template
 	manifestStr = strings.ReplaceAll(manifestStr, "<DATETIME>", nowStr)
 	manifestStr = strings.ReplaceAll(manifestStr, "<NAMESPACE>", i.Namespace)
 	manifestStr = strings.ReplaceAll(manifestStr, "<RANDOMSUFFIX>", randomSuffix)
