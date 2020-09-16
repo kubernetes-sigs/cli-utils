@@ -27,6 +27,7 @@ fmt:
 	go fmt ./...
 
 generate:
+	(which $(GOPATH)/bin/stringer || go get golang.org/x/tools/cmd/stringer)
 	go generate ./...
 
 license:
