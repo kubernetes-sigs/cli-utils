@@ -135,7 +135,7 @@ func TestSetNamespaces(t *testing.T) {
 			tf := cmdtesting.NewTestFactory().WithNamespace("namespace")
 			defer tf.Cleanup()
 
-			err := setNamespaces(tf, tc.infos, tc.defaultNamspace, tc.enforceNamespace)
+			err := SetNamespaces(tf, tc.infos, tc.defaultNamspace, tc.enforceNamespace)
 
 			if tc.expectedErrText != "" {
 				if err == nil {
@@ -212,7 +212,7 @@ func TestFilterLocalConfigs(t *testing.T) {
 
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
-			res := filterLocalConfig(tc.input)
+			res := FilterLocalConfig(tc.input)
 
 			var names []string
 			for _, inf := range res {

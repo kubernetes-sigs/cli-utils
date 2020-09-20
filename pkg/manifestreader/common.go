@@ -15,29 +15,14 @@ import (
 	"sigs.k8s.io/kustomize/kyaml/kio/filters"
 )
 
-// ManifestReader defines the interface for reading a set
-// of manifests into info objects.
-type ManifestReader interface {
-	Read() ([]*resource.Info, error)
-}
-
-// ReaderOptions defines the shared inputs for the different
-// implementations of the ManifestReader interface.
-type ReaderOptions struct {
-	Factory          util.Factory
-	Validate         bool
-	Namespace        string
-	EnforceNamespace bool
-}
-
-// setNamespaces verifies that every namespaced resource has the namespace
+// SetNamespaces verifies that every namespaced resource has the namespace
 // set, and if one does not, it will set the namespace to the provided
 // defaultNamespace.
 // This implementation will check each resource (that doesn't already have
 // the namespace set) on whether it is namespace or cluster scoped. It does
 // this by first checking the RESTMapper, and it there is not match there,
 // it will look for CRDs in the provided Infos.
-func setNamespaces(factory util.Factory, infos []*resource.Info,
+func SetNamespaces(factory util.Factory, infos []*resource.Info,
 	defaultNamespace string, enforceNamespace bool) error {
 	mapper, err := factory.ToRESTMapper()
 	if err != nil {
@@ -124,9 +109,9 @@ func setNamespaces(factory util.Factory, infos []*resource.Info,
 	return nil
 }
 
-// filterLocalConfig returns a new slice of infos where all resources
+// FilterLocalConfig returns a new slice of infos where all resources
 // with the LocalConfig annotation is filtered out.
-func filterLocalConfig(infos []*resource.Info) []*resource.Info {
+func FilterLocalConfig(infos []*resource.Info) []*resource.Info {
 	var filterInfos []*resource.Info
 	for _, inf := range infos {
 		acc, _ := meta.Accessor(inf.Object)
