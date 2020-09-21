@@ -10,6 +10,7 @@ import (
 	"gotest.tools/assert"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/cli-runtime/pkg/resource"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
@@ -24,6 +25,7 @@ type resourceInfo struct {
 	kind       string
 	name       string
 	namespace  string
+	uid        types.UID
 	generation int64
 }
 
@@ -39,6 +41,7 @@ func TestApplyTask_FetchGeneration(t *testing.T) {
 					kind:       "Deployment",
 					name:       "foo",
 					namespace:  "default",
+					uid:        types.UID("my-uid"),
 					generation: int64(42),
 				},
 			},
@@ -50,6 +53,7 @@ func TestApplyTask_FetchGeneration(t *testing.T) {
 					apiVersion: "custom.io/v1beta1",
 					kind:       "Custom",
 					name:       "bar",
+					uid:        types.UID("uid-1"),
 					generation: int64(32),
 				},
 				{
@@ -57,6 +61,7 @@ func TestApplyTask_FetchGeneration(t *testing.T) {
 					apiVersion: "custom2.io/v1",
 					kind:       "Custom2",
 					name:       "foo",
+					uid:        types.UID("uid-2"),
 					generation: int64(1),
 				},
 			},
@@ -92,7 +97,10 @@ func TestApplyTask_FetchGeneration(t *testing.T) {
 					Name:      info.name,
 					Namespace: info.namespace,
 				}
-				gen := taskContext.ResourceGeneration(id)
+				uid, _ := taskContext.ResourceUID(id)
+				assert.Equal(t, info.uid, uid)
+
+				gen, _ := taskContext.ResourceGeneration(id)
 				assert.Equal(t, info.generation, gen)
 			}
 		})
@@ -294,6 +302,7 @@ func toInfos(rss []resourceInfo) []*resource.Info {
 					"metadata": map[string]interface{}{
 						"name":       rs.name,
 						"namespace":  rs.namespace,
+						"uid":        string(rs.uid),
 						"generation": rs.generation,
 					},
 				},

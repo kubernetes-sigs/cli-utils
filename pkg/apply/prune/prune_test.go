@@ -192,7 +192,7 @@ func TestPrune(t *testing.T) {
 		for i := range common.Strategies {
 			drs := common.Strategies[i]
 			t.Run(name, func(t *testing.T) {
-				po := NewPruneOptions(populateObjectIds(tc.currentInfos, t))
+				po := NewPruneOptions()
 				// Set up the previously applied objects.
 				clusterObjs, _ := object.InfosToObjMetas(tc.pastInfos)
 				po.InvClient = inventory.NewFakeInventoryClient(clusterObjs)
@@ -210,7 +210,7 @@ func TestPrune(t *testing.T) {
 				err := func() error {
 					defer close(eventChannel)
 					// Run the prune and validate.
-					return po.Prune(currentInfos, eventChannel, Options{
+					return po.Prune(currentInfos, populateObjectIds(tc.currentInfos, t), eventChannel, Options{
 						DryRunStrategy: drs,
 					})
 				}()

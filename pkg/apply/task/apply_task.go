@@ -119,8 +119,9 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 				if err != nil {
 					continue
 				}
+				uid := acc.GetUID()
 				gen := acc.GetGeneration()
-				taskContext.ResourceApplied(id, gen)
+				taskContext.ResourceApplied(id, uid, gen)
 			}
 		}
 		a.sendTaskResult(taskContext, nil)
