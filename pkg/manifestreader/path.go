@@ -45,9 +45,9 @@ func (p *PathManifestReader) Read() ([]*resource.Info, error) {
 	if err != nil {
 		return nil, err
 	}
-	infos = filterLocalConfig(infos)
+	infos = FilterLocalConfig(infos)
 
-	err = setNamespaces(p.Factory, infos, p.Namespace, p.EnforceNamespace)
+	err = SetNamespaces(p.Factory, infos, p.Namespace, p.EnforceNamespace)
 	if err != nil {
 		return nil, err
 	}
