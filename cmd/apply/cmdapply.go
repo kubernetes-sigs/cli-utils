@@ -18,13 +18,11 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/apply"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
-	"sigs.k8s.io/cli-utils/pkg/manifestreader"
 	"sigs.k8s.io/cli-utils/pkg/provider"
 	"sigs.k8s.io/kustomize/kyaml/setters2"
 )
 
-func GetApplyRunner(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *ApplyRunner {
-	provider := provider.NewProvider(f, inventory.WrapInventoryObj)
+func GetApplyRunner(provider provider.Provider, ioStreams genericclioptions.IOStreams) *ApplyRunner {
 	r := &ApplyRunner{
 		Applier:   apply.NewApplier(provider, ioStreams),
 		ioStreams: ioStreams,
@@ -71,7 +69,8 @@ func GetApplyRunner(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *A
 }
 
 func ApplyCommand(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
-	return GetApplyRunner(f, ioStreams).Command
+	provider := provider.NewProvider(f, inventory.WrapInventoryObj)
+	return GetApplyRunner(provider, ioStreams).Command
 }
 
 type ApplyRunner struct {
@@ -116,35 +115,7 @@ func (r *ApplyRunner) RunE(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-
-	// Fetch the namespace from the configloader. The source of this
-	// either the namespace flag or the context. If the namespace is provided
-	// with the flag, enforceNamespace will be true. In this case, it is
-	// an error if any of the resources in the package has a different
-	// namespace set.
-	namespace, enforceNamespace, err := r.provider.Factory().ToRawKubeConfigLoader().Namespace()
-	if err != nil {
-		return err
-	}
-
-	var reader manifestreader.ManifestReader
-	readerOptions := manifestreader.ReaderOptions{
-		Factory:          r.provider.Factory(),
-		Namespace:        namespace,
-		EnforceNamespace: enforceNamespace,
-	}
-	if len(args) == 0 {
-		reader = &manifestreader.StreamManifestReader{
-			ReaderName:    "stdin",
-			Reader:        cmd.InOrStdin(),
-			ReaderOptions: readerOptions,
-		}
-	} else {
-		reader = &manifestreader.PathManifestReader{
-			Path:          args[0],
-			ReaderOptions: readerOptions,
-		}
-	}
+	reader := r.provider.ManifestReader(cmd.InOrStdin(), args)
 	infos, err := reader.Read()
 	if err != nil {
 		return err

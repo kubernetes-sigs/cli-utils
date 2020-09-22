@@ -10,7 +10,6 @@ import (
 
 	"github.com/go-errors/errors"
 	"github.com/spf13/cobra"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/cli-utils/cmd/status/printers"
@@ -22,7 +21,6 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/collector"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
-	"sigs.k8s.io/cli-utils/pkg/manifestreader"
 	"sigs.k8s.io/cli-utils/pkg/provider"
 	"sigs.k8s.io/cli-utils/pkg/util/factory"
 )
@@ -76,23 +74,7 @@ func (r *StatusRunner) runE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	var reader manifestreader.ManifestReader
-	readerOptions := manifestreader.ReaderOptions{
-		Factory:   r.provider.Factory(),
-		Namespace: metav1.NamespaceDefault,
-	}
-	if len(args) == 0 {
-		reader = &manifestreader.StreamManifestReader{
-			ReaderName:    "stdin",
-			Reader:        cmd.InOrStdin(),
-			ReaderOptions: readerOptions,
-		}
-	} else {
-		reader = &manifestreader.PathManifestReader{
-			Path:          args[0],
-			ReaderOptions: readerOptions,
-		}
-	}
+	reader := r.provider.ManifestReader(cmd.InOrStdin(), args)
 	infos, err := reader.Read()
 	if err != nil {
 		return err
