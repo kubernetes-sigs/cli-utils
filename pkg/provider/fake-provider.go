@@ -40,7 +40,7 @@ func (f *FakeProvider) ToRESTMapper() (meta.RESTMapper, error) {
 	return f.factory.ToRESTMapper()
 }
 
-func (f *FakeProvider) ManifestReader(reader io.Reader, args []string) manifestreader.ManifestReader {
+func (f *FakeProvider) ManifestReader(reader io.Reader, args []string) (manifestreader.ManifestReader, error) {
 	readerOptions := manifestreader.ReaderOptions{
 		Factory:   f.factory,
 		Namespace: metav1.NamespaceDefault,
@@ -49,5 +49,5 @@ func (f *FakeProvider) ManifestReader(reader io.Reader, args []string) manifestr
 		ReaderName:    "stdin",
 		Reader:        reader,
 		ReaderOptions: readerOptions,
-	}
+	}, nil
 }

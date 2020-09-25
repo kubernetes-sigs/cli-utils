@@ -7,7 +7,6 @@ import (
 	"io"
 
 	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/manifestreader"
@@ -19,7 +18,7 @@ type Provider interface {
 	Factory() util.Factory
 	InventoryClient() (inventory.InventoryClient, error)
 	ToRESTMapper() (meta.RESTMapper, error)
-	ManifestReader(reader io.Reader, args []string) manifestreader.ManifestReader
+	ManifestReader(reader io.Reader, args []string) (manifestreader.ManifestReader, error)
 }
 
 // InventoryProvider implements the Provider interface.
@@ -52,7 +51,7 @@ func (f *InventoryProvider) ToRESTMapper() (meta.RESTMapper, error) {
 	return f.factory.ToRESTMapper()
 }
 
-func (f *InventoryProvider) ManifestReader(reader io.Reader, args []string) manifestreader.ManifestReader {
+func (f *InventoryProvider) ManifestReader(reader io.Reader, args []string) (manifestreader.ManifestReader, error) {
 	// Fetch the namespace from the configloader. The source of this
 	// either the namespace flag or the context. If the namespace is provided
 	// with the flag, enforceNamespace will be true. In this case, it is
@@ -60,8 +59,7 @@ func (f *InventoryProvider) ManifestReader(reader io.Reader, args []string) mani
 	// namespace set.
 	namespace, enforceNamespace, err := f.factory.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
-		namespace = metav1.NamespaceDefault
-		enforceNamespace = false
+		return nil, err
 	}
 
 	readerOptions := manifestreader.ReaderOptions{
@@ -83,5 +81,5 @@ func (f *InventoryProvider) ManifestReader(reader io.Reader, args []string) mani
 			ReaderOptions: readerOptions,
 		}
 	}
-	return mReader
+	return mReader, nil
 }
