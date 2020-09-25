@@ -115,7 +115,10 @@ func (r *ApplyRunner) RunE(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	reader := r.provider.ManifestReader(cmd.InOrStdin(), args)
+	reader, err := r.provider.ManifestReader(cmd.InOrStdin(), args)
+	if err != nil {
+		return err
+	}
 	infos, err := reader.Read()
 	if err != nil {
 		return err
