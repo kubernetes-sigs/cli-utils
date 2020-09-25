@@ -41,7 +41,7 @@ func NewApplier(provider provider.Provider, ioStreams genericclioptions.IOStream
 		ApplyOptions: applyOptions,
 		// VisitedUids keeps track of the unique identifiers for all
 		// currently applied objects. Used to calculate prune set.
-		PruneOptions: prune.NewPruneOptions(applyOptions.VisitedUids),
+		PruneOptions: prune.NewPruneOptions(),
 		provider:     provider,
 		ioStreams:    ioStreams,
 	}

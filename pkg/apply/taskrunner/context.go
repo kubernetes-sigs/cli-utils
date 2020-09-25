@@ -4,6 +4,8 @@
 package taskrunner
 
 import (
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
@@ -38,20 +40,40 @@ func (tc *TaskContext) EventChannel() chan event.Event {
 // ResourceApplied updates the context with information about the
 // resource identified by the provided id. Currently, we keep information
 // about the generation of the resource after the apply operation completed.
-func (tc *TaskContext) ResourceApplied(id object.ObjMetadata, gen int64) {
+func (tc *TaskContext) ResourceApplied(id object.ObjMetadata, uid types.UID, gen int64) {
 	tc.appliedResources[id] = applyInfo{
 		generation: gen,
+		uid:        uid,
 	}
+}
+
+// ResourceUID looks up the UID of the given resource
+func (tc *TaskContext) ResourceUID(id object.ObjMetadata) (types.UID, bool) {
+	ai, found := tc.appliedResources[id]
+	if !found {
+		return "", false
+	}
+	return ai.uid, true
+}
+
+// AllResourceUIDs returns a set with the UIDs of all the resources in the
+// context.
+func (tc *TaskContext) AllResourceUIDs() sets.String {
+	uids := sets.NewString()
+	for _, ai := range tc.appliedResources {
+		uids.Insert(string(ai.uid))
+	}
+	return uids
 }
 
 // ResourceGeneration looks up the generation of the given resource
 // after it was applied.
-func (tc *TaskContext) ResourceGeneration(id object.ObjMetadata) int64 {
+func (tc *TaskContext) ResourceGeneration(id object.ObjMetadata) (int64, bool) {
 	ai, found := tc.appliedResources[id]
 	if !found {
-		return 0
+		return 0, false
 	}
-	return ai.generation
+	return ai.generation, true
 }
 
 // applyInfo captures information about resources that have been
@@ -63,4 +85,7 @@ type applyInfo struct {
 	// that the APIServer increases every time the desired state of a
 	// resource changes.
 	generation int64
+
+	// uid captures the uid of the resource that has been applied.
+	uid types.UID
 }

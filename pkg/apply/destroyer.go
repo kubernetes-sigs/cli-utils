@@ -29,9 +29,7 @@ import (
 func NewDestroyer(provider provider.Provider, ioStreams genericclioptions.IOStreams) *Destroyer {
 	return &Destroyer{
 		ApplyOptions: apply.NewApplyOptions(ioStreams),
-		// Create and maintain an empty set of UID's. This empty UID set
-		// is used during prune calculation to prune every object.
-		PruneOptions: prune.NewPruneOptions(sets.NewString()),
+		PruneOptions: prune.NewPruneOptions(),
 		provider:     provider,
 		ioStreams:    ioStreams,
 	}
@@ -98,7 +96,7 @@ func (d *Destroyer) Run(inv *resource.Info) <-chan event.Event {
 		// Events. That we use Prune to implement destroy is an
 		// implementation detail and the events should not be Prune events.
 		tempChannel, completedChannel := runPruneEventTransformer(ch)
-		err := d.PruneOptions.Prune(infos, tempChannel, prune.Options{
+		err := d.PruneOptions.Prune(infos, sets.NewString(), tempChannel, prune.Options{
 			DryRunStrategy:    d.DryRunStrategy,
 			PropagationPolicy: metav1.DeletePropagationBackground,
 		})

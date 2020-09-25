@@ -27,7 +27,8 @@ type PruneTask struct {
 // to signal to the taskrunner that the task has completed (or failed).
 func (p *PruneTask) Start(taskContext *taskrunner.TaskContext) {
 	go func() {
-		err := p.PruneOptions.Prune(p.Objects, taskContext.EventChannel(),
+		currentUIDs := taskContext.AllResourceUIDs()
+		err := p.PruneOptions.Prune(p.Objects, currentUIDs, taskContext.EventChannel(),
 			prune.Options{
 				DryRunStrategy:    p.DryRunStrategy,
 				PropagationPolicy: p.PropagationPolicy,

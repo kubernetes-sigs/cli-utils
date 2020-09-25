@@ -36,11 +36,6 @@ type PruneOptions struct {
 	InvClient inventory.InventoryClient
 	client    dynamic.Interface
 	mapper    meta.RESTMapper
-	// Stores the UID for each of the currently applied objects.
-	// These UID's are written during the apply, and this data
-	// structure is shared. IMPORTANT: the apply task must
-	// always complete before this prune is run.
-	currentUids sets.String
 	// True if we are destroying, which deletes the inventory object
 	// as well (possibly) the inventory namespace.
 	Destroy bool
@@ -49,10 +44,9 @@ type PruneOptions struct {
 // NewPruneOptions returns a struct (PruneOptions) encapsulating the necessary
 // information to run the prune. Returns an error if an error occurs
 // gathering this information.
-func NewPruneOptions(currentUids sets.String) *PruneOptions {
+func NewPruneOptions() *PruneOptions {
 	po := &PruneOptions{
-		currentUids: currentUids,
-		Destroy:     false,
+		Destroy: false,
 	}
 	return po
 }
@@ -86,7 +80,8 @@ type Options struct {
 // (retrieved from previous inventory objects) but omitted in
 // the current apply. Prune also delete all previous inventory
 // objects. Returns an error if there was a problem.
-func (po *PruneOptions) Prune(localInfos []*resource.Info, eventChannel chan<- event.Event, o Options) error {
+func (po *PruneOptions) Prune(localInfos []*resource.Info, currentUIDs sets.String,
+	eventChannel chan<- event.Event, o Options) error {
 	localInv, localInfos, err := inventory.SplitInfos(localInfos)
 	if err != nil {
 		return err
@@ -97,7 +92,7 @@ func (po *PruneOptions) Prune(localInfos []*resource.Info, eventChannel chan<- e
 	if err != nil {
 		return err
 	}
-	klog.V(4).Infof("prune %d currently applied objects", len(po.currentUids))
+	klog.V(4).Infof("prune %d currently applied objects", len(currentUIDs))
 	klog.V(4).Infof("prune %d previously applied objects", len(clusterObjs))
 	// Sort the resources in reverse order using the same rules as is
 	// used for apply.
@@ -125,7 +120,7 @@ func (po *PruneOptions) Prune(localInfos []*resource.Info, eventChannel chan<- e
 		// object is part of the local apply set, skip it.
 		uid := string(metadata.GetUID())
 		klog.V(7).Infof("prune previously applied object UID: %s", uid)
-		if po.currentUids.Has(uid) {
+		if currentUIDs.Has(uid) {
 			klog.V(7).Infof("prune object in current apply; do not prune: %s", uid)
 			continue
 		}
