@@ -55,13 +55,13 @@ func (i *InitOptions) Complete(args []string) error {
 	if len(args) != 1 {
 		return fmt.Errorf("need one 'directory' arg; have %d", len(args))
 	}
-	dir, err := normalizeDir(args[0])
+	dir, err := NormalizeDir(args[0])
 	if err != nil {
 		return err
 	}
 	i.Dir = dir
 
-	ns, err := findNamespace(i.factory.ToRawKubeConfigLoader(), i.Dir)
+	ns, err := FindNamespace(i.factory.ToRawKubeConfigLoader(), i.Dir)
 	if err != nil {
 		return err
 	}
@@ -87,13 +87,13 @@ type namespaceLoader interface {
 	Namespace() (string, bool, error)
 }
 
-// findNamespace looks up the namespace that should be used for the
+// FindNamespace looks up the namespace that should be used for the
 // inventory template of the package. If the namespace is specified with
 // the --namespace flag, it will be used no matter what. If not, this
 // will look at all the resource, and if all belong in the same namespace,
 // it will return that namespace. Otherwise, it will return the namespace
 // set in the context.
-func findNamespace(loader namespaceLoader, dir string) (string, error) {
+func FindNamespace(loader namespaceLoader, dir string) (string, error) {
 	namespace, enforceNamespace, err := loader.Namespace()
 	if err != nil {
 		return "", err
@@ -112,12 +112,12 @@ func findNamespace(loader namespaceLoader, dir string) (string, error) {
 	return namespace, nil
 }
 
-// normalizeDir returns full absolute directory path of the
+// NormalizeDir returns full absolute directory path of the
 // passed directory or an error. This function cleans up paths
 // such as current directory (.), relative directories (..), or
 // multiple separators.
 //
-func normalizeDir(dirPath string) (string, error) {
+func NormalizeDir(dirPath string) (string, error) {
 	if !isDirectory(dirPath) {
 		return "", fmt.Errorf("invalid directory argument: %s", dirPath)
 	}

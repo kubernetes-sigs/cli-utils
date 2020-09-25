@@ -212,7 +212,7 @@ func TestFindNamespace(t *testing.T) {
 				enforceNamespace: tc.enforceNamespace,
 			}
 
-			namespace, err := findNamespace(fakeLoader, dir)
+			namespace, err := FindNamespace(fakeLoader, dir)
 			assert.NoError(t, err)
 			assert.Equal(t, tc.expectedNamespace, namespace)
 		})
