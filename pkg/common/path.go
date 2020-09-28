@@ -49,7 +49,7 @@ func DemandOneDirectory(paths []string) (genericclioptions.FileNameFlags, error)
 	result := genericclioptions.FileNameFlags{}
 	if len(paths) == 1 {
 		dirPath := paths[0]
-		if !isPathADirectory(dirPath) {
+		if !IsDir(dirPath) {
 			return result, fmt.Errorf("argument '%s' is not but must be a directory", dirPath)
 		}
 	}
@@ -61,9 +61,9 @@ func DemandOneDirectory(paths []string) (genericclioptions.FileNameFlags, error)
 	return result, nil
 }
 
-func isPathADirectory(name string) bool {
-	if fi, err := os.Stat(name); err == nil {
-		if fi.Mode().IsDir() {
+func IsDir(dir string) bool {
+	if f, err := os.Stat(dir); err == nil {
+		if f.Mode().IsDir() {
 			return true
 		}
 	}
