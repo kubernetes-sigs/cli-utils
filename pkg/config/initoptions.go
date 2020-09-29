@@ -118,21 +118,10 @@ func FindNamespace(loader namespaceLoader, dir string) (string, error) {
 // multiple separators.
 //
 func NormalizeDir(dirPath string) (string, error) {
-	if !isDirectory(dirPath) {
+	if !common.IsDir(dirPath) {
 		return "", fmt.Errorf("invalid directory argument: %s", dirPath)
 	}
 	return filepath.Abs(dirPath)
-}
-
-// isDirectory returns true if the passed path is a directory;
-// false otherwise.
-func isDirectory(path string) bool {
-	if d, err := os.Stat(path); err == nil {
-		if d.IsDir() {
-			return true
-		}
-	}
-	return false
 }
 
 // allInSameNamespace goes through all resources in the package and
