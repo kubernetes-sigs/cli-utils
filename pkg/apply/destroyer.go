@@ -12,7 +12,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
-	"k8s.io/kubectl/pkg/cmd/apply"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/prune"
 	"sigs.k8s.io/cli-utils/pkg/common"
@@ -28,7 +27,6 @@ import (
 // between the two.
 func NewDestroyer(provider provider.Provider, ioStreams genericclioptions.IOStreams) *Destroyer {
 	return &Destroyer{
-		ApplyOptions: apply.NewApplyOptions(ioStreams),
 		PruneOptions: prune.NewPruneOptions(),
 		provider:     provider,
 		ioStreams:    ioStreams,
@@ -40,7 +38,6 @@ func NewDestroyer(provider provider.Provider, ioStreams genericclioptions.IOStre
 type Destroyer struct {
 	provider       provider.Provider
 	ioStreams      genericclioptions.IOStreams
-	ApplyOptions   *apply.ApplyOptions
 	PruneOptions   *prune.PruneOptions
 	invClient      inventory.InventoryClient
 	DryRunStrategy common.DryRunStrategy
@@ -50,15 +47,6 @@ type Destroyer struct {
 // a cluster. This involves validating command line inputs and configuring
 // clients for communicating with the cluster.
 func (d *Destroyer) Initialize(cmd *cobra.Command, paths []string) error {
-	fileNameFlags, err := common.DemandOneDirectory(paths)
-	if err != nil {
-		return err
-	}
-	d.ApplyOptions.DeleteFlags.FileNameFlags = &fileNameFlags
-	err = d.ApplyOptions.Complete(d.provider.Factory(), cmd)
-	if err != nil {
-		return errors.WrapPrefix(err, "error setting up ApplyOptions", 1)
-	}
 	invClient, err := d.provider.InventoryClient()
 	if err != nil {
 		return errors.WrapPrefix(err, "error creating inventory client", 1)
@@ -69,10 +57,6 @@ func (d *Destroyer) Initialize(cmd *cobra.Command, paths []string) error {
 		return errors.WrapPrefix(err, "error setting up PruneOptions", 1)
 	}
 	d.PruneOptions.Destroy = true
-
-	// Propagate dry-run flags.
-	d.ApplyOptions.DryRun = d.DryRunStrategy.ClientDryRun()
-	d.ApplyOptions.ServerDryRun = d.DryRunStrategy.ServerDryRun()
 	return nil
 }
 
@@ -148,27 +132,6 @@ func (d *Destroyer) Run(inv *resource.Info) <-chan event.Event {
 		}
 	}()
 	return ch
-}
-
-// SetFlags configures the command line flags needed for destroy
-// This is a temporary solution as we should separate the configuration
-// of cobra flags from the Destroyer.
-func (d *Destroyer) SetFlags(cmd *cobra.Command) {
-	d.ApplyOptions.DeleteFlags.AddFlags(cmd)
-	for _, flag := range []string{"kustomize", "filename", "recursive"} {
-		err := cmd.Flags().MarkHidden(flag)
-		if err != nil {
-			panic(err)
-		}
-	}
-	d.ApplyOptions.RecordFlags.AddFlags(cmd)
-	_ = cmd.Flags().MarkHidden("record")
-	_ = cmd.Flags().MarkHidden("cascade")
-	_ = cmd.Flags().MarkHidden("force")
-	_ = cmd.Flags().MarkHidden("grace-period")
-	_ = cmd.Flags().MarkHidden("timeout")
-	_ = cmd.Flags().MarkHidden("wait")
-	d.ApplyOptions.Overwrite = true
 }
 
 // runPruneEventTransformer creates a channel for events and

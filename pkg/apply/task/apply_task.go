@@ -4,10 +4,16 @@
 package task
 
 import (
+	"io/ioutil"
+
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/kubectl/pkg/cmd/apply"
+	"k8s.io/kubectl/pkg/cmd/delete"
+	"k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/slice"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/info"
@@ -15,17 +21,6 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
-
-// ApplyTask applies the given Objects to the cluster
-// by using the ApplyOptions.
-type ApplyTask struct {
-	ApplyOptions   applyOptions
-	InfoHelper     info.InfoHelper
-	Mapper         meta.RESTMapper
-	Objects        []*resource.Info
-	CRDs           []*resource.Info
-	DryRunStrategy common.DryRunStrategy
-}
 
 // applyOptions defines the two key functions on the ApplyOptions
 // struct that is used by the ApplyTask.
@@ -40,6 +35,21 @@ type applyOptions interface {
 	SetObjects([]*resource.Info)
 }
 
+// ApplyTask applies the given Objects to the cluster
+// by using the ApplyOptions.
+type ApplyTask struct {
+	Factory        util.Factory
+	InfoHelper     info.InfoHelper
+	Mapper         meta.RESTMapper
+	Objects        []*resource.Info
+	CRDs           []*resource.Info
+	DryRunStrategy common.DryRunStrategy
+}
+
+// applyOptionsFactoryFunc is a factory function for creating a new
+// applyOptions implementation. Used to allow unit testing.
+var applyOptionsFactoryFunc = newApplyOptions
+
 // Start creates a new goroutine that will invoke
 // the Run function on the ApplyOptions to update
 // the cluster. It will push a TaskResult on the taskChannel
@@ -50,9 +60,6 @@ type applyOptions interface {
 // the desired state of a resource is changed.
 func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 	go func() {
-		// Update the dry-run field on the Applier.
-		a.setApplyOptionsFields(taskContext.EventChannel())
-
 		objects := a.Objects
 
 		// If this is a dry run, we need to handle situations where
@@ -100,15 +107,22 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 			a.sendTaskResult(taskContext, err)
 			return
 		}
-		a.ApplyOptions.SetObjects(objects)
-		err = a.ApplyOptions.Run()
+
+		// Create a new instance of the applyOptions interface and use it
+		// to apply the objects.
+		ao, err := applyOptionsFactoryFunc(taskContext.EventChannel(), a.DryRunStrategy, a.Factory)
+		if err != nil {
+			a.sendTaskResult(taskContext, err)
+			return
+		}
+		ao.SetObjects(objects)
+		err = ao.Run()
 		if err != nil {
 			a.sendTaskResult(taskContext, err)
 			return
 		}
 		// Fetch the Generation from all Infos after they have been
 		// applied.
-		//TODO: This isn't really needed if we are doing dry-run.
 		for _, obj := range objects {
 			id, err := object.InfoToObjMeta(obj)
 			if err != nil {
@@ -128,22 +142,52 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 	}()
 }
 
+func newApplyOptions(eventChannel chan event.Event, strategy common.DryRunStrategy, factory util.Factory) (applyOptions, error) {
+	discovery, err := factory.ToDiscoveryClient()
+	if err != nil {
+		return nil, err
+	}
+	dynamic, err := factory.DynamicClient()
+	if err != nil {
+		return nil, err
+	}
+
+	emptyString := ""
+	return &apply.ApplyOptions{
+		VisitedNamespaces: sets.NewString(),
+		VisitedUids:       sets.NewString(),
+		Overwrite:         true, // Normally set in apply.NewApplyOptions
+		OpenAPIPatch:      true, // Normally set in apply.NewApplyOptions
+		Recorder:          genericclioptions.NoopRecorder{},
+		IOStreams: genericclioptions.IOStreams{
+			Out:    ioutil.Discard,
+			ErrOut: ioutil.Discard, // TODO: Warning for no lastConfigurationAnnotation
+			// is printed directly to stderr in ApplyOptions. We
+			// should turn that into a warning on the event channel.
+		},
+		// FilenameOptions are not needed since we don't use the ApplyOptions
+		// to read manifests.
+		DeleteOptions: &delete.DeleteOptions{},
+		PrintFlags: &genericclioptions.PrintFlags{
+			OutputFormat: &emptyString,
+		},
+		// Setting the ServerSideApply here since it is needed for server-side
+		// dry-run. We don't yet support SSA.
+		ServerSideApply: strategy.ServerDryRun(),
+		FieldManager:    "kubectl", // TODO: Make this configurable
+		DryRun:          strategy.ClientOrServerDryRun(),
+		ServerDryRun:    strategy.ServerDryRun(),
+		ToPrinter: (&KubectlPrinterAdapter{
+			ch: eventChannel,
+		}).toPrinterFunc(),
+		DiscoveryClient: discovery,
+		DynamicClient:   dynamic,
+	}, nil
+}
+
 func (a *ApplyTask) sendTaskResult(taskContext *taskrunner.TaskContext, err error) {
 	taskContext.TaskChannel() <- taskrunner.TaskResult{
 		Err: err,
-	}
-}
-
-func (a *ApplyTask) setApplyOptionsFields(eventChannel chan event.Event) {
-	if ao, ok := a.ApplyOptions.(*apply.ApplyOptions); ok {
-		ao.DryRun = a.DryRunStrategy.ClientDryRun()
-		ao.ServerDryRun = a.DryRunStrategy.ServerDryRun()
-		adapter := &KubectlPrinterAdapter{
-			ch: eventChannel,
-		}
-		// The adapter is used to intercept what is meant to be printing
-		// in the ApplyOptions, and instead turn those into events.
-		ao.ToPrinter = adapter.toPrinterFunc()
 	}
 }
 

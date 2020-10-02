@@ -11,7 +11,6 @@ import (
 	"gotest.tools/assert"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/cli-runtime/pkg/resource"
-	"k8s.io/kubectl/pkg/cmd/apply"
 	"sigs.k8s.io/cli-utils/pkg/apply/prune"
 	"sigs.k8s.io/cli-utils/pkg/apply/task"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
@@ -21,7 +20,6 @@ import (
 )
 
 var (
-	applyOptions = &apply.ApplyOptions{}
 	pruneOptions = &prune.PruneOptions{}
 
 	depInfo    = createInfo("apps/v1", "Deployment", "foo", "bar")
@@ -217,7 +215,6 @@ func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
 			tqs := TaskQueueSolver{
-				ApplyOptions: applyOptions,
 				PruneOptions: pruneOptions,
 				Mapper:       testutil.NewFakeRESTMapper(),
 			}

@@ -28,20 +28,6 @@ func GetDestroyRunner(provider provider.Provider, ioStreams genericclioptions.IO
 		RunE:                  r.RunE,
 	}
 
-	r.Destroyer.SetFlags(cmd)
-
-	// The following flags are added, but hidden because other code
-	// dependencies when parsing flags. These flags are hidden and unused.
-	var unusedBool bool
-	cmd.Flags().BoolVar(&unusedBool, "dry-run", unusedBool, "NOT USED")
-	cmdutil.AddValidateFlags(cmd)
-	_ = cmd.Flags().MarkHidden("validate")
-	// Server-side flags are hidden for now.
-	cmdutil.AddServerSideApplyFlags(cmd)
-	_ = cmd.Flags().MarkHidden("server-side")
-	_ = cmd.Flags().MarkHidden("force-conflicts")
-	_ = cmd.Flags().MarkHidden("field-manager")
-
 	r.Command = cmd
 	return r
 }
