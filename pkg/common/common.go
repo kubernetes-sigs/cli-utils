@@ -35,7 +35,7 @@ const (
 // random number seeded with the parameter.
 func RandomStr(seed int64) string {
 	rand.Seed(seed)
-	randomInt := rand.Intn(maxRandInt)
+	randomInt := rand.Intn(maxRandInt) // nolint:gosec
 	return fmt.Sprintf("%08d", randomInt)
 }
 

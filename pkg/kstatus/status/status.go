@@ -63,7 +63,7 @@ func FromStringOrDie(text string) Status {
 // Result contains the results of a call to compute the status of
 // a resource.
 type Result struct {
-	//Status
+	// Status
 	Status Status
 	// Message
 	Message string

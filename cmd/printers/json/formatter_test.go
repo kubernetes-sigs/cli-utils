@@ -397,6 +397,7 @@ func TestFormatter_FormatDeleteEvent(t *testing.T) {
 	}
 }
 
+// nolint:unparam
 func assertOutput(t *testing.T, expectedMap map[string]interface{}, actual string) bool {
 	var m map[string]interface{}
 	err := json.Unmarshal([]byte(actual), &m)
