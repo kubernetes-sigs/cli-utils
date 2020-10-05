@@ -42,7 +42,7 @@ tidy:
 	go mod tidy
 
 lint:
-	(which $(GOPATH)/bin/golangci-lint || go get github.com/golangci/golangci-lint/cmd/golangci-lint@v1.19.1)
+	(which $(GOPATH)/bin/golangci-lint || go get github.com/golangci/golangci-lint/cmd/golangci-lint@v1.31.0)
 	$(GOPATH)/bin/golangci-lint run ./...
 
 test:

@@ -4,13 +4,12 @@ go 1.13
 
 require (
 	github.com/go-errors/errors v1.0.1
+	github.com/golangci/golangci-lint v1.31.0 // indirect
 	github.com/google/uuid v1.1.1
 	github.com/pkg/errors v0.9.1
 	github.com/spf13/cobra v1.0.0
-	github.com/stretchr/testify v1.4.0
-	golang.org/x/crypto v0.0.0-20191011191535-87dc89f01550 // indirect
-	golang.org/x/xerrors v0.0.0-20191011141410-1b5146add898 // indirect
-	gopkg.in/yaml.v3 v3.0.0-20200121175148-a6ecf24a6d71
+	github.com/stretchr/testify v1.6.1
+	gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c
 	gotest.tools v2.2.0+incompatible
 	k8s.io/api v0.17.2
 	k8s.io/apiextensions-apiserver v0.17.2

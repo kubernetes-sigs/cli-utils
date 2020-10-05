@@ -159,7 +159,7 @@ func (b *baseRunner) run(ctx context.Context, taskQueue chan Task,
 			// If the statusChannel has closed or we are preparing
 			// to abort the task processing, we just ignore all
 			// statusEvents.
-			//TODO(mortent): Check if a losed statusChannel might
+			// TODO(mortent): Check if a losed statusChannel might
 			// create a busy loop here.
 			if !ok || abort {
 				continue

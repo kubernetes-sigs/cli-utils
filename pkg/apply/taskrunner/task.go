@@ -74,7 +74,7 @@ func (w *WaitTask) Start(taskContext *TaskContext) {
 func (w *WaitTask) setTimer(taskContext *TaskContext) {
 	timer := time.NewTimer(w.Timeout)
 	go func() {
-		//TODO(mortent): See if there is a better way to do this. This
+		// TODO(mortent): See if there is a better way to do this. This
 		// solution will cause the goroutine to hang forever if the
 		// Timeout is cancelled.
 		<-timer.C
