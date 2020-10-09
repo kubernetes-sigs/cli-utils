@@ -5,7 +5,7 @@ package event
 
 import (
 	"k8s.io/apimachinery/pkg/runtime"
-	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
+	pollevent "sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
@@ -43,7 +43,7 @@ type Event struct {
 
 	// StatusEvents contains information about the status of one of
 	// the applied resources.
-	StatusEvent event.Event
+	StatusEvent StatusEvent
 
 	// PruneEvent contains information about objects that have been
 	// pruned.
@@ -97,6 +97,19 @@ type ApplyEvent struct {
 	Type      ApplyEventType
 	Operation ApplyEventOperation
 	Object    runtime.Object
+}
+
+//go:generate stringer -type=StatusEventType
+type StatusEventType int
+
+const (
+	StatusEventResourceUpdate StatusEventType = iota
+	StatusEventCompleted
+)
+
+type StatusEvent struct {
+	Type     StatusEventType
+	Resource *pollevent.ResourceStatus
 }
 
 //go:generate stringer -type=PruneEventType

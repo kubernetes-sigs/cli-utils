@@ -181,8 +181,11 @@ func (b *baseRunner) run(ctx context.Context, taskQueue chan Task,
 			if o.emitStatusEvents {
 				// Forward all normal events to the eventChannel
 				eventChannel <- event.Event{
-					Type:        event.StatusType,
-					StatusEvent: statusEvent,
+					Type: event.StatusType,
+					StatusEvent: event.StatusEvent{
+						Type:     event.StatusEventResourceUpdate,
+						Resource: statusEvent.Resource,
+					},
 				}
 			}
 

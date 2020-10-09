@@ -99,7 +99,7 @@ func TestFormatter_FormatApplyEvent(t *testing.T) {
 				ServersideApplied: 1,
 			},
 			statusCollector: &fakeCollector{
-				m: map[object.ObjMetadata]pollevent.Event{
+				m: map[object.ObjMetadata]event.StatusEvent{
 					object.ObjMetadata{ //nolint:gofmt
 						GroupKind: schema.GroupKind{
 							Group: "apps",
@@ -163,14 +163,14 @@ func TestFormatter_FormatApplyEvent(t *testing.T) {
 func TestFormatter_FormatStatusEvent(t *testing.T) {
 	testCases := map[string]struct {
 		previewStrategy common.DryRunStrategy
-		event           pollevent.Event
+		event           event.StatusEvent
 		statusCollector list.Collector
 		expected        map[string]interface{}
 	}{
 		"resource update with Current status": {
 			previewStrategy: common.DryRunNone,
-			event: pollevent.Event{
-				EventType: pollevent.ResourceUpdateEvent,
+			event: event.StatusEvent{
+				Type: event.StatusEventResourceUpdate,
 				Resource: &pollevent.ResourceStatus{
 					Identifier: object.ObjMetadata{
 						GroupKind: schema.GroupKind{
@@ -192,44 +192,6 @@ func TestFormatter_FormatStatusEvent(t *testing.T) {
 				"name":      "bar",
 				"namespace": "foo",
 				"status":    "Current",
-				"timestamp": "",
-				"type":      "status",
-			},
-		},
-		"status event with error": {
-			previewStrategy: common.DryRunNone,
-			event: pollevent.Event{
-				EventType: pollevent.ErrorEvent,
-				Resource: &pollevent.ResourceStatus{
-					Identifier: object.ObjMetadata{
-						GroupKind: schema.GroupKind{
-							Group: "apps",
-							Kind:  "Deployment",
-						},
-						Namespace: "foo",
-						Name:      "bar",
-					},
-				},
-				Error: fmt.Errorf("this is a test error"),
-			},
-			expected: map[string]interface{}{
-				"error":     "this is a test error",
-				"eventType": "error",
-				"group":     "apps",
-				"kind":      "Deployment",
-				"name":      "bar",
-				"namespace": "foo",
-				"timestamp": "",
-				"type":      "status",
-			},
-		},
-		"status event with completed type": {
-			previewStrategy: common.DryRunNone,
-			event: pollevent.Event{
-				EventType: pollevent.CompletedEvent,
-			},
-			expected: map[string]interface{}{
-				"eventType": "completed",
 				"timestamp": "",
 				"type":      "status",
 			},
@@ -438,9 +400,9 @@ func createObject(group, kind, namespace, name string) runtime.Object {
 }
 
 type fakeCollector struct {
-	m map[object.ObjMetadata]pollevent.Event
+	m map[object.ObjMetadata]event.StatusEvent
 }
 
-func (f *fakeCollector) LatestStatus() map[object.ObjMetadata]pollevent.Event {
+func (f *fakeCollector) LatestStatus() map[object.ObjMetadata]event.StatusEvent {
 	return f.m
 }

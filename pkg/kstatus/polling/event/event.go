@@ -18,9 +18,6 @@ type EventType int
 const (
 	// ResourceUpdateEvent describes events related to a change in the status of one of the polled resources.
 	ResourceUpdateEvent EventType = iota
-	// CompletedEvent signals that all resources have been reconciled and the engine has completed its work. The
-	// event channel will be closed after this event.
-	CompletedEvent
 	// ErrorEvent signals that the engine has encountered an error that it can not recover from. The engine
 	// is shutting down and the event channel will be closed after this event.
 	ErrorEvent

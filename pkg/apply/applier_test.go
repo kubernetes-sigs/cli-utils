@@ -82,7 +82,7 @@ type expectedEvent struct {
 	eventType event.Type
 
 	applyEventType  event.ApplyEventType
-	statusEventType pollevent.EventType
+	statusEventType event.StatusEventType
 	pruneEventType  event.PruneEventType
 	deleteEventType event.DeleteEventType
 }
@@ -186,19 +186,19 @@ func TestApplier(t *testing.T) {
 				},
 				{
 					eventType:       event.StatusType,
-					statusEventType: pollevent.ResourceUpdateEvent,
+					statusEventType: event.StatusEventResourceUpdate,
 				},
 				{
 					eventType:       event.StatusType,
-					statusEventType: pollevent.ResourceUpdateEvent,
+					statusEventType: event.StatusEventResourceUpdate,
 				},
 				{
 					eventType:       event.StatusType,
-					statusEventType: pollevent.ResourceUpdateEvent,
+					statusEventType: event.StatusEventResourceUpdate,
 				},
 				{
 					eventType:       event.StatusType,
-					statusEventType: pollevent.CompletedEvent,
+					statusEventType: event.StatusEventCompleted,
 				},
 			},
 		},
@@ -262,7 +262,7 @@ func TestApplier(t *testing.T) {
 				case event.ApplyType:
 					assert.Equal(t, expected.applyEventType.String(), e.ApplyEvent.Type.String())
 				case event.StatusType:
-					assert.Equal(t, expected.statusEventType.String(), e.StatusEvent.EventType.String())
+					assert.Equal(t, expected.statusEventType.String(), e.StatusEvent.Type.String())
 				case event.PruneType:
 					assert.Equal(t, expected.pruneEventType.String(), e.PruneEvent.Type.String())
 				case event.DeleteType:

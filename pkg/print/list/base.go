@@ -9,13 +9,12 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/common"
-	pollevent "sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
 type Formatter interface {
 	FormatApplyEvent(ae event.ApplyEvent, as *ApplyStats, c Collector) error
-	FormatStatusEvent(se pollevent.Event, sc Collector) error
+	FormatStatusEvent(se event.StatusEvent, sc Collector) error
 	FormatPruneEvent(pe event.PruneEvent, ps *PruneStats) error
 	FormatDeleteEvent(de event.DeleteEvent, ds *DeleteStats) error
 	FormatErrorEvent(ee event.ErrorEvent) error
@@ -82,18 +81,18 @@ func (d *DeleteStats) incSkipped() {
 }
 
 type Collector interface {
-	LatestStatus() map[object.ObjMetadata]pollevent.Event
+	LatestStatus() map[object.ObjMetadata]event.StatusEvent
 }
 
 type StatusCollector struct {
-	latestStatus map[object.ObjMetadata]pollevent.Event
+	latestStatus map[object.ObjMetadata]event.StatusEvent
 }
 
-func (sc *StatusCollector) updateStatus(id object.ObjMetadata, se pollevent.Event) {
+func (sc *StatusCollector) updateStatus(id object.ObjMetadata, se event.StatusEvent) {
 	sc.latestStatus[id] = se
 }
 
-func (sc *StatusCollector) LatestStatus() map[object.ObjMetadata]pollevent.Event {
+func (sc *StatusCollector) LatestStatus() map[object.ObjMetadata]event.StatusEvent {
 	return sc.latestStatus
 }
 
@@ -104,7 +103,7 @@ func (sc *StatusCollector) LatestStatus() map[object.ObjMetadata]pollevent.Event
 func (b *BaseListPrinter) Print(ch <-chan event.Event, previewStrategy common.DryRunStrategy) error {
 	applyStats := &ApplyStats{}
 	statusCollector := &StatusCollector{
-		latestStatus: make(map[object.ObjMetadata]pollevent.Event),
+		latestStatus: make(map[object.ObjMetadata]event.StatusEvent),
 	}
 	printStatus := false
 	pruneStats := &PruneStats{}
@@ -126,22 +125,12 @@ func (b *BaseListPrinter) Print(ch <-chan event.Event, previewStrategy common.Dr
 				return err
 			}
 		case event.StatusType:
-			switch se := e.StatusEvent; se.EventType {
-			case pollevent.ResourceUpdateEvent:
+			if se := e.StatusEvent; se.Type == event.StatusEventResourceUpdate {
 				statusCollector.updateStatus(e.StatusEvent.Resource.Identifier, e.StatusEvent)
 				if printStatus {
 					if err := formatter.FormatStatusEvent(e.StatusEvent, statusCollector); err != nil {
 						return err
 					}
-				}
-			case pollevent.ErrorEvent:
-				if err := formatter.FormatStatusEvent(e.StatusEvent, statusCollector); err != nil {
-					return err
-				}
-			case pollevent.CompletedEvent:
-				printStatus = false
-				if err := formatter.FormatStatusEvent(e.StatusEvent, statusCollector); err != nil {
-					return err
 				}
 			}
 		case event.PruneType:
