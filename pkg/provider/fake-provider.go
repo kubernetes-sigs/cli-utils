@@ -15,16 +15,16 @@ import (
 )
 
 type FakeProvider struct {
-	factory util.Factory
-	objs    []object.ObjMetadata
+	factory   util.Factory
+	InvClient *inventory.FakeInventoryClient
 }
 
 var _ Provider = &FakeProvider{}
 
 func NewFakeProvider(f util.Factory, objs []object.ObjMetadata) *FakeProvider {
 	return &FakeProvider{
-		factory: f,
-		objs:    objs,
+		factory:   f,
+		InvClient: inventory.NewFakeInventoryClient(objs),
 	}
 }
 
@@ -33,7 +33,7 @@ func (f *FakeProvider) Factory() util.Factory {
 }
 
 func (f *FakeProvider) InventoryClient() (inventory.InventoryClient, error) {
-	return inventory.NewFakeInventoryClient(f.objs), nil
+	return f.InvClient, nil
 }
 
 func (f *FakeProvider) ToRESTMapper() (meta.RESTMapper, error) {
