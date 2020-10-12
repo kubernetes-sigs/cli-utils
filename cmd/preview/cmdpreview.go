@@ -27,8 +27,9 @@ var (
 
 // GetPreviewRunner creates and returns the PreviewRunner which stores the cobra command.
 func GetPreviewRunner(provider provider.Provider, ioStreams genericclioptions.IOStreams) *PreviewRunner {
+	applier, _ := apply.NewApplier(provider, ioStreams)
 	r := &PreviewRunner{
-		Applier:   apply.NewApplier(provider, ioStreams),
+		Applier:   applier,
 		Destroyer: apply.NewDestroyer(provider, ioStreams),
 		ioStreams: ioStreams,
 		provider:  provider,
@@ -40,8 +41,6 @@ func GetPreviewRunner(provider provider.Provider, ioStreams genericclioptions.IO
 		Args:                  cobra.MaximumNArgs(1),
 		RunE:                  r.RunE,
 	}
-
-	r.Applier.SetFlags(cmd)
 
 	cmd.Flags().BoolVar(&noPrune, "no-prune", noPrune, "If true, do not prune previously applied objects.")
 	cmd.Flags().BoolVar(&serverDryRun, "server-side", serverDryRun, "If true, preview runs in the server instead of the client.")
@@ -112,8 +111,7 @@ func (r *PreviewRunner) RunE(cmd *cobra.Command, args []string) error {
 	// if destroy flag is set in preview, transmit it to destroyer DryRunStrategy flag
 	// and pivot execution to destroy with dry-run
 	if !r.Destroyer.DryRunStrategy.ClientOrServerDryRun() {
-		err = r.Applier.Initialize(cmd)
-		if err != nil {
+		if err = r.Applier.Initialize(); err != nil {
 			return err
 		}
 

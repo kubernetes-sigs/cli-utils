@@ -23,8 +23,9 @@ import (
 )
 
 func GetApplyRunner(provider provider.Provider, ioStreams genericclioptions.IOStreams) *ApplyRunner {
+	applier, _ := apply.NewApplier(provider, ioStreams)
 	r := &ApplyRunner{
-		Applier:   apply.NewApplier(provider, ioStreams),
+		Applier:   applier,
 		ioStreams: ioStreams,
 		provider:  provider,
 	}
@@ -34,8 +35,6 @@ func GetApplyRunner(provider provider.Provider, ioStreams genericclioptions.IOSt
 		Short:                 i18n.T("Apply a configuration to a resource by package directory or stdin"),
 		RunE:                  r.RunE,
 	}
-
-	r.Applier.SetFlags(cmd)
 
 	// The following flags are added, but hidden because other code
 	// depend on them when parsing flags. These flags are hidden and unused.
@@ -95,8 +94,7 @@ func (r *ApplyRunner) RunE(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-
-	if err := r.Applier.Initialize(cmd); err != nil {
+	if err := r.Applier.Initialize(); err != nil {
 		return err
 	}
 

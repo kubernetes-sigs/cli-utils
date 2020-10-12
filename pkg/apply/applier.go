@@ -9,12 +9,12 @@ import (
 	"time"
 
 	"github.com/go-errors/errors"
-	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/kubectl/pkg/cmd/apply"
+	"k8s.io/kubectl/pkg/cmd/delete"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/info"
 	"sigs.k8s.io/cli-utils/pkg/apply/poller"
@@ -35,18 +35,71 @@ import (
 // the ApplyOptions were responsible for printing progress. This is now
 // handled by a separate printer with the KubectlPrinterAdapter bridging
 // between the two.
-func NewApplier(provider provider.Provider, ioStreams genericclioptions.IOStreams) *Applier {
-	applyOptions := apply.NewApplyOptions(ioStreams)
+func NewApplier(provider provider.Provider, ioStreams genericclioptions.IOStreams) (*Applier, error) {
+	applyOptions, err := kubectlApplyOptions(provider, ioStreams)
+	if err != nil {
+		return nil, err
+	}
 	a := &Applier{
-		ApplyOptions: applyOptions,
-		// VisitedUids keeps track of the unique identifiers for all
-		// currently applied objects. Used to calculate prune set.
+		applyOptions: applyOptions,
 		PruneOptions: prune.NewPruneOptions(),
 		provider:     provider,
 		ioStreams:    ioStreams,
 	}
 	a.infoHelperFactoryFunc = a.infoHelperFactory
-	return a
+	return a, nil
+}
+
+// kubectlApplyOptions fills in the kubectl ApplyOptions structure from the
+// passed parameters and returns the ApplyOptions or an error.
+func kubectlApplyOptions(provider provider.Provider, ioStreams genericclioptions.IOStreams) (*apply.ApplyOptions, error) {
+	applyOptions := apply.NewApplyOptions(ioStreams)     // Some ApplyOptions defaults set here
+	applyOptions.DeleteOptions = &delete.DeleteOptions{} // Empty DeleteOptions; Not used
+
+	// We don't use either the pre-processor or post-processor hooks
+	applyOptions.PreProcessorFn = nil
+	applyOptions.PostProcessorFn = nil
+
+	// Not using server-side apply (for now)
+	applyOptions.ForceConflicts = false
+	applyOptions.FieldManager = "kubectl"
+
+	// We've implemented our own pruning, so skip kubectl prune
+	applyOptions.Prune = false
+	applyOptions.PruneResources = nil
+	applyOptions.PruneWhitelist = []string{}
+
+	// Default to no dry-run
+	applyOptions.DryRun = false
+	applyOptions.ServerDryRun = false
+
+	// Get the factory, and fill-in ApplyOptions fields which need it.
+	f := provider.Factory()
+	var err error
+	applyOptions.DiscoveryClient, err = f.ToDiscoveryClient()
+	if err != nil {
+		return nil, err
+	}
+	applyOptions.OpenAPISchema, _ = f.OpenAPISchema()
+	applyOptions.Validator, err = f.Validator(true)
+	if err != nil {
+		return nil, err
+	}
+	applyOptions.Builder = f.NewBuilder()
+	applyOptions.Mapper, err = f.ToRESTMapper()
+	if err != nil {
+		return nil, err
+	}
+	applyOptions.DynamicClient, err = f.DynamicClient()
+	if err != nil {
+		return nil, err
+	}
+	applyOptions.Namespace, applyOptions.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
+	if err != nil {
+		return nil, err
+	}
+
+	return applyOptions, nil
 }
 
 // Applier performs the step of applying a set of resources into a cluster,
@@ -63,7 +116,7 @@ type Applier struct {
 	provider  provider.Provider
 	ioStreams genericclioptions.IOStreams
 
-	ApplyOptions *apply.ApplyOptions
+	applyOptions *apply.ApplyOptions
 	PruneOptions *prune.PruneOptions
 	StatusPoller poller.Poller
 	invClient    inventory.InventoryClient
@@ -76,16 +129,8 @@ type Applier struct {
 // Initialize sets up the Applier for actually doing an apply against
 // a cluster. This involves validating command line inputs and configuring
 // clients for communicating with the cluster.
-func (a *Applier) Initialize(cmd *cobra.Command) error {
-	// Setting this to satisfy ApplyOptions. It is not actually being used.
-	a.ApplyOptions.DeleteFlags.FileNameFlags = &genericclioptions.FileNameFlags{
-		Filenames: &[]string{"-"},
-	}
-	err := a.ApplyOptions.Complete(a.provider.Factory(), cmd)
-	if err != nil {
-		return errors.WrapPrefix(err, "error setting up ApplyOptions", 1)
-	}
-	a.ApplyOptions.PostProcessorFn = nil // Turn off the default kubectl pruning
+func (a *Applier) Initialize() error {
+	var err error
 	a.invClient, err = a.provider.InventoryClient()
 	if err != nil {
 		return err
@@ -103,30 +148,9 @@ func (a *Applier) Initialize(cmd *cobra.Command) error {
 	return nil
 }
 
-// SetFlags configures the command line flags needed for apply and
-// status. This is a temporary solution as we should separate the configuration
-// of cobra flags from the Applier.
-func (a *Applier) SetFlags(cmd *cobra.Command) {
-	a.ApplyOptions.DeleteFlags.AddFlags(cmd)
-	for _, flag := range []string{"kustomize", "filename", "recursive"} {
-		err := cmd.Flags().MarkHidden(flag)
-		if err != nil {
-			panic(err)
-		}
-	}
-	a.ApplyOptions.RecordFlags.AddFlags(cmd)
-	_ = cmd.Flags().MarkHidden("record")
-	_ = cmd.Flags().MarkHidden("cascade")
-	_ = cmd.Flags().MarkHidden("force")
-	_ = cmd.Flags().MarkHidden("grace-period")
-	_ = cmd.Flags().MarkHidden("timeout")
-	_ = cmd.Flags().MarkHidden("wait")
-	a.ApplyOptions.Overwrite = true
-}
-
 // infoHelperFactory returns a new instance of the InfoHelper.
 func (a *Applier) infoHelperFactory() info.InfoHelper {
-	return info.NewInfoHelper(a.provider.Factory(), a.ApplyOptions.Namespace)
+	return info.NewInfoHelper(a.provider.Factory(), a.applyOptions.Namespace)
 }
 
 // prepareObjects merges the currently applied objects into the
@@ -224,6 +248,14 @@ func (r *ResourceObjects) AllIds() []object.ObjMetadata {
 func (a *Applier) Run(ctx context.Context, objects []*resource.Info, options Options) <-chan event.Event {
 	eventChannel := make(chan event.Event)
 	setDefaults(&options)
+	// Set dry run for kubectl ApplyOptions and the InventoryClient.
+	if options.DryRunStrategy == common.DryRunClient {
+		a.applyOptions.DryRun = true
+	}
+	if options.DryRunStrategy == common.DryRunServer {
+		a.applyOptions.ServerSideApply = true
+		a.applyOptions.ServerDryRun = true
+	}
 	a.invClient.SetDryRunStrategy(options.DryRunStrategy) // client shared with prune, so sets dry-run for prune too.
 	go func() {
 		defer close(eventChannel)
@@ -245,7 +277,7 @@ func (a *Applier) Run(ctx context.Context, objects []*resource.Info, options Opt
 
 		// Fetch the queue (channel) of tasks that should be executed.
 		taskQueue := (&solver.TaskQueueSolver{
-			ApplyOptions: a.ApplyOptions,
+			ApplyOptions: a.applyOptions,
 			PruneOptions: a.PruneOptions,
 			InfoHelper:   a.infoHelperFactoryFunc(),
 			Mapper:       mapper,
