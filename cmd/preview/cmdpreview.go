@@ -41,24 +41,9 @@ func GetPreviewRunner(provider provider.Provider, ioStreams genericclioptions.IO
 		RunE:                  r.RunE,
 	}
 
-	r.Applier.SetFlags(cmd)
-
 	cmd.Flags().BoolVar(&noPrune, "no-prune", noPrune, "If true, do not prune previously applied objects.")
 	cmd.Flags().BoolVar(&serverDryRun, "server-side", serverDryRun, "If true, preview runs in the server instead of the client.")
-
-	// The following flags are added, but hidden because other code
-	// dependend on them when parsing flags. These flags are hidden and unused.
-	var unusedBool bool
-	cmd.Flags().BoolVar(&unusedBool, "dry-run", unusedBool, "NOT USED")
 	cmd.Flags().BoolVar(&previewDestroy, "destroy", previewDestroy, "If true, preview of destroy operations will be displayed.")
-	_ = cmd.Flags().MarkHidden("dry-run")
-	cmdutil.AddValidateFlags(cmd)
-	_ = cmd.Flags().MarkHidden("validate")
-	cmd.Flags().Bool("force-conflicts", false, "If true, server-side apply will force the changes against conflicts.")
-	cmd.Flags().String("field-manager", "kubectl", "Name of the manager used to track field ownership.")
-	// hide unwanted server-side flags
-	_ = cmd.Flags().MarkHidden("force-conflicts")
-	_ = cmd.Flags().MarkHidden("field-manager")
 
 	r.Command = cmd
 	return r
@@ -112,7 +97,7 @@ func (r *PreviewRunner) RunE(cmd *cobra.Command, args []string) error {
 	// if destroy flag is set in preview, transmit it to destroyer DryRunStrategy flag
 	// and pivot execution to destroy with dry-run
 	if !r.Destroyer.DryRunStrategy.ClientOrServerDryRun() {
-		err = r.Applier.Initialize(cmd)
+		err = r.Applier.Initialize()
 		if err != nil {
 			return err
 		}

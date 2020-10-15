@@ -12,6 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/cli-runtime/pkg/resource"
+	"k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
 	"sigs.k8s.io/cli-utils/pkg/common"
@@ -76,12 +77,15 @@ func TestApplyTask_FetchGeneration(t *testing.T) {
 
 			infos := toInfos(tc.rss)
 
-			applyOptions := &fakeApplyOptions{}
+			oldAO := applyOptionsFactoryFunc
+			applyOptionsFactoryFunc = func(chan event.Event, common.DryRunStrategy, util.Factory) (applyOptions, error) {
+				return &fakeApplyOptions{}, nil
+			}
+			defer func() { applyOptionsFactoryFunc = oldAO }()
 
 			applyTask := &ApplyTask{
-				ApplyOptions: applyOptions,
-				Objects:      infos,
-				InfoHelper:   &fakeInfoHelper{},
+				Objects:    infos,
+				InfoHelper: &fakeInfoHelper{},
 			}
 
 			applyTask.Start(taskContext)
@@ -236,10 +240,14 @@ func TestApplyTask_DryRun(t *testing.T) {
 					Kind:    "AnotherCustom",
 				})
 
-				applyOptions := &fakeApplyOptions{}
+				ao := &fakeApplyOptions{}
+				oldAO := applyOptionsFactoryFunc
+				applyOptionsFactoryFunc = func(chan event.Event, common.DryRunStrategy, util.Factory) (applyOptions, error) {
+					return ao, nil
+				}
+				defer func() { applyOptionsFactoryFunc = oldAO }()
 
 				applyTask := &ApplyTask{
-					ApplyOptions:   applyOptions,
 					Objects:        tc.infos,
 					InfoHelper:     &fakeInfoHelper{},
 					Mapper:         restMapper,
@@ -262,8 +270,8 @@ func TestApplyTask_DryRun(t *testing.T) {
 				close(eventChannel)
 				wg.Wait()
 
-				assert.Equal(t, len(tc.expectedObjects), len(applyOptions.objects))
-				for i, obj := range applyOptions.objects {
+				assert.Equal(t, len(tc.expectedObjects), len(ao.objects))
+				for i, obj := range ao.objects {
 					actual, err := object.InfoToObjMeta(obj)
 					if err != nil {
 						continue

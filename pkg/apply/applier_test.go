@@ -14,7 +14,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -27,7 +26,6 @@ import (
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
-	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/info"
@@ -220,14 +218,7 @@ func TestApplier(t *testing.T) {
 			cf := provider.NewProvider(tf, nil)                        // nil InventoryFactoryFunc since not needed
 			applier := NewApplier(cf, ioStreams)
 
-			cmd := &cobra.Command{}
-			applier.SetFlags(cmd)
-			var notUsedFlag bool
-			// This flag needs to be set as there is a dependency on it.
-			cmd.Flags().BoolVar(&notUsedFlag, "dry-run", notUsedFlag, "")
-			cmdutil.AddValidateFlags(cmd)
-			cmdutil.AddServerSideApplyFlags(cmd)
-			err = applier.Initialize(cmd)
+			err = applier.Initialize()
 			if !assert.NoError(t, err) {
 				return
 			}

@@ -23,7 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/resource"
-	"k8s.io/kubectl/pkg/cmd/apply"
+	"k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/info"
 	"sigs.k8s.io/cli-utils/pkg/apply/prune"
@@ -35,9 +35,9 @@ import (
 )
 
 type TaskQueueSolver struct {
-	ApplyOptions *apply.ApplyOptions
 	PruneOptions *prune.PruneOptions
 	InfoHelper   info.InfoHelper
+	Factory      util.Factory
 	Mapper       meta.RESTMapper
 }
 
@@ -69,9 +69,9 @@ func (t *TaskQueueSolver) BuildTaskQueue(ro resourceObjects,
 		tasks = append(tasks, &task.ApplyTask{
 			Objects:        append(crdSplitRes.before, crdSplitRes.crds...),
 			CRDs:           crdSplitRes.crds,
-			ApplyOptions:   t.ApplyOptions,
 			DryRunStrategy: o.DryRunStrategy,
 			InfoHelper:     t.InfoHelper,
+			Factory:        t.Factory,
 			Mapper:         t.Mapper,
 		})
 		if !o.DryRunStrategy.ClientOrServerDryRun() {
@@ -91,9 +91,9 @@ func (t *TaskQueueSolver) BuildTaskQueue(ro resourceObjects,
 		&task.ApplyTask{
 			Objects:        remainingInfos,
 			CRDs:           crdSplitRes.crds,
-			ApplyOptions:   t.ApplyOptions,
 			DryRunStrategy: o.DryRunStrategy,
 			InfoHelper:     t.InfoHelper,
+			Factory:        t.Factory,
 			Mapper:         t.Mapper,
 		},
 		&task.SendEventTask{

@@ -9,12 +9,10 @@ import (
 	"time"
 
 	"github.com/go-errors/errors"
-	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
-	"k8s.io/kubectl/pkg/cmd/apply"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/info"
 	"sigs.k8s.io/cli-utils/pkg/apply/poller"
@@ -36,11 +34,7 @@ import (
 // handled by a separate printer with the KubectlPrinterAdapter bridging
 // between the two.
 func NewApplier(provider provider.Provider, ioStreams genericclioptions.IOStreams) *Applier {
-	applyOptions := apply.NewApplyOptions(ioStreams)
 	a := &Applier{
-		ApplyOptions: applyOptions,
-		// VisitedUids keeps track of the unique identifiers for all
-		// currently applied objects. Used to calculate prune set.
 		PruneOptions: prune.NewPruneOptions(),
 		provider:     provider,
 		ioStreams:    ioStreams,
@@ -63,7 +57,6 @@ type Applier struct {
 	provider  provider.Provider
 	ioStreams genericclioptions.IOStreams
 
-	ApplyOptions *apply.ApplyOptions
 	PruneOptions *prune.PruneOptions
 	StatusPoller poller.Poller
 	invClient    inventory.InventoryClient
@@ -76,16 +69,8 @@ type Applier struct {
 // Initialize sets up the Applier for actually doing an apply against
 // a cluster. This involves validating command line inputs and configuring
 // clients for communicating with the cluster.
-func (a *Applier) Initialize(cmd *cobra.Command) error {
-	// Setting this to satisfy ApplyOptions. It is not actually being used.
-	a.ApplyOptions.DeleteFlags.FileNameFlags = &genericclioptions.FileNameFlags{
-		Filenames: &[]string{"-"},
-	}
-	err := a.ApplyOptions.Complete(a.provider.Factory(), cmd)
-	if err != nil {
-		return errors.WrapPrefix(err, "error setting up ApplyOptions", 1)
-	}
-	a.ApplyOptions.PostProcessorFn = nil // Turn off the default kubectl pruning
+func (a *Applier) Initialize() error {
+	var err error
 	a.invClient, err = a.provider.InventoryClient()
 	if err != nil {
 		return err
@@ -103,30 +88,9 @@ func (a *Applier) Initialize(cmd *cobra.Command) error {
 	return nil
 }
 
-// SetFlags configures the command line flags needed for apply and
-// status. This is a temporary solution as we should separate the configuration
-// of cobra flags from the Applier.
-func (a *Applier) SetFlags(cmd *cobra.Command) {
-	a.ApplyOptions.DeleteFlags.AddFlags(cmd)
-	for _, flag := range []string{"kustomize", "filename", "recursive"} {
-		err := cmd.Flags().MarkHidden(flag)
-		if err != nil {
-			panic(err)
-		}
-	}
-	a.ApplyOptions.RecordFlags.AddFlags(cmd)
-	_ = cmd.Flags().MarkHidden("record")
-	_ = cmd.Flags().MarkHidden("cascade")
-	_ = cmd.Flags().MarkHidden("force")
-	_ = cmd.Flags().MarkHidden("grace-period")
-	_ = cmd.Flags().MarkHidden("timeout")
-	_ = cmd.Flags().MarkHidden("wait")
-	a.ApplyOptions.Overwrite = true
-}
-
 // infoHelperFactory returns a new instance of the InfoHelper.
 func (a *Applier) infoHelperFactory() info.InfoHelper {
-	return info.NewInfoHelper(a.provider.Factory(), a.ApplyOptions.Namespace)
+	return info.NewInfoHelper(a.provider.Factory())
 }
 
 // prepareObjects merges the currently applied objects into the
@@ -245,8 +209,8 @@ func (a *Applier) Run(ctx context.Context, objects []*resource.Info, options Opt
 
 		// Fetch the queue (channel) of tasks that should be executed.
 		taskQueue := (&solver.TaskQueueSolver{
-			ApplyOptions: a.ApplyOptions,
 			PruneOptions: a.PruneOptions,
+			Factory:      a.provider.Factory(),
 			InfoHelper:   a.infoHelperFactoryFunc(),
 			Mapper:       mapper,
 		}).BuildTaskQueue(resourceObjects, solver.Options{

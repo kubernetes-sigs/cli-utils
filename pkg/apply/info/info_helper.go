@@ -19,16 +19,14 @@ type InfoHelper interface {
 	UpdateInfos(infos []*resource.Info) error
 }
 
-func NewInfoHelper(factory util.Factory, namespace string) *infoHelper {
+func NewInfoHelper(factory util.Factory) *infoHelper {
 	return &infoHelper{
-		factory:          factory,
-		defaultNamespace: namespace,
+		factory: factory,
 	}
 }
 
 type infoHelper struct {
-	factory          util.Factory
-	defaultNamespace string
+	factory util.Factory
 }
 
 func (ih *infoHelper) UpdateInfos(infos []*resource.Info) error {
