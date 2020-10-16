@@ -17,7 +17,7 @@ import (
 // GetDestroyRunner creates and returns the DestroyRunner which stores the cobra command.
 func GetDestroyRunner(provider provider.Provider, ioStreams genericclioptions.IOStreams) *DestroyRunner {
 	r := &DestroyRunner{
-		Destroyer: apply.NewDestroyer(provider, ioStreams),
+		Destroyer: apply.NewDestroyer(provider),
 		ioStreams: ioStreams,
 		provider:  provider,
 	}
@@ -47,7 +47,7 @@ type DestroyRunner struct {
 }
 
 func (r *DestroyRunner) RunE(cmd *cobra.Command, args []string) error {
-	err := r.Destroyer.Initialize(cmd, args)
+	err := r.Destroyer.Initialize()
 	if err != nil {
 		return err
 	}

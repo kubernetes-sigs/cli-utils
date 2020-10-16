@@ -24,7 +24,7 @@ import (
 
 func GetApplyRunner(provider provider.Provider, ioStreams genericclioptions.IOStreams) *ApplyRunner {
 	r := &ApplyRunner{
-		Applier:   apply.NewApplier(provider, ioStreams),
+		Applier:   apply.NewApplier(provider),
 		ioStreams: ioStreams,
 		provider:  provider,
 	}
