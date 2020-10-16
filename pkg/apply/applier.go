@@ -11,7 +11,6 @@ import (
 	"github.com/go-errors/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/info"
@@ -33,11 +32,10 @@ import (
 // the ApplyOptions were responsible for printing progress. This is now
 // handled by a separate printer with the KubectlPrinterAdapter bridging
 // between the two.
-func NewApplier(provider provider.Provider, ioStreams genericclioptions.IOStreams) *Applier {
+func NewApplier(provider provider.Provider) *Applier {
 	a := &Applier{
 		PruneOptions: prune.NewPruneOptions(),
 		provider:     provider,
-		ioStreams:    ioStreams,
 	}
 	a.infoHelperFactoryFunc = a.infoHelperFactory
 	return a
@@ -54,8 +52,7 @@ func NewApplier(provider provider.Provider, ioStreams genericclioptions.IOStream
 // parameters and/or the set of resources that needs to be applied to the
 // cluster, different sets of tasks might be needed.
 type Applier struct {
-	provider  provider.Provider
-	ioStreams genericclioptions.IOStreams
+	provider provider.Provider
 
 	PruneOptions *prune.PruneOptions
 	StatusPoller poller.Poller

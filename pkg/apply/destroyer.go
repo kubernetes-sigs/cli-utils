@@ -7,10 +7,8 @@ import (
 	"fmt"
 
 	"github.com/go-errors/errors"
-	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/prune"
@@ -25,11 +23,10 @@ import (
 // the ApplyOptions were responsible for printing progress. This is now
 // handled by a separate printer with the KubectlPrinterAdapter bridging
 // between the two.
-func NewDestroyer(provider provider.Provider, ioStreams genericclioptions.IOStreams) *Destroyer {
+func NewDestroyer(provider provider.Provider) *Destroyer {
 	return &Destroyer{
 		PruneOptions: prune.NewPruneOptions(),
 		provider:     provider,
-		ioStreams:    ioStreams,
 	}
 }
 
@@ -37,7 +34,6 @@ func NewDestroyer(provider provider.Provider, ioStreams genericclioptions.IOStre
 // prune them. This also deletes all the previous inventory objects
 type Destroyer struct {
 	provider       provider.Provider
-	ioStreams      genericclioptions.IOStreams
 	PruneOptions   *prune.PruneOptions
 	invClient      inventory.InventoryClient
 	DryRunStrategy common.DryRunStrategy
@@ -46,7 +42,7 @@ type Destroyer struct {
 // Initialize sets up the Destroyer for actually doing an destroy against
 // a cluster. This involves validating command line inputs and configuring
 // clients for communicating with the cluster.
-func (d *Destroyer) Initialize(cmd *cobra.Command, paths []string) error {
+func (d *Destroyer) Initialize() error {
 	invClient, err := d.provider.InventoryClient()
 	if err != nil {
 		return errors.WrapPrefix(err, "error creating inventory client", 1)

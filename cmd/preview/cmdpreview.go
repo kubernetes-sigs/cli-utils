@@ -28,8 +28,8 @@ var (
 // GetPreviewRunner creates and returns the PreviewRunner which stores the cobra command.
 func GetPreviewRunner(provider provider.Provider, ioStreams genericclioptions.IOStreams) *PreviewRunner {
 	r := &PreviewRunner{
-		Applier:   apply.NewApplier(provider, ioStreams),
-		Destroyer: apply.NewDestroyer(provider, ioStreams),
+		Applier:   apply.NewApplier(provider),
+		Destroyer: apply.NewDestroyer(provider),
 		ioStreams: ioStreams,
 		provider:  provider,
 	}
@@ -71,7 +71,7 @@ func (r *PreviewRunner) RunE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	var ch <-chan event.Event
-	err = r.Destroyer.Initialize(cmd, args)
+	err = r.Destroyer.Initialize()
 	if err != nil {
 		return err
 	}

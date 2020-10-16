@@ -22,7 +22,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
@@ -214,9 +213,8 @@ func TestApplier(t *testing.T) {
 
 			tf.UnstructuredClient = newFakeRESTClient(t, tc.handlers)
 
-			ioStreams, _, _, _ := genericclioptions.NewTestIOStreams() //nolint:dogsled
-			cf := provider.NewProvider(tf, nil)                        // nil InventoryFactoryFunc since not needed
-			applier := NewApplier(cf, ioStreams)
+			cf := provider.NewProvider(tf, nil) // nil InventoryFactoryFunc since not needed
+			applier := NewApplier(cf)
 
 			err = applier.Initialize()
 			if !assert.NoError(t, err) {
