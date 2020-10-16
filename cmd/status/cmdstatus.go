@@ -25,8 +25,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/util/factory"
 )
 
-func GetStatusRunner(f cmdutil.Factory) *StatusRunner {
-	provider := provider.NewProvider(f, inventory.WrapInventoryObj)
+func GetStatusRunner(provider provider.Provider) *StatusRunner {
 	r := &StatusRunner{
 		provider:          provider,
 		pollerFactoryFunc: pollerFactoryFunc,
@@ -43,18 +42,19 @@ func GetStatusRunner(f cmdutil.Factory) *StatusRunner {
 	c.Flags().DurationVar(&r.timeout, "timeout", 0,
 		"How long to wait before exiting")
 
-	r.command = c
+	r.Command = c
 	return r
 }
 
 func StatusCommand(f cmdutil.Factory) *cobra.Command {
-	return GetStatusRunner(f).command
+	provider := provider.NewProvider(f)
+	return GetStatusRunner(provider).Command
 }
 
 // StatusRunner captures the parameters for the command and contains
 // the run function.
 type StatusRunner struct {
-	command  *cobra.Command
+	Command  *cobra.Command
 	provider provider.Provider
 
 	period    time.Duration

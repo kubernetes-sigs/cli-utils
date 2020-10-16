@@ -23,15 +23,13 @@ type Provider interface {
 
 // InventoryProvider implements the Provider interface.
 type InventoryProvider struct {
-	factory        util.Factory
-	invFactoryFunc inventory.InventoryFactoryFunc
+	factory util.Factory
 }
 
-// NewProvider encapsulates the passed values, and returns a pointer to an Provider.
-func NewProvider(f util.Factory, invFactoryFunc inventory.InventoryFactoryFunc) *InventoryProvider {
+// NewProvider returns a Provider that implements a ConfigMap inventory object.
+func NewProvider(f util.Factory) *InventoryProvider {
 	return &InventoryProvider{
-		factory:        f,
-		invFactoryFunc: invFactoryFunc,
+		factory: f,
 	}
 }
 
@@ -43,7 +41,7 @@ func (f *InventoryProvider) Factory() util.Factory {
 // InventoryClient returns an InventoryClient created with the stored
 // factory and InventoryFactoryFunc values, or an error if one occurred.
 func (f *InventoryProvider) InventoryClient() (inventory.InventoryClient, error) {
-	return inventory.NewInventoryClient(f.factory, f.invFactoryFunc)
+	return inventory.NewInventoryClient(f.factory, inventory.WrapInventoryObj)
 }
 
 // ToRESTMapper returns a RESTMapper created by the stored kubectl factory.

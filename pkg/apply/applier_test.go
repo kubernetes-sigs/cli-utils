@@ -213,7 +213,7 @@ func TestApplier(t *testing.T) {
 
 			tf.UnstructuredClient = newFakeRESTClient(t, tc.handlers)
 
-			cf := provider.NewProvider(tf, nil) // nil InventoryFactoryFunc since not needed
+			cf := provider.NewProvider(tf)
 			applier := NewApplier(cf)
 
 			err = applier.Initialize()

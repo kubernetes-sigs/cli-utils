@@ -51,7 +51,7 @@ func GetPreviewRunner(provider provider.Provider, ioStreams genericclioptions.IO
 
 // PreviewCommand creates the PreviewRunner, returning the cobra command associated with it.
 func PreviewCommand(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
-	provider := provider.NewProvider(f, inventory.WrapInventoryObj)
+	provider := provider.NewProvider(f)
 	return GetPreviewRunner(provider, ioStreams).Command
 }
 
