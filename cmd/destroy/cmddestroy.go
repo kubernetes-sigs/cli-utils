@@ -34,7 +34,7 @@ func GetDestroyRunner(provider provider.Provider, ioStreams genericclioptions.IO
 
 // DestroyCommand creates the DestroyRunner, returning the cobra command associated with it.
 func DestroyCommand(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
-	provider := provider.NewProvider(f, inventory.WrapInventoryObj)
+	provider := provider.NewProvider(f)
 	return GetDestroyRunner(provider, ioStreams).Command
 }
 

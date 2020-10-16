@@ -17,7 +17,6 @@ import (
 	"sigs.k8s.io/cli-utils/cmd/printers"
 	"sigs.k8s.io/cli-utils/pkg/apply"
 	"sigs.k8s.io/cli-utils/pkg/common"
-	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/provider"
 	"sigs.k8s.io/kustomize/kyaml/setters2"
 )
@@ -54,7 +53,7 @@ func GetApplyRunner(provider provider.Provider, ioStreams genericclioptions.IOSt
 }
 
 func ApplyCommand(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
-	provider := provider.NewProvider(f, inventory.WrapInventoryObj)
+	provider := provider.NewProvider(f)
 	return GetApplyRunner(provider, ioStreams).Command
 }
 
@@ -78,10 +77,6 @@ func (r *ApplyRunner) RunE(cmd *cobra.Command, args []string) error {
 	}
 	prunePropPolicy, err := convertPropagationPolicy(r.prunePropagationPolicy)
 	if err != nil {
-		return err
-	}
-
-	if err := r.Applier.Initialize(); err != nil {
 		return err
 	}
 
@@ -111,6 +106,9 @@ func (r *ApplyRunner) RunE(cmd *cobra.Command, args []string) error {
 
 	// Run the applier. It will return a channel where we can receive updates
 	// to keep track of progress and any issues.
+	if err := r.Applier.Initialize(); err != nil {
+		return err
+	}
 	ch := r.Applier.Run(context.Background(), infos, apply.Options{
 		PollInterval:     r.period,
 		ReconcileTimeout: r.reconcileTimeout,
