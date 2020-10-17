@@ -5,10 +5,12 @@ package info
 
 import (
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/rest"
 	"k8s.io/kubectl/pkg/cmd/util"
+	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
 // InfoHelper provides functions for interacting with Info objects.
@@ -17,6 +19,8 @@ type InfoHelper interface {
 	// objects. This must be called at a time when all needed resource
 	// types are available in the RESTMapper.
 	UpdateInfos(infos []*resource.Info) error
+
+	BuildInfos(objs []*unstructured.Unstructured) ([]*resource.Info, error)
 }
 
 func NewInfoHelper(factory util.Factory) *infoHelper {
@@ -49,6 +53,15 @@ func (ih *infoHelper) UpdateInfos(infos []*resource.Info) error {
 		info.Client = c
 	}
 	return nil
+}
+
+func (ih *infoHelper) BuildInfos(objs []*unstructured.Unstructured) ([]*resource.Info, error) {
+	infos := object.UnstructuredsToInfos(objs)
+	err := ih.UpdateInfos(infos)
+	if err != nil {
+		return nil, err
+	}
+	return infos, nil
 }
 
 func (ih *infoHelper) ToRESTMapper() (meta.RESTMapper, error) {

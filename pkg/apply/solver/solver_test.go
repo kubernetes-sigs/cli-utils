@@ -22,19 +22,19 @@ import (
 var (
 	pruneOptions = &prune.PruneOptions{}
 
-	depInfo    = createInfo("apps/v1", "Deployment", "foo", "bar")
-	customInfo = createInfo("custom.io/v1", "Custom", "foo", "")
-	crdInfo    = createInfo("apiextensions.k8s.io/v1", "CustomResourceDefinition", "crd", "")
+	depInfo    = createInfo("apps/v1", "Deployment", "foo", "bar").Object.(*unstructured.Unstructured)
+	customInfo = createInfo("custom.io/v1", "Custom", "foo", "").Object.(*unstructured.Unstructured)
+	crdInfo    = createInfo("apiextensions.k8s.io/v1", "CustomResourceDefinition", "crd", "").Object.(*unstructured.Unstructured)
 )
 
 func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 	testCases := map[string]struct {
-		infos         []*resource.Info
+		objs          []*unstructured.Unstructured
 		options       Options
 		expectedTasks []taskrunner.Task
 	}{
 		"no resources": {
-			infos:   []*resource.Info{},
+			objs:    []*unstructured.Unstructured{},
 			options: Options{},
 			expectedTasks: []taskrunner.Task{
 				&task.ApplyTask{},
@@ -42,13 +42,13 @@ func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 			},
 		},
 		"single resource": {
-			infos: []*resource.Info{
+			objs: []*unstructured.Unstructured{
 				depInfo,
 			},
 			options: Options{},
 			expectedTasks: []taskrunner.Task{
 				&task.ApplyTask{
-					Objects: []*resource.Info{
+					Objects: []*unstructured.Unstructured{
 						depInfo,
 					},
 				},
@@ -56,7 +56,7 @@ func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 			},
 		},
 		"multiple resources with wait": {
-			infos: []*resource.Info{
+			objs: []*unstructured.Unstructured{
 				depInfo,
 				customInfo,
 			},
@@ -65,7 +65,7 @@ func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 			},
 			expectedTasks: []taskrunner.Task{
 				&task.ApplyTask{
-					Objects: []*resource.Info{
+					Objects: []*unstructured.Unstructured{
 						depInfo,
 						customInfo,
 					},
@@ -81,7 +81,7 @@ func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 			},
 		},
 		"multiple resources with wait and prune": {
-			infos: []*resource.Info{
+			objs: []*unstructured.Unstructured{
 				depInfo,
 				customInfo,
 			},
@@ -91,7 +91,7 @@ func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 			},
 			expectedTasks: []taskrunner.Task{
 				&task.ApplyTask{
-					Objects: []*resource.Info{
+					Objects: []*unstructured.Unstructured{
 						depInfo,
 						customInfo,
 					},
@@ -109,7 +109,7 @@ func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 			},
 		},
 		"multiple resources with wait, prune and dryrun": {
-			infos: []*resource.Info{
+			objs: []*unstructured.Unstructured{
 				depInfo,
 				customInfo,
 			},
@@ -120,7 +120,7 @@ func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 			},
 			expectedTasks: []taskrunner.Task{
 				&task.ApplyTask{
-					Objects: []*resource.Info{
+					Objects: []*unstructured.Unstructured{
 						depInfo,
 						customInfo,
 					},
@@ -131,7 +131,7 @@ func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 			},
 		},
 		"multiple resources with wait, prune and server-dryrun": {
-			infos: []*resource.Info{
+			objs: []*unstructured.Unstructured{
 				depInfo,
 				customInfo,
 			},
@@ -142,7 +142,7 @@ func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 			},
 			expectedTasks: []taskrunner.Task{
 				&task.ApplyTask{
-					Objects: []*resource.Info{
+					Objects: []*unstructured.Unstructured{
 						depInfo,
 						customInfo,
 					},
@@ -153,7 +153,7 @@ func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 			},
 		},
 		"multiple resources including CRD": {
-			infos: []*resource.Info{
+			objs: []*unstructured.Unstructured{
 				crdInfo,
 				depInfo,
 			},
@@ -162,7 +162,7 @@ func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 			},
 			expectedTasks: []taskrunner.Task{
 				&task.ApplyTask{
-					Objects: []*resource.Info{
+					Objects: []*unstructured.Unstructured{
 						crdInfo,
 					},
 				},
@@ -173,7 +173,7 @@ func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 					taskrunner.AllCurrent, 1*time.Second),
 				&task.ResetRESTMapperTask{},
 				&task.ApplyTask{
-					Objects: []*resource.Info{
+					Objects: []*unstructured.Unstructured{
 						depInfo,
 					},
 				},
@@ -188,7 +188,7 @@ func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 			},
 		},
 		"no wait with CRDs if it is a dryrun": {
-			infos: []*resource.Info{
+			objs: []*unstructured.Unstructured{
 				crdInfo,
 				depInfo,
 			},
@@ -198,12 +198,12 @@ func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 			},
 			expectedTasks: []taskrunner.Task{
 				&task.ApplyTask{
-					Objects: []*resource.Info{
+					Objects: []*unstructured.Unstructured{
 						crdInfo,
 					},
 				},
 				&task.ApplyTask{
-					Objects: []*resource.Info{
+					Objects: []*unstructured.Unstructured{
 						depInfo,
 					},
 				},
@@ -219,14 +219,11 @@ func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 				Mapper:       testutil.NewFakeRESTMapper(),
 			}
 
-			objs, err := object.InfosToObjMetas(tc.infos)
-			if err != nil {
-				t.Fatalf("unexpected error received: %s", err)
-			}
+			objs := object.UnstructuredsToObjMetas(tc.objs)
 			tq := tqs.BuildTaskQueue(&fakeResourceObjects{
-				infosForApply: tc.infos,
-				idsForApply:   objs,
-				idsForPrune:   nil,
+				objsForApply: tc.objs,
+				idsForApply:  objs,
+				idsForPrune:  nil,
 			}, tc.options)
 
 			tasks := queueToSlice(tq)
@@ -311,17 +308,17 @@ func getType(task taskrunner.Task) reflect.Type {
 }
 
 type fakeResourceObjects struct {
-	infosForApply []*resource.Info
-	idsForApply   []object.ObjMetadata
-	idsForPrune   []object.ObjMetadata
+	objsForApply []*unstructured.Unstructured
+	idsForApply  []object.ObjMetadata
+	idsForPrune  []object.ObjMetadata
 }
 
-func (f *fakeResourceObjects) InfosForApply() []*resource.Info {
-	return f.infosForApply
+func (f *fakeResourceObjects) ObjsForApply() []*unstructured.Unstructured {
+	return f.objsForApply
 }
 
-func (f *fakeResourceObjects) InfosForPrune() []*resource.Info {
-	return f.infosForApply
+func (f *fakeResourceObjects) ObjsForPrune() []*unstructured.Unstructured {
+	return f.objsForApply
 }
 
 func (f *fakeResourceObjects) IdsForApply() []object.ObjMetadata {
@@ -332,7 +329,7 @@ func (f *fakeResourceObjects) IdsForPrune() []object.ObjMetadata {
 	return f.idsForPrune
 }
 
-func ignoreErrInfoToObjMeta(info *resource.Info) object.ObjMetadata {
-	objMeta, _ := object.InfoToObjMeta(info)
+func ignoreErrInfoToObjMeta(info *unstructured.Unstructured) object.ObjMetadata {
+	objMeta := object.UnstructuredToObjMeta(info)
 	return objMeta
 }

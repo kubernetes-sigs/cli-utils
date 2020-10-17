@@ -12,6 +12,7 @@ import (
 	"k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/cli-utils/pkg/apply/solver"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
+	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/kustomize/kyaml/kio/filters"
 )
 
@@ -33,7 +34,7 @@ func SetNamespaces(factory util.Factory, infos []*resource.Info,
 
 	// find any crds in the set of resources.
 	for _, inf := range infos {
-		if solver.IsCRD(inf) {
+		if solver.IsCRD(object.InfoToUnstructured(inf)) {
 			crdInfos = append(crdInfos, inf)
 		}
 	}
@@ -43,7 +44,7 @@ func SetNamespaces(factory util.Factory, infos []*resource.Info,
 
 		// Exclude any inventory objects here since we don't want to change
 		// their namespace.
-		if inventory.IsInventoryObject(inf) {
+		if inventory.IsInventoryObject(object.InfoToUnstructured(inf)) {
 			continue
 		}
 

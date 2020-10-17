@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/klog"
 	"sigs.k8s.io/cli-utils/pkg/common"
@@ -46,7 +47,10 @@ type InventoryFactoryFunc func(*resource.Info) Inventory
 // inventory label) if it exists, or nil if it does not exist.
 func FindInventoryObj(infos []*resource.Info) *resource.Info {
 	for _, info := range infos {
-		if IsInventoryObject(info) {
+		if info == nil || info.Object == nil {
+			continue
+		}
+		if IsInventoryObject(object.InfoToUnstructured(info)) {
 			return info
 		}
 	}
@@ -55,11 +59,11 @@ func FindInventoryObj(infos []*resource.Info) *resource.Info {
 
 // IsInventoryObject returns true if the passed object has the
 // inventory label.
-func IsInventoryObject(info *resource.Info) bool {
-	if info == nil {
+func IsInventoryObject(obj *unstructured.Unstructured) bool {
+	if obj == nil {
 		return false
 	}
-	inventoryLabel, err := retrieveInventoryLabel(info)
+	inventoryLabel, err := retrieveInventoryLabel(obj)
 	if err == nil && len(inventoryLabel) > 0 {
 		return true
 	}
@@ -69,14 +73,11 @@ func IsInventoryObject(info *resource.Info) bool {
 // retrieveInventoryLabel returns the string value of the InventoryLabel
 // for the passed inventory object. Returns error if the passed object is nil or
 // is not a inventory object.
-func retrieveInventoryLabel(info *resource.Info) (string, error) {
-	if info == nil {
+func retrieveInventoryLabel(obj *unstructured.Unstructured) (string, error) {
+	if obj == nil {
 		return "", fmt.Errorf("inventory info is nil")
 	}
-	obj := info.Object
-	if obj == nil {
-		return "", fmt.Errorf("inventory object is nil")
-	}
+
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
 		return "", err
@@ -96,10 +97,40 @@ func SplitInfos(infos []*resource.Info) (*resource.Info, []*resource.Info, error
 	invs := make([]*resource.Info, 0)
 	resources := make([]*resource.Info, 0)
 	for _, info := range infos {
-		if IsInventoryObject(info) {
+		if info == nil || info.Object == nil {
+			continue
+		}
+		if IsInventoryObject(object.InfoToUnstructured(info)) {
 			invs = append(invs, info)
 		} else {
 			resources = append(resources, info)
+		}
+	}
+	if len(invs) == 0 {
+		return nil, resources, NoInventoryObjError{}
+	} else if len(invs) > 1 {
+		var invObjs []*unstructured.Unstructured
+		for _, inv := range invs {
+			invObjs = append(invObjs, object.InfoToUnstructured(inv))
+		}
+		return nil, resources, MultipleInventoryObjError{
+			InventoryObjectTemplates: invObjs,
+		}
+	}
+	return invs[0], resources, nil
+}
+
+// splitUnstructureds takes a slice of unstructured.Unstructured objects and
+// splits it into one slice that contains the inventory object templates and
+// another one that contains the remaining resources.
+func SplitUnstructureds(objs []*unstructured.Unstructured) (*unstructured.Unstructured, []*unstructured.Unstructured, error) {
+	invs := make([]*unstructured.Unstructured, 0)
+	resources := make([]*unstructured.Unstructured, 0)
+	for _, obj := range objs {
+		if IsInventoryObject(obj) {
+			invs = append(invs, obj)
+		} else {
+			resources = append(resources, obj)
 		}
 	}
 	if len(invs) == 0 {

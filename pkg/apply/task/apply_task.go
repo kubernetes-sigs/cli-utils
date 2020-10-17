@@ -41,8 +41,8 @@ type ApplyTask struct {
 	Factory        util.Factory
 	InfoHelper     info.InfoHelper
 	Mapper         meta.RESTMapper
-	Objects        []*resource.Info
-	CRDs           []*resource.Info
+	Objects        []*unstructured.Unstructured
+	CRDs           []*unstructured.Unstructured
 	DryRunStrategy common.DryRunStrategy
 }
 
@@ -84,7 +84,7 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 					ApplyEvent: event.ApplyEvent{
 						Type:      event.ApplyEventResourceUpdate,
 						Operation: event.Created,
-						Object:    obj.Object,
+						Object:    obj,
 					},
 				}
 			}
@@ -102,7 +102,7 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 
 		// Set the client and mapping fields on the provided
 		// infos so they can be applied to the cluster.
-		err := a.InfoHelper.UpdateInfos(objects)
+		infos, err := a.InfoHelper.BuildInfos(objects)
 		if err != nil {
 			a.sendTaskResult(taskContext, err)
 			return
@@ -115,7 +115,7 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 			a.sendTaskResult(taskContext, err)
 			return
 		}
-		ao.SetObjects(objects)
+		ao.SetObjects(infos)
 		err = ao.Run()
 		if err != nil {
 			a.sendTaskResult(taskContext, err)
@@ -123,13 +123,13 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 		}
 		// Fetch the Generation from all Infos after they have been
 		// applied.
-		for _, obj := range objects {
-			id, err := object.InfoToObjMeta(obj)
+		for _, inf := range infos {
+			id, err := object.InfoToObjMeta(inf)
 			if err != nil {
 				continue
 			}
-			if obj.Object != nil {
-				acc, err := meta.Accessor(obj.Object)
+			if inf.Object != nil {
+				acc, err := meta.Accessor(inf.Object)
 				if err != nil {
 					continue
 				}
@@ -196,13 +196,13 @@ func (a *ApplyTask) sendTaskResult(taskContext *taskrunner.TaskContext, err erro
 // in the resource set that defines the needed type. It returns two slices,
 // the seconds contains the resources that meets the above criteria while the
 // first slice contains the remaining resources.
-func (a *ApplyTask) filterCRsWithCRDInSet(objects []*resource.Info) ([]*resource.Info, []*resource.Info, error) {
-	var objs []*resource.Info
-	var objsWithCRD []*resource.Info
+func (a *ApplyTask) filterCRsWithCRDInSet(objects []*unstructured.Unstructured) ([]*unstructured.Unstructured, []*unstructured.Unstructured, error) {
+	var objs []*unstructured.Unstructured
+	var objsWithCRD []*unstructured.Unstructured
 
 	crdsInfo := buildCRDsInfo(a.CRDs)
 	for _, obj := range objects {
-		gvk := obj.Object.GetObjectKind().GroupVersionKind()
+		gvk := obj.GroupVersionKind()
 
 		// First check if we find the type in the RESTMapper.
 		//TODO: Maybe we do care if there is a new version of the CRD?
@@ -231,8 +231,8 @@ type crdsInfo struct {
 
 // includesCRDForCR checks if we have information about a CRD that defines
 // the types needed for the provided CR.
-func (c *crdsInfo) includesCRDForCR(cr *resource.Info) bool {
-	gvk := cr.Object.GetObjectKind().GroupVersionKind()
+func (c *crdsInfo) includesCRDForCR(cr *unstructured.Unstructured) bool {
+	gvk := cr.GroupVersionKind()
 	for _, crd := range c.crds {
 		if gvk.Group == crd.group &&
 			gvk.Kind == crd.kind &&
@@ -249,15 +249,14 @@ type crdInfo struct {
 	versions []string
 }
 
-func buildCRDsInfo(crds []*resource.Info) *crdsInfo {
+func buildCRDsInfo(crds []*unstructured.Unstructured) *crdsInfo {
 	var crdsInf []crdInfo
 	for _, crd := range crds {
-		u := crd.Object.(*unstructured.Unstructured)
-		group, _, _ := unstructured.NestedString(u.Object, "spec", "group")
-		kind, _, _ := unstructured.NestedString(u.Object, "spec", "names", "kind")
+		group, _, _ := unstructured.NestedString(crd.Object, "spec", "group")
+		kind, _, _ := unstructured.NestedString(crd.Object, "spec", "names", "kind")
 
 		var versions []string
-		crdVersions, _, _ := unstructured.NestedSlice(u.Object, "spec", "versions")
+		crdVersions, _, _ := unstructured.NestedSlice(crd.Object, "spec", "versions")
 		for _, ver := range crdVersions {
 			verObj := ver.(map[string]interface{})
 			version, _, _ := unstructured.NestedString(verObj, "name")

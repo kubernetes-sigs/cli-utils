@@ -11,7 +11,7 @@ import (
 	"github.com/go-errors/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/cli-runtime/pkg/resource"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/info"
 	"sigs.k8s.io/cli-utils/pkg/apply/poller"
@@ -36,8 +36,8 @@ func NewApplier(provider provider.Provider) *Applier {
 	a := &Applier{
 		PruneOptions: prune.NewPruneOptions(),
 		provider:     provider,
+		infoHelper:   info.NewInfoHelper(provider.Factory()),
 	}
-	a.infoHelperFactoryFunc = a.infoHelperFactory
 	return a
 }
 
@@ -57,10 +57,7 @@ type Applier struct {
 	PruneOptions *prune.PruneOptions
 	StatusPoller poller.Poller
 	invClient    inventory.InventoryClient
-
-	// infoHelperFactoryFunc is used to create a new instance of the
-	// InfoHelper. It is defined here so we can override it in unit tests.
-	infoHelperFactoryFunc func() info.InfoHelper
+	infoHelper   info.InfoHelper
 }
 
 // Initialize sets up the Applier for actually doing an apply against
@@ -85,46 +82,39 @@ func (a *Applier) Initialize() error {
 	return nil
 }
 
-// infoHelperFactory returns a new instance of the InfoHelper.
-func (a *Applier) infoHelperFactory() info.InfoHelper {
-	return info.NewInfoHelper(a.provider.Factory())
-}
-
 // prepareObjects merges the currently applied objects into the
 // set of stored objects in the cluster inventory. In the process, it
 // calculates the set of objects to be pruned (pruneIds), and orders the
 // resources for the subsequent apply. Returns the sorted resources to
 // apply as well as the objects for the prune, or an error if one occurred.
-func (a *Applier) prepareObjects(infos []*resource.Info) (*ResourceObjects, error) {
-	localInv, localInfos, err := inventory.SplitInfos(infos)
+func (a *Applier) prepareObjects(objs []*unstructured.Unstructured) (*ResourceObjects, error) {
+	localInv, localObjs, err := inventory.SplitUnstructureds(objs)
 	if err != nil {
 		return nil, err
 	}
 
 	// Ensures the namespace exists before applying the inventory object into it.
-	if invNamespace := inventoryNamespaceInSet(localInv, localInfos); invNamespace != nil {
-		if err = a.invClient.ApplyInventoryNamespace(invNamespace); err != nil {
+	if invNamespace := inventoryNamespaceInSet(localInv, localObjs); invNamespace != nil {
+		if err = a.invClient.ApplyInventoryNamespace(
+			object.UnstructuredToInfo(invNamespace)); err != nil {
 			return nil, err
 		}
 	}
 
-	currentObjs, err := object.InfosToObjMetas(localInfos)
-	if err != nil {
-		return nil, err
-	}
+	currentObjs := object.UnstructuredsToObjMetas(localObjs)
 	// returns the objects (pruneIds) to prune after apply. The prune
 	// algorithm requires stopping if the merge is not successful. Otherwise,
 	// the stored objects in inventory could become inconsistent.
-	pruneIds, err := a.invClient.Merge(localInv, currentObjs)
+	pruneIds, err := a.invClient.Merge(object.UnstructuredToInfo(localInv), currentObjs)
 	if err != nil {
 		return nil, err
 	}
 	// Sort order for applied resources.
-	sort.Sort(ordering.SortableInfos(localInfos))
+	sort.Sort(ordering.SortableUnstructureds(localObjs))
 
 	return &ResourceObjects{
 		LocalInv:  localInv,
-		Resources: localInfos,
+		Resources: localObjs,
 		PruneIds:  pruneIds,
 	}, nil
 }
@@ -133,31 +123,28 @@ func (a *Applier) prepareObjects(infos []*resource.Info) (*ResourceObjects, erro
 // will be applied and the existing inventories used to determine
 // resources that should be pruned.
 type ResourceObjects struct {
-	LocalInv  *resource.Info
-	Resources []*resource.Info
+	LocalInv  *unstructured.Unstructured
+	Resources []*unstructured.Unstructured
 	PruneIds  []object.ObjMetadata
 }
 
 // InfosForApply returns the infos representation for all the resources
 // that should be applied, including the inventory object. The
 // resources will be in sorted order.
-func (r *ResourceObjects) InfosForApply() []*resource.Info {
+func (r *ResourceObjects) ObjsForApply() []*unstructured.Unstructured {
 	return r.Resources
 }
 
-func (r *ResourceObjects) InfosForPrune() []*resource.Info {
-	return append([]*resource.Info{r.LocalInv}, r.Resources...)
+func (r *ResourceObjects) ObjsForPrune() []*unstructured.Unstructured {
+	return append([]*unstructured.Unstructured{r.LocalInv}, r.Resources...)
 }
 
 // IdsForApply returns the Ids for all resources that should be applied,
 // including the inventory object.
 func (r *ResourceObjects) IdsForApply() []object.ObjMetadata {
 	var ids []object.ObjMetadata
-	for _, info := range r.InfosForApply() {
-		id, err := object.InfoToObjMeta(info)
-		if err == nil {
-			ids = append(ids, id)
-		}
+	for _, obj := range r.ObjsForApply() {
+		ids = append(ids, object.UnstructuredToObjMeta(obj))
 	}
 	return ids
 }
@@ -182,7 +169,7 @@ func (r *ResourceObjects) AllIds() []object.ObjMetadata {
 // before all the given resources have been applied to the cluster. Any
 // cancellation or timeout will only affect how long we Wait for the
 // resources to become current.
-func (a *Applier) Run(ctx context.Context, objects []*resource.Info, options Options) <-chan event.Event {
+func (a *Applier) Run(ctx context.Context, objects []*unstructured.Unstructured, options Options) <-chan event.Event {
 	eventChannel := make(chan event.Event)
 	setDefaults(&options)
 	a.invClient.SetDryRunStrategy(options.DryRunStrategy) // client shared with prune, so sets dry-run for prune too.
@@ -208,7 +195,7 @@ func (a *Applier) Run(ctx context.Context, objects []*resource.Info, options Opt
 		taskQueue := (&solver.TaskQueueSolver{
 			PruneOptions: a.PruneOptions,
 			Factory:      a.provider.Factory(),
-			InfoHelper:   a.infoHelperFactoryFunc(),
+			InfoHelper:   a.infoHelper,
 			Mapper:       mapper,
 		}).BuildTaskQueue(resourceObjects, solver.Options{
 			ReconcileTimeout:       options.ReconcileTimeout,
@@ -306,18 +293,18 @@ func handleError(eventChannel chan event.Event, err error) {
 // inventoryNamespaceInSet returns the the namespace the passed inventory
 // object will be applied to, or nil if this namespace object does not exist
 // in the passed slice "infos" or the inventory object is cluster-scoped.
-func inventoryNamespaceInSet(inv *resource.Info, infos []*resource.Info) *resource.Info {
-	if inv == nil || inv.Object == nil {
+func inventoryNamespaceInSet(inv *unstructured.Unstructured, objs []*unstructured.Unstructured) *unstructured.Unstructured {
+	if inv == nil {
 		return nil
 	}
-	invAcc, _ := meta.Accessor(inv.Object)
+	invAcc, _ := meta.Accessor(inv)
 	invNamespace := invAcc.GetNamespace()
 
-	for _, info := range infos {
-		acc, _ := meta.Accessor(info.Object)
-		gvk := info.Object.GetObjectKind().GroupVersionKind()
+	for _, obj := range objs {
+		acc, _ := meta.Accessor(obj)
+		gvk := obj.GetObjectKind().GroupVersionKind()
 		if gvk == object.CoreV1Namespace && acc.GetName() == invNamespace {
-			return info
+			return obj
 		}
 	}
 	return nil

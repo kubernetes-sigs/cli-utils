@@ -17,6 +17,7 @@ import (
 	"sigs.k8s.io/cli-utils/cmd/printers"
 	"sigs.k8s.io/cli-utils/pkg/apply"
 	"sigs.k8s.io/cli-utils/pkg/common"
+	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/provider"
 	"sigs.k8s.io/kustomize/kyaml/setters2"
 )
@@ -109,7 +110,7 @@ func (r *ApplyRunner) RunE(cmd *cobra.Command, args []string) error {
 	if err := r.Applier.Initialize(); err != nil {
 		return err
 	}
-	ch := r.Applier.Run(context.Background(), infos, apply.Options{
+	ch := r.Applier.Run(context.Background(), object.InfosToUnstructureds(infos), apply.Options{
 		PollInterval:     r.period,
 		ReconcileTimeout: r.reconcileTimeout,
 		// If we are not waiting for status, tell the applier to not

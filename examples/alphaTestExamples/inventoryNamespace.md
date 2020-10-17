@@ -86,9 +86,9 @@ test-namespace is created first, so the following resources within the namespace
 <!-- @runApply @testE2EAgainstLatestRelease -->
 ```
 kapply apply $BASE --reconcile-timeout=1m > $OUTPUT/status
-expectedOutputLine "namespace/test-namespace configured"
+expectedOutputLine "namespace/test-namespace unchanged"
 expectedOutputLine "configmap/cm-a created"
-expectedOutputLine "2 resource(s) applied. 1 created, 0 unchanged, 1 configured"
+expectedOutputLine "2 resource(s) applied. 1 created, 1 unchanged, 0 configured"
 expectedOutputLine "0 resource(s) pruned, 0 skipped"
 
 # There should be only one inventory object

@@ -6,6 +6,7 @@ package ordering
 import (
 	"sort"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/resource"
 	"sigs.k8s.io/cli-utils/pkg/object"
@@ -26,6 +27,18 @@ func (a SortableInfos) Less(i, j int) bool {
 	if err != nil {
 		return false
 	}
+	return less(first, second)
+}
+
+type SortableUnstructureds []*unstructured.Unstructured
+
+var _ sort.Interface = SortableUnstructureds{}
+
+func (a SortableUnstructureds) Len() int      { return len(a) }
+func (a SortableUnstructureds) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
+func (a SortableUnstructureds) Less(i, j int) bool {
+	first := object.UnstructuredToObjMeta(a[i])
+	second := object.UnstructuredToObjMeta(a[j])
 	return less(first, second)
 }
 
