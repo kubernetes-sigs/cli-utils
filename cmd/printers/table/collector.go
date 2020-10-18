@@ -182,12 +182,8 @@ func (r *ResourceStateCollector) processEvent(ev event.Event) error {
 
 // processStatusEvent handles events pertaining to a status
 // update for a resource.
-func (r *ResourceStateCollector) processStatusEvent(e pe.Event) {
-	if e.EventType == pe.ErrorEvent {
-		r.processErrorEvent(e.Error)
-		return
-	}
-	if e.EventType == pe.ResourceUpdateEvent {
+func (r *ResourceStateCollector) processStatusEvent(e event.StatusEvent) {
+	if e.Type == event.StatusEventResourceUpdate {
 		resource := e.Resource
 		previous := r.resourceInfos[resource.Identifier]
 		previous.resourceStatus = e.Resource
@@ -216,11 +212,6 @@ func (r *ResourceStateCollector) processPruneEvent(e event.PruneEvent) {
 		}
 		previous.PruneOpResult = &e.Operation
 	}
-}
-
-// processErrorEvent handles events for errors.
-func (r *ResourceStateCollector) processErrorEvent(err error) {
-	r.err = err
 }
 
 // toIdentifier extracts the identifying information from an

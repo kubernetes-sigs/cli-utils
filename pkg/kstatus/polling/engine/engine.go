@@ -202,12 +202,6 @@ func (r *statusPollerRunner) Run() {
 	for {
 		select {
 		case <-r.ctx.Done():
-			// If the context has been cancelled, just send an CompletedEvent.
-			// Then return from this function, which will stop the ticker
-			// and close the event channel.
-			r.eventChannel <- event.Event{
-				EventType: event.CompletedEvent,
-			}
 			return
 		case <-ticker.C:
 			// First sync and then compute status for all resources.

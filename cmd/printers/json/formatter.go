@@ -13,7 +13,6 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/common"
-	pollevent "sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/print/list"
 )
@@ -63,27 +62,15 @@ func (jf *formatter) FormatApplyEvent(ae event.ApplyEvent, as *list.ApplyStats, 
 	return nil
 }
 
-func (jf *formatter) FormatStatusEvent(se pollevent.Event, _ list.Collector) error {
-	switch se.EventType {
-	case pollevent.ResourceUpdateEvent:
+func (jf *formatter) FormatStatusEvent(se event.StatusEvent, _ list.Collector) error {
+	if se.Type == event.StatusEventResourceUpdate {
 		id := se.Resource.Identifier
 		return jf.printResourceStatus(id, se)
-	case pollevent.ErrorEvent:
-		id := se.Resource.Identifier
-		return jf.printEvent("status", "error", map[string]interface{}{
-			"group":     id.GroupKind.Group,
-			"kind":      id.GroupKind.Kind,
-			"namespace": id.Namespace,
-			"name":      id.Name,
-			"error":     se.Error.Error(),
-		})
-	case pollevent.CompletedEvent:
-		return jf.printEvent("status", "completed", map[string]interface{}{})
 	}
 	return nil
 }
 
-func (jf *formatter) printResourceStatus(id object.ObjMetadata, se pollevent.Event) error {
+func (jf *formatter) printResourceStatus(id object.ObjMetadata, se event.StatusEvent) error {
 	return jf.printEvent("status", "resourceStatus",
 		map[string]interface{}{
 			"group":     id.GroupKind.Group,

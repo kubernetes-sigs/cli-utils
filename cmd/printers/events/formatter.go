@@ -14,7 +14,6 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/common"
-	pollevent "sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/print/list"
 )
@@ -54,18 +53,10 @@ func (ef *formatter) FormatApplyEvent(ae event.ApplyEvent, as *list.ApplyStats, 
 	return nil
 }
 
-func (ef *formatter) FormatStatusEvent(se pollevent.Event, _ list.Collector) error {
-	switch se.EventType {
-	case pollevent.ResourceUpdateEvent:
+func (ef *formatter) FormatStatusEvent(se event.StatusEvent, _ list.Collector) error {
+	if se.Type == event.StatusEventResourceUpdate {
 		id := se.Resource.Identifier
 		ef.printResourceStatus(id, se)
-	case pollevent.ErrorEvent:
-		id := se.Resource.Identifier
-		gk := id.GroupKind
-		ef.print("%s error: %s\n", resourceIDToString(gk, id.Name),
-			se.Error.Error())
-	case pollevent.CompletedEvent:
-		ef.print("all resources has reached the Current status")
 	}
 	return nil
 }
@@ -110,7 +101,7 @@ func (ef *formatter) FormatErrorEvent(_ event.ErrorEvent) error {
 	return nil
 }
 
-func (ef *formatter) printResourceStatus(id object.ObjMetadata, se pollevent.Event) {
+func (ef *formatter) printResourceStatus(id object.ObjMetadata, se event.StatusEvent) {
 	ef.print("%s is %s: %s", resourceIDToString(id.GroupKind, id.Name),
 		se.Resource.Status.String(), se.Resource.Message)
 }

@@ -52,7 +52,6 @@ func TestStatusPollerRunner(t *testing.T) {
 			expectedEventTypes: []event.EventType{
 				event.ResourceUpdateEvent,
 				event.ResourceUpdateEvent,
-				event.CompletedEvent,
 			},
 		},
 		"multiple resources": {
@@ -93,7 +92,6 @@ func TestStatusPollerRunner(t *testing.T) {
 				event.ResourceUpdateEvent,
 				event.ResourceUpdateEvent,
 				event.ResourceUpdateEvent,
-				event.CompletedEvent,
 			},
 		},
 	}
@@ -131,7 +129,7 @@ func TestStatusPollerRunner(t *testing.T) {
 			var eventTypes []event.EventType
 			for ch := range eventChannel {
 				eventTypes = append(eventTypes, ch.EventType)
-				if len(eventTypes) == len(tc.expectedEventTypes)-1 {
+				if len(eventTypes) == len(tc.expectedEventTypes) {
 					cancel()
 				}
 			}
@@ -165,19 +163,11 @@ func TestNewStatusPollerRunnerCancellation(t *testing.T) {
 
 	eventChannel := engine.Poll(ctx, identifiers, options)
 
-	var lastEvent event.Event
 	for {
 		select {
-		case e, more := <-eventChannel:
+		case <-eventChannel:
 			timer.Stop()
-			if more {
-				lastEvent = e
-			} else {
-				if want, got := event.CompletedEvent, lastEvent.EventType; got != want {
-					t.Errorf("Expected e to have type %s, but got %s", want, got)
-				}
-				return
-			}
+			return
 		case <-timer.C:
 			t.Errorf("expected runner to time out, but it didn't")
 			return

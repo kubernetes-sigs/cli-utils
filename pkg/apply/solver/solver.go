@@ -30,7 +30,6 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/apply/task"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
 	"sigs.k8s.io/cli-utils/pkg/common"
-	pollevent "sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
@@ -115,8 +114,8 @@ func (t *TaskQueueSolver) BuildTaskQueue(ro resourceObjects,
 			&task.SendEventTask{
 				Event: event.Event{
 					Type: event.StatusType,
-					StatusEvent: pollevent.Event{
-						EventType: pollevent.CompletedEvent,
+					StatusEvent: event.StatusEvent{
+						Type: event.StatusEventCompleted,
 					},
 				},
 			},
@@ -150,8 +149,8 @@ func (t *TaskQueueSolver) BuildTaskQueue(ro resourceObjects,
 				&task.SendEventTask{
 					Event: event.Event{
 						Type: event.StatusType,
-						StatusEvent: pollevent.Event{
-							EventType: pollevent.CompletedEvent,
+						StatusEvent: event.StatusEvent{
+							Type: event.StatusEventCompleted,
 						},
 					},
 				},

@@ -65,7 +65,7 @@ func TestFormatter_FormatApplyEvent(t *testing.T) {
 				ServersideApplied: 1,
 			},
 			statusCollector: &fakeCollector{
-				m: map[object.ObjMetadata]pollevent.Event{
+				m: map[object.ObjMetadata]event.StatusEvent{
 					object.ObjMetadata{ //nolint:gofmt
 						GroupKind: schema.GroupKind{
 							Group: "apps",
@@ -103,14 +103,14 @@ deployment.apps/my-dep is Current: Resource is Current
 func TestFormatter_FormatStatusEvent(t *testing.T) {
 	testCases := map[string]struct {
 		previewStrategy common.DryRunStrategy
-		event           pollevent.Event
+		event           event.StatusEvent
 		statusCollector list.Collector
 		expected        string
 	}{
 		"resource update with Current status": {
 			previewStrategy: common.DryRunNone,
-			event: pollevent.Event{
-				EventType: pollevent.ResourceUpdateEvent,
+			event: event.StatusEvent{
+				Type: event.StatusEventResourceUpdate,
 				Resource: &pollevent.ResourceStatus{
 					Identifier: object.ObjMetadata{
 						GroupKind: schema.GroupKind{
@@ -125,31 +125,6 @@ func TestFormatter_FormatStatusEvent(t *testing.T) {
 				},
 			},
 			expected: "deployment.apps/bar is Current: Resource is Current",
-		},
-		"status event with error": {
-			previewStrategy: common.DryRunNone,
-			event: pollevent.Event{
-				EventType: pollevent.ErrorEvent,
-				Resource: &pollevent.ResourceStatus{
-					Identifier: object.ObjMetadata{
-						GroupKind: schema.GroupKind{
-							Group: "apps",
-							Kind:  "Deployment",
-						},
-						Namespace: "foo",
-						Name:      "bar",
-					},
-				},
-				Error: fmt.Errorf("this is a test error"),
-			},
-			expected: "deployment.apps/bar error: this is a test error",
-		},
-		"status event with completed type": {
-			previewStrategy: common.DryRunNone,
-			event: pollevent.Event{
-				EventType: pollevent.CompletedEvent,
-			},
-			expected: "all resources has reached the Current status",
 		},
 	}
 
@@ -280,9 +255,9 @@ func createObject(group, kind, namespace, name string) runtime.Object {
 }
 
 type fakeCollector struct {
-	m map[object.ObjMetadata]pollevent.Event
+	m map[object.ObjMetadata]event.StatusEvent
 }
 
-func (f *fakeCollector) LatestStatus() map[object.ObjMetadata]pollevent.Event {
+func (f *fakeCollector) LatestStatus() map[object.ObjMetadata]event.StatusEvent {
 	return f.m
 }
