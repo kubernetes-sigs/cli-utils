@@ -29,6 +29,9 @@ const (
 	OnRemoveKeep = "keep"
 	// Maximum random number, non-inclusive, eight digits.
 	maxRandInt = 100000000
+	// DefaultFieldManager is default owner of applied fields in
+	// server-side apply.
+	DefaultFieldManager = "kubectl"
 )
 
 // RandomStr returns an eight-digit (with leading zeros) string of a
@@ -77,4 +80,16 @@ func (drs DryRunStrategy) ServerDryRun() bool {
 // ClientOrServerDryRun returns true if input drs is either client or server dry run
 func (drs DryRunStrategy) ClientOrServerDryRun() bool {
 	return drs == DryRunClient || drs == DryRunServer
+}
+
+// ServerSideOptions encapsulates the fields to implement server-side apply.
+type ServerSideOptions struct {
+	// ServerSideApply means the merge patch is calculated on the API server instead of the client.
+	ServerSideApply bool
+
+	// ForceConflicts overwrites the fields when applying if the field manager differs.
+	ForceConflicts bool
+
+	// FieldManager identifies the client "owner" of the applied fields (e.g. kubectl)
+	FieldManager string
 }

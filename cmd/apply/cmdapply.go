@@ -35,9 +35,15 @@ func GetApplyRunner(provider provider.Provider, ioStreams genericclioptions.IOSt
 		RunE:                  r.RunE,
 	}
 
+	cmd.Flags().BoolVar(&r.serverSideOptions.ServerSideApply, "server-side", false,
+		"If true, apply merge patch is calculated on API server instead of client.")
+	cmd.Flags().BoolVar(&r.serverSideOptions.ForceConflicts, "force-conflicts", false,
+		"If true, overwrite applied fields on server if field manager conflict.")
+	cmd.Flags().StringVar(&r.serverSideOptions.FieldManager, "field-manager", common.DefaultFieldManager,
+		"The client owner of the fields being applied on the server-side.")
+
 	cmd.Flags().StringVar(&r.output, "output", printers.DefaultPrinter(),
 		fmt.Sprintf("Output format, must be one of %s", strings.Join(printers.SupportedPrinters(), ",")))
-
 	cmd.Flags().DurationVar(&r.period, "poll-period", 2*time.Second,
 		"Polling period for resource statuses.")
 	cmd.Flags().DurationVar(&r.reconcileTimeout, "reconcile-timeout", time.Duration(0),
@@ -64,6 +70,7 @@ type ApplyRunner struct {
 	Applier   *apply.Applier
 	provider  provider.Provider
 
+	serverSideOptions      common.ServerSideOptions
 	output                 string
 	period                 time.Duration
 	reconcileTimeout       time.Duration
@@ -111,8 +118,9 @@ func (r *ApplyRunner) RunE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	ch := r.Applier.Run(context.Background(), object.InfosToUnstructureds(infos), apply.Options{
-		PollInterval:     r.period,
-		ReconcileTimeout: r.reconcileTimeout,
+		ServerSideOptions: r.serverSideOptions,
+		PollInterval:      r.period,
+		ReconcileTimeout:  r.reconcileTimeout,
 		// If we are not waiting for status, tell the applier to not
 		// emit the events.
 		EmitStatusEvents:       emitStatusEvents,

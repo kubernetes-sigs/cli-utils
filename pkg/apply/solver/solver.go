@@ -41,6 +41,7 @@ type TaskQueueSolver struct {
 }
 
 type Options struct {
+	ServerSideOptions      common.ServerSideOptions
 	ReconcileTimeout       time.Duration
 	Prune                  bool
 	DryRunStrategy         common.DryRunStrategy
@@ -66,12 +67,13 @@ func (t *TaskQueueSolver) BuildTaskQueue(ro resourceObjects,
 	crdSplitRes, hasCRDs := splitAfterCRDs(remainingInfos)
 	if hasCRDs {
 		tasks = append(tasks, &task.ApplyTask{
-			Objects:        append(crdSplitRes.before, crdSplitRes.crds...),
-			CRDs:           crdSplitRes.crds,
-			DryRunStrategy: o.DryRunStrategy,
-			InfoHelper:     t.InfoHelper,
-			Factory:        t.Factory,
-			Mapper:         t.Mapper,
+			Objects:           append(crdSplitRes.before, crdSplitRes.crds...),
+			CRDs:              crdSplitRes.crds,
+			ServerSideOptions: o.ServerSideOptions,
+			DryRunStrategy:    o.DryRunStrategy,
+			InfoHelper:        t.InfoHelper,
+			Factory:           t.Factory,
+			Mapper:            t.Mapper,
 		})
 		if !o.DryRunStrategy.ClientOrServerDryRun() {
 			objs := object.UnstructuredsToObjMetas(crdSplitRes.crds)
@@ -88,12 +90,13 @@ func (t *TaskQueueSolver) BuildTaskQueue(ro resourceObjects,
 
 	tasks = append(tasks,
 		&task.ApplyTask{
-			Objects:        remainingInfos,
-			CRDs:           crdSplitRes.crds,
-			DryRunStrategy: o.DryRunStrategy,
-			InfoHelper:     t.InfoHelper,
-			Factory:        t.Factory,
-			Mapper:         t.Mapper,
+			Objects:           remainingInfos,
+			CRDs:              crdSplitRes.crds,
+			ServerSideOptions: o.ServerSideOptions,
+			DryRunStrategy:    o.DryRunStrategy,
+			InfoHelper:        t.InfoHelper,
+			Factory:           t.Factory,
+			Mapper:            t.Mapper,
 		},
 		&task.SendEventTask{
 			Event: event.Event{

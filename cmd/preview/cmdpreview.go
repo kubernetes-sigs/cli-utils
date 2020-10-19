@@ -113,10 +113,16 @@ func (r *PreviewRunner) RunE(cmd *cobra.Command, args []string) error {
 
 		// Run the applier. It will return a channel where we can receive updates
 		// to keep track of progress and any issues.
+		serverSideOptions := common.ServerSideOptions{
+			ServerSideApply: false,
+			ForceConflicts:  false,
+			FieldManager:    common.DefaultFieldManager,
+		}
 		ch = r.Applier.Run(ctx, object.InfosToUnstructureds(infos), apply.Options{
-			EmitStatusEvents: false,
-			NoPrune:          noPrune,
-			DryRunStrategy:   drs,
+			EmitStatusEvents:  false,
+			NoPrune:           noPrune,
+			DryRunStrategy:    drs,
+			ServerSideOptions: serverSideOptions,
 		})
 	} else {
 		inv, _, err := inventory.SplitInfos(infos)
