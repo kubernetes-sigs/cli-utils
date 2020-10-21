@@ -75,7 +75,7 @@ func TestApplyTask_FetchGeneration(t *testing.T) {
 			defer close(eventChannel)
 			taskContext := taskrunner.NewTaskContext(eventChannel)
 
-			infos := toInfos(tc.rss)
+			objs := toUnstructureds(tc.rss)
 
 			oldAO := applyOptionsFactoryFunc
 			applyOptionsFactoryFunc = func(chan event.Event, common.DryRunStrategy, util.Factory) (applyOptions, error) {
@@ -84,7 +84,7 @@ func TestApplyTask_FetchGeneration(t *testing.T) {
 			defer func() { applyOptionsFactoryFunc = oldAO }()
 
 			applyTask := &ApplyTask{
-				Objects:    infos,
+				Objects:    objs,
 				InfoHelper: &fakeInfoHelper{},
 			}
 
@@ -113,14 +113,14 @@ func TestApplyTask_FetchGeneration(t *testing.T) {
 
 func TestApplyTask_DryRun(t *testing.T) {
 	testCases := map[string]struct {
-		infos           []*resource.Info
-		crds            []*resource.Info
+		objs            []*unstructured.Unstructured
+		crds            []*unstructured.Unstructured
 		expectedObjects []object.ObjMetadata
 		expectedEvents  []event.Event
 	}{
 		"dry run with no CRDs or CRs": {
-			infos: []*resource.Info{
-				toInfo(map[string]interface{}{
+			objs: []*unstructured.Unstructured{
+				toUnstructured(map[string]interface{}{
 					"apiVersion": "apps/v1",
 					"kind":       "Deployment",
 					"metadata": map[string]interface{}{
@@ -142,8 +142,8 @@ func TestApplyTask_DryRun(t *testing.T) {
 			expectedEvents: []event.Event{},
 		},
 		"dry run with CRD and CR": {
-			crds: []*resource.Info{
-				toInfo(map[string]interface{}{
+			crds: []*unstructured.Unstructured{
+				toUnstructured(map[string]interface{}{
 					"apiVersion": "apiextensions.k8s.io/v1",
 					"kind":       "CustomResourceDefinition",
 					"metadata": map[string]interface{}{
@@ -162,8 +162,8 @@ func TestApplyTask_DryRun(t *testing.T) {
 					},
 				}),
 			},
-			infos: []*resource.Info{
-				toInfo(map[string]interface{}{
+			objs: []*unstructured.Unstructured{
+				toUnstructured(map[string]interface{}{
 					"apiVersion": "custom.io/v1alpha1",
 					"kind":       "Custom",
 					"metadata": map[string]interface{}{
@@ -179,8 +179,8 @@ func TestApplyTask_DryRun(t *testing.T) {
 			},
 		},
 		"dry run with CRD and CR and CRD already installed": {
-			crds: []*resource.Info{
-				toInfo(map[string]interface{}{
+			crds: []*unstructured.Unstructured{
+				toUnstructured(map[string]interface{}{
 					"apiVersion": "apiextensions.k8s.io/v1",
 					"kind":       "CustomResourceDefinition",
 					"metadata": map[string]interface{}{
@@ -199,8 +199,8 @@ func TestApplyTask_DryRun(t *testing.T) {
 					},
 				}),
 			},
-			infos: []*resource.Info{
-				toInfo(map[string]interface{}{
+			objs: []*unstructured.Unstructured{
+				toUnstructured(map[string]interface{}{
 					"apiVersion": "anothercustom.io/v2",
 					"kind":       "AnotherCustom",
 					"metadata": map[string]interface{}{
@@ -248,7 +248,7 @@ func TestApplyTask_DryRun(t *testing.T) {
 				defer func() { applyOptionsFactoryFunc = oldAO }()
 
 				applyTask := &ApplyTask{
-					Objects:        tc.infos,
+					Objects:        tc.objs,
 					InfoHelper:     &fakeInfoHelper{},
 					Mapper:         restMapper,
 					DryRunStrategy: drs,
@@ -288,36 +288,30 @@ func TestApplyTask_DryRun(t *testing.T) {
 	}
 }
 
-func toInfo(obj map[string]interface{}) *resource.Info {
-	return &resource.Info{
-		Object: &unstructured.Unstructured{
-			Object: obj,
-		},
+func toUnstructured(obj map[string]interface{}) *unstructured.Unstructured {
+	return &unstructured.Unstructured{
+		Object: obj,
 	}
 }
 
-func toInfos(rss []resourceInfo) []*resource.Info {
-	var infos []*resource.Info
+func toUnstructureds(rss []resourceInfo) []*unstructured.Unstructured {
+	var objs []*unstructured.Unstructured
 
 	for _, rs := range rss {
-		infos = append(infos, &resource.Info{
-			Name:      rs.name,
-			Namespace: rs.namespace,
-			Object: &unstructured.Unstructured{
-				Object: map[string]interface{}{
-					"apiVersion": rs.apiVersion,
-					"kind":       rs.kind,
-					"metadata": map[string]interface{}{
-						"name":       rs.name,
-						"namespace":  rs.namespace,
-						"uid":        string(rs.uid),
-						"generation": rs.generation,
-					},
+		objs = append(objs, &unstructured.Unstructured{
+			Object: map[string]interface{}{
+				"apiVersion": rs.apiVersion,
+				"kind":       rs.kind,
+				"metadata": map[string]interface{}{
+					"name":       rs.name,
+					"namespace":  rs.namespace,
+					"uid":        string(rs.uid),
+					"generation": rs.generation,
 				},
 			},
 		})
 	}
-	return infos
+	return objs
 }
 
 type fakeApplyOptions struct {
@@ -336,4 +330,8 @@ type fakeInfoHelper struct{}
 
 func (f *fakeInfoHelper) UpdateInfos([]*resource.Info) error {
 	return nil
+}
+
+func (f *fakeInfoHelper) BuildInfos(objs []*unstructured.Unstructured) ([]*resource.Info, error) {
+	return object.UnstructuredsToInfos(objs), nil
 }

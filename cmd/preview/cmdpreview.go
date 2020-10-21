@@ -15,6 +15,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
+	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/provider"
 	"sigs.k8s.io/kustomize/kyaml/setters2"
 )
@@ -112,7 +113,7 @@ func (r *PreviewRunner) RunE(cmd *cobra.Command, args []string) error {
 
 		// Run the applier. It will return a channel where we can receive updates
 		// to keep track of progress and any issues.
-		ch = r.Applier.Run(ctx, infos, apply.Options{
+		ch = r.Applier.Run(ctx, object.InfosToUnstructureds(infos), apply.Options{
 			EmitStatusEvents: false,
 			NoPrune:          noPrune,
 			DryRunStrategy:   drs,

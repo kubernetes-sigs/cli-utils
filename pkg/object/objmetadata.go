@@ -24,6 +24,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/cli-runtime/pkg/resource"
@@ -195,6 +196,26 @@ func InfoToObjMeta(info *resource.Info) (ObjMetadata, error) {
 	obj := info.Object
 	gk := obj.GetObjectKind().GroupVersionKind().GroupKind()
 	return CreateObjMetadata(info.Namespace, info.Name, gk)
+}
+
+func UnstructuredsToObjMetas(objs []*unstructured.Unstructured) []ObjMetadata {
+	var objMetas []ObjMetadata
+	for _, obj := range objs {
+		objMetas = append(objMetas, ObjMetadata{
+			Name:      obj.GetName(),
+			Namespace: obj.GetNamespace(),
+			GroupKind: obj.GroupVersionKind().GroupKind(),
+		})
+	}
+	return objMetas
+}
+
+func UnstructuredToObjMeta(obj *unstructured.Unstructured) ObjMetadata {
+	return ObjMetadata{
+		Name:      obj.GetName(),
+		Namespace: obj.GetNamespace(),
+		GroupKind: obj.GroupVersionKind().GroupKind(),
+	}
 }
 
 // CalcHash returns a hash of the sorted strings from

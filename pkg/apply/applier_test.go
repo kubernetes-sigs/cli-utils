@@ -27,7 +27,6 @@ import (
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	"k8s.io/kubectl/pkg/scheme"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
-	"sigs.k8s.io/cli-utils/pkg/apply/info"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling"
@@ -205,7 +204,7 @@ func TestApplier(t *testing.T) {
 
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
-			infos, err := createInfos(tc.resources)
+			infos, err := createObjs(tc.resources)
 			assert.NoError(t, err)
 
 			tf := cmdtesting.NewTestFactory().WithNamespace(tc.namespace)
@@ -215,6 +214,9 @@ func TestApplier(t *testing.T) {
 
 			cf := provider.NewProvider(tf)
 			applier := NewApplier(cf)
+			applier.infoHelper = &fakeInfoHelper{
+				factory: tf,
+			}
 
 			err = applier.Initialize()
 			if !assert.NoError(t, err) {
@@ -227,12 +229,6 @@ func TestApplier(t *testing.T) {
 				start:  make(chan struct{}),
 			}
 			applier.StatusPoller = poller
-
-			applier.infoHelperFactoryFunc = func() info.InfoHelper {
-				return &fakeInfoHelper{
-					factory: tf,
-				}
-			}
 
 			ctx := context.Background()
 			eventChannel := applier.Run(ctx, infos, Options{
@@ -275,140 +271,106 @@ func TestApplier(t *testing.T) {
 
 var namespace = "test-namespace"
 
-var inventoryObjInfo = &resource.Info{
-	Namespace: namespace,
-	Name:      "test-inventory-obj",
-	Object: &unstructured.Unstructured{
+var inventoryObj = &unstructured.Unstructured{
+	Object: map[string]interface{}{
+		"apiVersion": "v1",
+		"kind":       "ConfigMap",
+		"metadata": map[string]interface{}{
+			"name":      "test-inventory-obj",
+			"namespace": namespace,
+			"labels": map[string]interface{}{
+				common.InventoryLabel: "test-app-label",
+			},
+		},
+	},
+}
+
+var obj1 = &unstructured.Unstructured{
+	Object: map[string]interface{}{
+		"apiVersion": "v1",
+		"kind":       "Pod",
+		"metadata": map[string]interface{}{
+			"name":      "obj1",
+			"namespace": namespace,
+		},
+	},
+}
+
+var obj2 = &unstructured.Unstructured{
+	Object: map[string]interface{}{
+		"apiVersion": "batch/v1",
+		"kind":       "Job",
+		"metadata": map[string]interface{}{
+			"name":      "obj2",
+			"namespace": namespace,
+		},
+	},
+}
+
+var obj3 = &unstructured.Unstructured{
+	Object: map[string]interface{}{
+		"apiVersion": "apps/v1",
+		"kind":       "Deployment",
+		"metadata": map[string]interface{}{
+			"name":      "obj3",
+			"namespace": "different-namespace",
+		},
+	},
+}
+
+var clusterScopedObj = &unstructured.Unstructured{
+	Object: map[string]interface{}{
+		"apiVersion": "rbac.authorization.k8s.io/v1",
+		"kind":       "ClusterRole",
+		"metadata": map[string]interface{}{
+			"name": "cluster-scoped-1",
+		},
+	},
+}
+
+func createNamespace(ns string) *unstructured.Unstructured {
+	return &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"apiVersion": "v1",
-			"kind":       "ConfigMap",
+			"kind":       "Namespace",
 			"metadata": map[string]interface{}{
-				"name":      "test-inventory-obj",
-				"namespace": namespace,
-				"labels": map[string]interface{}{
-					common.InventoryLabel: "test-app-label",
-				},
-			},
-		},
-	},
-}
-
-var obj1Info = &resource.Info{
-	Namespace: namespace,
-	Name:      "obj1",
-	Mapping: &meta.RESTMapping{
-		Scope: meta.RESTScopeNamespace,
-	},
-	Object: &unstructured.Unstructured{
-		Object: map[string]interface{}{
-			"apiVersion": "v1",
-			"kind":       "Pod",
-			"metadata": map[string]interface{}{
-				"name":      "obj1",
-				"namespace": namespace,
-			},
-		},
-	},
-}
-
-var obj2Info = &resource.Info{
-	Namespace: namespace,
-	Name:      "obj2",
-	Mapping: &meta.RESTMapping{
-		Scope: meta.RESTScopeNamespace,
-	},
-	Object: &unstructured.Unstructured{
-		Object: map[string]interface{}{
-			"apiVersion": "batch/v1",
-			"kind":       "Job",
-			"metadata": map[string]interface{}{
-				"name":      "obj2",
-				"namespace": namespace,
-			},
-		},
-	},
-}
-
-var obj3Info = &resource.Info{
-	Namespace: "different-namespace",
-	Name:      "obj3",
-	Mapping: &meta.RESTMapping{
-		Scope: meta.RESTScopeNamespace,
-	},
-	Object: &unstructured.Unstructured{
-		Object: map[string]interface{}{
-			"apiVersion": "apps/v1",
-			"kind":       "Deployment",
-			"metadata": map[string]interface{}{
-				"name":      "obj3",
-				"namespace": "different-namespace",
-			},
-		},
-	},
-}
-
-var clusterScopedObjInfo = &resource.Info{
-	Name: "cluster-scoped-1",
-	Mapping: &meta.RESTMapping{
-		Scope: meta.RESTScopeRoot,
-	},
-	Object: &unstructured.Unstructured{
-		Object: map[string]interface{}{
-			"apiVersion": "rbac.authorization.k8s.io/v1",
-			"kind":       "ClusterRole",
-			"metadata": map[string]interface{}{
-				"name": "cluster-scoped-1",
-			},
-		},
-	},
-}
-
-func createNamespaceInfo(ns string) *resource.Info {
-	return &resource.Info{
-		Name: ns,
-		Object: &unstructured.Unstructured{
-			Object: map[string]interface{}{
-				"apiVersion": "v1",
-				"kind":       "Namespace",
-				"metadata": map[string]interface{}{
-					"name": ns,
-				},
+				"name": ns,
 			},
 		},
 	}
 }
 
 func TestInventoryNamespaceInSet(t *testing.T) {
-	inventoryNamespace := createNamespaceInfo(namespace)
+	inventoryNamespace := createNamespace(namespace)
 
 	tests := map[string]struct {
-		inv       *resource.Info
-		objects   []*resource.Info
-		namespace *resource.Info
+		inv       *unstructured.Unstructured
+		objects   []*unstructured.Unstructured
+		namespace *unstructured.Unstructured
 	}{
 		"Nil inventory object, no resources returns nil namespace": {
 			inv:       nil,
-			objects:   []*resource.Info{},
+			objects:   []*unstructured.Unstructured{},
 			namespace: nil,
 		},
 		"Inventory object, but no resources returns nil namespace": {
-			inv:       inventoryObjInfo,
-			objects:   []*resource.Info{},
+			inv:       inventoryObj,
+			objects:   []*unstructured.Unstructured{},
 			namespace: nil,
 		},
 		"Inventory object, resources with no namespace returns nil namespace": {
-			inv:       inventoryObjInfo,
-			objects:   []*resource.Info{obj1Info, obj2Info},
+			inv:       inventoryObj,
+			objects:   []*unstructured.Unstructured{obj1, obj2},
 			namespace: nil,
 		},
 		"Inventory object, different namespace returns nil namespace": {
-			inv:       inventoryObjInfo,
-			objects:   []*resource.Info{createNamespaceInfo("foo")},
+			inv:       inventoryObj,
+			objects:   []*unstructured.Unstructured{createNamespace("foo")},
 			namespace: nil,
 		},
 		"Inventory object, inventory namespace returns inventory namespace": {
-			inv:       inventoryObjInfo,
-			objects:   []*resource.Info{obj1Info, inventoryNamespace, obj3Info},
+			inv:       inventoryObj,
+			objects:   []*unstructured.Unstructured{obj1, inventoryNamespace, obj3},
 			namespace: inventoryNamespace,
 		},
 	}
@@ -426,61 +388,61 @@ func TestInventoryNamespaceInSet(t *testing.T) {
 func TestReadAndPrepareObjects(t *testing.T) {
 	testCases := map[string]struct {
 		// locally read resources input into applier.prepareObjects
-		resources []*resource.Info
+		resources []*unstructured.Unstructured
 		// objects already stored in the cluster inventory
-		clusterObjs []*resource.Info
+		clusterObjs []*unstructured.Unstructured
 		// expected returned local inventory object
-		localInv *resource.Info
+		localInv *unstructured.Unstructured
 		// expected returned local objects to apply (in order)
-		localInfos []*resource.Info
+		localObjs []*unstructured.Unstructured
 		// expected calculated prune objects
-		pruneIds []*resource.Info
+		pruneObjs []*unstructured.Unstructured
 		// expected error
 		isError bool
 	}{
 		"no inventory object": {
-			resources: []*resource.Info{obj1Info},
+			resources: []*unstructured.Unstructured{obj1},
 			isError:   true,
 		},
 		"multiple inventory objects": {
-			resources: []*resource.Info{inventoryObjInfo, inventoryObjInfo},
+			resources: []*unstructured.Unstructured{inventoryObj, inventoryObj},
 			isError:   true,
 		},
 		"only inventory object": {
-			resources: []*resource.Info{inventoryObjInfo},
-			localInv:  inventoryObjInfo,
+			resources: []*unstructured.Unstructured{inventoryObj},
+			localInv:  inventoryObj,
 			isError:   false,
 		},
 		"only inventory object, prune one object": {
-			resources:   []*resource.Info{inventoryObjInfo},
-			clusterObjs: []*resource.Info{obj1Info},
-			localInv:    inventoryObjInfo,
-			pruneIds:    []*resource.Info{obj1Info},
+			resources:   []*unstructured.Unstructured{inventoryObj},
+			clusterObjs: []*unstructured.Unstructured{obj1},
+			localInv:    inventoryObj,
+			pruneObjs:   []*unstructured.Unstructured{obj1},
 			isError:     false,
 		},
 		"inventory object already at the beginning": {
-			resources: []*resource.Info{inventoryObjInfo, obj1Info,
-				clusterScopedObjInfo},
-			localInv:   inventoryObjInfo,
-			localInfos: []*resource.Info{obj1Info, clusterScopedObjInfo},
-			isError:    false,
+			resources: []*unstructured.Unstructured{inventoryObj, obj1,
+				clusterScopedObj},
+			localInv:  inventoryObj,
+			localObjs: []*unstructured.Unstructured{obj1, clusterScopedObj},
+			isError:   false,
 		},
 		"inventory object already at the beginning, prune one": {
-			resources: []*resource.Info{inventoryObjInfo, obj1Info,
-				clusterScopedObjInfo},
-			clusterObjs: []*resource.Info{obj2Info},
-			localInv:    inventoryObjInfo,
-			localInfos:  []*resource.Info{obj1Info, clusterScopedObjInfo},
-			pruneIds:    []*resource.Info{obj2Info},
+			resources: []*unstructured.Unstructured{inventoryObj, obj1,
+				clusterScopedObj},
+			clusterObjs: []*unstructured.Unstructured{obj2},
+			localInv:    inventoryObj,
+			localObjs:   []*unstructured.Unstructured{obj1, clusterScopedObj},
+			pruneObjs:   []*unstructured.Unstructured{obj2},
 			isError:     false,
 		},
 		"inventory object not at the beginning": {
-			resources: []*resource.Info{obj1Info, obj2Info, inventoryObjInfo,
-				clusterScopedObjInfo},
-			clusterObjs: []*resource.Info{obj2Info},
-			localInv:    inventoryObjInfo,
-			localInfos:  []*resource.Info{obj1Info, obj2Info, clusterScopedObjInfo},
-			pruneIds:    []*resource.Info{},
+			resources: []*unstructured.Unstructured{obj1, obj2, inventoryObj,
+				clusterScopedObj},
+			clusterObjs: []*unstructured.Unstructured{obj2},
+			localInv:    inventoryObj,
+			localObjs:   []*unstructured.Unstructured{obj1, obj2, clusterScopedObj},
+			pruneObjs:   []*unstructured.Unstructured{},
 			isError:     false,
 		},
 	}
@@ -488,7 +450,7 @@ func TestReadAndPrepareObjects(t *testing.T) {
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			// Set up objects already stored in cluster inventory.
-			clusterObjs, _ := object.InfosToObjMetas(tc.clusterObjs)
+			clusterObjs := object.UnstructuredsToObjMetas(tc.clusterObjs)
 			fakeInvClient := inventory.NewFakeInventoryClient(clusterObjs)
 			// Create applier with fake inventory client, and call prepareObjects
 			applier := &Applier{invClient: fakeInvClient}
@@ -503,17 +465,18 @@ func TestReadAndPrepareObjects(t *testing.T) {
 				return
 			}
 			// Validate the returned ResourceObjs
-			if *tc.localInv != *resourceObjs.LocalInv {
+			if tc.localInv.GetNamespace() != resourceObjs.LocalInv.GetNamespace() ||
+				tc.localInv.GetName() != resourceObjs.LocalInv.GetName() {
 				t.Errorf("expected local inventory (%v), got (%v)",
 					tc.localInv, resourceObjs.LocalInv)
 			}
-			if !infoSetsEqual(tc.localInfos, resourceObjs.Resources) {
+			if !objSetsEqual(tc.localObjs, resourceObjs.Resources) {
 				t.Errorf("expected local infos (%v), got (%v)",
-					tc.localInfos, resourceObjs.Resources)
+					tc.localObjs, resourceObjs.Resources)
 			}
-			if len(tc.pruneIds) != len(resourceObjs.PruneIds) {
+			if len(tc.pruneObjs) != len(resourceObjs.PruneIds) {
 				t.Errorf("expected prune ids (%v), got (%v)",
-					tc.pruneIds, resourceObjs.PruneIds)
+					tc.pruneObjs, resourceObjs.PruneIds)
 			}
 		})
 	}
@@ -570,21 +533,17 @@ func toIdentifier(t *testing.T, resourceInfo resourceInfo, namespace string) obj
 	}
 }
 
-func createInfos(resources []resourceInfo) ([]*resource.Info, error) {
-	var infos []*resource.Info
+func createObjs(resources []resourceInfo) ([]*unstructured.Unstructured, error) {
+	var objs []*unstructured.Unstructured
 	for _, ri := range resources {
 		u := &unstructured.Unstructured{}
 		err := runtime.DecodeInto(codec, []byte(ri.manifest), u)
 		if err != nil {
 			return nil, err
 		}
-		infos = append(infos, &resource.Info{
-			Object:    u,
-			Name:      u.GetName(),
-			Namespace: u.GetNamespace(),
-		})
+		objs = append(objs, u)
 	}
-	return infos, nil
+	return objs, nil
 }
 
 // The handler interface allows different testcases to provide
@@ -762,6 +721,23 @@ func (f *fakeInfoHelper) UpdateInfos(infos []*resource.Info) error {
 	return nil
 }
 
+func (f *fakeInfoHelper) BuildInfos(objs []*unstructured.Unstructured) ([]*resource.Info, error) {
+	var infos []*resource.Info
+	for _, obj := range objs {
+		infos = append(infos, &resource.Info{
+			Name:      obj.GetName(),
+			Namespace: obj.GetNamespace(),
+			Source:    "unstructured",
+			Object:    obj,
+		})
+	}
+	err := f.UpdateInfos(infos)
+	if err != nil {
+		return nil, err
+	}
+	return infos, nil
+}
+
 func (f *fakeInfoHelper) getClient(gv schema.GroupVersion) (resource.RESTClient, error) {
 	if f.factory.UnstructuredClientForMappingFunc != nil {
 		return f.factory.UnstructuredClientForMappingFunc(gv)
@@ -774,22 +750,16 @@ func (f *fakeInfoHelper) getClient(gv schema.GroupVersion) (resource.RESTClient,
 
 // infoSetEquals returns true if the set of Infos in setA equals the
 // set of Infos in setB (ordering does not matter); false otherwise.
-func infoSetsEqual(setA []*resource.Info, setB []*resource.Info) bool {
+func objSetsEqual(setA []*unstructured.Unstructured, setB []*unstructured.Unstructured) bool {
 	if len(setA) != len(setB) {
 		return false
 	}
 	mapA := map[string]bool{}
-	objMetasA, err := object.InfosToObjMetas(setA)
-	if err != nil {
-		return false
-	}
+	objMetasA := object.UnstructuredsToObjMetas(setA)
 	for _, objMetaA := range objMetasA {
 		mapA[objMetaA.String()] = true
 	}
-	objMetasB, err := object.InfosToObjMetas(setB)
-	if err != nil {
-		return false
-	}
+	objMetasB := object.UnstructuredsToObjMetas(setB)
 	for _, objMetaB := range objMetasB {
 		if _, ok := mapA[objMetaB.String()]; !ok {
 			return false

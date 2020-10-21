@@ -21,8 +21,8 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/info"
@@ -49,8 +49,8 @@ type Options struct {
 }
 
 type resourceObjects interface {
-	InfosForApply() []*resource.Info
-	InfosForPrune() []*resource.Info
+	ObjsForApply() []*unstructured.Unstructured
+	ObjsForPrune() []*unstructured.Unstructured
 	IdsForApply() []object.ObjMetadata
 	IdsForPrune() []object.ObjMetadata
 }
@@ -61,7 +61,7 @@ type resourceObjects interface {
 func (t *TaskQueueSolver) BuildTaskQueue(ro resourceObjects,
 	o Options) chan taskrunner.Task {
 	var tasks []taskrunner.Task
-	remainingInfos := ro.InfosForApply()
+	remainingInfos := ro.ObjsForApply()
 
 	crdSplitRes, hasCRDs := splitAfterCRDs(remainingInfos)
 	if hasCRDs {
@@ -74,7 +74,7 @@ func (t *TaskQueueSolver) BuildTaskQueue(ro resourceObjects,
 			Mapper:         t.Mapper,
 		})
 		if !o.DryRunStrategy.ClientOrServerDryRun() {
-			objs, _ := object.InfosToObjMetas(crdSplitRes.crds)
+			objs := object.UnstructuredsToObjMetas(crdSplitRes.crds)
 			tasks = append(tasks, taskrunner.NewWaitTask(
 				objs,
 				taskrunner.AllCurrent,
@@ -125,7 +125,7 @@ func (t *TaskQueueSolver) BuildTaskQueue(ro resourceObjects,
 	if o.Prune {
 		tasks = append(tasks,
 			&task.PruneTask{
-				Objects:           ro.InfosForPrune(),
+				Objects:           ro.ObjsForPrune(),
 				PruneOptions:      t.PruneOptions,
 				PropagationPolicy: o.PrunePropagationPolicy,
 				DryRunStrategy:    o.DryRunStrategy,
@@ -170,9 +170,9 @@ func tasksToQueue(tasks []taskrunner.Task) chan taskrunner.Task {
 }
 
 type crdSplitResult struct {
-	before []*resource.Info
-	after  []*resource.Info
-	crds   []*resource.Info
+	before []*unstructured.Unstructured
+	after  []*unstructured.Unstructured
+	crds   []*unstructured.Unstructured
 }
 
 // splitAfterCRDs takes a sorted slice of infos and splits it into
@@ -181,21 +181,21 @@ type crdSplitResult struct {
 // The function returns the three different sets of resources and
 // a boolean that tells whether there were any CRDs in the set of
 // resources.
-func splitAfterCRDs(infos []*resource.Info) (crdSplitResult, bool) {
-	var before []*resource.Info
-	var after []*resource.Info
+func splitAfterCRDs(objs []*unstructured.Unstructured) (crdSplitResult, bool) {
+	var before []*unstructured.Unstructured
+	var after []*unstructured.Unstructured
 
-	var crds []*resource.Info
-	for _, info := range infos {
-		if IsCRD(info) {
-			crds = append(crds, info)
+	var crds []*unstructured.Unstructured
+	for _, obj := range objs {
+		if IsCRD(obj) {
+			crds = append(crds, obj)
 			continue
 		}
 
 		if len(crds) > 0 {
-			after = append(after, info)
+			after = append(after, obj)
 		} else {
-			before = append(before, info)
+			before = append(before, obj)
 		}
 	}
 	return crdSplitResult{
@@ -205,7 +205,7 @@ func splitAfterCRDs(infos []*resource.Info) (crdSplitResult, bool) {
 	}, len(crds) > 0
 }
 
-func IsCRD(info *resource.Info) bool {
+func IsCRD(info *unstructured.Unstructured) bool {
 	gvk, found := toGVK(info)
 	if !found {
 		return false
@@ -218,12 +218,9 @@ func IsCRD(info *resource.Info) bool {
 	return false
 }
 
-func toGVK(info *resource.Info) (schema.GroupVersionKind, bool) {
-	if mapping := info.ResourceMapping(); mapping != nil {
-		return mapping.GroupVersionKind, true
-	}
-	if info.Object != nil {
-		return info.Object.GetObjectKind().GroupVersionKind(), true
+func toGVK(obj *unstructured.Unstructured) (schema.GroupVersionKind, bool) {
+	if obj != nil {
+		return obj.GroupVersionKind(), true
 	}
 	return schema.GroupVersionKind{}, false
 }

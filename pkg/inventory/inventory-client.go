@@ -211,7 +211,7 @@ func (cic *ClusterInventoryClient) getClusterInventoryInfo(localInv *resource.In
 	}
 	groupResource := mapping.Resource.GroupResource().String()
 	namespace := localObj.Namespace
-	label, err := retrieveInventoryLabel(localInv)
+	label, err := retrieveInventoryLabel(object.InfoToUnstructured(localInv))
 	if err != nil {
 		return nil, err
 	}

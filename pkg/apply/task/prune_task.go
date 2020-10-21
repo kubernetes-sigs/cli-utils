@@ -5,10 +5,11 @@ package task
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/cli-runtime/pkg/resource"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/cli-utils/pkg/apply/prune"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
 	"sigs.k8s.io/cli-utils/pkg/common"
+	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
 // PruneTask prunes objects from the cluster
@@ -16,7 +17,7 @@ import (
 // set of resources that have just been applied.
 type PruneTask struct {
 	PruneOptions      *prune.PruneOptions
-	Objects           []*resource.Info
+	Objects           []*unstructured.Unstructured
 	DryRunStrategy    common.DryRunStrategy
 	PropagationPolicy metav1.DeletionPropagation
 }
@@ -28,8 +29,8 @@ type PruneTask struct {
 func (p *PruneTask) Start(taskContext *taskrunner.TaskContext) {
 	go func() {
 		currentUIDs := taskContext.AllResourceUIDs()
-		err := p.PruneOptions.Prune(p.Objects, currentUIDs, taskContext.EventChannel(),
-			prune.Options{
+		err := p.PruneOptions.Prune(object.UnstructuredsToInfos(p.Objects),
+			currentUIDs, taskContext.EventChannel(), prune.Options{
 				DryRunStrategy:    p.DryRunStrategy,
 				PropagationPolicy: p.PropagationPolicy,
 			})

@@ -216,10 +216,6 @@ func TestIsInventoryObject(t *testing.T) {
 		isInventory bool
 	}{
 		{
-			invInfo:     nil,
-			isInventory: false,
-		},
-		{
 			invInfo:     invInfo,
 			isInventory: true,
 		},
@@ -230,7 +226,7 @@ func TestIsInventoryObject(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		inventory := IsInventoryObject(test.invInfo)
+		inventory := IsInventoryObject(test.invInfo.Object.(*unstructured.Unstructured))
 		if test.isInventory && !inventory {
 			t.Errorf("Inventory object not identified: %#v", test.invInfo)
 		}
@@ -246,12 +242,6 @@ func TestRetrieveInventoryLabel(t *testing.T) {
 		inventoryLabel string
 		isError        bool
 	}{
-		// Nil inventory object throws error.
-		{
-			inventoryInfo:  nil,
-			inventoryLabel: "",
-			isError:        true,
-		},
 		// Pod is not a inventory object.
 		{
 			inventoryInfo:  pod2Info,
@@ -272,7 +262,7 @@ func TestRetrieveInventoryLabel(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		actual, err := retrieveInventoryLabel(test.inventoryInfo)
+		actual, err := retrieveInventoryLabel(object.InfoToUnstructured(test.inventoryInfo))
 		if test.isError && err == nil {
 			t.Errorf("Did not receive expected error.\n")
 		}
