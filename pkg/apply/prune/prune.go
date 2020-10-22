@@ -17,9 +17,9 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/klog"
 	"k8s.io/kubectl/pkg/cmd/util"
@@ -80,15 +80,15 @@ type Options struct {
 // (retrieved from previous inventory objects) but omitted in
 // the current apply. Prune also delete all previous inventory
 // objects. Returns an error if there was a problem.
-func (po *PruneOptions) Prune(localInfos []*resource.Info, currentUIDs sets.String,
+func (po *PruneOptions) Prune(localObjs []*unstructured.Unstructured, currentUIDs sets.String,
 	eventChannel chan<- event.Event, o Options) error {
-	localInv, localInfos, err := inventory.SplitInfos(localInfos)
+	localInv, localObjs, err := inventory.SplitUnstructureds(localObjs)
 	if err != nil {
 		return err
 	}
-	invNamespace := localInv.Namespace
-	klog.V(4).Infof("prune local inventory object: %s/%s", invNamespace, localInv.Name)
-	clusterObjs, err := po.InvClient.GetClusterObjs(localInv)
+	invNamespace := localInv.GetNamespace()
+	klog.V(4).Infof("prune local inventory object: %s/%s", invNamespace, localInv.GetName())
+	clusterObjs, err := po.InvClient.GetClusterObjs(object.UnstructuredToInfo(localInv))
 	if err != nil {
 		return err
 	}
@@ -148,11 +148,8 @@ func (po *PruneOptions) Prune(localInfos []*resource.Info, currentUIDs sets.Stri
 		}
 		eventChannel <- createPruneEvent(obj, event.Pruned)
 	}
-	localObjs, err := object.InfosToObjMetas(localInfos)
-	if err != nil {
-		return err
-	}
-	return po.InvClient.Replace(localInv, localObjs)
+	localIds := object.UnstructuredsToObjMetas(localObjs)
+	return po.InvClient.Replace(object.UnstructuredToInfo(localInv), localIds)
 }
 
 // preventDeleteAnnotation returns true if the "onRemove:keep"

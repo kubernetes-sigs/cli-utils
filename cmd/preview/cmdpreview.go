@@ -123,7 +123,7 @@ func (r *PreviewRunner) RunE(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return err
 		}
-		ch = r.Destroyer.Run(inv)
+		ch = r.Destroyer.Run(object.InfoToUnstructured(inv))
 	}
 
 	// The printer will print updates from the channel. It will block

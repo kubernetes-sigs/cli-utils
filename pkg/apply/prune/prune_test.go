@@ -27,7 +27,7 @@ var roleName = "role"
 
 var testInventoryLabel = "test-app-label"
 
-var inventoryObj = unstructured.Unstructured{
+var inventoryObj = &unstructured.Unstructured{
 	Object: map[string]interface{}{
 		"apiVersion": "v1",
 		"kind":       "ConfigMap",
@@ -41,7 +41,7 @@ var inventoryObj = unstructured.Unstructured{
 	},
 }
 
-var namespace = unstructured.Unstructured{
+var namespace = &unstructured.Unstructured{
 	Object: map[string]interface{}{
 		"apiVersion": "v1",
 		"kind":       "Namespace",
@@ -53,13 +53,7 @@ var namespace = unstructured.Unstructured{
 	},
 }
 
-var namespaceInfo = &resource.Info{
-	Namespace: testNamespace,
-	Name:      namespaceName,
-	Object:    &namespace,
-}
-
-var pdb = unstructured.Unstructured{
+var pdb = &unstructured.Unstructured{
 	Object: map[string]interface{}{
 		"apiVersion": "policy/v1beta1",
 		"kind":       "PodDisruptionBudget",
@@ -71,13 +65,7 @@ var pdb = unstructured.Unstructured{
 	},
 }
 
-var pdbInfo = &resource.Info{
-	Namespace: testNamespace,
-	Name:      pdbName,
-	Object:    &pdb,
-}
-
-var role = unstructured.Unstructured{
+var role = &unstructured.Unstructured{
 	Object: map[string]interface{}{
 		"apiVersion": "rbac.authorization.k8s.io/v1",
 		"kind":       "Role",
@@ -89,15 +77,9 @@ var role = unstructured.Unstructured{
 	},
 }
 
-var roleInfo = &resource.Info{
-	Namespace: testNamespace,
-	Name:      roleName,
-	Object:    &role,
-}
-
 // Returns a inventory object with the inventory set from
 // the passed "children".
-func createInventoryInfo(name string, children ...*resource.Info) *resource.Info {
+func createInventoryInfo(name string, children ...*unstructured.Unstructured) *unstructured.Unstructured {
 	inventoryName := inventoryObjName
 	if len(name) > 0 {
 		inventoryName = name
@@ -109,19 +91,16 @@ func createInventoryInfo(name string, children ...*resource.Info) *resource.Info
 		Object:    inventoryObjCopy,
 	}
 	wrappedInv := inventory.WrapInventoryObj(inventoryInfo)
-	objs, err := object.InfosToObjMetas(children)
-	if err != nil {
-		return nil
-	}
-	if err = wrappedInv.Store(objs); err != nil {
+	objs := object.UnstructuredsToObjMetas(children)
+	if err := wrappedInv.Store(objs); err != nil {
 		return nil
 	}
 	inventoryInfo, _ = wrappedInv.GetObject()
-	return inventoryInfo
+	return object.InfoToUnstructured(inventoryInfo)
 }
 
 // preventDelete object contains the "on-remove:keep" lifecycle directive.
-var preventDelete = unstructured.Unstructured{
+var preventDelete = &unstructured.Unstructured{
 	Object: map[string]interface{}{
 		"apiVersion": "v1",
 		"kind":       "Pod",
@@ -136,56 +115,50 @@ var preventDelete = unstructured.Unstructured{
 	},
 }
 
-var preventDeleteInfo = &resource.Info{
-	Namespace: testNamespace,
-	Name:      "test-prevent-delete",
-	Object:    &preventDelete,
-}
-
 func TestPrune(t *testing.T) {
 	tests := map[string]struct {
-		// pastInfos/currentInfos do NOT contain the inventory object.
+		// pastObjs/currentObjs do NOT contain the inventory object.
 		// Inventory object is generated from these past/current objects.
-		pastInfos    []*resource.Info
-		currentInfos []*resource.Info
-		prunedInfos  []*resource.Info
-		isError      bool
+		pastObjs    []*unstructured.Unstructured
+		currentObjs []*unstructured.Unstructured
+		prunedObjs  []*unstructured.Unstructured
+		isError     bool
 	}{
 		"Past and current objects are empty; no pruned objects": {
-			pastInfos:    []*resource.Info{},
-			currentInfos: []*resource.Info{},
-			prunedInfos:  []*resource.Info{},
-			isError:      false,
+			pastObjs:    []*unstructured.Unstructured{},
+			currentObjs: []*unstructured.Unstructured{},
+			prunedObjs:  []*unstructured.Unstructured{},
+			isError:     false,
 		},
 		"Past and current objects are the same; no pruned objects": {
-			pastInfos:    []*resource.Info{namespaceInfo, pdbInfo},
-			currentInfos: []*resource.Info{pdbInfo, namespaceInfo},
-			prunedInfos:  []*resource.Info{},
-			isError:      false,
+			pastObjs:    []*unstructured.Unstructured{namespace, pdb},
+			currentObjs: []*unstructured.Unstructured{pdb, namespace},
+			prunedObjs:  []*unstructured.Unstructured{},
+			isError:     false,
 		},
 		"No past objects; no pruned objects": {
-			pastInfos:    []*resource.Info{},
-			currentInfos: []*resource.Info{pdbInfo, namespaceInfo},
-			prunedInfos:  []*resource.Info{},
-			isError:      false,
+			pastObjs:    []*unstructured.Unstructured{},
+			currentObjs: []*unstructured.Unstructured{pdb, namespace},
+			prunedObjs:  []*unstructured.Unstructured{},
+			isError:     false,
 		},
 		"No current objects; all previous objects pruned in correct order": {
-			pastInfos:    []*resource.Info{namespaceInfo, pdbInfo, roleInfo},
-			currentInfos: []*resource.Info{},
-			prunedInfos:  []*resource.Info{pdbInfo, roleInfo, namespaceInfo},
-			isError:      false,
+			pastObjs:    []*unstructured.Unstructured{namespace, pdb, role},
+			currentObjs: []*unstructured.Unstructured{},
+			prunedObjs:  []*unstructured.Unstructured{pdb, role, namespace},
+			isError:     false,
 		},
 		"Omitted object is pruned": {
-			pastInfos:    []*resource.Info{namespaceInfo, pdbInfo},
-			currentInfos: []*resource.Info{pdbInfo, roleInfo},
-			prunedInfos:  []*resource.Info{namespaceInfo},
-			isError:      false,
+			pastObjs:    []*unstructured.Unstructured{namespace, pdb},
+			currentObjs: []*unstructured.Unstructured{pdb, role},
+			prunedObjs:  []*unstructured.Unstructured{namespace},
+			isError:     false,
 		},
 		"Prevent delete lifecycle annotation stops pruning": {
-			pastInfos:    []*resource.Info{preventDeleteInfo, pdbInfo},
-			currentInfos: []*resource.Info{pdbInfo, roleInfo},
-			prunedInfos:  []*resource.Info{},
-			isError:      false,
+			pastObjs:    []*unstructured.Unstructured{preventDelete, pdb},
+			currentObjs: []*unstructured.Unstructured{pdb, role},
+			prunedObjs:  []*unstructured.Unstructured{},
+			isError:     false,
 		},
 	}
 	for name, tc := range tests {
@@ -194,23 +167,23 @@ func TestPrune(t *testing.T) {
 			t.Run(name, func(t *testing.T) {
 				po := NewPruneOptions()
 				// Set up the previously applied objects.
-				clusterObjs, _ := object.InfosToObjMetas(tc.pastInfos)
+				clusterObjs := object.UnstructuredsToObjMetas(tc.pastObjs)
 				po.InvClient = inventory.NewFakeInventoryClient(clusterObjs)
 				// Set up the currently applied objects.
-				currentInventoryInfo := createInventoryInfo("current-group", tc.currentInfos...)
-				currentInfos := append(tc.currentInfos, currentInventoryInfo)
+				currentInventory := createInventoryInfo("current-group", tc.currentObjs...)
+				currentObjs := append(tc.currentObjs, currentInventory)
 				// Set up the fake dynamic client to recognize all objects, and the RESTMapper.
 				po.client = fake.NewSimpleDynamicClient(scheme.Scheme,
-					namespaceInfo.Object, pdbInfo.Object, roleInfo.Object)
+					namespace, pdb, role)
 				po.mapper = testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme,
 					scheme.Scheme.PrioritizedVersionsAllGroups()...)
 				// The event channel can not block; make sure its bigger than all
 				// the events that can be put on it.
-				eventChannel := make(chan event.Event, len(tc.pastInfos)+1) // Add one for inventory object
+				eventChannel := make(chan event.Event, len(tc.pastObjs)+1) // Add one for inventory object
 				err := func() error {
 					defer close(eventChannel)
 					// Run the prune and validate.
-					return po.Prune(currentInfos, populateObjectIds(tc.currentInfos, t), eventChannel, Options{
+					return po.Prune(currentObjs, populateObjectIds(tc.currentObjs, t), eventChannel, Options{
 						DryRunStrategy: drs,
 					})
 				}()
@@ -223,13 +196,13 @@ func TestPrune(t *testing.T) {
 					for e := range eventChannel {
 						actualPruneEvents = append(actualPruneEvents, e)
 					}
-					if want, got := len(tc.prunedInfos), len(actualPruneEvents); want != got {
+					if want, got := len(tc.prunedObjs), len(actualPruneEvents); want != got {
 						t.Errorf("Expected (%d) prune events, got (%d)", want, got)
 					}
 
-					for i, info := range tc.prunedInfos {
+					for i, obj := range tc.prunedObjs {
 						e := actualPruneEvents[i]
-						expKind := info.Object.GetObjectKind().GroupVersionKind().Kind
+						expKind := obj.GetObjectKind().GroupVersionKind().Kind
 						actKind := e.PruneEvent.Object.GetObjectKind().GroupVersionKind().Kind
 						if expKind != actKind {
 							t.Errorf("Expected kind %s, got %s", expKind, actKind)
@@ -245,10 +218,9 @@ func TestPrune(t *testing.T) {
 
 // populateObjectIds returns a pointer to a set of strings containing
 // the UID's of the passed objects (infos).
-func populateObjectIds(infos []*resource.Info, t *testing.T) sets.String {
+func populateObjectIds(objs []*unstructured.Unstructured, t *testing.T) sets.String {
 	uids := sets.NewString()
-	for _, currInfo := range infos {
-		currObj := currInfo.Object
+	for _, currObj := range objs {
 		metadata, err := meta.Accessor(currObj)
 		if err != nil {
 			t.Fatalf("Unexpected error retrieving object metadata: %#v", err)

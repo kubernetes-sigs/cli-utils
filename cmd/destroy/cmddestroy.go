@@ -11,6 +11,7 @@ import (
 	"sigs.k8s.io/cli-utils/cmd/printers"
 	"sigs.k8s.io/cli-utils/pkg/apply"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
+	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/provider"
 )
 
@@ -68,7 +69,7 @@ func (r *DestroyRunner) RunE(cmd *cobra.Command, args []string) error {
 
 	// Run the destroyer. It will return a channel where we can receive updates
 	// to keep track of progress and any issues.
-	ch := r.Destroyer.Run(inv)
+	ch := r.Destroyer.Run(object.InfoToUnstructured(inv))
 
 	// The printer will print updates from the channel. It will block
 	// until the channel is closed.
