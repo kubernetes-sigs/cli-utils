@@ -4,7 +4,7 @@
 package inventory
 
 import (
-	"k8s.io/cli-runtime/pkg/resource"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
@@ -26,7 +26,7 @@ func NewFakeInventoryClient(initObjs []object.ObjMetadata) *FakeInventoryClient 
 }
 
 // GetClusterObjs returns currently stored set of objects.
-func (fic *FakeInventoryClient) GetClusterObjs(inv *resource.Info) ([]object.ObjMetadata, error) {
+func (fic *FakeInventoryClient) GetClusterObjs(inv *unstructured.Unstructured) ([]object.ObjMetadata, error) {
 	if fic.Err != nil {
 		return []object.ObjMetadata{}, fic.Err
 	}
@@ -36,7 +36,7 @@ func (fic *FakeInventoryClient) GetClusterObjs(inv *resource.Info) ([]object.Obj
 // Merge stores the passed objects with the current stored cluster inventory
 // objects. Returns the set difference of the current set of objects minus
 // the passed set of objects, or an error if one is set up.
-func (fic *FakeInventoryClient) Merge(inv *resource.Info, objs []object.ObjMetadata) ([]object.ObjMetadata, error) {
+func (fic *FakeInventoryClient) Merge(inv *unstructured.Unstructured, objs []object.ObjMetadata) ([]object.ObjMetadata, error) {
 	if fic.Err != nil {
 		return []object.ObjMetadata{}, fic.Err
 	}
@@ -47,7 +47,7 @@ func (fic *FakeInventoryClient) Merge(inv *resource.Info, objs []object.ObjMetad
 
 // Replace the stored cluster inventory objs with the passed obj, or an
 // error if one is set up.
-func (fic *FakeInventoryClient) Replace(inv *resource.Info, objs []object.ObjMetadata) error {
+func (fic *FakeInventoryClient) Replace(inv *unstructured.Unstructured, objs []object.ObjMetadata) error {
 	if fic.Err != nil {
 		return fic.Err
 	}
@@ -56,7 +56,7 @@ func (fic *FakeInventoryClient) Replace(inv *resource.Info, objs []object.ObjMet
 }
 
 // DeleteInventoryObj returns an error if one is forced; does nothing otherwise.
-func (fic *FakeInventoryClient) DeleteInventoryObj(inv *resource.Info) error {
+func (fic *FakeInventoryClient) DeleteInventoryObj(inv *unstructured.Unstructured) error {
 	if fic.Err != nil {
 		return fic.Err
 	}
@@ -65,7 +65,7 @@ func (fic *FakeInventoryClient) DeleteInventoryObj(inv *resource.Info) error {
 
 func (fic *FakeInventoryClient) SetDryRunStrategy(drs common.DryRunStrategy) {}
 
-func (fic *FakeInventoryClient) ApplyInventoryNamespace(info *resource.Info) error {
+func (fic *FakeInventoryClient) ApplyInventoryNamespace(inv *unstructured.Unstructured) error {
 	if fic.Err != nil {
 		return fic.Err
 	}

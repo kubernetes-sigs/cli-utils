@@ -14,7 +14,6 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/apply/prune"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
-	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/provider"
 )
 
@@ -92,7 +91,7 @@ func (d *Destroyer) Run(inv *unstructured.Unstructured) <-chan event.Event {
 		}
 
 		// Now delete the inventory object as well.
-		err = d.invClient.DeleteInventoryObj(object.UnstructuredToInfo(inv))
+		err = d.invClient.DeleteInventoryObj(inv)
 		if err != nil {
 			ch <- event.Event{
 				Type: event.ErrorType,

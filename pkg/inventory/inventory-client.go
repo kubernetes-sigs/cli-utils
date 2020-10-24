@@ -15,6 +15,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util"
 	"k8s.io/kubectl/pkg/validation"
+	"sigs.k8s.io/cli-utils/pkg/apply/info"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/ordering"
@@ -26,20 +27,20 @@ type InventoryClient interface {
 	// GetCluster returns the set of previously applied objects as ObjMetadata,
 	// or an error if one occurred. This set of previously applied object references
 	// is stored in the inventory objects living in the cluster.
-	GetClusterObjs(inv *resource.Info) ([]object.ObjMetadata, error)
+	GetClusterObjs(inv *unstructured.Unstructured) ([]object.ObjMetadata, error)
 	// Merge applies the union of the passed objects with the currently
 	// stored objects in the inventory object. Returns the slice of
 	// objects which are a set diff (objects to be pruned). Otherwise,
 	// returns an error if one happened.
-	Merge(inv *resource.Info, objs []object.ObjMetadata) ([]object.ObjMetadata, error)
+	Merge(inv *unstructured.Unstructured, objs []object.ObjMetadata) ([]object.ObjMetadata, error)
 	// Replace replaces the set of objects stored in the inventory
 	// object with the passed set of objects, or an error if one occurs.
-	Replace(inv *resource.Info, objs []object.ObjMetadata) error
+	Replace(inv *unstructured.Unstructured, objs []object.ObjMetadata) error
 	// DeleteInventoryObj deletes the passed inventory object from the APIServer.
-	DeleteInventoryObj(inv *resource.Info) error
+	DeleteInventoryObj(inv *unstructured.Unstructured) error
 	// SetDryRunStrategy sets the dry run strategy on whether this we actually mutate.
 	SetDryRunStrategy(drs common.DryRunStrategy)
-	ApplyInventoryNamespace(invNamespace *resource.Info) error
+	ApplyInventoryNamespace(invNamespace *unstructured.Unstructured) error
 }
 
 // ClusterInventoryClient is a concrete implementation of the
@@ -51,6 +52,7 @@ type ClusterInventoryClient struct {
 	clientFunc           func(*meta.RESTMapping) (resource.RESTClient, error)
 	dryRunStrategy       common.DryRunStrategy
 	InventoryFactoryFunc InventoryFactoryFunc
+	infoHelper           info.InfoHelper
 }
 
 var _ InventoryClient = &ClusterInventoryClient{}
@@ -75,6 +77,7 @@ func NewInventoryClient(factory cmdutil.Factory, invFunc InventoryFactoryFunc) (
 		clientFunc:           factory.UnstructuredClientForMapping,
 		dryRunStrategy:       common.DryRunNone,
 		InventoryFactoryFunc: invFunc,
+		infoHelper:           info.NewInfoHelper(factory),
 	}
 	return &clusterInventoryClient, nil
 }
@@ -86,7 +89,7 @@ func NewInventoryClient(factory cmdutil.Factory, invFunc InventoryFactoryFunc) (
 // to prune. Creates the initial cluster inventory object storing the passed
 // objects if an inventory object does not exist. Returns an error if one
 // occurred.
-func (cic *ClusterInventoryClient) Merge(localInv *resource.Info, objs []object.ObjMetadata) ([]object.ObjMetadata, error) {
+func (cic *ClusterInventoryClient) Merge(localInv *unstructured.Unstructured, objs []object.ObjMetadata) ([]object.ObjMetadata, error) {
 	pruneIds := []object.ObjMetadata{}
 	clusterInv, err := cic.getClusterInventoryInfo(localInv)
 	if err != nil {
@@ -129,7 +132,7 @@ func (cic *ClusterInventoryClient) Merge(localInv *resource.Info, objs []object.
 			if err != nil {
 				return pruneIds, err
 			}
-			klog.V(4).Infof("update cluster inventory: %s/%s", clusterInv.Namespace, clusterInv.Name)
+			klog.V(4).Infof("update cluster inventory: %s/%s", clusterInv.GetNamespace(), clusterInv.GetName())
 			if err := cic.applyInventoryObj(clusterInv); err != nil {
 				return pruneIds, err
 			}
@@ -141,7 +144,7 @@ func (cic *ClusterInventoryClient) Merge(localInv *resource.Info, objs []object.
 
 // Replace stores the passed objects in the cluster inventory object, or
 // an error if one occurred.
-func (cic *ClusterInventoryClient) Replace(localInv *resource.Info, objs []object.ObjMetadata) error {
+func (cic *ClusterInventoryClient) Replace(localInv *unstructured.Unstructured, objs []object.ObjMetadata) error {
 	clusterObjs, err := cic.GetClusterObjs(localInv)
 	if err != nil {
 		return err
@@ -163,7 +166,7 @@ func (cic *ClusterInventoryClient) Replace(localInv *resource.Info, objs []objec
 		if err != nil {
 			return err
 		}
-		klog.V(4).Infof("replace cluster inventory: %s/%s", clusterInv.Namespace, clusterInv.Name)
+		klog.V(4).Infof("replace cluster inventory: %s/%s", clusterInv.GetNamespace(), clusterInv.GetName())
 		klog.V(4).Infof("replace cluster inventory %d objects", len(objs))
 		if err := cic.applyInventoryObj(clusterInv); err != nil {
 			return err
@@ -174,7 +177,7 @@ func (cic *ClusterInventoryClient) Replace(localInv *resource.Info, objs []objec
 
 // GetClusterObjs returns the objects stored in the cluster inventory object, or
 // an error if one occurred.
-func (cic *ClusterInventoryClient) GetClusterObjs(localInv *resource.Info) ([]object.ObjMetadata, error) {
+func (cic *ClusterInventoryClient) GetClusterObjs(localInv *unstructured.Unstructured) ([]object.ObjMetadata, error) {
 	var objs []object.ObjMetadata
 	clusterInv, err := cic.getClusterInventoryInfo(localInv)
 	if err != nil {
@@ -197,21 +200,18 @@ func (cic *ClusterInventoryClient) GetClusterObjs(localInv *resource.Info) ([]ob
 //
 // TODO(seans3): Remove the special case code to merge multiple cluster inventory
 // objects once we've determined that this case is no longer possible.
-func (cic *ClusterInventoryClient) getClusterInventoryInfo(localInv *resource.Info) (*resource.Info, error) {
+func (cic *ClusterInventoryClient) getClusterInventoryInfo(localInv *unstructured.Unstructured) (*unstructured.Unstructured, error) {
 	if localInv == nil {
 		return nil, fmt.Errorf("retrieving cluster inventory object with nil local inventory")
 	}
-	localObj, err := object.InfoToObjMeta(localInv)
-	if err != nil {
-		return nil, err
-	}
+	localObj := object.UnstructuredToObjMeta(localInv)
 	mapping, err := cic.mapper.RESTMapping(localObj.GroupKind)
 	if err != nil {
 		return nil, err
 	}
 	groupResource := mapping.Resource.GroupResource().String()
 	namespace := localObj.Namespace
-	label, err := retrieveInventoryLabel(object.InfoToUnstructured(localInv))
+	label, err := retrieveInventoryLabel(localInv)
 	if err != nil {
 		return nil, err
 	}
@@ -232,11 +232,11 @@ func (cic *ClusterInventoryClient) getClusterInventoryInfo(localInv *resource.In
 	if err != nil {
 		return nil, err
 	}
-	var clusterInv *resource.Info
+	var clusterInv *unstructured.Unstructured
 	if len(retrievedInventoryInfos) == 1 {
-		clusterInv = retrievedInventoryInfos[0]
+		clusterInv = object.InfoToUnstructured(retrievedInventoryInfos[0])
 	} else if len(retrievedInventoryInfos) > 1 {
-		clusterInv, err = cic.mergeClusterInventory(retrievedInventoryInfos)
+		clusterInv, err = cic.mergeClusterInventory(object.InfosToUnstructureds(retrievedInventoryInfos))
 		if err != nil {
 			return nil, err
 		}
@@ -251,15 +251,15 @@ func (cic *ClusterInventoryClient) getClusterInventoryInfo(localInv *resource.In
 //
 // TODO(seans3): Remove this code once we're certain no customers have multiple
 // inventory objects in their clusters.
-func (cic *ClusterInventoryClient) mergeClusterInventory(invInfos []*resource.Info) (*resource.Info, error) {
-	if len(invInfos) == 0 {
+func (cic *ClusterInventoryClient) mergeClusterInventory(invObjs []*unstructured.Unstructured) (*unstructured.Unstructured, error) {
+	if len(invObjs) == 0 {
 		return nil, nil
 	}
-	klog.V(4).Infof("merging %d inventory objects", len(invInfos))
+	klog.V(4).Infof("merging %d inventory objects", len(invObjs))
 	// Make the selection of the retained inventory info deterministic,
 	// choosing the first inventory object as the one to retain.
-	sort.Sort(ordering.SortableInfos(invInfos))
-	retained := invInfos[0]
+	sort.Sort(ordering.SortableUnstructureds(invObjs))
+	retained := invObjs[0]
 	wrapRetained := cic.InventoryFactoryFunc(retained)
 	retainedObjs, err := wrapRetained.Load()
 	if err != nil {
@@ -267,8 +267,8 @@ func (cic *ClusterInventoryClient) mergeClusterInventory(invInfos []*resource.In
 	}
 	// Merge all the objects in the other inventory objects into
 	// the retained objects.
-	for i := 1; i < len(invInfos); i++ {
-		merge := invInfos[i]
+	for i := 1; i < len(invObjs); i++ {
+		merge := invObjs[i]
 		wrapMerge := cic.InventoryFactoryFunc(merge)
 		mergeObjs, err := wrapMerge.Load()
 		if err != nil {
@@ -293,8 +293,8 @@ func (cic *ClusterInventoryClient) mergeClusterInventory(invInfos []*resource.In
 		return nil, err
 	}
 	// Finally, delete the other inventory objects.
-	for i := 1; i < len(invInfos); i++ {
-		merge := invInfos[i]
+	for i := 1; i < len(invObjs); i++ {
+		merge := invObjs[i]
 		if err := cic.DeleteInventoryObj(merge); err != nil {
 			return nil, err
 		}
@@ -303,70 +303,82 @@ func (cic *ClusterInventoryClient) mergeClusterInventory(invInfos []*resource.In
 }
 
 // applyInventoryObj applies the passed inventory object to the APIServer.
-func (cic *ClusterInventoryClient) applyInventoryObj(info *resource.Info) error {
+func (cic *ClusterInventoryClient) applyInventoryObj(obj *unstructured.Unstructured) error {
 	if cic.dryRunStrategy.ClientOrServerDryRun() {
 		klog.V(4).Infof("dry-run apply inventory object: not applied")
 		return nil
 	}
-	if info == nil {
+	if obj == nil {
 		return fmt.Errorf("attempting apply a nil inventory object")
 	}
-	helper := resource.NewHelper(info.Client, info.Mapping)
-	klog.V(4).Infof("replacing inventory object: %s/%s", info.Namespace, info.Name)
+	invInfo, err := cic.toInfo(obj)
+	if err != nil {
+		return err
+	}
+	helper := resource.NewHelper(invInfo.Client, invInfo.Mapping)
+	klog.V(4).Infof("replacing inventory object: %s/%s", invInfo.Namespace, invInfo.Name)
 	var overwrite = true
-	replacedObj, err := helper.Replace(info.Namespace, info.Name, overwrite, info.Object)
+	replacedObj, err := helper.Replace(invInfo.Namespace, invInfo.Name, overwrite, invInfo.Object)
 	if err != nil {
 		return err
 	}
 	var ignoreError = true
-	return info.Refresh(replacedObj, ignoreError)
+	return invInfo.Refresh(replacedObj, ignoreError)
 }
 
 // createInventoryObj creates the passed inventory object on the APIServer.
-func (cic *ClusterInventoryClient) createInventoryObj(info *resource.Info) error {
+func (cic *ClusterInventoryClient) createInventoryObj(obj *unstructured.Unstructured) error {
 	if cic.dryRunStrategy.ClientOrServerDryRun() {
 		klog.V(4).Infof("dry-run create inventory object: not created")
 		return nil
 	}
-	if info == nil {
+	if obj == nil {
 		return fmt.Errorf("attempting create a nil inventory object")
 	}
 	// Default inventory name gets random suffix. Fixes problem where legacy
 	// inventory templates within same namespace will collide on name.
-	err := fixLegacyInventoryName(info)
+	err := fixLegacyInventoryName(obj)
 	if err != nil {
 		return err
 	}
-	helper, err := cic.helperFromInfo(info)
+	invInfo, err := cic.toInfo(obj)
 	if err != nil {
 		return err
 	}
-	klog.V(4).Infof("creating inventory object: %s/%s", info.Namespace, info.Name)
+	helper, err := cic.helperFromInfo(invInfo)
+	if err != nil {
+		return err
+	}
+	klog.V(4).Infof("creating inventory object: %s/%s", invInfo.Namespace, invInfo.Name)
 	var clearResourceVersion = false
-	createdObj, err := helper.Create(info.Namespace, clearResourceVersion, info.Object, nil)
+	createdObj, err := helper.Create(invInfo.Namespace, clearResourceVersion, invInfo.Object, nil)
 	if err != nil {
 		return err
 	}
 	var ignoreError = true
-	return info.Refresh(createdObj, ignoreError)
+	return invInfo.Refresh(createdObj, ignoreError)
 }
 
 // DeleteInventoryObj deletes the passed inventory object from the APIServer, or
 // an error if one occurs.
-func (cic *ClusterInventoryClient) DeleteInventoryObj(info *resource.Info) error {
+func (cic *ClusterInventoryClient) DeleteInventoryObj(obj *unstructured.Unstructured) error {
 	if cic.dryRunStrategy.ClientOrServerDryRun() {
 		klog.V(4).Infof("dry-run delete inventory object: not deleted")
 		return nil
 	}
-	if info == nil {
+	if obj == nil {
 		return fmt.Errorf("attempting delete a nil inventory object")
 	}
-	helper, err := cic.helperFromInfo(info)
+	invInfo, err := cic.toInfo(obj)
 	if err != nil {
 		return err
 	}
-	klog.V(4).Infof("deleting inventory object: %s/%s", info.Namespace, info.Name)
-	_, err = helper.Delete(info.Namespace, info.Name)
+	helper, err := cic.helperFromInfo(invInfo)
+	if err != nil {
+		return err
+	}
+	klog.V(4).Infof("deleting inventory object: %s/%s", invInfo.Namespace, invInfo.Name)
+	_, err = helper.Delete(invInfo.Namespace, invInfo.Name)
 	return err
 }
 
@@ -378,21 +390,25 @@ func (cic *ClusterInventoryClient) SetDryRunStrategy(drs common.DryRunStrategy) 
 
 // ApplyInventoryNamespace creates the passed namespace if it does not already
 // exist, or returns an error if one happened. NOTE: No error if already exists.
-func (cic *ClusterInventoryClient) ApplyInventoryNamespace(info *resource.Info) error {
+func (cic *ClusterInventoryClient) ApplyInventoryNamespace(obj *unstructured.Unstructured) error {
 	if cic.dryRunStrategy.ClientOrServerDryRun() {
-		klog.V(4).Infof("dry-run apply inventory namespace (%s): not applied", info.Name)
+		klog.V(4).Infof("dry-run apply inventory namespace (%s): not applied", obj.GetName())
 		return nil
 	}
-	helper, err := cic.helperFromInfo(info)
+	invInfo, err := cic.toInfo(obj)
 	if err != nil {
 		return err
 	}
-	klog.V(4).Infof("applying inventory namespace: %s", info.Name)
-	if err := util.CreateApplyAnnotation(info.Object, unstructured.UnstructuredJSONScheme); err != nil {
+	helper, err := cic.helperFromInfo(invInfo)
+	if err != nil {
+		return err
+	}
+	klog.V(4).Infof("applying inventory namespace: %s", invInfo.Name)
+	if err := util.CreateApplyAnnotation(invInfo.Object, unstructured.UnstructuredJSONScheme); err != nil {
 		return err
 	}
 	var clearResourceVersion = false
-	createdObj, err := helper.Create(info.Namespace, clearResourceVersion, info.Object, nil)
+	createdObj, err := helper.Create(invInfo.Namespace, clearResourceVersion, invInfo.Object, nil)
 	if err != nil {
 		if !apierrors.IsAlreadyExists(err) {
 			return err
@@ -400,7 +416,15 @@ func (cic *ClusterInventoryClient) ApplyInventoryNamespace(info *resource.Info) 
 		return nil
 	}
 	var ignoreError = true
-	return info.Refresh(createdObj, ignoreError)
+	return invInfo.Refresh(createdObj, ignoreError)
+}
+
+func (cic *ClusterInventoryClient) toInfo(obj *unstructured.Unstructured) (*resource.Info, error) {
+	invInfos, err := cic.infoHelper.BuildInfos([]*unstructured.Unstructured{obj})
+	if err != nil {
+		return nil, err
+	}
+	return invInfos[0], nil
 }
 
 // helperFromInfo returns the resource.Helper to talk to the APIServer based

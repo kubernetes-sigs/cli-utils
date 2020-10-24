@@ -4,13 +4,12 @@
 package inventory
 
 import (
-	"fmt"
+	"reflect"
 	"regexp"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/resource"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/object"
@@ -24,7 +23,7 @@ var pod3Name = "pod-3"
 
 var testInventoryLabel = "test-app-label"
 
-var inventoryObj = unstructured.Unstructured{
+var inventoryObj = &unstructured.Unstructured{
 	Object: map[string]interface{}{
 		"apiVersion": "v1",
 		"kind":       "ConfigMap",
@@ -38,7 +37,7 @@ var inventoryObj = unstructured.Unstructured{
 	},
 }
 
-var legacyInvObj = unstructured.Unstructured{
+var legacyInvObj = &unstructured.Unstructured{
 	Object: map[string]interface{}{
 		"apiVersion": "v1",
 		"kind":       "ConfigMap",
@@ -58,10 +57,10 @@ var invInfo = &resource.Info{
 	Mapping: &meta.RESTMapping{
 		Scope: meta.RESTScopeNamespace,
 	},
-	Object: &inventoryObj,
+	Object: inventoryObj,
 }
 
-var pod1 = unstructured.Unstructured{
+var pod1 = &unstructured.Unstructured{
 	Object: map[string]interface{}{
 		"apiVersion": "v1",
 		"kind":       "Pod",
@@ -79,10 +78,10 @@ var pod1Info = &resource.Info{
 	Mapping: &meta.RESTMapping{
 		Scope: meta.RESTScopeNamespace,
 	},
-	Object: &pod1,
+	Object: pod1,
 }
 
-var pod2 = unstructured.Unstructured{
+var pod2 = &unstructured.Unstructured{
 	Object: map[string]interface{}{
 		"apiVersion": "v1",
 		"kind":       "Pod",
@@ -100,10 +99,10 @@ var pod2Info = &resource.Info{
 	Mapping: &meta.RESTMapping{
 		Scope: meta.RESTScopeNamespace,
 	},
-	Object: &pod2,
+	Object: pod2,
 }
 
-var pod3 = unstructured.Unstructured{
+var pod3 = &unstructured.Unstructured{
 	Object: map[string]interface{}{
 		"apiVersion": "v1",
 		"kind":       "Pod",
@@ -121,16 +120,7 @@ var pod3Info = &resource.Info{
 	Mapping: &meta.RESTMapping{
 		Scope: meta.RESTScopeNamespace,
 	},
-	Object: &pod3,
-}
-
-var nilInfo = &resource.Info{
-	Namespace: testNamespace,
-	Name:      inventoryObjName,
-	Mapping: &meta.RESTMapping{
-		Scope: meta.RESTScopeNamespace,
-	},
-	Object: nil,
+	Object: pod3,
 }
 
 var inventoryObjLabelWithSpace = unstructured.Unstructured{
@@ -158,37 +148,37 @@ var invInfoLabelWithSpace = &resource.Info{
 
 func TestFindInventoryObj(t *testing.T) {
 	tests := map[string]struct {
-		infos  []*resource.Info
+		infos  []*unstructured.Unstructured
 		exists bool
 		name   string
 	}{
 		"No inventory object is false": {
-			infos:  []*resource.Info{},
+			infos:  []*unstructured.Unstructured{},
 			exists: false,
 			name:   "",
 		},
 		"Nil inventory object is false": {
-			infos:  []*resource.Info{nil},
+			infos:  []*unstructured.Unstructured{nil},
 			exists: false,
 			name:   "",
 		},
 		"Only inventory object is true": {
-			infos:  []*resource.Info{copyInventoryInfo()},
+			infos:  []*unstructured.Unstructured{copyInventoryInfo()},
 			exists: true,
 			name:   inventoryObjName,
 		},
 		"Missing inventory object is false": {
-			infos:  []*resource.Info{pod1Info},
+			infos:  []*unstructured.Unstructured{pod1},
 			exists: false,
 			name:   "",
 		},
 		"Multiple non-inventory objects is false": {
-			infos:  []*resource.Info{pod1Info, pod2Info, pod3Info},
+			infos:  []*unstructured.Unstructured{pod1, pod2, pod3},
 			exists: false,
 			name:   "",
 		},
 		"Inventory object with multiple others is true": {
-			infos:  []*resource.Info{pod1Info, pod2Info, copyInventoryInfo(), pod3Info},
+			infos:  []*unstructured.Unstructured{pod1, pod2, copyInventoryInfo(), pod3},
 			exists: true,
 			name:   inventoryObjName,
 		},
@@ -203,8 +193,8 @@ func TestFindInventoryObj(t *testing.T) {
 			if !tc.exists && inventoryObj != nil {
 				t.Errorf("Inventory object found, but it does not exist: %#v", inventoryObj)
 			}
-			if tc.exists && inventoryObj != nil && tc.name != inventoryObj.Name {
-				t.Errorf("Inventory object name does not match: %s/%s", tc.name, inventoryObj.Name)
+			if tc.exists && inventoryObj != nil && tc.name != inventoryObj.GetName() {
+				t.Errorf("Inventory object name does not match: %s/%s", tc.name, inventoryObj.GetName())
 			}
 		})
 	}
@@ -277,54 +267,48 @@ func TestRetrieveInventoryLabel(t *testing.T) {
 	}
 }
 
-func TestSplitInfos(t *testing.T) {
+func TestSplitUnstructureds(t *testing.T) {
 	tests := map[string]struct {
-		infos   []*resource.Info
-		inv     *resource.Info
-		objs    []*resource.Info
+		allObjs []*unstructured.Unstructured
+		inv     *unstructured.Unstructured
+		objs    []*unstructured.Unstructured
 		isError bool
 	}{
 		"No objects is an error": {
-			infos:   []*resource.Info{},
+			allObjs: []*unstructured.Unstructured{},
 			inv:     nil,
-			objs:    []*resource.Info{},
-			isError: true,
-		},
-		"Nil object is an error": {
-			infos:   []*resource.Info{nilInfo},
-			inv:     nil,
-			objs:    []*resource.Info{},
+			objs:    []*unstructured.Unstructured{},
 			isError: true,
 		},
 		"Only inventory object is true": {
-			infos:   []*resource.Info{invInfo},
-			inv:     invInfo,
-			objs:    []*resource.Info{},
+			allObjs: []*unstructured.Unstructured{inventoryObj},
+			inv:     inventoryObj,
+			objs:    []*unstructured.Unstructured{},
 			isError: false,
 		},
 		"Missing inventory object is false": {
-			infos:   []*resource.Info{pod1Info},
+			allObjs: []*unstructured.Unstructured{pod1},
 			inv:     nil,
-			objs:    []*resource.Info{pod1Info},
+			objs:    []*unstructured.Unstructured{pod1},
 			isError: true,
 		},
 		"Multiple non-inventory objects is false": {
-			infos:   []*resource.Info{pod1Info, pod2Info, pod3Info},
+			allObjs: []*unstructured.Unstructured{pod1, pod2, pod3},
 			inv:     nil,
-			objs:    []*resource.Info{pod1Info, pod2Info, pod3Info},
+			objs:    []*unstructured.Unstructured{pod1, pod2, pod3},
 			isError: true,
 		},
 		"Inventory object with multiple others is true": {
-			infos:   []*resource.Info{pod1Info, pod2Info, invInfo, pod3Info},
-			inv:     invInfo,
-			objs:    []*resource.Info{pod1Info, pod2Info, pod3Info},
+			allObjs: []*unstructured.Unstructured{pod1, pod2, inventoryObj, pod3},
+			inv:     inventoryObj,
+			objs:    []*unstructured.Unstructured{pod1, pod2, pod3},
 			isError: false,
 		},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			inv, infos, err := SplitInfos(tc.infos)
+			inv, infos, err := SplitUnstructureds(tc.allObjs)
 			if !tc.isError && err != nil {
 				t.Fatalf("unexpected error received: %s", err)
 			}
@@ -334,7 +318,7 @@ func TestSplitInfos(t *testing.T) {
 				}
 				return
 			}
-			if *tc.inv != *inv {
+			if !reflect.DeepEqual(tc.inv.Object, inv.Object) {
 				t.Errorf("expected inventory (%v); got (%v)", *tc.inv, *inv)
 			}
 			if len(tc.objs) != len(infos) {
@@ -346,34 +330,34 @@ func TestSplitInfos(t *testing.T) {
 
 func TestAddSuffixToName(t *testing.T) {
 	tests := []struct {
-		info     *resource.Info
+		obj      *unstructured.Unstructured
 		suffix   string
 		expected string
 		isError  bool
 	}{
 		// Nil info should return error.
 		{
-			info:     nil,
+			obj:      nil,
 			suffix:   "",
 			expected: "",
 			isError:  true,
 		},
 		// Empty suffix should return error.
 		{
-			info:     copyInventoryInfo(),
+			obj:      copyInventoryInfo(),
 			suffix:   "",
 			expected: "",
 			isError:  true,
 		},
 		// Empty suffix should return error.
 		{
-			info:     copyInventoryInfo(),
+			obj:      copyInventoryInfo(),
 			suffix:   " \t",
 			expected: "",
 			isError:  true,
 		},
 		{
-			info:     copyInventoryInfo(),
+			obj:      copyInventoryInfo(),
 			suffix:   "hashsuffix",
 			expected: inventoryObjName + "-hashsuffix",
 			isError:  false,
@@ -381,7 +365,7 @@ func TestAddSuffixToName(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		err := addSuffixToName(test.info, test.suffix)
+		err := addSuffixToName(test.obj, test.suffix)
 		if test.isError {
 			if err == nil {
 				t.Errorf("Should have produced an error, but returned none.")
@@ -391,13 +375,7 @@ func TestAddSuffixToName(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Received error when expecting none (%s)\n", err)
 			}
-			actualName, err := getObjectName(test.info.Object)
-			if err != nil {
-				t.Fatalf("Error getting object name: %s", err)
-			}
-			if actualName != test.info.Name {
-				t.Errorf("Object name (%s) does not match info name (%s)\n", actualName, test.info.Name)
-			}
+			actualName := test.obj.GetName()
 			if test.expected != actualName {
 				t.Errorf("Expected name (%s), got (%s)\n", test.expected, actualName)
 			}
@@ -407,42 +385,19 @@ func TestAddSuffixToName(t *testing.T) {
 
 func TestLegacyInventoryName(t *testing.T) {
 	tests := map[string]struct {
-		info       *resource.Info
+		obj        *unstructured.Unstructured
 		invName    string // Expected inventory name (if not modified)
 		isModified bool   // Should inventory name be changed
 		isError    bool   // Should an error be thrown
 	}{
-		"Nil info is an error": {
-			info:       nil,
-			isModified: false,
-			isError:    true,
-		},
-		"Nil info.Object is an error": {
-			info: &resource.Info{
-				Namespace: testNamespace,
-				Name:      inventoryObjName,
-				Object:    nil,
-			},
-			invName:    inventoryObjName,
-			isModified: false,
-			isError:    true,
-		},
 		"Legacy inventory name gets random suffix": {
-			info: &resource.Info{
-				Namespace: testNamespace,
-				Name:      legacyInvName,
-				Object:    &legacyInvObj,
-			},
+			obj:        legacyInvObj,
 			invName:    legacyInvName,
 			isModified: true,
 			isError:    false,
 		},
 		"Non-legacy inventory name does not get modified": {
-			info: &resource.Info{
-				Namespace: testNamespace,
-				Name:      inventoryObjName,
-				Object:    &inventoryObj,
-			},
+			obj:        inventoryObj,
 			invName:    inventoryObjName,
 			isModified: false,
 			isError:    false,
@@ -451,7 +406,7 @@ func TestLegacyInventoryName(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			err := fixLegacyInventoryName(tc.info)
+			err := fixLegacyInventoryName(tc.obj)
 			if tc.isError {
 				if err == nil {
 					t.Fatalf("Should have produced an error, but returned none.")
@@ -461,16 +416,10 @@ func TestLegacyInventoryName(t *testing.T) {
 			if !tc.isError && err != nil {
 				t.Fatalf("Received error when expecting none (%s)\n", err)
 			}
-			actualName, err := getObjectName(tc.info.Object)
-			if err != nil {
-				t.Fatalf("Error getting object name: %s", err)
-			}
-			if actualName != tc.info.Name {
-				t.Errorf("Object name and info name differ: %s/%s", actualName, tc.info.Name)
-			}
+			actualName := tc.obj.GetName()
 			if !tc.isModified {
-				if tc.invName != tc.info.Name {
-					t.Fatalf("expected non-modified name (%s), got (%s)", tc.invName, tc.info.Name)
+				if tc.invName != tc.obj.GetName() {
+					t.Fatalf("expected non-modified name (%s), got (%s)", tc.invName, tc.obj.GetName())
 				}
 				return
 			}
@@ -485,25 +434,11 @@ func TestLegacyInventoryName(t *testing.T) {
 	}
 }
 
-func getObjectName(obj runtime.Object) (string, error) {
-	u, ok := obj.(*unstructured.Unstructured)
-	if !ok {
-		return "", fmt.Errorf("Inventory object is not Unstructured format")
-	}
-	return u.GetName(), nil
+func copyInventoryInfo() *unstructured.Unstructured {
+	return inventoryObj.DeepCopy()
 }
 
-func copyInventoryInfo() *resource.Info {
-	inventoryObjCopy := inventoryObj.DeepCopy()
-	var inventoryInfo = &resource.Info{
-		Namespace: testNamespace,
-		Name:      inventoryObjName,
-		Object:    inventoryObjCopy,
-	}
-	return inventoryInfo
-}
-
-func storeObjsInInventory(inv *resource.Info, objs []object.ObjMetadata) *resource.Info {
+func storeObjsInInventory(inv *unstructured.Unstructured, objs []object.ObjMetadata) *unstructured.Unstructured {
 	wrapped := WrapInventoryObj(inv)
 	_ = wrapped.Store(objs)
 	inv, _ = wrapped.GetObject()

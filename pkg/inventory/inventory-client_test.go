@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/rest/fake"
@@ -20,7 +21,7 @@ import (
 
 func TestGetClusterInventoryInfo(t *testing.T) {
 	tests := map[string]struct {
-		inv       *resource.Info
+		inv       *unstructured.Unstructured
 		localObjs []object.ObjMetadata
 		isError   bool
 	}{
@@ -30,19 +31,19 @@ func TestGetClusterInventoryInfo(t *testing.T) {
 			isError:   true,
 		},
 		"Empty local inventory object": {
-			inv:       invInfo,
+			inv:       inventoryObj,
 			localObjs: []object.ObjMetadata{},
 			isError:   false,
 		},
 		"Local inventory with a single object": {
-			inv: invInfo,
+			inv: inventoryObj,
 			localObjs: []object.ObjMetadata{
 				ignoreErrInfoToObjMeta(pod2Info),
 			},
 			isError: false,
 		},
 		"Local inventory with multiple objects": {
-			inv: invInfo,
+			inv: inventoryObj,
 			localObjs: []object.ObjMetadata{
 				ignoreErrInfoToObjMeta(pod1Info),
 				ignoreErrInfoToObjMeta(pod2Info),
@@ -60,7 +61,7 @@ func TestGetClusterInventoryInfo(t *testing.T) {
 			fakeBuilder := FakeBuilder{}
 			fakeBuilder.SetInventoryObjs(tc.localObjs)
 			invClient.builderFunc = fakeBuilder.GetBuilder()
-			var inv *resource.Info
+			var inv *unstructured.Unstructured
 			if tc.inv != nil {
 				inv = storeObjsInInventory(tc.inv, tc.localObjs)
 			}
@@ -90,7 +91,7 @@ func TestGetClusterInventoryInfo(t *testing.T) {
 
 func TestMerge(t *testing.T) {
 	tests := map[string]struct {
-		localInv    *resource.Info
+		localInv    *unstructured.Unstructured
 		localObjs   []object.ObjMetadata
 		clusterObjs []object.ObjMetadata
 		pruneObjs   []object.ObjMetadata
@@ -188,7 +189,7 @@ func TestMerge(t *testing.T) {
 
 func TestCreateInventory(t *testing.T) {
 	tests := map[string]struct {
-		inv       *resource.Info
+		inv       *unstructured.Unstructured
 		localObjs []object.ObjMetadata
 		isError   bool
 	}{
@@ -198,19 +199,19 @@ func TestCreateInventory(t *testing.T) {
 			isError:   true,
 		},
 		"Empty local inventory object": {
-			inv:       invInfo,
+			inv:       inventoryObj,
 			localObjs: []object.ObjMetadata{},
 			isError:   false,
 		},
 		"Local inventory with a single object": {
-			inv: invInfo,
+			inv: inventoryObj,
 			localObjs: []object.ObjMetadata{
 				ignoreErrInfoToObjMeta(pod2Info),
 			},
 			isError: false,
 		},
 		"Local inventory with multiple objects": {
-			inv: invInfo,
+			inv: inventoryObj,
 			localObjs: []object.ObjMetadata{
 				ignoreErrInfoToObjMeta(pod1Info),
 				ignoreErrInfoToObjMeta(pod2Info),
@@ -264,7 +265,7 @@ func TestCreateInventory(t *testing.T) {
 
 func TestReplace(t *testing.T) {
 	tests := map[string]struct {
-		localInv    *resource.Info
+		localInv    *unstructured.Unstructured
 		localObjs   []object.ObjMetadata
 		clusterObjs []object.ObjMetadata
 		isError     bool
@@ -347,7 +348,7 @@ func TestReplace(t *testing.T) {
 
 func TestGetClusterObjs(t *testing.T) {
 	tests := map[string]struct {
-		localInv    *resource.Info
+		localInv    *unstructured.Unstructured
 		clusterObjs []object.ObjMetadata
 		isError     bool
 	}{
@@ -403,7 +404,7 @@ func TestGetClusterObjs(t *testing.T) {
 
 func TestDeleteInventoryObj(t *testing.T) {
 	tests := map[string]struct {
-		inv       *resource.Info
+		inv       *unstructured.Unstructured
 		localObjs []object.ObjMetadata
 	}{
 		"Nil local inventory object is an error": {
@@ -411,17 +412,17 @@ func TestDeleteInventoryObj(t *testing.T) {
 			localObjs: []object.ObjMetadata{},
 		},
 		"Empty local inventory object": {
-			inv:       invInfo,
+			inv:       inventoryObj,
 			localObjs: []object.ObjMetadata{},
 		},
 		"Local inventory with a single object": {
-			inv: invInfo,
+			inv: inventoryObj,
 			localObjs: []object.ObjMetadata{
 				ignoreErrInfoToObjMeta(pod2Info),
 			},
 		},
 		"Local inventory with multiple objects": {
-			inv: invInfo,
+			inv: inventoryObj,
 			localObjs: []object.ObjMetadata{
 				ignoreErrInfoToObjMeta(pod1Info),
 				ignoreErrInfoToObjMeta(pod2Info),
@@ -473,7 +474,7 @@ func TestDeleteInventoryObj(t *testing.T) {
 }
 
 type invAndObjs struct {
-	inv     *resource.Info
+	inv     *unstructured.Unstructured
 	invObjs []object.ObjMetadata
 }
 
@@ -557,7 +558,7 @@ func TestMergeInventoryObjs(t *testing.T) {
 			t.Run(name, func(t *testing.T) {
 				invClient, _ := NewInventoryClient(tf, WrapInventoryObj)
 				invClient.SetDryRunStrategy(drs)
-				inventories := []*resource.Info{}
+				inventories := []*unstructured.Unstructured{}
 				for _, i := range tc.invs {
 					inv := storeObjsInInventory(i.inv, i.invObjs)
 					inventories = append(inventories, inv)

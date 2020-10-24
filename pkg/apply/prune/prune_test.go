@@ -10,7 +10,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/dynamic/fake"
 	"k8s.io/kubectl/pkg/scheme"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
@@ -79,24 +78,15 @@ var role = &unstructured.Unstructured{
 
 // Returns a inventory object with the inventory set from
 // the passed "children".
-func createInventoryInfo(name string, children ...*unstructured.Unstructured) *unstructured.Unstructured {
-	inventoryName := inventoryObjName
-	if len(name) > 0 {
-		inventoryName = name
-	}
+func createInventoryInfo(children ...*unstructured.Unstructured) *unstructured.Unstructured {
 	inventoryObjCopy := inventoryObj.DeepCopy()
-	var inventoryInfo = &resource.Info{
-		Namespace: testNamespace,
-		Name:      inventoryName,
-		Object:    inventoryObjCopy,
-	}
-	wrappedInv := inventory.WrapInventoryObj(inventoryInfo)
+	wrappedInv := inventory.WrapInventoryObj(inventoryObjCopy)
 	objs := object.UnstructuredsToObjMetas(children)
 	if err := wrappedInv.Store(objs); err != nil {
 		return nil
 	}
-	inventoryInfo, _ = wrappedInv.GetObject()
-	return object.InfoToUnstructured(inventoryInfo)
+	inventoryInfo, _ := wrappedInv.GetObject()
+	return inventoryInfo
 }
 
 // preventDelete object contains the "on-remove:keep" lifecycle directive.
@@ -170,7 +160,7 @@ func TestPrune(t *testing.T) {
 				clusterObjs := object.UnstructuredsToObjMetas(tc.pastObjs)
 				po.InvClient = inventory.NewFakeInventoryClient(clusterObjs)
 				// Set up the currently applied objects.
-				currentInventory := createInventoryInfo("current-group", tc.currentObjs...)
+				currentInventory := createInventoryInfo(tc.currentObjs...)
 				currentObjs := append(tc.currentObjs, currentInventory)
 				// Set up the fake dynamic client to recognize all objects, and the RESTMapper.
 				po.client = fake.NewSimpleDynamicClient(scheme.Scheme,

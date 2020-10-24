@@ -62,14 +62,14 @@ func (r *DestroyRunner) RunE(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	inv, _, err := inventory.SplitInfos(infos)
+	inv, _, err := inventory.SplitUnstructureds(object.InfosToUnstructureds(infos))
 	if err != nil {
 		return err
 	}
 
 	// Run the destroyer. It will return a channel where we can receive updates
 	// to keep track of progress and any issues.
-	ch := r.Destroyer.Run(object.InfoToUnstructured(inv))
+	ch := r.Destroyer.Run(inv)
 
 	// The printer will print updates from the channel. It will block
 	// until the channel is closed.
