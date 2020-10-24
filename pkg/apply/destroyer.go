@@ -8,12 +8,13 @@ import (
 
 	"github.com/go-errors/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/cli-runtime/pkg/resource"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/prune"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
+	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/provider"
 )
 
@@ -59,7 +60,7 @@ func (d *Destroyer) Initialize() error {
 // Run performs the destroy step. Passes the inventory object. This
 // happens asynchronously on progress and any errors are reported
 // back on the event channel.
-func (d *Destroyer) Run(inv *resource.Info) <-chan event.Event {
+func (d *Destroyer) Run(inv *unstructured.Unstructured) <-chan event.Event {
 	ch := make(chan event.Event)
 
 	go func() {
@@ -69,14 +70,14 @@ func (d *Destroyer) Run(inv *resource.Info) <-chan event.Event {
 		// Force a pruning of all cluster resources by clearing out the
 		// local resources, and sending only the inventory object to the
 		// prune.
-		infos := []*resource.Info{inv}
+		invs := []*unstructured.Unstructured{inv}
 
 		// Start the event transformer goroutine so we can transform
 		// the Prune events emitted from the Prune function to Delete
 		// Events. That we use Prune to implement destroy is an
 		// implementation detail and the events should not be Prune events.
 		tempChannel, completedChannel := runPruneEventTransformer(ch)
-		err := d.PruneOptions.Prune(infos, sets.NewString(), tempChannel, prune.Options{
+		err := d.PruneOptions.Prune(invs, sets.NewString(), tempChannel, prune.Options{
 			DryRunStrategy:    d.DryRunStrategy,
 			PropagationPolicy: metav1.DeletePropagationBackground,
 		})
@@ -91,7 +92,7 @@ func (d *Destroyer) Run(inv *resource.Info) <-chan event.Event {
 		}
 
 		// Now delete the inventory object as well.
-		err = d.invClient.DeleteInventoryObj(inv)
+		err = d.invClient.DeleteInventoryObj(object.UnstructuredToInfo(inv))
 		if err != nil {
 			ch <- event.Event{
 				Type: event.ErrorType,
@@ -108,18 +109,6 @@ func (d *Destroyer) Run(inv *resource.Info) <-chan event.Event {
 		// Wait for the event transformer to complete processing all
 		// events and shut down before we continue.
 		<-completedChannel
-		if err != nil {
-			// If we see an error here we just report it on the channel and then
-			// give up. Eventually we might be able to determine which errors
-			// are fatal and which might allow us to continue.
-			ch <- event.Event{
-				Type: event.ErrorType,
-				ErrorEvent: event.ErrorEvent{
-					Err: errors.WrapPrefix(err, "error pruning resources", 1),
-				},
-			}
-			return
-		}
 		ch <- event.Event{
 			Type: event.DeleteType,
 			DeleteEvent: event.DeleteEvent{
