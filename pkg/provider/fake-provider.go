@@ -40,9 +40,14 @@ func (f *FakeProvider) ToRESTMapper() (meta.RESTMapper, error) {
 	return f.factory.ToRESTMapper()
 }
 
-func (f *FakeProvider) ManifestReader(reader io.Reader, args []string) (manifestreader.ManifestReader, error) {
+func (f *FakeProvider) ManifestReader(reader io.Reader, _ []string) (manifestreader.ManifestReader, error) {
+	mapper, err := f.factory.ToRESTMapper()
+	if err != nil {
+		return nil, err
+	}
+
 	readerOptions := manifestreader.ReaderOptions{
-		Factory:   f.factory,
+		Mapper:    mapper,
 		Namespace: metav1.NamespaceDefault,
 	}
 	return &manifestreader.StreamManifestReader{

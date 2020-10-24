@@ -56,8 +56,11 @@ func (ih *infoHelper) UpdateInfos(infos []*resource.Info) error {
 }
 
 func (ih *infoHelper) BuildInfos(objs []*unstructured.Unstructured) ([]*resource.Info, error) {
-	infos := object.UnstructuredsToInfos(objs)
-	err := ih.UpdateInfos(infos)
+	infos, err := object.UnstructuredsToInfos(objs)
+	if err != nil {
+		return nil, err
+	}
+	err = ih.UpdateInfos(infos)
 	if err != nil {
 		return nil, err
 	}

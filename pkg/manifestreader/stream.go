@@ -6,7 +6,9 @@ package manifestreader
 import (
 	"io"
 
-	"k8s.io/cli-runtime/pkg/resource"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"sigs.k8s.io/kustomize/kyaml/kio"
+	"sigs.k8s.io/kustomize/kyaml/kio/kioutil"
 )
 
 // StreamManifestReader reads manifest from the provided io.Reader
@@ -20,33 +22,29 @@ type StreamManifestReader struct {
 }
 
 // Read reads the manifests and returns them as Info objects.
-func (r *StreamManifestReader) Read() ([]*resource.Info, error) {
-	validator, err := r.Factory.Validator(r.Validate)
+func (r *StreamManifestReader) Read() ([]*unstructured.Unstructured, error) {
+	var objs []*unstructured.Unstructured
+	nodes, err := (&kio.ByteReader{
+		Reader: r.Reader,
+	}).Read()
 	if err != nil {
-		return nil, err
+		return objs, err
 	}
 
-	result := r.Factory.NewBuilder().
-		Local().
-		Unstructured().
-		Schema(validator).
-		ContinueOnError().
-		Stream(r.Reader, r.ReaderName).
-		Flatten().
-		Do()
+	for _, n := range nodes {
+		err = removeAnnotations(n, kioutil.IndexAnnotation)
+		if err != nil {
+			return objs, err
+		}
+		u, err := kyamlNodeToUnstructured(n)
+		if err != nil {
+			return objs, err
+		}
+		objs = append(objs, u)
+	}
 
-	if err := result.Err(); err != nil {
-		return nil, err
-	}
-	infos, err := result.Infos()
-	if err != nil {
-		return nil, err
-	}
-	infos = FilterLocalConfig(infos)
+	objs = FilterLocalConfig(objs)
 
-	err = SetNamespaces(r.Factory, infos, r.Namespace, r.EnforceNamespace)
-	if err != nil {
-		return nil, err
-	}
-	return infos, nil
+	err = SetNamespaces(r.Mapper, objs, r.Namespace, r.EnforceNamespace)
+	return objs, err
 }

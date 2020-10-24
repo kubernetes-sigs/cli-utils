@@ -4,7 +4,9 @@
 package manifestreader
 
 import (
-	"k8s.io/cli-runtime/pkg/resource"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"sigs.k8s.io/kustomize/kyaml/kio"
+	"sigs.k8s.io/kustomize/kyaml/kio/kioutil"
 )
 
 // PathManifestReader reads manifests from the provided path
@@ -17,39 +19,29 @@ type PathManifestReader struct {
 }
 
 // Read reads the manifests and returns them as Info objects.
-func (p *PathManifestReader) Read() ([]*resource.Info, error) {
-	validator, err := p.Factory.Validator(p.Validate)
+func (p *PathManifestReader) Read() ([]*unstructured.Unstructured, error) {
+	var objs []*unstructured.Unstructured
+	nodes, err := (&kio.LocalPackageReader{
+		PackagePath: p.Path,
+	}).Read()
 	if err != nil {
-		return nil, err
+		return objs, err
 	}
 
-	fileNameOptions := &resource.FilenameOptions{
-		Filenames: []string{p.Path},
-		Recursive: true,
+	for _, n := range nodes {
+		err = removeAnnotations(n, kioutil.IndexAnnotation)
+		if err != nil {
+			return objs, err
+		}
+		u, err := kyamlNodeToUnstructured(n)
+		if err != nil {
+			return objs, err
+		}
+		objs = append(objs, u)
 	}
 
-	enforceNamespace := false
-	result := p.Factory.NewBuilder().
-		Local().
-		Unstructured().
-		Schema(validator).
-		ContinueOnError().
-		FilenameParam(enforceNamespace, fileNameOptions).
-		Flatten().
-		Do()
+	objs = FilterLocalConfig(objs)
 
-	if err := result.Err(); err != nil {
-		return nil, err
-	}
-	infos, err := result.Infos()
-	if err != nil {
-		return nil, err
-	}
-	infos = FilterLocalConfig(infos)
-
-	err = SetNamespaces(p.Factory, infos, p.Namespace, p.EnforceNamespace)
-	if err != nil {
-		return nil, err
-	}
-	return infos, nil
+	err = SetNamespaces(p.Mapper, objs, p.Namespace, p.EnforceNamespace)
+	return objs, err
 }

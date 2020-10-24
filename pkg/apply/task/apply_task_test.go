@@ -333,5 +333,5 @@ func (f *fakeInfoHelper) UpdateInfos([]*resource.Info) error {
 }
 
 func (f *fakeInfoHelper) BuildInfos(objs []*unstructured.Unstructured) ([]*resource.Info, error) {
-	return object.UnstructuredsToInfos(objs), nil
+	return object.UnstructuredsToInfos(objs)
 }

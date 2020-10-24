@@ -4,16 +4,16 @@
 package manifestreader
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/cli-runtime/pkg/resource"
-	"k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/cli-utils/pkg/apply/solver"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
-	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/kustomize/kyaml/kio/filters"
+	"sigs.k8s.io/kustomize/kyaml/kio/kioutil"
+	"sigs.k8s.io/kustomize/kyaml/yaml"
 )
 
 // SetNamespaces verifies that every namespaced resource has the namespace
@@ -22,29 +22,24 @@ import (
 // This implementation will check each resource (that doesn't already have
 // the namespace set) on whether it is namespace or cluster scoped. It does
 // this by first checking the RESTMapper, and it there is not match there,
-// it will look for CRDs in the provided Infos.
-func SetNamespaces(factory util.Factory, infos []*resource.Info,
+// it will look for CRDs in the provided Unstructureds.
+func SetNamespaces(mapper meta.RESTMapper, objs []*unstructured.Unstructured,
 	defaultNamespace string, enforceNamespace bool) error {
-	mapper, err := factory.ToRESTMapper()
-	if err != nil {
-		return err
-	}
-
-	var crdInfos []*resource.Info
+	var crdObjs []*unstructured.Unstructured
 
 	// find any crds in the set of resources.
-	for _, inf := range infos {
-		if solver.IsCRD(object.InfoToUnstructured(inf)) {
-			crdInfos = append(crdInfos, inf)
+	for _, obj := range objs {
+		if solver.IsCRD(obj) {
+			crdObjs = append(crdObjs, obj)
 		}
 	}
 
-	for _, inf := range infos {
-		accessor, _ := meta.Accessor(inf.Object)
+	for _, obj := range objs {
+		accessor, _ := meta.Accessor(obj)
 
 		// Exclude any inventory objects here since we don't want to change
 		// their namespace.
-		if inventory.IsInventoryObject(object.InfoToUnstructured(inf)) {
+		if inventory.IsInventoryObject(obj) {
 			continue
 		}
 
@@ -59,7 +54,7 @@ func SetNamespaces(factory util.Factory, infos []*resource.Info,
 			continue
 		}
 
-		gk := inf.Object.GetObjectKind().GroupVersionKind().GroupKind()
+		gk := obj.GetObjectKind().GroupVersionKind().GroupKind()
 		mapping, err := mapper.RESTMapping(gk)
 
 		if err != nil && !meta.IsNoMatchError(err) {
@@ -73,7 +68,6 @@ func SetNamespaces(factory util.Factory, infos []*resource.Info,
 				// This means the resource does not have the namespace set,
 				// but it is a namespaced resource. So we set the namespace
 				// to the provided default value.
-				inf.Namespace = defaultNamespace
 				accessor.SetNamespace(defaultNamespace)
 			}
 			continue
@@ -87,12 +81,11 @@ func SetNamespaces(factory util.Factory, infos []*resource.Info,
 		// namespace-scoped. If it is the latter, we set the namespace
 		// to the provided default.
 		var scope string
-		for _, crdInf := range crdInfos {
-			u, _ := crdInf.Object.(*unstructured.Unstructured)
-			group, _, _ := unstructured.NestedString(u.Object, "spec", "group")
-			kind, _, _ := unstructured.NestedString(u.Object, "spec", "names", "kind")
+		for _, crdObj := range crdObjs {
+			group, _, _ := unstructured.NestedString(crdObj.Object, "spec", "group")
+			kind, _, _ := unstructured.NestedString(crdObj.Object, "spec", "names", "kind")
 			if gk.Kind == kind && gk.Group == group {
-				scope, _, _ = unstructured.NestedString(u.Object, "spec", "scope")
+				scope, _, _ = unstructured.NestedString(crdObj.Object, "spec", "scope")
 			}
 		}
 
@@ -102,7 +95,6 @@ func SetNamespaces(factory util.Factory, infos []*resource.Info,
 		case "Cluster":
 			continue
 		case "Namespaced":
-			inf.Namespace = defaultNamespace
 			accessor.SetNamespace(defaultNamespace)
 		}
 	}
@@ -110,18 +102,48 @@ func SetNamespaces(factory util.Factory, infos []*resource.Info,
 	return nil
 }
 
-// FilterLocalConfig returns a new slice of infos where all resources
+// FilterLocalConfig returns a new slice of Unstructured where all resources
 // with the LocalConfig annotation is filtered out.
-func FilterLocalConfig(infos []*resource.Info) []*resource.Info {
-	var filterInfos []*resource.Info
-	for _, inf := range infos {
-		acc, _ := meta.Accessor(inf.Object)
+func FilterLocalConfig(objs []*unstructured.Unstructured) []*unstructured.Unstructured {
+	var filteredObjs []*unstructured.Unstructured
+	for _, obj := range objs {
+		acc, _ := meta.Accessor(obj)
 		// Ignoring the value of the LocalConfigAnnotation here. This is to be
 		// consistent with the behavior in the kyaml library:
 		// https://github.com/kubernetes-sigs/kustomize/blob/30b58e90a39485bc5724b2278651c5d26b815cb2/kyaml/kio/filters/local.go#L29
 		if _, found := acc.GetAnnotations()[filters.LocalConfigAnnotation]; !found {
-			filterInfos = append(filterInfos, inf)
+			filteredObjs = append(filteredObjs, obj)
 		}
 	}
-	return filterInfos
+	return filteredObjs
+}
+
+// removeAnnotations removes the specified kioutil annotations from the resource.
+func removeAnnotations(n *yaml.RNode, annotations ...kioutil.AnnotationKey) error {
+	for _, a := range annotations {
+		err := n.PipeE(yaml.ClearAnnotation(a))
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// kyamlNodeToUnstructured take a resource represented as a kyaml RNode and
+// turns it into an Unstructured object.
+func kyamlNodeToUnstructured(n *yaml.RNode) (*unstructured.Unstructured, error) {
+	b, err := n.MarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+
+	var m map[string]interface{}
+	err = json.Unmarshal(b, &m)
+	if err != nil {
+		return nil, err
+	}
+
+	return &unstructured.Unstructured{
+		Object: m,
+	}, nil
 }
