@@ -88,7 +88,7 @@ func (po *PruneOptions) Prune(localObjs []*unstructured.Unstructured, currentUID
 	}
 	invNamespace := localInv.GetNamespace()
 	klog.V(4).Infof("prune local inventory object: %s/%s", invNamespace, localInv.GetName())
-	clusterObjs, err := po.InvClient.GetClusterObjs(object.UnstructuredToInfo(localInv))
+	clusterObjs, err := po.InvClient.GetClusterObjs(localInv)
 	if err != nil {
 		return err
 	}
@@ -149,7 +149,7 @@ func (po *PruneOptions) Prune(localObjs []*unstructured.Unstructured, currentUID
 		eventChannel <- createPruneEvent(obj, event.Pruned)
 	}
 	localIds := object.UnstructuredsToObjMetas(localObjs)
-	return po.InvClient.Replace(object.UnstructuredToInfo(localInv), localIds)
+	return po.InvClient.Replace(localInv, localIds)
 }
 
 // preventDeleteAnnotation returns true if the "onRemove:keep"

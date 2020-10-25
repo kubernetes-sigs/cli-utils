@@ -95,8 +95,7 @@ func (a *Applier) prepareObjects(objs []*unstructured.Unstructured) (*ResourceOb
 
 	// Ensures the namespace exists before applying the inventory object into it.
 	if invNamespace := inventoryNamespaceInSet(localInv, localObjs); invNamespace != nil {
-		if err = a.invClient.ApplyInventoryNamespace(
-			object.UnstructuredToInfo(invNamespace)); err != nil {
+		if err = a.invClient.ApplyInventoryNamespace(invNamespace); err != nil {
 			return nil, err
 		}
 	}
@@ -105,7 +104,7 @@ func (a *Applier) prepareObjects(objs []*unstructured.Unstructured) (*ResourceOb
 	// returns the objects (pruneIds) to prune after apply. The prune
 	// algorithm requires stopping if the merge is not successful. Otherwise,
 	// the stored objects in inventory could become inconsistent.
-	pruneIds, err := a.invClient.Merge(object.UnstructuredToInfo(localInv), currentObjs)
+	pruneIds, err := a.invClient.Merge(localInv, currentObjs)
 	if err != nil {
 		return nil, err
 	}

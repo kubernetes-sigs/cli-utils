@@ -119,11 +119,11 @@ func (r *PreviewRunner) RunE(cmd *cobra.Command, args []string) error {
 			DryRunStrategy:   drs,
 		})
 	} else {
-		inv, _, err := inventory.SplitInfos(infos)
+		inv, _, err := inventory.SplitUnstructureds(object.InfosToUnstructureds(infos))
 		if err != nil {
 			return err
 		}
-		ch = r.Destroyer.Run(object.InfoToUnstructured(inv))
+		ch = r.Destroyer.Run(inv)
 	}
 
 	// The printer will print updates from the channel. It will block
