@@ -78,7 +78,7 @@ func TestApplyTask_FetchGeneration(t *testing.T) {
 			objs := toUnstructureds(tc.rss)
 
 			oldAO := applyOptionsFactoryFunc
-			applyOptionsFactoryFunc = func(chan event.Event, common.DryRunStrategy, util.Factory) (applyOptions, error) {
+			applyOptionsFactoryFunc = func(chan event.Event, common.ServerSideOptions, common.DryRunStrategy, util.Factory) (applyOptions, error) {
 				return &fakeApplyOptions{}, nil
 			}
 			defer func() { applyOptionsFactoryFunc = oldAO }()
@@ -242,7 +242,7 @@ func TestApplyTask_DryRun(t *testing.T) {
 
 				ao := &fakeApplyOptions{}
 				oldAO := applyOptionsFactoryFunc
-				applyOptionsFactoryFunc = func(chan event.Event, common.DryRunStrategy, util.Factory) (applyOptions, error) {
+				applyOptionsFactoryFunc = func(chan event.Event, common.ServerSideOptions, common.DryRunStrategy, util.Factory) (applyOptions, error) {
 					return ao, nil
 				}
 				defer func() { applyOptionsFactoryFunc = oldAO }()

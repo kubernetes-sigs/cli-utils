@@ -197,6 +197,7 @@ func (a *Applier) Run(ctx context.Context, objects []*unstructured.Unstructured,
 			InfoHelper:   a.infoHelper,
 			Mapper:       mapper,
 		}).BuildTaskQueue(resourceObjects, solver.Options{
+			ServerSideOptions:      options.ServerSideOptions,
 			ReconcileTimeout:       options.ReconcileTimeout,
 			Prune:                  !options.NoPrune,
 			DryRunStrategy:         options.DryRunStrategy,
@@ -237,6 +238,9 @@ func (a *Applier) Run(ctx context.Context, objects []*unstructured.Unstructured,
 }
 
 type Options struct {
+	// Encapsulates the fields for server-side apply.
+	ServerSideOptions common.ServerSideOptions
+
 	// ReconcileTimeout defines whether the applier should wait
 	// until all applied resources have been reconciled, and if so,
 	// how long to wait.

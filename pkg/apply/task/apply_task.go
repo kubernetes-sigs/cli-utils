@@ -38,12 +38,13 @@ type applyOptions interface {
 // ApplyTask applies the given Objects to the cluster
 // by using the ApplyOptions.
 type ApplyTask struct {
-	Factory        util.Factory
-	InfoHelper     info.InfoHelper
-	Mapper         meta.RESTMapper
-	Objects        []*unstructured.Unstructured
-	CRDs           []*unstructured.Unstructured
-	DryRunStrategy common.DryRunStrategy
+	Factory           util.Factory
+	InfoHelper        info.InfoHelper
+	Mapper            meta.RESTMapper
+	Objects           []*unstructured.Unstructured
+	CRDs              []*unstructured.Unstructured
+	DryRunStrategy    common.DryRunStrategy
+	ServerSideOptions common.ServerSideOptions
 }
 
 // applyOptionsFactoryFunc is a factory function for creating a new
@@ -110,7 +111,8 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 
 		// Create a new instance of the applyOptions interface and use it
 		// to apply the objects.
-		ao, err := applyOptionsFactoryFunc(taskContext.EventChannel(), a.DryRunStrategy, a.Factory)
+		ao, err := applyOptionsFactoryFunc(taskContext.EventChannel(),
+			a.ServerSideOptions, a.DryRunStrategy, a.Factory)
 		if err != nil {
 			a.sendTaskResult(taskContext, err)
 			return
@@ -142,7 +144,8 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 	}()
 }
 
-func newApplyOptions(eventChannel chan event.Event, strategy common.DryRunStrategy, factory util.Factory) (applyOptions, error) {
+func newApplyOptions(eventChannel chan event.Event, serverSideOptions common.ServerSideOptions,
+	strategy common.DryRunStrategy, factory util.Factory) (applyOptions, error) {
 	discovery, err := factory.ToDiscoveryClient()
 	if err != nil {
 		return nil, err
@@ -171,10 +174,10 @@ func newApplyOptions(eventChannel chan event.Event, strategy common.DryRunStrate
 		PrintFlags: &genericclioptions.PrintFlags{
 			OutputFormat: &emptyString,
 		},
-		// Setting the ServerSideApply here since it is needed for server-side
-		// dry-run. We don't yet support SSA.
-		ServerSideApply: strategy.ServerDryRun(),
-		FieldManager:    "kubectl", // TODO: Make this configurable
+		// Server-side apply if flag set or server-side dry run.
+		ServerSideApply: strategy.ServerDryRun() || serverSideOptions.ServerSideApply,
+		ForceConflicts:  serverSideOptions.ForceConflicts,
+		FieldManager:    serverSideOptions.FieldManager,
 		DryRun:          strategy.ClientOrServerDryRun(),
 		ServerDryRun:    strategy.ServerDryRun(),
 		ToPrinter: (&KubectlPrinterAdapter{
