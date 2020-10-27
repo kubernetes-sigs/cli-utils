@@ -15,7 +15,6 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
-	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/provider"
 	"sigs.k8s.io/kustomize/kyaml/setters2"
 )
@@ -90,7 +89,7 @@ func (r *PreviewRunner) RunE(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	infos, err := reader.Read()
+	objs, err := reader.Read()
 	if err != nil {
 		return err
 	}
@@ -118,14 +117,14 @@ func (r *PreviewRunner) RunE(cmd *cobra.Command, args []string) error {
 			ForceConflicts:  false,
 			FieldManager:    common.DefaultFieldManager,
 		}
-		ch = r.Applier.Run(ctx, object.InfosToUnstructureds(infos), apply.Options{
+		ch = r.Applier.Run(ctx, objs, apply.Options{
 			EmitStatusEvents:  false,
 			NoPrune:           noPrune,
 			DryRunStrategy:    drs,
 			ServerSideOptions: serverSideOptions,
 		})
 	} else {
-		inv, _, err := inventory.SplitUnstructureds(object.InfosToUnstructureds(infos))
+		inv, _, err := inventory.SplitUnstructureds(objs)
 		if err != nil {
 			return err
 		}

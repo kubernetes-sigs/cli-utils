@@ -11,17 +11,6 @@ import (
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 )
 
-var (
-	depManifest = `
-kind: Deployment
-apiVersion: apps/v1
-metadata:
-  name: foo
-spec:
-  replicas: 1
-`
-)
-
 func TestStreamManifestReader_Read(t *testing.T) {
 	testCases := map[string]struct {
 		manifests        string
@@ -40,6 +29,14 @@ func TestStreamManifestReader_Read(t *testing.T) {
 			infosCount: 1,
 			namespaces: []string{"foo"},
 		},
+		"multiple resources": {
+			manifests:        depManifest + "\n---\n" + cmManifest,
+			namespace:        "bar",
+			enforceNamespace: false,
+
+			infosCount: 2,
+			namespaces: []string{"bar", "bar"},
+		},
 	}
 
 	for tn, tc := range testCases {
@@ -47,13 +44,18 @@ func TestStreamManifestReader_Read(t *testing.T) {
 			tf := cmdtesting.NewTestFactory().WithNamespace("test-ns")
 			defer tf.Cleanup()
 
+			mapper, err := tf.ToRESTMapper()
+			if !assert.NoError(t, err) {
+				t.FailNow()
+			}
+
 			stringReader := strings.NewReader(tc.manifests)
 
-			infos, err := (&StreamManifestReader{
+			objs, err := (&StreamManifestReader{
 				ReaderName: "testReader",
 				Reader:     stringReader,
 				ReaderOptions: ReaderOptions{
-					Factory:          tf,
+					Mapper:           mapper,
 					Namespace:        tc.namespace,
 					EnforceNamespace: tc.enforceNamespace,
 					Validate:         tc.validate,
@@ -61,10 +63,10 @@ func TestStreamManifestReader_Read(t *testing.T) {
 			}).Read()
 
 			assert.NoError(t, err)
-			assert.Equal(t, len(infos), tc.infosCount)
+			assert.Equal(t, len(objs), tc.infosCount)
 
-			for i, info := range infos {
-				assert.Equal(t, tc.namespaces[i], info.Namespace)
+			for i, obj := range objs {
+				assert.Equal(t, tc.namespaces[i], obj.GetNamespace())
 			}
 		})
 	}

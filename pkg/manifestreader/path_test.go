@@ -9,7 +9,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"k8s.io/apimachinery/pkg/api/meta"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
+	"sigs.k8s.io/kustomize/kyaml/kio/kioutil"
 )
 
 func TestPathManifestReader_Read(t *testing.T) {
@@ -32,12 +34,28 @@ func TestPathManifestReader_Read(t *testing.T) {
 			infosCount: 1,
 			namespaces: []string{"foo"},
 		},
+		"multiple manifests": {
+			manifests: map[string]string{
+				"dep.yaml": depManifest,
+				"cm.yaml":  cmManifest,
+			},
+			namespace:        "default",
+			enforceNamespace: true,
+
+			infosCount: 2,
+			namespaces: []string{"default", "default"},
+		},
 	}
 
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
 			tf := cmdtesting.NewTestFactory().WithNamespace("test-ns")
 			defer tf.Cleanup()
+
+			mapper, err := tf.ToRESTMapper()
+			if !assert.NoError(t, err) {
+				t.FailNow()
+			}
 
 			dir, err := ioutil.TempDir("", "path-reader-test")
 			assert.NoError(t, err)
@@ -47,10 +65,10 @@ func TestPathManifestReader_Read(t *testing.T) {
 				assert.NoError(t, err)
 			}
 
-			infos, err := (&PathManifestReader{
+			objs, err := (&PathManifestReader{
 				Path: dir,
 				ReaderOptions: ReaderOptions{
-					Factory:          tf,
+					Mapper:           mapper,
 					Namespace:        tc.namespace,
 					EnforceNamespace: tc.enforceNamespace,
 					Validate:         tc.validate,
@@ -58,10 +76,13 @@ func TestPathManifestReader_Read(t *testing.T) {
 			}).Read()
 
 			assert.NoError(t, err)
-			assert.Equal(t, len(infos), tc.infosCount)
+			assert.Equal(t, len(objs), tc.infosCount)
 
-			for i, info := range infos {
-				assert.Equal(t, tc.namespaces[i], info.Namespace)
+			for i, obj := range objs {
+				assert.Equal(t, tc.namespaces[i], obj.GetNamespace())
+				accessor, _ := meta.Accessor(obj)
+				_, ok := accessor.GetAnnotations()[kioutil.PathAnnotation]
+				assert.True(t, ok)
 			}
 		})
 	}

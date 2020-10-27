@@ -105,6 +105,7 @@ func (a *Applier) prepareObjects(objs []*unstructured.Unstructured) (*ResourceOb
 	// algorithm requires stopping if the merge is not successful. Otherwise,
 	// the stored objects in inventory could become inconsistent.
 	pruneIds, err := a.invClient.Merge(localInv, currentObjs)
+
 	if err != nil {
 		return nil, err
 	}

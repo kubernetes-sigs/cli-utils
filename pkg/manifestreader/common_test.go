@@ -12,11 +12,12 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/cli-runtime/pkg/resource"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	"k8s.io/kubectl/pkg/scheme"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/kustomize/kyaml/kio/filters"
+	"sigs.k8s.io/kustomize/kyaml/kio/kioutil"
+	"sigs.k8s.io/kustomize/kyaml/yaml"
 )
 
 func TestSetNamespaces(t *testing.T) {
@@ -25,7 +26,7 @@ func TestSetNamespaces(t *testing.T) {
 	_ = apiextv1.AddToScheme(scheme.Scheme)
 
 	testCases := map[string]struct {
-		infos            []*resource.Info
+		objs             []*unstructured.Unstructured
 		defaultNamspace  string
 		enforceNamespace bool
 
@@ -33,13 +34,13 @@ func TestSetNamespaces(t *testing.T) {
 		expectedErrText    string
 	}{
 		"resources already have namespace": {
-			infos: []*resource.Info{
-				toInfo(schema.GroupVersionKind{
+			objs: []*unstructured.Unstructured{
+				toUnstructured(schema.GroupVersionKind{
 					Group:   "apps",
 					Version: "v1",
 					Kind:    "Deployment",
 				}, "default"),
-				toInfo(schema.GroupVersionKind{
+				toUnstructured(schema.GroupVersionKind{
 					Group:   "policy",
 					Version: "v1beta1",
 					Kind:    "PodDisruptionBudget",
@@ -53,8 +54,8 @@ func TestSetNamespaces(t *testing.T) {
 			},
 		},
 		"resources without namespace and mapping in RESTMapper": {
-			infos: []*resource.Info{
-				toInfo(schema.GroupVersionKind{
+			objs: []*unstructured.Unstructured{
+				toUnstructured(schema.GroupVersionKind{
 					Group:   "apps",
 					Version: "v1",
 					Kind:    "Deployment",
@@ -65,8 +66,8 @@ func TestSetNamespaces(t *testing.T) {
 			expectedNamespaces: []string{"foo"},
 		},
 		"resource with namespace that does match enforced ns": {
-			infos: []*resource.Info{
-				toInfo(schema.GroupVersionKind{
+			objs: []*unstructured.Unstructured{
+				toUnstructured(schema.GroupVersionKind{
 					Group:   "apps",
 					Version: "v1",
 					Kind:    "Deployment",
@@ -77,8 +78,8 @@ func TestSetNamespaces(t *testing.T) {
 			expectedNamespaces: []string{"bar"},
 		},
 		"resource with namespace that doesn't match enforced ns": {
-			infos: []*resource.Info{
-				toInfo(schema.GroupVersionKind{
+			objs: []*unstructured.Unstructured{
+				toUnstructured(schema.GroupVersionKind{
 					Group:   "apps",
 					Version: "v1",
 					Kind:    "Deployment",
@@ -89,13 +90,13 @@ func TestSetNamespaces(t *testing.T) {
 			expectedErrText:  "does not match the namespace",
 		},
 		"cluster-scoped CR with CRD": {
-			infos: []*resource.Info{
-				toInfo(schema.GroupVersionKind{
+			objs: []*unstructured.Unstructured{
+				toUnstructured(schema.GroupVersionKind{
 					Group:   "custom.io",
 					Version: "v1",
 					Kind:    "Custom",
 				}, ""),
-				toCRDInfo(schema.GroupVersionKind{
+				toCRDUnstructured(schema.GroupVersionKind{
 					Group:   "apiextensions.k8s.io",
 					Version: "v1",
 					Kind:    "CustomResourceDefinition",
@@ -109,8 +110,8 @@ func TestSetNamespaces(t *testing.T) {
 			expectedNamespaces: []string{"", ""},
 		},
 		"namespace-scoped CR with CRD": {
-			infos: []*resource.Info{
-				toCRDInfo(schema.GroupVersionKind{
+			objs: []*unstructured.Unstructured{
+				toCRDUnstructured(schema.GroupVersionKind{
 					Group:   "apiextensions.k8s.io",
 					Version: "v1",
 					Kind:    "CustomResourceDefinition",
@@ -118,7 +119,7 @@ func TestSetNamespaces(t *testing.T) {
 					Group: "custom.io",
 					Kind:  "Custom",
 				}, "Namespaced"),
-				toInfo(schema.GroupVersionKind{
+				toUnstructured(schema.GroupVersionKind{
 					Group:   "custom.io",
 					Version: "v1",
 					Kind:    "Custom",
@@ -135,7 +136,12 @@ func TestSetNamespaces(t *testing.T) {
 			tf := cmdtesting.NewTestFactory().WithNamespace("namespace")
 			defer tf.Cleanup()
 
-			err := SetNamespaces(tf, tc.infos, tc.defaultNamspace, tc.enforceNamespace)
+			mapper, err := tf.ToRESTMapper()
+			if !assert.NoError(t, err) {
+				t.FailNow()
+			}
+
+			err = SetNamespaces(mapper, tc.objs, tc.defaultNamspace, tc.enforceNamespace)
 
 			if tc.expectedErrText != "" {
 				if err == nil {
@@ -147,10 +153,10 @@ func TestSetNamespaces(t *testing.T) {
 
 			assert.NoError(t, err)
 
-			for i, inf := range tc.infos {
+			for i, obj := range tc.objs {
 				expectedNs := tc.expectedNamespaces[i]
-				assert.Equal(t, expectedNs, inf.Namespace)
-				accessor, _ := meta.Accessor(inf.Object)
+				assert.Equal(t, expectedNs, obj.GetNamespace())
+				accessor, _ := meta.Accessor(obj)
 				assert.Equal(t, expectedNs, accessor.GetNamespace())
 			}
 		})
@@ -178,13 +184,13 @@ var (
 
 func TestFilterLocalConfigs(t *testing.T) {
 	testCases := map[string]struct {
-		input    []*resource.Info
+		input    []*unstructured.Unstructured
 		expected []string
 	}{
 		"don't filter if no annotation": {
-			input: []*resource.Info{
-				objMetaToInfo(depID),
-				objMetaToInfo(clusterRoleID),
+			input: []*unstructured.Unstructured{
+				objMetaToUnstructured(depID),
+				objMetaToUnstructured(clusterRoleID),
 			},
 			expected: []string{
 				depID.Name,
@@ -192,17 +198,17 @@ func TestFilterLocalConfigs(t *testing.T) {
 			},
 		},
 		"filter all if all have annotation": {
-			input: []*resource.Info{
-				addAnnotation(t, objMetaToInfo(depID), filters.LocalConfigAnnotation, "true"),
-				addAnnotation(t, objMetaToInfo(clusterRoleID), filters.LocalConfigAnnotation, "false"),
+			input: []*unstructured.Unstructured{
+				addAnnotation(t, objMetaToUnstructured(depID), filters.LocalConfigAnnotation, "true"),
+				addAnnotation(t, objMetaToUnstructured(clusterRoleID), filters.LocalConfigAnnotation, "false"),
 			},
 			expected: []string{},
 		},
 		"filter even if resource have other annotations": {
-			input: []*resource.Info{
+			input: []*unstructured.Unstructured{
 				addAnnotation(t,
 					addAnnotation(
-						t, objMetaToInfo(depID),
+						t, objMetaToUnstructured(depID),
 						filters.LocalConfigAnnotation, "true"),
 					"my-annotation", "foo"),
 			},
@@ -215,8 +221,8 @@ func TestFilterLocalConfigs(t *testing.T) {
 			res := FilterLocalConfig(tc.input)
 
 			var names []string
-			for _, inf := range res {
-				names = append(names, inf.Name)
+			for _, obj := range res {
+				names = append(names, obj.GetName())
 			}
 
 			// Avoid test failures due to nil slice and empty slice
@@ -229,59 +235,131 @@ func TestFilterLocalConfigs(t *testing.T) {
 	}
 }
 
-func toInfo(gvk schema.GroupVersionKind, namespace string) *resource.Info {
-	return &resource.Info{
-		Namespace: namespace,
-		Object: &unstructured.Unstructured{
-			Object: map[string]interface{}{
-				"apiVersion": gvk.GroupVersion().String(),
-				"kind":       gvk.Kind,
-				"metadata": map[string]interface{}{
-					"namespace": namespace,
-				},
+func TestRemoveAnnotations(t *testing.T) {
+	testCases := map[string]struct {
+		node                *yaml.RNode
+		removeAnnotations   []kioutil.AnnotationKey
+		expectedAnnotations []kioutil.AnnotationKey
+	}{
+		"filter both kioutil annotations": {
+			node: yaml.MustParse(`
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: foo
+  annotations:
+    config.kubernetes.io/path: deployment.yaml
+    config.kubernetes.io/index: 0
+`),
+			removeAnnotations: []kioutil.AnnotationKey{
+				kioutil.PathAnnotation,
+				kioutil.IndexAnnotation,
+			},
+		},
+		"filter only a subset of the annotations": {
+			node: yaml.MustParse(`
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: foo
+  annotations:
+    config.kubernetes.io/path: deployment.yaml
+    config.kubernetes.io/index: 0
+`),
+			removeAnnotations: []kioutil.AnnotationKey{
+				kioutil.IndexAnnotation,
+			},
+			expectedAnnotations: []kioutil.AnnotationKey{
+				kioutil.PathAnnotation,
+			},
+		},
+		"filter none of the annotations": {
+			node: yaml.MustParse(`
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: foo
+  annotations:
+    config.kubernetes.io/path: deployment.yaml
+    config.kubernetes.io/index: 0
+`),
+			removeAnnotations: []kioutil.AnnotationKey{},
+			expectedAnnotations: []kioutil.AnnotationKey{
+				kioutil.PathAnnotation,
+				kioutil.IndexAnnotation,
+			},
+		},
+	}
+
+	for tn, tc := range testCases {
+		t.Run(tn, func(t *testing.T) {
+			node := tc.node
+			err := removeAnnotations(node, tc.removeAnnotations...)
+			if !assert.NoError(t, err) {
+				t.FailNow()
+			}
+
+			for _, anno := range tc.removeAnnotations {
+				n, err := node.Pipe(yaml.GetAnnotation(anno))
+				if !assert.NoError(t, err) {
+					t.FailNow()
+				}
+				assert.Nil(t, n)
+			}
+			for _, anno := range tc.expectedAnnotations {
+				n, err := node.Pipe(yaml.GetAnnotation(anno))
+				if !assert.NoError(t, err) {
+					t.FailNow()
+				}
+				assert.NotNil(t, n)
+			}
+		})
+	}
+}
+
+func toUnstructured(gvk schema.GroupVersionKind, namespace string) *unstructured.Unstructured {
+	return &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": gvk.GroupVersion().String(),
+			"kind":       gvk.Kind,
+			"metadata": map[string]interface{}{
+				"namespace": namespace,
 			},
 		},
 	}
 }
 
-func toCRDInfo(gvk schema.GroupVersionKind, gk schema.GroupKind,
-	scope string) *resource.Info {
-	return &resource.Info{
-		Object: &unstructured.Unstructured{
-			Object: map[string]interface{}{
-				"apiVersion": gvk.GroupVersion().String(),
-				"kind":       gvk.Kind,
-				"spec": map[string]interface{}{
-					"group": gk.Group,
-					"names": map[string]interface{}{
-						"kind": gk.Kind,
-					},
-					"scope": scope,
+func toCRDUnstructured(gvk schema.GroupVersionKind, gk schema.GroupKind,
+	scope string) *unstructured.Unstructured {
+	return &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": gvk.GroupVersion().String(),
+			"kind":       gvk.Kind,
+			"spec": map[string]interface{}{
+				"group": gk.Group,
+				"names": map[string]interface{}{
+					"kind": gk.Kind,
 				},
+				"scope": scope,
 			},
 		},
 	}
 }
 
-func objMetaToInfo(id object.ObjMetadata) *resource.Info {
-	return &resource.Info{
-		Namespace: id.Namespace,
-		Name:      id.Name,
-		Object: &unstructured.Unstructured{
-			Object: map[string]interface{}{
-				"apiVersion": fmt.Sprintf("%s/v1", id.GroupKind.Group),
-				"kind":       id.GroupKind.Kind,
-				"metadata": map[string]interface{}{
-					"namespace": id.Namespace,
-					"name":      id.Name,
-				},
+func objMetaToUnstructured(id object.ObjMetadata) *unstructured.Unstructured {
+	return &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": fmt.Sprintf("%s/v1", id.GroupKind.Group),
+			"kind":       id.GroupKind.Kind,
+			"metadata": map[string]interface{}{
+				"namespace": id.Namespace,
+				"name":      id.Name,
 			},
 		},
 	}
 }
 
-func addAnnotation(t *testing.T, info *resource.Info, name, val string) *resource.Info {
-	u := info.Object.(*unstructured.Unstructured)
+func addAnnotation(t *testing.T, u *unstructured.Unstructured, name, val string) *unstructured.Unstructured {
 	annos, found, err := unstructured.NestedStringMap(u.Object, "metadata", "annotations")
 	if err != nil {
 		t.Fatal(err)
@@ -294,5 +372,5 @@ func addAnnotation(t *testing.T, info *resource.Info, name, val string) *resourc
 	if err != nil {
 		t.Fatal(err)
 	}
-	return info
+	return u
 }

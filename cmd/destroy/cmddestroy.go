@@ -11,7 +11,6 @@ import (
 	"sigs.k8s.io/cli-utils/cmd/printers"
 	"sigs.k8s.io/cli-utils/pkg/apply"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
-	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/provider"
 )
 
@@ -58,11 +57,11 @@ func (r *DestroyRunner) RunE(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	infos, err := reader.Read()
+	objs, err := reader.Read()
 	if err != nil {
 		return err
 	}
-	inv, _, err := inventory.SplitUnstructureds(object.InfosToUnstructureds(infos))
+	inv, _, err := inventory.SplitUnstructureds(objs)
 	if err != nil {
 		return err
 	}
