@@ -80,7 +80,7 @@ func ExpandPackageDir(f genericclioptions.FileNameFlags) (genericclioptions.File
 		return f, fmt.Errorf("expand package directory should pass one package directory. "+
 			"Passed the following paths: %v", f.Filenames)
 	}
-	configFilepaths, err := expandDir((*f.Filenames)[0])
+	_, configFilepaths, err := ExpandDir((*f.Filenames)[0])
 	if err != nil {
 		return f, err
 	}
@@ -136,29 +136,34 @@ func FilterInputFile(in io.Reader, tmpDir string) error {
 	return w.Write(filteredNodes)
 }
 
-// expandDir takes a single package directory as a parameter, and returns
-// an array of config file paths excluding the inventory object. Returns
-// an error if one occurred while processing the paths.
-func expandDir(dir string) ([]string, error) {
+// ExpandDir takes a single package directory as a parameter, and returns
+// the inventory template filepath and an array of config file paths. If no
+// inventory template file, then the first return value is an empty string.
+// Returns an error if one occurred while processing the paths.
+func ExpandDir(dir string) (string, []string, error) {
 	filepaths := []string{}
 	r := kio.LocalPackageReader{PackagePath: dir}
 	nodes, err := r.Read()
 	if err != nil {
-		return filepaths, err
+		return "", filepaths, err
 	}
+	var invFilepath string
 	for _, node := range nodes {
 		meta, err := node.GetMeta()
 		if err != nil {
 			continue
 		}
+		path := meta.Annotations[kioutil.PathAnnotation]
+		path = filepath.Join(dir, path)
 		// If object has inventory label, skip it.
 		labels := meta.Labels
 		if _, exists := labels[InventoryLabel]; exists {
+			if invFilepath == "" {
+				invFilepath = path
+			}
 			continue
 		}
-		path := meta.Annotations[kioutil.PathAnnotation]
-		path = filepath.Join(dir, path)
 		filepaths = append(filepaths, path)
 	}
-	return filepaths, nil
+	return invFilepath, filepaths, nil
 }

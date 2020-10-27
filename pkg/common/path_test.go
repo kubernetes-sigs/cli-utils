@@ -17,17 +17,20 @@ import (
 )
 
 const (
-	packageDir        = "test-pkg-dir"
-	inventoryFilename = "inventory.yaml"
-	podAFilename      = "pod-a.yaml"
-	podBFilename      = "pod-b.yaml"
-	configSeparator   = "---"
+	packageDir              = "test-pkg-dir"
+	subFolder               = "sub-folder"
+	inventoryFilename       = "inventory.yaml"
+	secondInventoryFilename = "inventory-2.yaml"
+	podAFilename            = "pod-a.yaml"
+	podBFilename            = "pod-b.yaml"
+	configSeparator         = "---"
 )
 
 var (
-	inventoryFilePath = filepath.Join(packageDir, inventoryFilename)
-	podAFilePath      = filepath.Join(packageDir, podAFilename)
-	podBFilePath      = filepath.Join(packageDir, podBFilename)
+	inventoryFilePath       = filepath.Join(packageDir, inventoryFilename)
+	secondInventoryFilePath = filepath.Join(packageDir, subFolder, secondInventoryFilename)
+	podAFilePath            = filepath.Join(packageDir, podAFilename)
+	podBFilePath            = filepath.Join(packageDir, podBFilename)
 )
 
 func setupTestFilesystem(t *testing.T) testutil.TestFilesystem {
@@ -37,6 +40,8 @@ func setupTestFilesystem(t *testing.T) testutil.TestFilesystem {
 	tf := testutil.Setup(t, packageDir)
 	t.Logf("Adding File: %s", inventoryFilePath)
 	tf.WriteFile(t, inventoryFilePath, inventoryConfigMap)
+	t.Logf("Adding File: %s", secondInventoryFilePath)
+	tf.WriteFile(t, secondInventoryFilePath, secondInventoryConfigMap)
 	t.Logf("Adding File: %s", podAFilePath)
 	tf.WriteFile(t, podAFilePath, podA)
 	t.Logf("Adding File: %s", podBFilePath)
@@ -50,6 +55,16 @@ kind: ConfigMap
 metadata:
   namespace: test-namespace
   name: inventory
+  labels:
+    cli-utils.sigs.k8s.io/inventory-id: test-inventory
+`)
+
+var secondInventoryConfigMap = []byte(`
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  namespace: test-namespace
+  name: inventory-2
   labels:
     cli-utils.sigs.k8s.io/inventory-id: test-inventory
 `)
@@ -213,6 +228,72 @@ func TestFilterInputFile(t *testing.T) {
 			if expectedStr != actualStr {
 				t.Errorf("Expected file contents (%s) not equal to actual file contents (%s)",
 					expectedStr, actualStr)
+			}
+		})
+	}
+}
+
+func TestExpandDir(t *testing.T) {
+	tf := setupTestFilesystem(t)
+	defer tf.Clean()
+
+	testCases := map[string]struct {
+		packageDirPath    string
+		expandedInventory string
+		expandedPaths     []string
+		isError           bool
+	}{
+		"empty path is error": {
+			packageDirPath: "",
+			isError:        true,
+		},
+		"path that is not dir is error": {
+			packageDirPath: "fakedir1",
+			isError:        true,
+		},
+		"root package dir excludes inventory object": {
+			packageDirPath:    tf.GetRootDir(),
+			expandedInventory: "inventory.yaml",
+			expandedPaths: []string{
+				"pod-a.yaml",
+				"pod-b.yaml",
+			},
+			isError: false,
+		},
+	}
+
+	for tn, tc := range testCases {
+		t.Run(tn, func(t *testing.T) {
+			actualInventory, actualPaths, err := ExpandDir(tc.packageDirPath)
+			if tc.isError {
+				if err == nil {
+					t.Fatalf("expected error but received none")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("received unexpected error %#v", err)
+				return
+			}
+			actualFilename := filepath.Base(actualInventory)
+			if tc.expandedInventory != actualFilename {
+				t.Errorf("expected inventory template filepath (%s), got (%s)", tc.expandedInventory, actualFilename)
+			}
+			if len(tc.expandedPaths) != len(actualPaths) {
+				t.Errorf("expected (%d) resource filepaths, got (%d)", len(tc.expandedPaths), len(actualPaths))
+			}
+			for _, expectedPath := range tc.expandedPaths {
+				found := false
+				for _, actualPath := range actualPaths {
+					actualFilename := filepath.Base(actualPath)
+					if expectedPath == actualFilename {
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Errorf("expected filename (%s) not found", expectedPath)
+				}
 			}
 		})
 	}
