@@ -13,6 +13,7 @@ package prune
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"strings"
 
@@ -82,10 +83,13 @@ type Options struct {
 // (retrieved from previous inventory objects) but omitted in
 // the current apply. Prune also delete all previous inventory
 // objects. Returns an error if there was a problem.
-func (po *PruneOptions) Prune(localInv *unstructured.Unstructured, localObjs []*unstructured.Unstructured, currentUIDs sets.String,
+func (po *PruneOptions) Prune(localInv inventory.InventoryInfo, localObjs []*unstructured.Unstructured, currentUIDs sets.String,
 	eventChannel chan<- event.Event, o Options) error {
-	invNamespace := strings.TrimSpace(strings.ToLower(localInv.GetNamespace()))
-	klog.V(4).Infof("prune local inventory object: %s/%s", invNamespace, localInv.GetName())
+	if localInv == nil {
+		return fmt.Errorf("the local inventory object can't be nil")
+	}
+	invNamespace := localInv.Namespace()
+	klog.V(4).Infof("prune local inventory object: %s/%s", invNamespace, localInv.Name())
 	// Create the set of namespaces for currently (locally) applied objects, including
 	// the namespace the inventory object lives in (if it's not cluster-scoped). When
 	// pruning, check this set of namespaces to ensure these namespaces are not deleted.
@@ -139,8 +143,8 @@ func (po *PruneOptions) Prune(localInv *unstructured.Unstructured, localObjs []*
 		// currently applied objects.
 		if !po.Destroy {
 			if clusterObj.GroupKind == object.CoreV1Namespace.GroupKind() &&
-				localNamespaces.Has(strings.ToLower(clusterObj.Name)) {
-				klog.V(7).Infof("skip pruning namespace: %s", clusterObj.Name)
+				clusterObj.Name == localInv.Namespace() {
+				klog.V(7).Infof("skip pruning inventory namespace: %s", obj)
 				eventChannel <- createPruneEvent(obj, event.PruneSkipped)
 				continue
 			}

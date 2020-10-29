@@ -64,7 +64,12 @@ func (r *DestroyRunner) RunE(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	inv, _, err := inventory.SplitUnstructureds(objs)
+	inventoryClient, err := r.provider.InventoryClient()
+	if err != nil {
+		return err
+	}
+
+	inv, _, err := inventory.SplitUnstructureds(inventoryClient.InvInfoFactoryFunc(), objs)
 	if err != nil {
 		return err
 	}

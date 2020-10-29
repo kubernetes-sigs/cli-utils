@@ -8,7 +8,6 @@ import (
 
 	"github.com/go-errors/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/prune"
@@ -59,7 +58,7 @@ func (d *Destroyer) Initialize() error {
 // Run performs the destroy step. Passes the inventory object. This
 // happens asynchronously on progress and any errors are reported
 // back on the event channel.
-func (d *Destroyer) Run(inv *unstructured.Unstructured) <-chan event.Event {
+func (d *Destroyer) Run(inv inventory.InventoryInfo) <-chan event.Event {
 	ch := make(chan event.Event)
 
 	go func() {

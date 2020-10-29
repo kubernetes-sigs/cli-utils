@@ -21,7 +21,7 @@ import (
 
 func TestGetClusterInventoryInfo(t *testing.T) {
 	tests := map[string]struct {
-		inv       *unstructured.Unstructured
+		inv       InventoryInfo
 		localObjs []object.ObjMetadata
 		isError   bool
 	}{
@@ -31,19 +31,19 @@ func TestGetClusterInventoryInfo(t *testing.T) {
 			isError:   true,
 		},
 		"Empty local inventory object": {
-			inv:       inventoryObj,
+			inv:       localInv,
 			localObjs: []object.ObjMetadata{},
 			isError:   false,
 		},
 		"Local inventory with a single object": {
-			inv: inventoryObj,
+			inv: localInv,
 			localObjs: []object.ObjMetadata{
 				ignoreErrInfoToObjMeta(pod2Info),
 			},
 			isError: false,
 		},
 		"Local inventory with multiple objects": {
-			inv: inventoryObj,
+			inv: localInv,
 			localObjs: []object.ObjMetadata{
 				ignoreErrInfoToObjMeta(pod1Info),
 				ignoreErrInfoToObjMeta(pod2Info),
@@ -57,7 +57,8 @@ func TestGetClusterInventoryInfo(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			invClient, _ := NewInventoryClient(tf, WrapInventoryObj)
+			invClient, _ := NewInventoryClient(tf,
+				WrapInventoryObj, InvInfoToConfigMap, WrapInventoryInfoObj)
 			fakeBuilder := FakeBuilder{}
 			fakeBuilder.SetInventoryObjs(tc.localObjs)
 			invClient.builderFunc = fakeBuilder.GetBuilder()
@@ -91,7 +92,7 @@ func TestGetClusterInventoryInfo(t *testing.T) {
 
 func TestMerge(t *testing.T) {
 	tests := map[string]struct {
-		localInv    *unstructured.Unstructured
+		localInv    InventoryInfo
 		localObjs   []object.ObjMetadata
 		clusterObjs []object.ObjMetadata
 		pruneObjs   []object.ObjMetadata
@@ -105,14 +106,14 @@ func TestMerge(t *testing.T) {
 			isError:     true,
 		},
 		"Cluster and local inventories empty: no prune objects; no change": {
-			localInv:    copyInventoryInfo(),
+			localInv:    copyInventory(),
 			localObjs:   []object.ObjMetadata{},
 			clusterObjs: []object.ObjMetadata{},
 			pruneObjs:   []object.ObjMetadata{},
 			isError:     false,
 		},
 		"Cluster and local inventories same: no prune objects; no change": {
-			localInv: copyInventoryInfo(),
+			localInv: copyInventory(),
 			localObjs: []object.ObjMetadata{
 				ignoreErrInfoToObjMeta(pod1Info),
 			},
@@ -123,7 +124,7 @@ func TestMerge(t *testing.T) {
 			isError:   false,
 		},
 		"Cluster two obj, local one: prune obj": {
-			localInv: copyInventoryInfo(),
+			localInv: copyInventory(),
 			localObjs: []object.ObjMetadata{
 				ignoreErrInfoToObjMeta(pod1Info),
 			},
@@ -137,7 +138,7 @@ func TestMerge(t *testing.T) {
 			isError: false,
 		},
 		"Cluster multiple objs, local multiple different objs: prune objs": {
-			localInv: copyInventoryInfo(),
+			localInv: copyInventory(),
 			localObjs: []object.ObjMetadata{
 				ignoreErrInfoToObjMeta(pod2Info),
 			},
@@ -161,7 +162,8 @@ func TestMerge(t *testing.T) {
 			drs := common.Strategies[i]
 			t.Run(name, func(t *testing.T) {
 				// Create the local inventory object storing "tc.localObjs"
-				invClient, _ := NewInventoryClient(tf, WrapInventoryObj)
+				invClient, _ := NewInventoryClient(tf,
+					WrapInventoryObj, InvInfoToConfigMap, WrapInventoryInfoObj)
 				invClient.SetDryRunStrategy(drs)
 				// Create a fake builder to return "tc.clusterObjs" from
 				// the cluster inventory object.
@@ -189,7 +191,7 @@ func TestMerge(t *testing.T) {
 
 func TestCreateInventory(t *testing.T) {
 	tests := map[string]struct {
-		inv       *unstructured.Unstructured
+		inv       InventoryInfo
 		localObjs []object.ObjMetadata
 		isError   bool
 	}{
@@ -199,19 +201,19 @@ func TestCreateInventory(t *testing.T) {
 			isError:   true,
 		},
 		"Empty local inventory object": {
-			inv:       inventoryObj,
+			inv:       localInv,
 			localObjs: []object.ObjMetadata{},
 			isError:   false,
 		},
 		"Local inventory with a single object": {
-			inv: inventoryObj,
+			inv: localInv,
 			localObjs: []object.ObjMetadata{
 				ignoreErrInfoToObjMeta(pod2Info),
 			},
 			isError: false,
 		},
 		"Local inventory with multiple objects": {
-			inv: inventoryObj,
+			inv: localInv,
 			localObjs: []object.ObjMetadata{
 				ignoreErrInfoToObjMeta(pod1Info),
 				ignoreErrInfoToObjMeta(pod2Info),
@@ -247,8 +249,9 @@ func TestCreateInventory(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			invClient, _ := NewInventoryClient(tf, WrapInventoryObj)
-			inv := tc.inv
+			invClient, _ := NewInventoryClient(tf,
+				WrapInventoryObj, InvInfoToConfigMap, WrapInventoryInfoObj)
+			inv := invClient.invToUnstructuredFunc(tc.inv)
 			if inv != nil {
 				inv = storeObjsInInventory(tc.inv, tc.localObjs)
 			}
@@ -265,7 +268,7 @@ func TestCreateInventory(t *testing.T) {
 
 func TestReplace(t *testing.T) {
 	tests := map[string]struct {
-		localInv    *unstructured.Unstructured
+		localInv    InventoryInfo
 		localObjs   []object.ObjMetadata
 		clusterObjs []object.ObjMetadata
 		isError     bool
@@ -277,13 +280,13 @@ func TestReplace(t *testing.T) {
 			isError:     true,
 		},
 		"Cluster and local inventories empty: no error": {
-			localInv:    copyInventoryInfo(),
+			localInv:    copyInventory(),
 			localObjs:   []object.ObjMetadata{},
 			clusterObjs: []object.ObjMetadata{},
 			isError:     false,
 		},
 		"Cluster and local inventories same: no error": {
-			localInv: copyInventoryInfo(),
+			localInv: copyInventory(),
 			localObjs: []object.ObjMetadata{
 				ignoreErrInfoToObjMeta(pod1Info),
 			},
@@ -293,7 +296,7 @@ func TestReplace(t *testing.T) {
 			isError: false,
 		},
 		"Cluster two obj, local one: no error": {
-			localInv: copyInventoryInfo(),
+			localInv: copyInventory(),
 			localObjs: []object.ObjMetadata{
 				ignoreErrInfoToObjMeta(pod1Info),
 			},
@@ -304,7 +307,7 @@ func TestReplace(t *testing.T) {
 			isError: false,
 		},
 		"Cluster multiple objs, local multiple different objs: no error": {
-			localInv: copyInventoryInfo(),
+			localInv: copyInventory(),
 			localObjs: []object.ObjMetadata{
 				ignoreErrInfoToObjMeta(pod2Info),
 			},
@@ -323,7 +326,8 @@ func TestReplace(t *testing.T) {
 		for i := range common.Strategies {
 			drs := common.Strategies[i]
 			t.Run(name, func(t *testing.T) {
-				invClient, _ := NewInventoryClient(tf, WrapInventoryObj)
+				invClient, _ := NewInventoryClient(tf,
+					WrapInventoryObj, InvInfoToConfigMap, WrapInventoryInfoObj)
 				invClient.SetDryRunStrategy(drs)
 				// Create fake builder returning the cluster inventory object
 				// storing the "tc.clusterObjs" objects.
@@ -348,7 +352,7 @@ func TestReplace(t *testing.T) {
 
 func TestGetClusterObjs(t *testing.T) {
 	tests := map[string]struct {
-		localInv    *unstructured.Unstructured
+		localInv    InventoryInfo
 		clusterObjs []object.ObjMetadata
 		isError     bool
 	}{
@@ -358,17 +362,17 @@ func TestGetClusterObjs(t *testing.T) {
 			isError:     true,
 		},
 		"No cluster objs": {
-			localInv:    copyInventoryInfo(),
+			localInv:    copyInventory(),
 			clusterObjs: []object.ObjMetadata{},
 			isError:     false,
 		},
 		"Single cluster obj": {
-			localInv:    copyInventoryInfo(),
+			localInv:    copyInventory(),
 			clusterObjs: []object.ObjMetadata{ignoreErrInfoToObjMeta(pod1Info)},
 			isError:     false,
 		},
 		"Multiple cluster objs": {
-			localInv:    copyInventoryInfo(),
+			localInv:    copyInventory(),
 			clusterObjs: []object.ObjMetadata{ignoreErrInfoToObjMeta(pod1Info), ignoreErrInfoToObjMeta(pod3Info)},
 			isError:     false,
 		},
@@ -379,7 +383,8 @@ func TestGetClusterObjs(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			invClient, _ := NewInventoryClient(tf, WrapInventoryObj)
+			invClient, _ := NewInventoryClient(tf,
+				WrapInventoryObj, InvInfoToConfigMap, WrapInventoryInfoObj)
 			// Create fake builder returning "tc.clusterObjs" from cluster inventory.
 			fakeBuilder := FakeBuilder{}
 			fakeBuilder.SetInventoryObjs(tc.clusterObjs)
@@ -404,7 +409,7 @@ func TestGetClusterObjs(t *testing.T) {
 
 func TestDeleteInventoryObj(t *testing.T) {
 	tests := map[string]struct {
-		inv       *unstructured.Unstructured
+		inv       InventoryInfo
 		localObjs []object.ObjMetadata
 	}{
 		"Nil local inventory object is an error": {
@@ -412,17 +417,17 @@ func TestDeleteInventoryObj(t *testing.T) {
 			localObjs: []object.ObjMetadata{},
 		},
 		"Empty local inventory object": {
-			inv:       inventoryObj,
+			inv:       localInv,
 			localObjs: []object.ObjMetadata{},
 		},
 		"Local inventory with a single object": {
-			inv: inventoryObj,
+			inv: localInv,
 			localObjs: []object.ObjMetadata{
 				ignoreErrInfoToObjMeta(pod2Info),
 			},
 		},
 		"Local inventory with multiple objects": {
-			inv: inventoryObj,
+			inv: localInv,
 			localObjs: []object.ObjMetadata{
 				ignoreErrInfoToObjMeta(pod1Info),
 				ignoreErrInfoToObjMeta(pod2Info),
@@ -458,13 +463,14 @@ func TestDeleteInventoryObj(t *testing.T) {
 		for i := range common.Strategies {
 			drs := common.Strategies[i]
 			t.Run(name, func(t *testing.T) {
-				invClient, _ := NewInventoryClient(tf, WrapInventoryObj)
+				invClient, _ := NewInventoryClient(tf,
+					WrapInventoryObj, InvInfoToConfigMap, WrapInventoryInfoObj)
 				invClient.SetDryRunStrategy(drs)
-				inv := tc.inv
+				inv := invClient.invToUnstructuredFunc(tc.inv)
 				if inv != nil {
 					inv = storeObjsInInventory(tc.inv, tc.localObjs)
 				}
-				err := invClient.DeleteInventoryObj(inv)
+				err := invClient.deleteInventoryObj(inv)
 				if err != nil {
 					t.Fatalf("unexpected error received: %s", err)
 				}
@@ -474,7 +480,7 @@ func TestDeleteInventoryObj(t *testing.T) {
 }
 
 type invAndObjs struct {
-	inv     *unstructured.Unstructured
+	inv     InventoryInfo
 	invObjs []object.ObjMetadata
 }
 
@@ -489,7 +495,7 @@ func TestMergeInventoryObjs(t *testing.T) {
 		"Single inventory object with no inventory is valid": {
 			invs: []invAndObjs{
 				{
-					inv:     copyInventoryInfo(),
+					inv:     copyInventory(),
 					invObjs: []object.ObjMetadata{},
 				},
 			},
@@ -498,7 +504,7 @@ func TestMergeInventoryObjs(t *testing.T) {
 		"Single inventory object returns same objects": {
 			invs: []invAndObjs{
 				{
-					inv:     copyInventoryInfo(),
+					inv:     copyInventory(),
 					invObjs: []object.ObjMetadata{pod1Obj},
 				},
 			},
@@ -507,11 +513,11 @@ func TestMergeInventoryObjs(t *testing.T) {
 		"Two inventories with the same objects returns them": {
 			invs: []invAndObjs{
 				{
-					inv:     copyInventoryInfo(),
+					inv:     copyInventory(),
 					invObjs: []object.ObjMetadata{pod1Obj},
 				},
 				{
-					inv:     copyInventoryInfo(),
+					inv:     copyInventory(),
 					invObjs: []object.ObjMetadata{pod1Obj},
 				},
 			},
@@ -520,11 +526,11 @@ func TestMergeInventoryObjs(t *testing.T) {
 		"Two inventories with different retain the union": {
 			invs: []invAndObjs{
 				{
-					inv:     copyInventoryInfo(),
+					inv:     copyInventory(),
 					invObjs: []object.ObjMetadata{pod1Obj},
 				},
 				{
-					inv:     copyInventoryInfo(),
+					inv:     copyInventory(),
 					invObjs: []object.ObjMetadata{pod2Obj},
 				},
 			},
@@ -533,15 +539,15 @@ func TestMergeInventoryObjs(t *testing.T) {
 		"More than two inventory objects retains all objects": {
 			invs: []invAndObjs{
 				{
-					inv:     copyInventoryInfo(),
+					inv:     copyInventory(),
 					invObjs: []object.ObjMetadata{pod1Obj, pod2Obj},
 				},
 				{
-					inv:     copyInventoryInfo(),
+					inv:     copyInventory(),
 					invObjs: []object.ObjMetadata{pod2Obj},
 				},
 				{
-					inv:     copyInventoryInfo(),
+					inv:     copyInventory(),
 					invObjs: []object.ObjMetadata{pod3Obj},
 				},
 			},
@@ -556,7 +562,8 @@ func TestMergeInventoryObjs(t *testing.T) {
 		for i := range common.Strategies {
 			drs := common.Strategies[i]
 			t.Run(name, func(t *testing.T) {
-				invClient, _ := NewInventoryClient(tf, WrapInventoryObj)
+				invClient, _ := NewInventoryClient(tf,
+					WrapInventoryObj, InvInfoToConfigMap, WrapInventoryInfoObj)
 				invClient.SetDryRunStrategy(drs)
 				inventories := []*unstructured.Unstructured{}
 				for _, i := range tc.invs {

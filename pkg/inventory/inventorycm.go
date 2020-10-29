@@ -10,8 +10,10 @@ package inventory
 
 import (
 	"fmt"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
@@ -22,12 +24,50 @@ func WrapInventoryObj(inv *unstructured.Unstructured) Inventory {
 	return &InventoryConfigMap{inv: inv}
 }
 
+// WrapInventoryInfoObj takes a passed ConfigMap (as a resource.Info),
+// wraps it with the InventoryConfigMap and upcasts the wrapper as
+// an the InventoryInfo interface.
+func WrapInventoryInfoObj(inv *unstructured.Unstructured) InventoryInfo {
+	return &InventoryConfigMap{inv: inv}
+}
+
+func InvInfoToConfigMap(inv InventoryInfo) *unstructured.Unstructured {
+	icm, ok := inv.(*InventoryConfigMap)
+	if ok {
+		return icm.inv
+	}
+	return nil
+}
+
 // InventoryConfigMap wraps a ConfigMap resource and implements
 // the Inventory interface. This wrapper loads and stores the
 // object metadata (inventory) to and from the wrapped ConfigMap.
 type InventoryConfigMap struct {
 	inv      *unstructured.Unstructured
 	objMetas []object.ObjMetadata
+}
+
+var _ InventoryInfo = &InventoryConfigMap{}
+var _ Inventory = &InventoryConfigMap{}
+
+func (icm *InventoryConfigMap) Name() string {
+	return icm.inv.GetName()
+}
+
+func (icm *InventoryConfigMap) Namespace() string {
+	return icm.inv.GetNamespace()
+}
+
+func (icm *InventoryConfigMap) ID() string {
+	labels := icm.inv.GetLabels()
+	if len(labels) == 0 {
+		return ""
+	}
+	inventoryLabel, exists := labels[common.InventoryLabel]
+	if !exists {
+		return ""
+	}
+	return strings.TrimSpace(inventoryLabel)
 }
 
 // Load is an Inventory interface function returning the set of

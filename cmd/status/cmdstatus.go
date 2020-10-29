@@ -83,13 +83,13 @@ func (r *StatusRunner) runE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// Find the inventory template among the manifests.
-	inv, _, err := inventory.SplitUnstructureds(objs)
+	invClient, err := r.provider.InventoryClient()
 	if err != nil {
 		return err
 	}
 
-	invClient, err := r.provider.InventoryClient()
+	// Find the inventory template among the manifests.
+	inv, _, err := inventory.SplitUnstructureds(invClient.InvInfoFactoryFunc(), objs)
 	if err != nil {
 		return err
 	}

@@ -44,7 +44,11 @@ func (f *InventoryProvider) Factory() util.Factory {
 // InventoryClient returns an InventoryClient created with the stored
 // factory and InventoryFactoryFunc values, or an error if one occurred.
 func (f *InventoryProvider) InventoryClient() (inventory.InventoryClient, error) {
-	return inventory.NewInventoryClient(f.factory, inventory.WrapInventoryObj)
+	return inventory.NewInventoryClient(f.factory,
+		inventory.WrapInventoryObj,
+		inventory.InvInfoToConfigMap,
+		inventory.WrapInventoryInfoObj,
+	)
 }
 
 // ToRESTMapper returns a RESTMapper created by the stored kubectl factory.
