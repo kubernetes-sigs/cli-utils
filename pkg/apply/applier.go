@@ -5,6 +5,7 @@ package apply
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"time"
 
@@ -87,15 +88,16 @@ func (a *Applier) Initialize() error {
 // calculates the set of objects to be pruned (pruneIds), and orders the
 // resources for the subsequent apply. Returns the sorted resources to
 // apply as well as the objects for the prune, or an error if one occurred.
-func (a *Applier) prepareObjects(objs []*unstructured.Unstructured) (*ResourceObjects, error) {
-	localInv, localObjs, err := inventory.SplitUnstructureds(objs)
-	if err != nil {
+func (a *Applier) prepareObjects(localInv *unstructured.Unstructured, localObjs []*unstructured.Unstructured) (*ResourceObjects, error) {
+	if localInv == nil {
+		return nil, fmt.Errorf("the local inventory can't be nil")
+	}
+	if err := inventory.ValidateNoInventory(localObjs); err != nil {
 		return nil, err
 	}
-
 	// Ensures the namespace exists before applying the inventory object into it.
 	if invNamespace := inventoryNamespaceInSet(localInv, localObjs); invNamespace != nil {
-		if err = a.invClient.ApplyInventoryNamespace(invNamespace); err != nil {
+		if err := a.invClient.ApplyInventoryNamespace(invNamespace); err != nil {
 			return nil, err
 		}
 	}
@@ -128,15 +130,16 @@ type ResourceObjects struct {
 	PruneIds  []object.ObjMetadata
 }
 
-// InfosForApply returns the infos representation for all the resources
-// that should be applied, including the inventory object. The
+// ObjsForApply returns the unstructured representation for all the resources
+// that should be applied, not including the inventory object. The
 // resources will be in sorted order.
 func (r *ResourceObjects) ObjsForApply() []*unstructured.Unstructured {
 	return r.Resources
 }
 
-func (r *ResourceObjects) ObjsForPrune() []*unstructured.Unstructured {
-	return append([]*unstructured.Unstructured{r.LocalInv}, r.Resources...)
+// Inventory returns the unstructured representation of the inventory object.
+func (r *ResourceObjects) Inventory() *unstructured.Unstructured {
+	return r.LocalInv
 }
 
 // IdsForApply returns the Ids for all resources that should be applied,
@@ -169,7 +172,7 @@ func (r *ResourceObjects) AllIds() []object.ObjMetadata {
 // before all the given resources have been applied to the cluster. Any
 // cancellation or timeout will only affect how long we Wait for the
 // resources to become current.
-func (a *Applier) Run(ctx context.Context, objects []*unstructured.Unstructured, options Options) <-chan event.Event {
+func (a *Applier) Run(ctx context.Context, inventory *unstructured.Unstructured, objects []*unstructured.Unstructured, options Options) <-chan event.Event {
 	eventChannel := make(chan event.Event)
 	setDefaults(&options)
 	a.invClient.SetDryRunStrategy(options.DryRunStrategy) // client shared with prune, so sets dry-run for prune too.
@@ -179,7 +182,7 @@ func (a *Applier) Run(ctx context.Context, objects []*unstructured.Unstructured,
 		// This provides us with a slice of all the objects that will be
 		// applied to the cluster. This takes care of ordering resources
 		// and handling the inventory object.
-		resourceObjects, err := a.prepareObjects(objects)
+		resourceObjects, err := a.prepareObjects(inventory, objects)
 		if err != nil {
 			handleError(eventChannel, err)
 			return

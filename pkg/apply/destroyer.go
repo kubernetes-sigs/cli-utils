@@ -66,17 +66,12 @@ func (d *Destroyer) Run(inv *unstructured.Unstructured) <-chan event.Event {
 		defer close(ch)
 		d.invClient.SetDryRunStrategy(d.DryRunStrategy)
 
-		// Force a pruning of all cluster resources by clearing out the
-		// local resources, and sending only the inventory object to the
-		// prune.
-		invs := []*unstructured.Unstructured{inv}
-
 		// Start the event transformer goroutine so we can transform
 		// the Prune events emitted from the Prune function to Delete
 		// Events. That we use Prune to implement destroy is an
 		// implementation detail and the events should not be Prune events.
 		tempChannel, completedChannel := runPruneEventTransformer(ch)
-		err := d.PruneOptions.Prune(invs, sets.NewString(), tempChannel, prune.Options{
+		err := d.PruneOptions.Prune(inv, nil, sets.NewString(), tempChannel, prune.Options{
 			DryRunStrategy:    d.DryRunStrategy,
 			PropagationPolicy: metav1.DeletePropagationBackground,
 		})

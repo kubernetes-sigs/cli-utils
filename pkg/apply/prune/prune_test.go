@@ -161,7 +161,6 @@ func TestPrune(t *testing.T) {
 				po.InvClient = inventory.NewFakeInventoryClient(clusterObjs)
 				// Set up the currently applied objects.
 				currentInventory := createInventoryInfo(tc.currentObjs...)
-				currentObjs := append(tc.currentObjs, currentInventory)
 				// Set up the fake dynamic client to recognize all objects, and the RESTMapper.
 				po.client = fake.NewSimpleDynamicClient(scheme.Scheme,
 					namespace, pdb, role)
@@ -173,7 +172,7 @@ func TestPrune(t *testing.T) {
 				err := func() error {
 					defer close(eventChannel)
 					// Run the prune and validate.
-					return po.Prune(currentObjs, populateObjectIds(tc.currentObjs, t), eventChannel, Options{
+					return po.Prune(currentInventory, tc.currentObjs, populateObjectIds(tc.currentObjs, t), eventChannel, Options{
 						DryRunStrategy: drs,
 					})
 				}()
