@@ -5,6 +5,8 @@ package preview
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -44,6 +46,8 @@ func GetPreviewRunner(provider provider.Provider, ioStreams genericclioptions.IO
 	cmd.Flags().BoolVar(&noPrune, "no-prune", noPrune, "If true, do not prune previously applied objects.")
 	cmd.Flags().BoolVar(&serverDryRun, "server-side", serverDryRun, "If true, preview runs in the server instead of the client.")
 	cmd.Flags().BoolVar(&previewDestroy, "destroy", previewDestroy, "If true, preview of destroy operations will be displayed.")
+	cmd.Flags().StringVar(&r.output, "output", printers.DefaultPrinter(),
+		fmt.Sprintf("Output format, must be one of %s", strings.Join(printers.SupportedPrinters(), ",")))
 
 	r.Command = cmd
 	return r
@@ -62,6 +66,8 @@ type PreviewRunner struct {
 	Applier   *apply.Applier
 	Destroyer *apply.Destroyer
 	provider  provider.Provider
+
+	output string
 }
 
 // RunE is the function run from the cobra command.
@@ -133,6 +139,6 @@ func (r *PreviewRunner) RunE(cmd *cobra.Command, args []string) error {
 
 	// The printer will print updates from the channel. It will block
 	// until the channel is closed.
-	printer := printers.GetPrinter(printers.EventsPrinter, r.ioStreams)
+	printer := printers.GetPrinter(r.output, r.ioStreams)
 	return printer.Print(ch, drs)
 }
