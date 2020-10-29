@@ -4,6 +4,9 @@
 package destroy
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -28,6 +31,9 @@ func GetDestroyRunner(provider provider.Provider, ioStreams genericclioptions.IO
 		RunE:                  r.RunE,
 	}
 
+	cmd.Flags().StringVar(&r.output, "output", printers.DefaultPrinter(),
+		fmt.Sprintf("Output format, must be one of %s", strings.Join(printers.SupportedPrinters(), ",")))
+
 	r.Command = cmd
 	return r
 }
@@ -44,6 +50,8 @@ type DestroyRunner struct {
 	ioStreams genericclioptions.IOStreams
 	Destroyer *apply.Destroyer
 	provider  provider.Provider
+
+	output string
 }
 
 func (r *DestroyRunner) RunE(cmd *cobra.Command, args []string) error {
@@ -72,6 +80,6 @@ func (r *DestroyRunner) RunE(cmd *cobra.Command, args []string) error {
 
 	// The printer will print updates from the channel. It will block
 	// until the channel is closed.
-	printer := printers.GetPrinter(printers.EventsPrinter, r.ioStreams)
+	printer := printers.GetPrinter(r.output, r.ioStreams)
 	return printer.Print(ch, r.Destroyer.DryRunStrategy)
 }
