@@ -23,7 +23,6 @@ import (
 
 var (
 	noPrune        = false
-	serverDryRun   = false
 	previewDestroy = false
 )
 
@@ -44,7 +43,12 @@ func GetPreviewRunner(provider provider.Provider, ioStreams genericclioptions.IO
 	}
 
 	cmd.Flags().BoolVar(&noPrune, "no-prune", noPrune, "If true, do not prune previously applied objects.")
-	cmd.Flags().BoolVar(&serverDryRun, "server-side", serverDryRun, "If true, preview runs in the server instead of the client.")
+	cmd.Flags().BoolVar(&r.serverSideOptions.ServerSideApply, "server-side", false,
+		"If true, preview runs in the server instead of the client.")
+	cmd.Flags().BoolVar(&r.serverSideOptions.ForceConflicts, "force-conflicts", false,
+		"If true during server-side preview, do not report field conflicts.")
+	cmd.Flags().StringVar(&r.serverSideOptions.FieldManager, "field-manager", common.DefaultFieldManager,
+		"If true during server-side preview, sets field owner.")
 	cmd.Flags().BoolVar(&previewDestroy, "destroy", previewDestroy, "If true, preview of destroy operations will be displayed.")
 	cmd.Flags().StringVar(&r.output, "output", printers.DefaultPrinter(),
 		fmt.Sprintf("Output format, must be one of %s", strings.Join(printers.SupportedPrinters(), ",")))
@@ -67,7 +71,8 @@ type PreviewRunner struct {
 	Destroyer *apply.Destroyer
 	provider  provider.Provider
 
-	output string
+	serverSideOptions common.ServerSideOptions
+	output            string
 }
 
 // RunE is the function run from the cobra command.
@@ -83,7 +88,7 @@ func (r *PreviewRunner) RunE(cmd *cobra.Command, args []string) error {
 	}
 
 	drs := common.DryRunClient
-	if serverDryRun {
+	if r.serverSideOptions.ServerSideApply {
 		drs = common.DryRunServer
 	}
 
@@ -118,16 +123,11 @@ func (r *PreviewRunner) RunE(cmd *cobra.Command, args []string) error {
 
 		// Run the applier. It will return a channel where we can receive updates
 		// to keep track of progress and any issues.
-		serverSideOptions := common.ServerSideOptions{
-			ServerSideApply: false,
-			ForceConflicts:  false,
-			FieldManager:    common.DefaultFieldManager,
-		}
 		ch = r.Applier.Run(ctx, objs, apply.Options{
 			EmitStatusEvents:  false,
 			NoPrune:           noPrune,
 			DryRunStrategy:    drs,
-			ServerSideOptions: serverSideOptions,
+			ServerSideOptions: r.serverSideOptions,
 		})
 	} else {
 		inv, _, err := inventory.SplitUnstructureds(objs)
