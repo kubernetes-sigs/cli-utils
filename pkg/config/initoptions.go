@@ -13,11 +13,13 @@ import (
 
 	"github.com/google/uuid"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/klog"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/inventory/configmap"
 	"sigs.k8s.io/kustomize/kyaml/kio"
 	"sigs.k8s.io/kustomize/kyaml/kio/filters"
+	"sigs.k8s.io/kustomize/kyaml/openapi"
 )
 
 const (
@@ -60,6 +62,7 @@ func (i *InitOptions) Complete(args []string) error {
 		return err
 	}
 	i.Dir = dir
+	klog.V(4).Infof("init directory: %s", i.Dir)
 
 	ns, err := FindNamespace(i.factory.ToRawKubeConfigLoader(), i.Dir)
 	if err != nil {
@@ -99,6 +102,7 @@ func FindNamespace(loader namespaceLoader, dir string) (string, error) {
 		return "", err
 	}
 	if enforceNamespace {
+		klog.V(6).Infof("enforcing namespace: %s", namespace)
 		return namespace, nil
 	}
 
@@ -107,8 +111,10 @@ func FindNamespace(loader namespaceLoader, dir string) (string, error) {
 		return "", err
 	}
 	if allInSameNs {
+		klog.V(6).Infof("all in same namespace: %s", ns)
 		return ns, nil
 	}
+	klog.V(6).Infof("returning namespace: %s", namespace)
 	return namespace, nil
 }
 
@@ -148,16 +154,24 @@ func allInSameNamespace(packageDir string) (string, bool, error) {
 		if err != nil {
 			return "", false, err
 		}
+		// Skip found cluster-scoped resources. If not found, just assume namespaced.
+		namespaced, found := openapi.IsNamespaceScoped(rm.TypeMeta)
+		if found && !namespaced {
+			continue
+		}
 		if rm.Namespace == "" {
+			klog.V(6).Infof("one resource missing namespace (%s): return empty namespace", rm.Name)
 			return "", false, nil
 		}
 		if ns == "" {
 			ns = rm.Namespace
 		} else if rm.Namespace != ns {
+			klog.V(6).Infof("two namespaces not same: %s versus %s", rm.Namespace, ns)
 			return "", false, nil
 		}
 	}
 	if ns != "" {
+		klog.V(6).Infof("returning empty namespace")
 		return ns, true, nil
 	}
 	return "", false, nil
@@ -208,6 +222,7 @@ func (i *InitOptions) fillInValues() string {
 	nowStr := now.Format("2006-01-02 15:04:05 MST")
 	randomSuffix := common.RandomStr(now.UTC().UnixNano())
 	manifestStr := i.Template
+	klog.V(4).Infof("namespace/inventory-id: %s/%s", i.Namespace, i.InventoryID)
 	manifestStr = strings.ReplaceAll(manifestStr, "<DATETIME>", nowStr)
 	manifestStr = strings.ReplaceAll(manifestStr, "<NAMESPACE>", i.Namespace)
 	manifestStr = strings.ReplaceAll(manifestStr, "<RANDOMSUFFIX>", randomSuffix)
@@ -220,6 +235,7 @@ func (i *InitOptions) Run() error {
 	if fileExists(manifestFilePath) {
 		return fmt.Errorf("inventory object template file already exists: %s", manifestFilePath)
 	}
+	klog.V(4).Infof("creating manifest filename: %s", manifestFilePath)
 	f, err := os.Create(manifestFilePath)
 	if err != nil {
 		return fmt.Errorf("unable to create inventory object template file: %s", err)
