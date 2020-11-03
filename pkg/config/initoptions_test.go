@@ -58,6 +58,21 @@ metadata:
     config.kubernetes.io/local-config: "true"
 `)
 
+var readFileE = []byte(`
+apiVersion: v1
+kind: Pod
+metadata:
+  name: objE
+  namespace: namespaceA
+`)
+
+var readFileF = []byte(`
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: namespaceA
+`)
+
 func TestComplete(t *testing.T) {
 	tests := map[string]struct {
 		args               []string
@@ -123,6 +138,16 @@ func TestComplete(t *testing.T) {
 			},
 			isError:           false,
 			expectedNamespace: "foo",
+		},
+		"Cluster-scoped resources are ignored in namespace calculation": {
+			args: []string{},
+			files: map[string][]byte{
+				"a_test.yaml": readFileA,
+				"e_test.yaml": readFileE,
+				"f_test.yaml": readFileF,
+			},
+			isError:           false,
+			expectedNamespace: "namespaceA",
 		},
 	}
 	for name, tc := range tests {
