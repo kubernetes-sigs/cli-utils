@@ -82,10 +82,6 @@ func (r *PreviewRunner) RunE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	var ch <-chan event.Event
-	err = r.Destroyer.Initialize()
-	if err != nil {
-		return err
-	}
 
 	drs := common.DryRunClient
 	if r.serverSideOptions.ServerSideApply {
@@ -131,6 +127,10 @@ func (r *PreviewRunner) RunE(cmd *cobra.Command, args []string) error {
 		})
 	} else {
 		inv, _, err := inventory.SplitUnstructureds(objs)
+		if err != nil {
+			return err
+		}
+		err = r.Destroyer.Initialize()
 		if err != nil {
 			return err
 		}

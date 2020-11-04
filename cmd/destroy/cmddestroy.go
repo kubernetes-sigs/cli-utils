@@ -55,11 +55,6 @@ type DestroyRunner struct {
 }
 
 func (r *DestroyRunner) RunE(cmd *cobra.Command, args []string) error {
-	err := r.Destroyer.Initialize()
-	if err != nil {
-		return err
-	}
-
 	// Retrieve the inventory object.
 	reader, err := r.provider.ManifestReader(cmd.InOrStdin(), args)
 	if err != nil {
@@ -76,6 +71,10 @@ func (r *DestroyRunner) RunE(cmd *cobra.Command, args []string) error {
 
 	// Run the destroyer. It will return a channel where we can receive updates
 	// to keep track of progress and any issues.
+	err = r.Destroyer.Initialize()
+	if err != nil {
+		return err
+	}
 	ch := r.Destroyer.Run(inv)
 
 	// The printer will print updates from the channel. It will block
