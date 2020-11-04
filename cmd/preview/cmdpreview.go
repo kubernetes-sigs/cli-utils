@@ -100,6 +100,10 @@ func (r *PreviewRunner) RunE(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+	inv, objs, err := inventory.SplitUnstructureds(objs)
+	if err != nil {
+		return err
+	}
 
 	// if destroy flag is set in preview, transmit it to destroyer DryRunStrategy flag
 	// and pivot execution to destroy with dry-run
@@ -119,17 +123,13 @@ func (r *PreviewRunner) RunE(cmd *cobra.Command, args []string) error {
 
 		// Run the applier. It will return a channel where we can receive updates
 		// to keep track of progress and any issues.
-		ch = r.Applier.Run(ctx, objs, apply.Options{
+		ch = r.Applier.Run(ctx, inv, objs, apply.Options{
 			EmitStatusEvents:  false,
 			NoPrune:           noPrune,
 			DryRunStrategy:    drs,
 			ServerSideOptions: r.serverSideOptions,
 		})
 	} else {
-		inv, _, err := inventory.SplitUnstructureds(objs)
-		if err != nil {
-			return err
-		}
 		err = r.Destroyer.Initialize()
 		if err != nil {
 			return err

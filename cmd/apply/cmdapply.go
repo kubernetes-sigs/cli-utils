@@ -17,6 +17,7 @@ import (
 	"sigs.k8s.io/cli-utils/cmd/printers"
 	"sigs.k8s.io/cli-utils/pkg/apply"
 	"sigs.k8s.io/cli-utils/pkg/common"
+	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/provider"
 	"sigs.k8s.io/kustomize/kyaml/setters2"
 )
@@ -110,13 +111,17 @@ func (r *ApplyRunner) RunE(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+	inv, objs, err := inventory.SplitUnstructureds(objs)
+	if err != nil {
+		return err
+	}
 
 	// Run the applier. It will return a channel where we can receive updates
 	// to keep track of progress and any issues.
 	if err := r.Applier.Initialize(); err != nil {
 		return err
 	}
-	ch := r.Applier.Run(context.Background(), objs, apply.Options{
+	ch := r.Applier.Run(context.Background(), inv, objs, apply.Options{
 		ServerSideOptions: r.serverSideOptions,
 		PollInterval:      r.period,
 		ReconcileTimeout:  r.reconcileTimeout,

@@ -16,6 +16,7 @@ import (
 // set of resources that have just been applied.
 type PruneTask struct {
 	PruneOptions      *prune.PruneOptions
+	InventoryObject   *unstructured.Unstructured
 	Objects           []*unstructured.Unstructured
 	DryRunStrategy    common.DryRunStrategy
 	PropagationPolicy metav1.DeletionPropagation
@@ -28,7 +29,7 @@ type PruneTask struct {
 func (p *PruneTask) Start(taskContext *taskrunner.TaskContext) {
 	go func() {
 		currentUIDs := taskContext.AllResourceUIDs()
-		err := p.PruneOptions.Prune(p.Objects,
+		err := p.PruneOptions.Prune(p.InventoryObject, p.Objects,
 			currentUIDs, taskContext.EventChannel(), prune.Options{
 				DryRunStrategy:    p.DryRunStrategy,
 				PropagationPolicy: p.PropagationPolicy,

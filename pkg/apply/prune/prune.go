@@ -80,12 +80,8 @@ type Options struct {
 // (retrieved from previous inventory objects) but omitted in
 // the current apply. Prune also delete all previous inventory
 // objects. Returns an error if there was a problem.
-func (po *PruneOptions) Prune(localObjs []*unstructured.Unstructured, currentUIDs sets.String,
+func (po *PruneOptions) Prune(localInv *unstructured.Unstructured, localObjs []*unstructured.Unstructured, currentUIDs sets.String,
 	eventChannel chan<- event.Event, o Options) error {
-	localInv, localObjs, err := inventory.SplitUnstructureds(localObjs)
-	if err != nil {
-		return err
-	}
 	invNamespace := localInv.GetNamespace()
 	klog.V(4).Infof("prune local inventory object: %s/%s", invNamespace, localInv.GetName())
 	clusterObjs, err := po.InvClient.GetClusterObjs(localInv)

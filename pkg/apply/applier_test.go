@@ -204,7 +204,7 @@ func TestApplier(t *testing.T) {
 
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
-			infos, err := createObjs(tc.resources)
+			inv, infos, err := createObjs(tc.resources)
 			assert.NoError(t, err)
 
 			tf := cmdtesting.NewTestFactory().WithNamespace(tc.namespace)
@@ -231,7 +231,7 @@ func TestApplier(t *testing.T) {
 			applier.StatusPoller = poller
 
 			ctx := context.Background()
-			eventChannel := applier.Run(ctx, infos, Options{
+			eventChannel := applier.Run(ctx, inv, infos, Options{
 				ReconcileTimeout: tc.reconcileTimeout,
 				EmitStatusEvents: true,
 				NoPrune:          !tc.prune,
@@ -387,6 +387,8 @@ func TestInventoryNamespaceInSet(t *testing.T) {
 
 func TestReadAndPrepareObjects(t *testing.T) {
 	testCases := map[string]struct {
+		// local inventory input into applier.prepareObjects
+		inventory *unstructured.Unstructured
 		// locally read resources input into applier.prepareObjects
 		resources []*unstructured.Unstructured
 		// objects already stored in the cluster inventory
@@ -405,31 +407,32 @@ func TestReadAndPrepareObjects(t *testing.T) {
 			isError:   true,
 		},
 		"multiple inventory objects": {
-			resources: []*unstructured.Unstructured{inventoryObj, inventoryObj},
+			inventory: inventoryObj,
+			resources: []*unstructured.Unstructured{inventoryObj},
 			isError:   true,
 		},
 		"only inventory object": {
-			resources: []*unstructured.Unstructured{inventoryObj},
+			inventory: inventoryObj,
 			localInv:  inventoryObj,
 			isError:   false,
 		},
 		"only inventory object, prune one object": {
-			resources:   []*unstructured.Unstructured{inventoryObj},
+			inventory:   inventoryObj,
 			clusterObjs: []*unstructured.Unstructured{obj1},
 			localInv:    inventoryObj,
 			pruneObjs:   []*unstructured.Unstructured{obj1},
 			isError:     false,
 		},
 		"inventory object already at the beginning": {
-			resources: []*unstructured.Unstructured{inventoryObj, obj1,
-				clusterScopedObj},
+			inventory: inventoryObj,
+			resources: []*unstructured.Unstructured{obj1, clusterScopedObj},
 			localInv:  inventoryObj,
 			localObjs: []*unstructured.Unstructured{obj1, clusterScopedObj},
 			isError:   false,
 		},
 		"inventory object already at the beginning, prune one": {
-			resources: []*unstructured.Unstructured{inventoryObj, obj1,
-				clusterScopedObj},
+			inventory:   inventoryObj,
+			resources:   []*unstructured.Unstructured{obj1, clusterScopedObj},
 			clusterObjs: []*unstructured.Unstructured{obj2},
 			localInv:    inventoryObj,
 			localObjs:   []*unstructured.Unstructured{obj1, clusterScopedObj},
@@ -437,8 +440,8 @@ func TestReadAndPrepareObjects(t *testing.T) {
 			isError:     false,
 		},
 		"inventory object not at the beginning": {
-			resources: []*unstructured.Unstructured{obj1, obj2, inventoryObj,
-				clusterScopedObj},
+			inventory:   inventoryObj,
+			resources:   []*unstructured.Unstructured{obj1, obj2, clusterScopedObj},
 			clusterObjs: []*unstructured.Unstructured{obj2},
 			localInv:    inventoryObj,
 			localObjs:   []*unstructured.Unstructured{obj1, obj2, clusterScopedObj},
@@ -454,7 +457,7 @@ func TestReadAndPrepareObjects(t *testing.T) {
 			fakeInvClient := inventory.NewFakeInventoryClient(clusterObjs)
 			// Create applier with fake inventory client, and call prepareObjects
 			applier := &Applier{invClient: fakeInvClient}
-			resourceObjs, err := applier.prepareObjects(tc.resources)
+			resourceObjs, err := applier.prepareObjects(tc.inventory, tc.resources)
 			if !tc.isError && err != nil {
 				t.Fatalf("unexpected error received: %s", err)
 			}
@@ -533,17 +536,17 @@ func toIdentifier(t *testing.T, resourceInfo resourceInfo, namespace string) obj
 	}
 }
 
-func createObjs(resources []resourceInfo) ([]*unstructured.Unstructured, error) {
+func createObjs(resources []resourceInfo) (*unstructured.Unstructured, []*unstructured.Unstructured, error) {
 	var objs []*unstructured.Unstructured
 	for _, ri := range resources {
 		u := &unstructured.Unstructured{}
 		err := runtime.DecodeInto(codec, []byte(ri.manifest), u)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		objs = append(objs, u)
 	}
-	return objs, nil
+	return inventory.SplitUnstructureds(objs)
 }
 
 // The handler interface allows different testcases to provide

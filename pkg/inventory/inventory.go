@@ -86,6 +86,23 @@ func retrieveInventoryLabel(obj *unstructured.Unstructured) (string, error) {
 	return strings.TrimSpace(inventoryLabel), nil
 }
 
+// ValidateNoInventory takes a slice of unstructured.Unstructured objects and
+// validates that no inventory object is in the input slice.
+func ValidateNoInventory(objs []*unstructured.Unstructured) error {
+	invs := make([]*unstructured.Unstructured, 0)
+	for _, obj := range objs {
+		if IsInventoryObject(obj) {
+			invs = append(invs, obj)
+		}
+	}
+	if len(invs) == 0 {
+		return nil
+	}
+	return MultipleInventoryObjError{
+		InventoryObjectTemplates: invs,
+	}
+}
+
 // splitUnstructureds takes a slice of unstructured.Unstructured objects and
 // splits it into one slice that contains the inventory object templates and
 // another one that contains the remaining resources.

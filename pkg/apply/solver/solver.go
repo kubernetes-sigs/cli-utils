@@ -51,7 +51,7 @@ type Options struct {
 
 type resourceObjects interface {
 	ObjsForApply() []*unstructured.Unstructured
-	ObjsForPrune() []*unstructured.Unstructured
+	Inventory() *unstructured.Unstructured
 	IdsForApply() []object.ObjMetadata
 	IdsForPrune() []object.ObjMetadata
 }
@@ -128,7 +128,8 @@ func (t *TaskQueueSolver) BuildTaskQueue(ro resourceObjects,
 	if o.Prune {
 		tasks = append(tasks,
 			&task.PruneTask{
-				Objects:           ro.ObjsForPrune(),
+				Objects:           ro.ObjsForApply(),
+				InventoryObject:   ro.Inventory(),
 				PruneOptions:      t.PruneOptions,
 				PropagationPolicy: o.PrunePropagationPolicy,
 				DryRunStrategy:    o.DryRunStrategy,
