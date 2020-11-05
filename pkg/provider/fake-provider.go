@@ -8,6 +8,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/manifestreader"
@@ -55,4 +56,8 @@ func (f *FakeProvider) ManifestReader(reader io.Reader, _ []string) (manifestrea
 		Reader:        reader,
 		ReaderOptions: readerOptions,
 	}, nil
+}
+
+func (f *FakeProvider) InventoryInfo(objs []*unstructured.Unstructured) (inventory.InventoryInfo, []*unstructured.Unstructured, error) {
+	return inventory.SplitUnstructureds(objs)
 }

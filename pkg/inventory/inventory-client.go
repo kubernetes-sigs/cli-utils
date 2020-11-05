@@ -42,8 +42,6 @@ type InventoryClient interface {
 	SetDryRunStrategy(drs common.DryRunStrategy)
 	// ApplyInventoryNamespace applies the Namespace that the inventory object should be in.
 	ApplyInventoryNamespace(invNamespace *unstructured.Unstructured) error
-	// InvInfoFactoryFunc returns the factory function to create an InventoryInfo from an unstructured.
-	InvInfoFactoryFunc() UnstructuredToInvInfoFunc
 }
 
 // ClusterInventoryClient is a concrete implementation of the
@@ -56,7 +54,6 @@ type ClusterInventoryClient struct {
 	dryRunStrategy        common.DryRunStrategy
 	InventoryFactoryFunc  InventoryFactoryFunc
 	invToUnstructuredFunc InventoryToUnstructuredFunc
-	unsToInfoFunc         UnstructuredToInvInfoFunc
 	infoHelper            info.InfoHelper
 }
 
@@ -66,8 +63,7 @@ var _ InventoryClient = &ClusterInventoryClient{}
 // InventoryClient interface or an error.
 func NewInventoryClient(factory cmdutil.Factory,
 	invFunc InventoryFactoryFunc,
-	invToUnstructuredFunc InventoryToUnstructuredFunc,
-	unsToInfoFunc UnstructuredToInvInfoFunc) (*ClusterInventoryClient, error) {
+	invToUnstructuredFunc InventoryToUnstructuredFunc) (*ClusterInventoryClient, error) {
 	var err error
 	mapper, err := factory.ToRESTMapper()
 	if err != nil {
@@ -86,14 +82,9 @@ func NewInventoryClient(factory cmdutil.Factory,
 		dryRunStrategy:        common.DryRunNone,
 		InventoryFactoryFunc:  invFunc,
 		invToUnstructuredFunc: invToUnstructuredFunc,
-		unsToInfoFunc:         unsToInfoFunc,
 		infoHelper:            info.NewInfoHelper(factory),
 	}
 	return &clusterInventoryClient, nil
-}
-
-func (cic *ClusterInventoryClient) InvInfoFactoryFunc() UnstructuredToInvInfoFunc {
-	return cic.unsToInfoFunc
 }
 
 // Merge stores the union of the passed objects with the objects currently

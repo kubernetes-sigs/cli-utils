@@ -15,7 +15,6 @@ import (
 	"sigs.k8s.io/cli-utils/cmd/status/printers"
 	"sigs.k8s.io/cli-utils/pkg/apply/poller"
 	"sigs.k8s.io/cli-utils/pkg/common"
-	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/aggregator"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/collector"
@@ -88,8 +87,7 @@ func (r *StatusRunner) runE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// Find the inventory template among the manifests.
-	inv, _, err := inventory.SplitUnstructureds(invClient.InvInfoFactoryFunc(), objs)
+	inv, _, err := r.provider.InventoryInfo(objs)
 	if err != nil {
 		return err
 	}

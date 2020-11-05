@@ -16,7 +16,6 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/apply"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/common"
-	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/provider"
 	"sigs.k8s.io/kustomize/kyaml/setters2"
 )
@@ -100,12 +99,8 @@ func (r *PreviewRunner) RunE(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	inventoryClient, err := r.provider.InventoryClient()
-	if err != nil {
-		return err
-	}
 
-	inv, objs, err := inventory.SplitUnstructureds(inventoryClient.InvInfoFactoryFunc(), objs)
+	inv, objs, err := r.provider.InventoryInfo(objs)
 	if err != nil {
 		return err
 	}

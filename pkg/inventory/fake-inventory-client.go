@@ -81,7 +81,3 @@ func (fic *FakeInventoryClient) SetError(err error) {
 func (fic *FakeInventoryClient) ClearError() {
 	fic.Err = nil
 }
-
-func (fic *FakeInventoryClient) InvInfoFactoryFunc() UnstructuredToInvInfoFunc {
-	return WrapInventoryInfoObj
-}

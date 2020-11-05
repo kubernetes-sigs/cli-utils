@@ -7,6 +7,7 @@ import (
 	"io"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/manifestreader"
@@ -20,6 +21,7 @@ var _ Provider = &InventoryProvider{}
 type Provider interface {
 	Factory() util.Factory
 	InventoryClient() (inventory.InventoryClient, error)
+	InventoryInfo([]*unstructured.Unstructured) (inventory.InventoryInfo, []*unstructured.Unstructured, error)
 	ToRESTMapper() (meta.RESTMapper, error)
 	ManifestReader(reader io.Reader, args []string) (manifestreader.ManifestReader, error)
 }
@@ -47,8 +49,11 @@ func (f *InventoryProvider) InventoryClient() (inventory.InventoryClient, error)
 	return inventory.NewInventoryClient(f.factory,
 		inventory.WrapInventoryObj,
 		inventory.InvInfoToConfigMap,
-		inventory.WrapInventoryInfoObj,
 	)
+}
+
+func (f *InventoryProvider) InventoryInfo(objs []*unstructured.Unstructured) (inventory.InventoryInfo, []*unstructured.Unstructured, error) {
+	return inventory.SplitUnstructureds(objs)
 }
 
 // ToRESTMapper returns a RESTMapper created by the stored kubectl factory.

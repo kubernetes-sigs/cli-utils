@@ -309,7 +309,7 @@ func TestSplitUnstructureds(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			inv, infos, err := SplitUnstructureds(WrapInventoryInfoObj, tc.allObjs)
+			inv, infos, err := SplitUnstructureds(tc.allObjs)
 			if !tc.isError && err != nil {
 				t.Fatalf("unexpected error received: %s", err)
 			}

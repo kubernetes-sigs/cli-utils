@@ -46,10 +46,6 @@ type InventoryFactoryFunc func(*unstructured.Unstructured) Inventory
 // given InventoryInfo.
 type InventoryToUnstructuredFunc func(InventoryInfo) *unstructured.Unstructured
 
-// UnstructuredToInvInfoFunc creates the object which implements the InventoryInfo
-// interface from the passed unstructured object.
-type UnstructuredToInvInfoFunc func(*unstructured.Unstructured) InventoryInfo
-
 // FindInventoryObj returns the "Inventory" object (ConfigMap with
 // inventory label) if it exists, or nil if it does not exist.
 func FindInventoryObj(objs []*unstructured.Unstructured) *unstructured.Unstructured {
@@ -114,7 +110,7 @@ func ValidateNoInventory(objs []*unstructured.Unstructured) error {
 // splitUnstructureds takes a slice of unstructured.Unstructured objects and
 // splits it into one slice that contains the inventory object templates and
 // another one that contains the remaining resources.
-func SplitUnstructureds(factoryFunc UnstructuredToInvInfoFunc, objs []*unstructured.Unstructured) (InventoryInfo, []*unstructured.Unstructured, error) {
+func SplitUnstructureds(objs []*unstructured.Unstructured) (InventoryInfo, []*unstructured.Unstructured, error) {
 	invs := make([]*unstructured.Unstructured, 0)
 	resources := make([]*unstructured.Unstructured, 0)
 	for _, obj := range objs {
@@ -131,7 +127,7 @@ func SplitUnstructureds(factoryFunc UnstructuredToInvInfoFunc, objs []*unstructu
 			InventoryObjectTemplates: invs,
 		}
 	}
-	return factoryFunc(invs[0]), resources, nil
+	return WrapInventoryInfoObj(invs[0]), resources, nil
 }
 
 // addSuffixToName adds the passed suffix (usually a hash) as a suffix

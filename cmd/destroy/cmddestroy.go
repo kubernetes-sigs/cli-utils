@@ -13,7 +13,6 @@ import (
 	"k8s.io/kubectl/pkg/util/i18n"
 	"sigs.k8s.io/cli-utils/cmd/printers"
 	"sigs.k8s.io/cli-utils/pkg/apply"
-	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/provider"
 )
 
@@ -64,12 +63,7 @@ func (r *DestroyRunner) RunE(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	inventoryClient, err := r.provider.InventoryClient()
-	if err != nil {
-		return err
-	}
-
-	inv, _, err := inventory.SplitUnstructureds(inventoryClient.InvInfoFactoryFunc(), objs)
+	inv, _, err := r.provider.InventoryInfo(objs)
 	if err != nil {
 		return err
 	}
