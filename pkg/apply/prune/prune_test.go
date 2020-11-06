@@ -251,6 +251,18 @@ func TestPreventDeleteAnnotation(t *testing.T) {
 			},
 			expected: true,
 		},
+		"Annotation key client.lifecycle.config.k8s.io/deletion without value is false": {
+			annotations: map[string]string{
+				common.LifecycleDeleteAnnotation: "any",
+			},
+			expected: false,
+		},
+		"Annotation key client.lifecycle.config.k8s.io/deletion and value is true": {
+			annotations: map[string]string{
+				common.LifecycleDeleteAnnotation: common.PreventDeletion,
+			},
+			expected: true,
+		},
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
