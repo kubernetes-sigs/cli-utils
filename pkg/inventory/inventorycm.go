@@ -70,6 +70,10 @@ func (icm *InventoryConfigMap) ID() string {
 	return strings.TrimSpace(inventoryLabel)
 }
 
+func (icm *InventoryConfigMap) UnstructuredInventory() *unstructured.Unstructured {
+	return icm.inv
+}
+
 // Load is an Inventory interface function returning the set of
 // object metadata from the wrapped ConfigMap, or an error.
 func (icm *InventoryConfigMap) Load() ([]object.ObjMetadata, error) {

@@ -551,7 +551,8 @@ func createObjs(resources []resourceInfo) (inventory.InventoryInfo, []*unstructu
 		}
 		objs = append(objs, u)
 	}
-	return inventory.SplitUnstructureds(objs)
+	inv, objs, err := inventory.SplitUnstructureds(objs)
+	return inventory.WrapInventoryInfoObj(inv), objs, err
 }
 
 // The handler interface allows different testcases to provide

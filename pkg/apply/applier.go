@@ -188,7 +188,7 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.InventoryInfo, obje
 			return
 		}
 
-		mapper, err := a.provider.ToRESTMapper()
+		mapper, err := a.provider.Factory().ToRESTMapper()
 		if err != nil {
 			handleError(eventChannel, err)
 			return

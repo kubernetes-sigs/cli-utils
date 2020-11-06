@@ -13,15 +13,17 @@ import (
 	"k8s.io/kubectl/pkg/util/i18n"
 	"sigs.k8s.io/cli-utils/cmd/printers"
 	"sigs.k8s.io/cli-utils/pkg/apply"
+	"sigs.k8s.io/cli-utils/pkg/manifestreader"
 	"sigs.k8s.io/cli-utils/pkg/provider"
 )
 
 // GetDestroyRunner creates and returns the DestroyRunner which stores the cobra command.
-func GetDestroyRunner(provider provider.Provider, ioStreams genericclioptions.IOStreams) *DestroyRunner {
+func GetDestroyRunner(provider provider.Provider, loader manifestreader.ManifestLoader, ioStreams genericclioptions.IOStreams) *DestroyRunner {
 	r := &DestroyRunner{
 		Destroyer: apply.NewDestroyer(provider),
 		ioStreams: ioStreams,
 		provider:  provider,
+		loader:    loader,
 	}
 	cmd := &cobra.Command{
 		Use:                   "destroy (DIRECTORY | STDIN)",
@@ -40,7 +42,8 @@ func GetDestroyRunner(provider provider.Provider, ioStreams genericclioptions.IO
 // DestroyCommand creates the DestroyRunner, returning the cobra command associated with it.
 func DestroyCommand(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	provider := provider.NewProvider(f)
-	return GetDestroyRunner(provider, ioStreams).Command
+	loader := manifestreader.NewManifestLoader(f)
+	return GetDestroyRunner(provider, loader, ioStreams).Command
 }
 
 // DestroyRunner encapsulates data necessary to run the destroy command.
@@ -49,13 +52,14 @@ type DestroyRunner struct {
 	ioStreams genericclioptions.IOStreams
 	Destroyer *apply.Destroyer
 	provider  provider.Provider
+	loader    manifestreader.ManifestLoader
 
 	output string
 }
 
 func (r *DestroyRunner) RunE(cmd *cobra.Command, args []string) error {
 	// Retrieve the inventory object.
-	reader, err := r.provider.ManifestReader(cmd.InOrStdin(), args)
+	reader, err := r.loader.ManifestReader(cmd.InOrStdin(), args)
 	if err != nil {
 		return err
 	}
@@ -63,7 +67,7 @@ func (r *DestroyRunner) RunE(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	inv, _, err := r.provider.InventoryInfo(objs)
+	inv, _, err := r.loader.InventoryInfo(objs)
 	if err != nil {
 		return err
 	}

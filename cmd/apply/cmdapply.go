@@ -17,15 +17,17 @@ import (
 	"sigs.k8s.io/cli-utils/cmd/printers"
 	"sigs.k8s.io/cli-utils/pkg/apply"
 	"sigs.k8s.io/cli-utils/pkg/common"
+	"sigs.k8s.io/cli-utils/pkg/manifestreader"
 	"sigs.k8s.io/cli-utils/pkg/provider"
 	"sigs.k8s.io/kustomize/kyaml/setters2"
 )
 
-func GetApplyRunner(provider provider.Provider, ioStreams genericclioptions.IOStreams) *ApplyRunner {
+func GetApplyRunner(provider provider.Provider, loader manifestreader.ManifestLoader, ioStreams genericclioptions.IOStreams) *ApplyRunner {
 	r := &ApplyRunner{
 		Applier:   apply.NewApplier(provider),
 		ioStreams: ioStreams,
 		provider:  provider,
+		loader:    loader,
 	}
 	cmd := &cobra.Command{
 		Use:                   "apply (DIRECTORY | STDIN)",
@@ -60,7 +62,8 @@ func GetApplyRunner(provider provider.Provider, ioStreams genericclioptions.IOSt
 
 func ApplyCommand(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	provider := provider.NewProvider(f)
-	return GetApplyRunner(provider, ioStreams).Command
+	loader := manifestreader.NewManifestLoader(f)
+	return GetApplyRunner(provider, loader, ioStreams).Command
 }
 
 type ApplyRunner struct {
@@ -68,6 +71,7 @@ type ApplyRunner struct {
 	ioStreams genericclioptions.IOStreams
 	Applier   *apply.Applier
 	provider  provider.Provider
+	loader    manifestreader.ManifestLoader
 
 	serverSideOptions      common.ServerSideOptions
 	output                 string
@@ -102,7 +106,7 @@ func (r *ApplyRunner) RunE(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	reader, err := r.provider.ManifestReader(cmd.InOrStdin(), args)
+	reader, err := r.loader.ManifestReader(cmd.InOrStdin(), args)
 	if err != nil {
 		return err
 	}
@@ -111,7 +115,7 @@ func (r *ApplyRunner) RunE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	inv, objs, err := r.provider.InventoryInfo(objs)
+	inv, objs, err := r.loader.InventoryInfo(objs)
 	if err != nil {
 		return err
 	}
