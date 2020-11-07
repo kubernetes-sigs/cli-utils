@@ -13,6 +13,7 @@ package prune
 
 import (
 	"sort"
+	"strings"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -82,8 +83,15 @@ type Options struct {
 // objects. Returns an error if there was a problem.
 func (po *PruneOptions) Prune(localInv *unstructured.Unstructured, localObjs []*unstructured.Unstructured, currentUIDs sets.String,
 	eventChannel chan<- event.Event, o Options) error {
-	invNamespace := localInv.GetNamespace()
+	invNamespace := strings.TrimSpace(strings.ToLower(localInv.GetNamespace()))
 	klog.V(4).Infof("prune local inventory object: %s/%s", invNamespace, localInv.GetName())
+	// Create the set of namespaces for currently (locally) applied objects, including
+	// the namespace the inventory object lives in (if it's not cluster-scoped). When
+	// pruning, check this set of namespaces to ensure these namespaces are not deleted.
+	localNamespaces := mergeObjNamespaces(localObjs)
+	if invNamespace != "" {
+		localNamespaces.Insert(invNamespace)
+	}
 	clusterObjs, err := po.InvClient.GetClusterObjs(localInv)
 	if err != nil {
 		return err
@@ -126,11 +134,12 @@ func (po *PruneOptions) Prune(localInv *unstructured.Unstructured, localObjs []*
 			eventChannel <- createPruneEvent(obj, event.PruneSkipped)
 			continue
 		}
-		// If regular pruning (not destroying), skip deleting inventory namespace.
+		// If regular pruning (not destroying), skip deleting namespace containing
+		// currently applied objects.
 		if !po.Destroy {
 			if clusterObj.GroupKind == object.CoreV1Namespace.GroupKind() &&
-				clusterObj.Name == invNamespace {
-				klog.V(7).Infof("skip pruning inventory namespace: %s", obj)
+				localNamespaces.Has(strings.ToLower(clusterObj.Name)) {
+				klog.V(7).Infof("skip pruning namespace: %s", clusterObj.Name)
 				eventChannel <- createPruneEvent(obj, event.PruneSkipped)
 				continue
 			}
@@ -146,6 +155,20 @@ func (po *PruneOptions) Prune(localInv *unstructured.Unstructured, localObjs []*
 	}
 	localIds := object.UnstructuredsToObjMetas(localObjs)
 	return po.InvClient.Replace(localInv, localIds)
+}
+
+// mergeObjNamespaces returns a set of strings of all the namespaces
+// for non cluster-scoped objects. These namespaces are forced to
+// lower-case.
+func mergeObjNamespaces(objs []*unstructured.Unstructured) sets.String {
+	namespaces := sets.NewString()
+	for _, obj := range objs {
+		namespace := strings.TrimSpace(strings.ToLower(obj.GetNamespace()))
+		if namespace != "" {
+			namespaces.Insert(namespace)
+		}
+	}
+	return namespaces
 }
 
 // preventDeleteAnnotation returns true if the "onRemove:keep"
