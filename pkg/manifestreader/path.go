@@ -9,6 +9,9 @@ import (
 	"sigs.k8s.io/kustomize/kyaml/kio/kioutil"
 )
 
+// PathManifestReader implements ManifestReader interface.
+var _ ManifestReader = &PathManifestReader{}
+
 // PathManifestReader reads manifests from the provided path
 // and returns them as Info objects. The returned Infos will not have
 // client or mapping set.

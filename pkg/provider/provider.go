@@ -12,6 +12,9 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/manifestreader"
 )
 
+// InventoryProvider implements the Provider interface.
+var _ Provider = &InventoryProvider{}
+
 // Provider is an interface which wraps the kubectl factory and
 // the inventory client.
 type Provider interface {

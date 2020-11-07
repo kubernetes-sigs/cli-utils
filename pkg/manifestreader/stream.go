@@ -11,6 +11,9 @@ import (
 	"sigs.k8s.io/kustomize/kyaml/kio/kioutil"
 )
 
+// StreamManifestReader implements ManifestReader interface.
+var _ ManifestReader = &StreamManifestReader{}
+
 // StreamManifestReader reads manifest from the provided io.Reader
 // and returns them as Info objects. The returned Infos will not have
 // client or mapping set.
