@@ -20,7 +20,7 @@ import (
 
 var testNamespace = "test-inventory-namespace"
 var inventoryObjName = "test-inventory-obj"
-var namespaceName = "namespace"
+var podName = "pod-1"
 var pdbName = "pdb"
 var roleName = "role"
 
@@ -45,7 +45,18 @@ var namespace = &unstructured.Unstructured{
 		"apiVersion": "v1",
 		"kind":       "Namespace",
 		"metadata": map[string]interface{}{
-			"name":      namespaceName,
+			"name": testNamespace,
+			"uid":  "uid1",
+		},
+	},
+}
+
+var pod = &unstructured.Unstructured{
+	Object: map[string]interface{}{
+		"apiVersion": "v1",
+		"kind":       "Pod",
+		"metadata": map[string]interface{}{
+			"name":      podName,
 			"namespace": testNamespace,
 			"uid":       "uid1",
 		},
@@ -148,6 +159,12 @@ func TestPrune(t *testing.T) {
 			pastObjs:    []*unstructured.Unstructured{preventDelete, pdb},
 			currentObjs: []*unstructured.Unstructured{pdb, role},
 			prunedObjs:  []*unstructured.Unstructured{},
+			isError:     false,
+		},
+		"Namespace not pruned if objects are still in it": {
+			pastObjs:    []*unstructured.Unstructured{namespace, pdb, pod},
+			currentObjs: []*unstructured.Unstructured{pod},
+			prunedObjs:  []*unstructured.Unstructured{pdb},
 			isError:     false,
 		},
 	}
