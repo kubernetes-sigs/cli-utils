@@ -207,6 +207,7 @@ func (a *Applier) Run(ctx context.Context, inventory *unstructured.Unstructured,
 			DryRunStrategy:         options.DryRunStrategy,
 			PrunePropagationPolicy: options.PrunePropagationPolicy,
 			PruneTimeout:           options.PruneTimeout,
+			ContinueOnError:        options.ContinueOnError,
 		})
 
 		// Send event to inform the caller about the resources that
@@ -233,6 +234,7 @@ func (a *Applier) Run(ctx context.Context, inventory *unstructured.Unstructured,
 			PollInterval:     options.PollInterval,
 			UseCache:         true,
 			EmitStatusEvents: options.EmitStatusEvents,
+			ContinueOnError:  options.ContinueOnError,
 		})
 		if err != nil {
 			handleError(eventChannel, err)
@@ -275,6 +277,10 @@ type Options struct {
 	// to be fully deleted after pruning, and if so, how long we should
 	// wait.
 	PruneTimeout time.Duration
+
+	// ContinueOnError defines whether apply should continue for subsequent
+	// resources when an error happens.
+	ContinueOnError bool
 }
 
 // setDefaults set the options to the default values if they

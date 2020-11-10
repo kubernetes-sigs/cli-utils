@@ -47,6 +47,7 @@ type Options struct {
 	DryRunStrategy         common.DryRunStrategy
 	PrunePropagationPolicy metav1.DeletionPropagation
 	PruneTimeout           time.Duration
+	ContinueOnError        bool
 }
 
 type resourceObjects interface {
@@ -74,6 +75,7 @@ func (t *TaskQueueSolver) BuildTaskQueue(ro resourceObjects,
 			InfoHelper:        t.InfoHelper,
 			Factory:           t.Factory,
 			Mapper:            t.Mapper,
+			ContinueOnError:   o.ContinueOnError,
 		})
 		if !o.DryRunStrategy.ClientOrServerDryRun() {
 			objs := object.UnstructuredsToObjMetas(crdSplitRes.crds)
@@ -97,6 +99,7 @@ func (t *TaskQueueSolver) BuildTaskQueue(ro resourceObjects,
 			InfoHelper:        t.InfoHelper,
 			Factory:           t.Factory,
 			Mapper:            t.Mapper,
+			ContinueOnError:   o.ContinueOnError,
 		},
 		&task.SendEventTask{
 			Event: event.Event{
@@ -133,6 +136,7 @@ func (t *TaskQueueSolver) BuildTaskQueue(ro resourceObjects,
 				PruneOptions:      t.PruneOptions,
 				PropagationPolicy: o.PrunePropagationPolicy,
 				DryRunStrategy:    o.DryRunStrategy,
+				ContinueOnError:   o.ContinueOnError,
 			},
 			&task.SendEventTask{
 				Event: event.Event{

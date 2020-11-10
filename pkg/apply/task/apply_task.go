@@ -8,6 +8,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
@@ -45,6 +46,7 @@ type ApplyTask struct {
 	CRDs              []*unstructured.Unstructured
 	DryRunStrategy    common.DryRunStrategy
 	ServerSideOptions common.ServerSideOptions
+	ContinueOnError   bool
 }
 
 // applyOptionsFactoryFunc is a factory function for creating a new
@@ -117,11 +119,21 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 			a.sendTaskResult(taskContext, err)
 			return
 		}
-		ao.SetObjects(infos)
-		err = ao.Run()
-		if err != nil {
-			a.sendTaskResult(taskContext, err)
-			return
+		if a.ContinueOnError {
+			for i, info := range infos {
+				ao.SetObjects([]*resource.Info{info})
+				err = ao.Run()
+				if err != nil {
+					taskContext.EventChannel() <- createApplyEventWithError(info.Object, object.UnstructuredToObjMeta(objects[i]), err)
+				}
+			}
+		} else {
+			ao.SetObjects(infos)
+			err = ao.Run()
+			if err != nil {
+				a.sendTaskResult(taskContext, err)
+				return
+			}
 		}
 		// Fetch the Generation from all Infos after they have been
 		// applied.
@@ -277,3 +289,15 @@ func buildCRDsInfo(crds []*unstructured.Unstructured) *crdsInfo {
 
 // ClearTimeout is not supported by the ApplyTask.
 func (a *ApplyTask) ClearTimeout() {}
+
+// createApplyEventWithError is a helper function to package an apply event.
+func createApplyEventWithError(obj runtime.Object, meta object.ObjMetadata, err error) event.Event {
+	return event.Event{
+		Type: event.ApplyType,
+		ApplyEvent: event.ApplyEvent{
+			Object:     obj,
+			ObjectMeta: meta,
+			Error:      err,
+		},
+	}
+}

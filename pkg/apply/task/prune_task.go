@@ -20,6 +20,7 @@ type PruneTask struct {
 	Objects           []*unstructured.Unstructured
 	DryRunStrategy    common.DryRunStrategy
 	PropagationPolicy metav1.DeletionPropagation
+	ContinueOnError   bool
 }
 
 // Start creates a new goroutine that will invoke
@@ -33,6 +34,7 @@ func (p *PruneTask) Start(taskContext *taskrunner.TaskContext) {
 			currentUIDs, taskContext.EventChannel(), prune.Options{
 				DryRunStrategy:    p.DryRunStrategy,
 				PropagationPolicy: p.PropagationPolicy,
+				ContinueOnError:   p.ContinueOnError,
 			})
 		taskContext.TaskChannel() <- taskrunner.TaskResult{
 			Err: err,

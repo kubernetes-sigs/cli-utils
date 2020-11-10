@@ -42,6 +42,7 @@ type Options struct {
 	PollInterval     time.Duration
 	UseCache         bool
 	EmitStatusEvents bool
+	ContinueOnError  bool
 }
 
 // Run starts the execution of the taskqueue. It will start the
@@ -57,6 +58,7 @@ func (tsr *taskStatusRunner) Run(ctx context.Context, taskQueue chan Task,
 
 	o := baseOptions{
 		emitStatusEvents: options.EmitStatusEvents,
+		continueOnError:  options.ContinueOnError,
 	}
 	err := tsr.baseRunner.run(ctx, taskQueue, statusChannel, eventChannel, o)
 	// cancel the statusPoller by cancelling the context.
@@ -117,6 +119,7 @@ type baseRunner struct {
 
 type baseOptions struct {
 	emitStatusEvents bool
+	continueOnError  bool
 }
 
 // run is the main function that implements the processing of
@@ -210,7 +213,15 @@ func (b *baseRunner) run(ctx context.Context, taskQueue chan Task,
 			currentTask.ClearTimeout()
 			if msg.Err != nil {
 				b.amendTimeoutError(msg.Err)
-				return msg.Err
+				if !o.continueOnError {
+					return msg.Err
+				}
+				eventChannel <- event.Event{
+					Type: event.ErrorType,
+					ErrorEvent: event.ErrorEvent{
+						Err: msg.Err,
+					},
+				}
 			}
 			if abort {
 				return abortReason

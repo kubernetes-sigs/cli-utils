@@ -94,9 +94,11 @@ const (
 )
 
 type ApplyEvent struct {
-	Type      ApplyEventType
-	Operation ApplyEventOperation
-	Object    runtime.Object
+	Type       ApplyEventType
+	Operation  ApplyEventOperation
+	Object     runtime.Object
+	ObjectMeta object.ObjMetadata
+	Error      error
 }
 
 //go:generate stringer -type=StatusEventType
@@ -110,6 +112,7 @@ const (
 type StatusEvent struct {
 	Type     StatusEventType
 	Resource *pollevent.ResourceStatus
+	Error    error
 }
 
 //go:generate stringer -type=PruneEventType
@@ -129,9 +132,11 @@ const (
 )
 
 type PruneEvent struct {
-	Type      PruneEventType
-	Operation PruneEventOperation
-	Object    runtime.Object
+	Type       PruneEventType
+	Operation  PruneEventOperation
+	Object     runtime.Object
+	ObjectMeta object.ObjMetadata
+	Error      error
 }
 
 //go:generate stringer -type=DeleteEventType
@@ -154,4 +159,5 @@ type DeleteEvent struct {
 	Type      DeleteEventType
 	Operation DeleteEventOperation
 	Object    runtime.Object
+	Error     error
 }
