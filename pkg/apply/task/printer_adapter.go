@@ -7,9 +7,11 @@ import (
 	"fmt"
 	"io"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/printers"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
+	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
 // KubectlPrinterAdapter is a workaround for capturing progress from
@@ -34,9 +36,10 @@ func (r *resourcePrinterImpl) PrintObj(obj runtime.Object, _ io.Writer) error {
 	r.ch <- event.Event{
 		Type: event.ApplyType,
 		ApplyEvent: event.ApplyEvent{
-			Type:      event.ApplyEventResourceUpdate,
-			Operation: r.applyOperation,
-			Object:    obj,
+			Type:       event.ApplyEventResourceUpdate,
+			Operation:  r.applyOperation,
+			Object:     obj.(*unstructured.Unstructured),
+			Identifier: object.RuntimeObjectToObjMeta(obj),
 		},
 	}
 	return nil

@@ -20,7 +20,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/klog"
@@ -97,6 +96,10 @@ func (po *PruneOptions) Prune(localInv *unstructured.Unstructured, localObjs []*
 	}
 	clusterObjs, err := po.InvClient.GetClusterObjs(localInv)
 	if err != nil {
+		if o.ContinueOnError {
+			eventChannel <- createPruneFailedEvent(err)
+			return nil
+		}
 		return err
 	}
 	klog.V(4).Infof("prune %d currently applied objects", len(currentUIDs))
@@ -163,6 +166,10 @@ func (po *PruneOptions) Prune(localInv *unstructured.Unstructured, localObjs []*
 			klog.V(4).Infof("prune object delete: %s/%s", clusterObj.Namespace, clusterObj.Name)
 			err = namespacedClient.Delete(context.TODO(), clusterObj.Name, metav1.DeleteOptions{})
 			if err != nil {
+				if o.ContinueOnError {
+					eventChannel <- createPruneEventWithError(obj, clusterObj, err)
+					continue
+				}
 				return err
 			}
 		}
@@ -198,27 +205,37 @@ func preventDeleteAnnotation(annotations map[string]string) bool {
 }
 
 // createPruneEvent is a helper function to package a prune event.
-func createPruneEvent(obj runtime.Object, meta object.ObjMetadata, op event.PruneEventOperation) event.Event {
+func createPruneEvent(obj *unstructured.Unstructured, meta object.ObjMetadata, op event.PruneEventOperation) event.Event {
 	return event.Event{
 		Type: event.PruneType,
 		PruneEvent: event.PruneEvent{
 			Type:       event.PruneEventResourceUpdate,
 			Operation:  op,
 			Object:     obj,
-			ObjectMeta: meta,
+			Identifier: meta,
 		},
 	}
 }
 
 // createPruneEventWithError is a helper function to package a prune event.
-func createPruneEventWithError(obj runtime.Object, meta object.ObjMetadata, err error) event.Event {
+func createPruneEventWithError(obj *unstructured.Unstructured, meta object.ObjMetadata, err error) event.Event {
 	return event.Event{
 		Type: event.PruneType,
 		PruneEvent: event.PruneEvent{
-			Type:       event.PruneEventResourceUpdate,
+			Type:       event.PruneEventFailed,
 			Object:     obj,
-			ObjectMeta: meta,
+			Identifier: meta,
 			Error:      err,
+		},
+	}
+}
+
+func createPruneFailedEvent(err error) event.Event {
+	return event.Event{
+		Type: event.PruneType,
+		PruneEvent: event.PruneEvent{
+			Type:  event.PruneEventFailed,
+			Error: err,
 		},
 	}
 }

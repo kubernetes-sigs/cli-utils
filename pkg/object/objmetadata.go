@@ -24,7 +24,9 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/cli-runtime/pkg/resource"
@@ -215,6 +217,15 @@ func UnstructuredToObjMeta(obj *unstructured.Unstructured) ObjMetadata {
 		Name:      obj.GetName(),
 		Namespace: obj.GetNamespace(),
 		GroupKind: obj.GroupVersionKind().GroupKind(),
+	}
+}
+
+func RuntimeObjectToObjMeta(obj runtime.Object) ObjMetadata {
+	accessor, _ := meta.Accessor(obj)
+	return ObjMetadata{
+		GroupKind: obj.GetObjectKind().GroupVersionKind().GroupKind(),
+		Namespace: accessor.GetNamespace(),
+		Name:      accessor.GetName(),
 	}
 }
 

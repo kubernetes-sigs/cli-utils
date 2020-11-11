@@ -13,11 +13,12 @@ func _() {
 	var x [1]struct{}
 	_ = x[PruneEventResourceUpdate-0]
 	_ = x[PruneEventCompleted-1]
+	_ = x[PruneEventFailed-2]
 }
 
-const _PruneEventType_name = "PruneEventResourceUpdatePruneEventCompleted"
+const _PruneEventType_name = "PruneEventResourceUpdatePruneEventCompletedPruneEventFailed"
 
-var _PruneEventType_index = [...]uint8{0, 24, 43}
+var _PruneEventType_index = [...]uint8{0, 24, 43, 59}
 
 func (i PruneEventType) String() string {
 	if i < 0 || i >= PruneEventType(len(_PruneEventType_index)-1) {

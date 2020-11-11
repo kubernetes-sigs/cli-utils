@@ -213,15 +213,7 @@ func (b *baseRunner) run(ctx context.Context, taskQueue chan Task,
 			currentTask.ClearTimeout()
 			if msg.Err != nil {
 				b.amendTimeoutError(msg.Err)
-				if !o.continueOnError {
-					return msg.Err
-				}
-				eventChannel <- event.Event{
-					Type: event.ErrorType,
-					ErrorEvent: event.ErrorEvent{
-						Err: msg.Err,
-					},
-				}
+				return msg.Err
 			}
 			if abort {
 				return abortReason

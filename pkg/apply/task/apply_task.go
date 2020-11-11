@@ -8,7 +8,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
@@ -107,7 +106,12 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 		// infos so they can be applied to the cluster.
 		infos, err := a.InfoHelper.BuildInfos(objects)
 		if err != nil {
-			a.sendTaskResult(taskContext, err)
+			if a.ContinueOnError {
+				a.sendTaskResult(taskContext, nil)
+				a.sendErrorEvent(taskContext, err)
+			} else {
+				a.sendTaskResult(taskContext, err)
+			}
 			return
 		}
 
@@ -116,7 +120,12 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 		ao, err := applyOptionsFactoryFunc(taskContext.EventChannel(),
 			a.ServerSideOptions, a.DryRunStrategy, a.Factory)
 		if err != nil {
-			a.sendTaskResult(taskContext, err)
+			if a.ContinueOnError {
+				a.sendTaskResult(taskContext, nil)
+				a.sendErrorEvent(taskContext, err)
+			} else {
+				a.sendTaskResult(taskContext, err)
+			}
 			return
 		}
 		if a.ContinueOnError {
@@ -124,7 +133,7 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 				ao.SetObjects([]*resource.Info{info})
 				err = ao.Run()
 				if err != nil {
-					taskContext.EventChannel() <- createApplyEventWithError(info.Object, object.UnstructuredToObjMeta(objects[i]), err)
+					taskContext.EventChannel() <- createApplyEventWithError(objects[i], object.UnstructuredToObjMeta(objects[i]), err)
 				}
 			}
 		} else {
@@ -202,6 +211,16 @@ func newApplyOptions(eventChannel chan event.Event, serverSideOptions common.Ser
 func (a *ApplyTask) sendTaskResult(taskContext *taskrunner.TaskContext, err error) {
 	taskContext.TaskChannel() <- taskrunner.TaskResult{
 		Err: err,
+	}
+}
+
+func (a *ApplyTask) sendErrorEvent(taskContext *taskrunner.TaskContext, err error) {
+	taskContext.EventChannel() <- event.Event{
+		Type: event.ApplyType,
+		ApplyEvent: event.ApplyEvent{
+			Type:  event.ApplyEventFailed,
+			Error: err,
+		},
 	}
 }
 
@@ -291,12 +310,12 @@ func buildCRDsInfo(crds []*unstructured.Unstructured) *crdsInfo {
 func (a *ApplyTask) ClearTimeout() {}
 
 // createApplyEventWithError is a helper function to package an apply event.
-func createApplyEventWithError(obj runtime.Object, meta object.ObjMetadata, err error) event.Event {
+func createApplyEventWithError(obj *unstructured.Unstructured, meta object.ObjMetadata, err error) event.Event {
 	return event.Event{
 		Type: event.ApplyType,
 		ApplyEvent: event.ApplyEvent{
 			Object:     obj,
-			ObjectMeta: meta,
+			Identifier: meta,
 			Error:      err,
 		},
 	}

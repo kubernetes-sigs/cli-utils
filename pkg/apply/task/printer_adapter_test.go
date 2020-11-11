@@ -9,8 +9,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	appsv1 "k8s.io/api/apps/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 )
 
@@ -27,14 +26,14 @@ func TestKubectlPrinterAdapter(t *testing.T) {
 	resourcePrinter, err := toPrinterFunc(operation)
 	assert.NoError(t, err)
 
-	deployment := appsv1.Deployment{
-		TypeMeta: v1.TypeMeta{
-			APIVersion: "apps/v1",
-			Kind:       "Deployment",
-		},
-		ObjectMeta: v1.ObjectMeta{
-			Name:      "name",
-			Namespace: "namespace",
+	deployment := unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "apps/v1",
+			"kind":       "Deployment",
+			"metadata": map[string]interface{}{
+				"name":      "name",
+				"namespace": "namespace",
+			},
 		},
 	}
 
