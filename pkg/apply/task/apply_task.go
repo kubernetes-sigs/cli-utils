@@ -178,13 +178,12 @@ func newApplyOptions(eventChannel chan event.Event, serverSideOptions common.Ser
 		ServerSideApply: strategy.ServerDryRun() || serverSideOptions.ServerSideApply,
 		ForceConflicts:  serverSideOptions.ForceConflicts,
 		FieldManager:    serverSideOptions.FieldManager,
-		DryRun:          strategy.ClientOrServerDryRun(),
-		ServerDryRun:    strategy.ServerDryRun(),
+		DryRunStrategy:  strategy.Strategy(),
 		ToPrinter: (&KubectlPrinterAdapter{
 			ch: eventChannel,
 		}).toPrinterFunc(),
-		DiscoveryClient: discovery,
-		DynamicClient:   dynamic,
+		DynamicClient:  dynamic,
+		DryRunVerifier: resource.NewDryRunVerifier(dynamic, discovery),
 	}, nil
 }
 

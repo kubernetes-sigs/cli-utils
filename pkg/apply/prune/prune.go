@@ -12,6 +12,7 @@
 package prune
 
 import (
+	"context"
 	"sort"
 	"strings"
 
@@ -107,7 +108,7 @@ func (po *PruneOptions) Prune(localInv *unstructured.Unstructured, localObjs []*
 			return err
 		}
 		namespacedClient := po.client.Resource(mapping.Resource).Namespace(clusterObj.Namespace)
-		obj, err := namespacedClient.Get(clusterObj.Name, metav1.GetOptions{})
+		obj, err := namespacedClient.Get(context.TODO(), clusterObj.Name, metav1.GetOptions{})
 		if err != nil {
 			// Object not found in cluster, so no need to delete it; skip to next object.
 			if apierrors.IsNotFound(err) {
@@ -146,7 +147,7 @@ func (po *PruneOptions) Prune(localInv *unstructured.Unstructured, localObjs []*
 		}
 		if !o.DryRunStrategy.ClientOrServerDryRun() {
 			klog.V(4).Infof("prune object delete: %s/%s", clusterObj.Namespace, clusterObj.Name)
-			err = namespacedClient.Delete(clusterObj.Name, &metav1.DeleteOptions{})
+			err = namespacedClient.Delete(context.TODO(), clusterObj.Name, metav1.DeleteOptions{})
 			if err != nil {
 				return err
 			}

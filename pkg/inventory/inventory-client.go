@@ -351,7 +351,7 @@ func (cic *ClusterInventoryClient) createInventoryObj(obj *unstructured.Unstruct
 	}
 	klog.V(4).Infof("creating inventory object: %s/%s", invInfo.Namespace, invInfo.Name)
 	var clearResourceVersion = false
-	createdObj, err := helper.Create(invInfo.Namespace, clearResourceVersion, invInfo.Object, nil)
+	createdObj, err := helper.Create(invInfo.Namespace, clearResourceVersion, invInfo.Object)
 	if err != nil {
 		return err
 	}
@@ -408,7 +408,7 @@ func (cic *ClusterInventoryClient) ApplyInventoryNamespace(obj *unstructured.Uns
 		return err
 	}
 	var clearResourceVersion = false
-	createdObj, err := helper.Create(invInfo.Namespace, clearResourceVersion, invInfo.Object, nil)
+	createdObj, err := helper.Create(invInfo.Namespace, clearResourceVersion, invInfo.Object)
 	if err != nil {
 		if !apierrors.IsAlreadyExists(err) {
 			return err

@@ -20,15 +20,15 @@ require (
 	gopkg.in/check.v1 v1.0.0-20200227125254-8fa46927fb4f // indirect
 	gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c
 	gotest.tools v2.2.0+incompatible
-	k8s.io/api v0.17.2
-	k8s.io/apiextensions-apiserver v0.17.2
-	k8s.io/apimachinery v0.17.2
-	k8s.io/cli-runtime v0.17.2
-	k8s.io/client-go v0.17.2
+	k8s.io/api v0.18.10
+	k8s.io/apiextensions-apiserver v0.18.10
+	k8s.io/apimachinery v0.18.10
+	k8s.io/cli-runtime v0.18.10
+	k8s.io/client-go v0.18.10
 	k8s.io/klog v1.0.0
-	k8s.io/kubectl v0.0.0-20191219154910-1528d4eea6dd
-	k8s.io/utils v0.0.0-20191114184206-e782cd3c129f
-	sigs.k8s.io/controller-runtime v0.4.0
+	k8s.io/kubectl v0.18.10
+	k8s.io/utils v0.0.0-20200324210504-a9aa75ae1b89
+	sigs.k8s.io/controller-runtime v0.6.0
 	sigs.k8s.io/kustomize/kyaml v0.9.3
 	sigs.k8s.io/yaml v1.2.0
 )
