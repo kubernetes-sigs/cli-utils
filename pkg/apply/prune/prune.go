@@ -175,10 +175,8 @@ func mergeObjNamespaces(objs []*unstructured.Unstructured) sets.String {
 // annotation exists within the annotation map; false otherwise.
 func preventDeleteAnnotation(annotations map[string]string) bool {
 	for annotation, value := range annotations {
-		if annotation == common.OnRemoveAnnotation {
-			if value == common.OnRemoveKeep {
-				return true
-			}
+		if common.NoDeletion(annotation, value) {
+			return true
 		}
 	}
 	return false

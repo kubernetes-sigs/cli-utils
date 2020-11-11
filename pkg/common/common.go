@@ -32,6 +32,13 @@ const (
 	// DefaultFieldManager is default owner of applied fields in
 	// server-side apply.
 	DefaultFieldManager = "kubectl"
+
+	// LifecycleDeletionAnnotation is the lifecycle annotation key for deletion operation.
+	LifecycleDeleteAnnotation = "client.lifecycle.config.k8s.io/deletion"
+
+	// PreventDeletion is the value used with LifecycleDeletionAnnotation
+	// to prevent deleting a resource.
+	PreventDeletion = "detach"
 )
 
 // RandomStr returns an eight-digit (with leading zeros) string of a
@@ -40,6 +47,19 @@ func RandomStr(seed int64) string {
 	rand.Seed(seed)
 	randomInt := rand.Intn(maxRandInt) // nolint:gosec
 	return fmt.Sprintf("%08d", randomInt)
+}
+
+// NoDeletion checks the passed in annotation key and value and returns
+// true if that matches with the prevent deletion annotation.
+func NoDeletion(key, value string) bool {
+	m := map[string]string{
+		LifecycleDeleteAnnotation: PreventDeletion,
+		OnRemoveAnnotation:        OnRemoveKeep,
+	}
+	if val, found := m[key]; found {
+		return val == value
+	}
+	return false
 }
 
 var Strategies = []DryRunStrategy{DryRunClient, DryRunServer}
