@@ -9,8 +9,8 @@ import (
 
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/klog"
-	"k8s.io/kubectl/pkg/cmd/apply"
 	"k8s.io/kubectl/pkg/cmd/diff"
 	"k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/i18n"
@@ -90,10 +90,7 @@ func Initialize(o *diff.DiffOptions, f util.Factory, args []string) (func(), err
 		return cleanupFunc, err
 	}
 
-	o.DryRunVerifier = &apply.DryRunVerifier{
-		Finder:        util.NewCRDFinder(util.CRDFromDynamic(o.DynamicClient)),
-		OpenAPIGetter: o.DiscoveryClient,
-	}
+	o.DryRunVerifier = resource.NewDryRunVerifier(o.DynamicClient, o.DiscoveryClient)
 
 	o.CmdNamespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {

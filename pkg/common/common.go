@@ -6,6 +6,8 @@ package common
 import (
 	"fmt"
 	"math/rand"
+
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
 const (
@@ -100,6 +102,18 @@ func (drs DryRunStrategy) ServerDryRun() bool {
 // ClientOrServerDryRun returns true if input drs is either client or server dry run
 func (drs DryRunStrategy) ClientOrServerDryRun() bool {
 	return drs == DryRunClient || drs == DryRunServer
+}
+
+// Strategy returns the
+func (drs DryRunStrategy) Strategy() cmdutil.DryRunStrategy {
+	switch drs {
+	case DryRunClient:
+		return cmdutil.DryRunClient
+	case DryRunServer:
+		return cmdutil.DryRunServer
+	default:
+		return cmdutil.DryRunNone
+	}
 }
 
 // ServerSideOptions encapsulates the fields to implement server-side apply.
