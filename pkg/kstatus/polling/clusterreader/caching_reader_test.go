@@ -138,9 +138,9 @@ func TestSync_Errors(t *testing.T) {
 				apiextv1.SchemeGroupVersion.WithKind("CustomResourceDefinition"),
 			),
 			readerError:     errors.NewInternalError(fmt.Errorf("testing")),
-			expectSyncError: true,
+			expectSyncError: false,
 			cacheError:      true,
-			cacheErrorText:  "not found",
+			cacheErrorText:  "Internal error occurred: testing",
 		},
 		"mapping not found": {
 			mapper:          testutil.NewFakeRESTMapper(),
