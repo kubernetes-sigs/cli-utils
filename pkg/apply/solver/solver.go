@@ -30,6 +30,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/apply/task"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
 	"sigs.k8s.io/cli-utils/pkg/common"
+	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
@@ -51,7 +52,7 @@ type Options struct {
 
 type resourceObjects interface {
 	ObjsForApply() []*unstructured.Unstructured
-	Inventory() *unstructured.Unstructured
+	Inventory() inventory.InventoryInfo
 	IdsForApply() []object.ObjMetadata
 	IdsForPrune() []object.ObjMetadata
 }

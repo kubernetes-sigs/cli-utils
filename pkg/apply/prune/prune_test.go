@@ -89,15 +89,18 @@ var role = &unstructured.Unstructured{
 
 // Returns a inventory object with the inventory set from
 // the passed "children".
-func createInventoryInfo(children ...*unstructured.Unstructured) *unstructured.Unstructured {
+func createInventoryInfo(children ...*unstructured.Unstructured) inventory.InventoryInfo {
 	inventoryObjCopy := inventoryObj.DeepCopy()
 	wrappedInv := inventory.WrapInventoryObj(inventoryObjCopy)
 	objs := object.UnstructuredsToObjMetas(children)
 	if err := wrappedInv.Store(objs); err != nil {
 		return nil
 	}
-	inventoryInfo, _ := wrappedInv.GetObject()
-	return inventoryInfo
+	obj, err := wrappedInv.GetObject()
+	if err != nil {
+		return nil
+	}
+	return inventory.WrapInventoryInfoObj(obj)
 }
 
 // preventDelete object contains the "on-remove:keep" lifecycle directive.

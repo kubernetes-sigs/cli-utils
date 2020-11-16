@@ -26,7 +26,7 @@ func NewFakeInventoryClient(initObjs []object.ObjMetadata) *FakeInventoryClient 
 }
 
 // GetClusterObjs returns currently stored set of objects.
-func (fic *FakeInventoryClient) GetClusterObjs(inv *unstructured.Unstructured) ([]object.ObjMetadata, error) {
+func (fic *FakeInventoryClient) GetClusterObjs(inv InventoryInfo) ([]object.ObjMetadata, error) {
 	if fic.Err != nil {
 		return []object.ObjMetadata{}, fic.Err
 	}
@@ -36,7 +36,7 @@ func (fic *FakeInventoryClient) GetClusterObjs(inv *unstructured.Unstructured) (
 // Merge stores the passed objects with the current stored cluster inventory
 // objects. Returns the set difference of the current set of objects minus
 // the passed set of objects, or an error if one is set up.
-func (fic *FakeInventoryClient) Merge(inv *unstructured.Unstructured, objs []object.ObjMetadata) ([]object.ObjMetadata, error) {
+func (fic *FakeInventoryClient) Merge(inv InventoryInfo, objs []object.ObjMetadata) ([]object.ObjMetadata, error) {
 	if fic.Err != nil {
 		return []object.ObjMetadata{}, fic.Err
 	}
@@ -47,7 +47,7 @@ func (fic *FakeInventoryClient) Merge(inv *unstructured.Unstructured, objs []obj
 
 // Replace the stored cluster inventory objs with the passed obj, or an
 // error if one is set up.
-func (fic *FakeInventoryClient) Replace(inv *unstructured.Unstructured, objs []object.ObjMetadata) error {
+func (fic *FakeInventoryClient) Replace(inv InventoryInfo, objs []object.ObjMetadata) error {
 	if fic.Err != nil {
 		return fic.Err
 	}
@@ -56,7 +56,7 @@ func (fic *FakeInventoryClient) Replace(inv *unstructured.Unstructured, objs []o
 }
 
 // DeleteInventoryObj returns an error if one is forced; does nothing otherwise.
-func (fic *FakeInventoryClient) DeleteInventoryObj(inv *unstructured.Unstructured) error {
+func (fic *FakeInventoryClient) DeleteInventoryObj(inv InventoryInfo) error {
 	if fic.Err != nil {
 		return fic.Err
 	}

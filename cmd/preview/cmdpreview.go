@@ -16,7 +16,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/apply"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/common"
-	"sigs.k8s.io/cli-utils/pkg/inventory"
+	"sigs.k8s.io/cli-utils/pkg/manifestreader"
 	"sigs.k8s.io/cli-utils/pkg/provider"
 	"sigs.k8s.io/kustomize/kyaml/setters2"
 )
@@ -27,12 +27,13 @@ var (
 )
 
 // GetPreviewRunner creates and returns the PreviewRunner which stores the cobra command.
-func GetPreviewRunner(provider provider.Provider, ioStreams genericclioptions.IOStreams) *PreviewRunner {
+func GetPreviewRunner(provider provider.Provider, loader manifestreader.ManifestLoader, ioStreams genericclioptions.IOStreams) *PreviewRunner {
 	r := &PreviewRunner{
 		Applier:   apply.NewApplier(provider),
 		Destroyer: apply.NewDestroyer(provider),
 		ioStreams: ioStreams,
 		provider:  provider,
+		loader:    loader,
 	}
 	cmd := &cobra.Command{
 		Use:                   "preview (DIRECTORY | STDIN)",
@@ -60,7 +61,8 @@ func GetPreviewRunner(provider provider.Provider, ioStreams genericclioptions.IO
 // PreviewCommand creates the PreviewRunner, returning the cobra command associated with it.
 func PreviewCommand(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	provider := provider.NewProvider(f)
-	return GetPreviewRunner(provider, ioStreams).Command
+	loader := manifestreader.NewManifestLoader(f)
+	return GetPreviewRunner(provider, loader, ioStreams).Command
 }
 
 // PreviewRunner encapsulates data necessary to run the preview command.
@@ -70,6 +72,7 @@ type PreviewRunner struct {
 	Applier   *apply.Applier
 	Destroyer *apply.Destroyer
 	provider  provider.Provider
+	loader    manifestreader.ManifestLoader
 
 	serverSideOptions common.ServerSideOptions
 	output            string
@@ -92,7 +95,7 @@ func (r *PreviewRunner) RunE(cmd *cobra.Command, args []string) error {
 		r.Destroyer.DryRunStrategy = drs
 	}
 
-	reader, err := r.provider.ManifestReader(cmd.InOrStdin(), args)
+	reader, err := r.loader.ManifestReader(cmd.InOrStdin(), args)
 	if err != nil {
 		return err
 	}
@@ -100,7 +103,8 @@ func (r *PreviewRunner) RunE(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	inv, objs, err := inventory.SplitUnstructureds(objs)
+
+	inv, objs, err := r.loader.InventoryInfo(objs)
 	if err != nil {
 		return err
 	}

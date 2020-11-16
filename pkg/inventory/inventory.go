@@ -42,6 +42,10 @@ type Inventory interface {
 // interface from the passed info object.
 type InventoryFactoryFunc func(*unstructured.Unstructured) Inventory
 
+// InventoryToUnstructuredFunc returns the unstructured object for the
+// given InventoryInfo.
+type InventoryToUnstructuredFunc func(InventoryInfo) *unstructured.Unstructured
+
 // FindInventoryObj returns the "Inventory" object (ConfigMap with
 // inventory label) if it exists, or nil if it does not exist.
 func FindInventoryObj(objs []*unstructured.Unstructured) *unstructured.Unstructured {

@@ -88,7 +88,7 @@ func (a *Applier) Initialize() error {
 // calculates the set of objects to be pruned (pruneIds), and orders the
 // resources for the subsequent apply. Returns the sorted resources to
 // apply as well as the objects for the prune, or an error if one occurred.
-func (a *Applier) prepareObjects(localInv *unstructured.Unstructured, localObjs []*unstructured.Unstructured) (*ResourceObjects, error) {
+func (a *Applier) prepareObjects(localInv inventory.InventoryInfo, localObjs []*unstructured.Unstructured) (*ResourceObjects, error) {
 	if localInv == nil {
 		return nil, fmt.Errorf("the local inventory can't be nil")
 	}
@@ -125,7 +125,7 @@ func (a *Applier) prepareObjects(localInv *unstructured.Unstructured, localObjs 
 // will be applied and the existing inventories used to determine
 // resources that should be pruned.
 type ResourceObjects struct {
-	LocalInv  *unstructured.Unstructured
+	LocalInv  inventory.InventoryInfo
 	Resources []*unstructured.Unstructured
 	PruneIds  []object.ObjMetadata
 }
@@ -138,7 +138,7 @@ func (r *ResourceObjects) ObjsForApply() []*unstructured.Unstructured {
 }
 
 // Inventory returns the unstructured representation of the inventory object.
-func (r *ResourceObjects) Inventory() *unstructured.Unstructured {
+func (r *ResourceObjects) Inventory() inventory.InventoryInfo {
 	return r.LocalInv
 }
 
@@ -172,7 +172,7 @@ func (r *ResourceObjects) AllIds() []object.ObjMetadata {
 // before all the given resources have been applied to the cluster. Any
 // cancellation or timeout will only affect how long we Wait for the
 // resources to become current.
-func (a *Applier) Run(ctx context.Context, inventory *unstructured.Unstructured, objects []*unstructured.Unstructured, options Options) <-chan event.Event {
+func (a *Applier) Run(ctx context.Context, invInfo inventory.InventoryInfo, objects []*unstructured.Unstructured, options Options) <-chan event.Event {
 	eventChannel := make(chan event.Event)
 	setDefaults(&options)
 	a.invClient.SetDryRunStrategy(options.DryRunStrategy) // client shared with prune, so sets dry-run for prune too.
@@ -182,13 +182,13 @@ func (a *Applier) Run(ctx context.Context, inventory *unstructured.Unstructured,
 		// This provides us with a slice of all the objects that will be
 		// applied to the cluster. This takes care of ordering resources
 		// and handling the inventory object.
-		resourceObjects, err := a.prepareObjects(inventory, objects)
+		resourceObjects, err := a.prepareObjects(invInfo, objects)
 		if err != nil {
 			handleError(eventChannel, err)
 			return
 		}
 
-		mapper, err := a.provider.ToRESTMapper()
+		mapper, err := a.provider.Factory().ToRESTMapper()
 		if err != nil {
 			handleError(eventChannel, err)
 			return
@@ -300,12 +300,11 @@ func handleError(eventChannel chan event.Event, err error) {
 // inventoryNamespaceInSet returns the the namespace the passed inventory
 // object will be applied to, or nil if this namespace object does not exist
 // in the passed slice "infos" or the inventory object is cluster-scoped.
-func inventoryNamespaceInSet(inv *unstructured.Unstructured, objs []*unstructured.Unstructured) *unstructured.Unstructured {
+func inventoryNamespaceInSet(inv inventory.InventoryInfo, objs []*unstructured.Unstructured) *unstructured.Unstructured {
 	if inv == nil {
 		return nil
 	}
-	invAcc, _ := meta.Accessor(inv)
-	invNamespace := invAcc.GetNamespace()
+	invNamespace := inv.Namespace()
 
 	for _, obj := range objs {
 		acc, _ := meta.Accessor(obj)

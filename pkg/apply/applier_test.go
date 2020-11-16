@@ -285,6 +285,8 @@ var inventoryObj = &unstructured.Unstructured{
 	},
 }
 
+var localInv = inventory.WrapInventoryInfoObj(inventoryObj)
+
 var obj1 = &unstructured.Unstructured{
 	Object: map[string]interface{}{
 		"apiVersion": "v1",
@@ -344,7 +346,7 @@ func TestInventoryNamespaceInSet(t *testing.T) {
 	inventoryNamespace := createNamespace(namespace)
 
 	tests := map[string]struct {
-		inv       *unstructured.Unstructured
+		inv       inventory.InventoryInfo
 		objects   []*unstructured.Unstructured
 		namespace *unstructured.Unstructured
 	}{
@@ -354,22 +356,22 @@ func TestInventoryNamespaceInSet(t *testing.T) {
 			namespace: nil,
 		},
 		"Inventory object, but no resources returns nil namespace": {
-			inv:       inventoryObj,
+			inv:       localInv,
 			objects:   []*unstructured.Unstructured{},
 			namespace: nil,
 		},
 		"Inventory object, resources with no namespace returns nil namespace": {
-			inv:       inventoryObj,
+			inv:       localInv,
 			objects:   []*unstructured.Unstructured{obj1, obj2},
 			namespace: nil,
 		},
 		"Inventory object, different namespace returns nil namespace": {
-			inv:       inventoryObj,
+			inv:       localInv,
 			objects:   []*unstructured.Unstructured{createNamespace("foo")},
 			namespace: nil,
 		},
 		"Inventory object, inventory namespace returns inventory namespace": {
-			inv:       inventoryObj,
+			inv:       localInv,
 			objects:   []*unstructured.Unstructured{obj1, inventoryNamespace, obj3},
 			namespace: inventoryNamespace,
 		},
@@ -388,13 +390,13 @@ func TestInventoryNamespaceInSet(t *testing.T) {
 func TestReadAndPrepareObjects(t *testing.T) {
 	testCases := map[string]struct {
 		// local inventory input into applier.prepareObjects
-		inventory *unstructured.Unstructured
+		inventory inventory.InventoryInfo
 		// locally read resources input into applier.prepareObjects
 		resources []*unstructured.Unstructured
 		// objects already stored in the cluster inventory
 		clusterObjs []*unstructured.Unstructured
 		// expected returned local inventory object
-		localInv *unstructured.Unstructured
+		localInv inventory.InventoryInfo
 		// expected returned local objects to apply (in order)
 		localObjs []*unstructured.Unstructured
 		// expected calculated prune objects
@@ -407,43 +409,43 @@ func TestReadAndPrepareObjects(t *testing.T) {
 			isError:   true,
 		},
 		"multiple inventory objects": {
-			inventory: inventoryObj,
+			inventory: localInv,
 			resources: []*unstructured.Unstructured{inventoryObj},
 			isError:   true,
 		},
 		"only inventory object": {
-			inventory: inventoryObj,
-			localInv:  inventoryObj,
+			inventory: localInv,
+			localInv:  localInv,
 			isError:   false,
 		},
 		"only inventory object, prune one object": {
-			inventory:   inventoryObj,
+			inventory:   localInv,
 			clusterObjs: []*unstructured.Unstructured{obj1},
-			localInv:    inventoryObj,
+			localInv:    localInv,
 			pruneObjs:   []*unstructured.Unstructured{obj1},
 			isError:     false,
 		},
 		"inventory object already at the beginning": {
-			inventory: inventoryObj,
+			inventory: localInv,
 			resources: []*unstructured.Unstructured{obj1, clusterScopedObj},
-			localInv:  inventoryObj,
+			localInv:  localInv,
 			localObjs: []*unstructured.Unstructured{obj1, clusterScopedObj},
 			isError:   false,
 		},
 		"inventory object already at the beginning, prune one": {
-			inventory:   inventoryObj,
+			inventory:   localInv,
 			resources:   []*unstructured.Unstructured{obj1, clusterScopedObj},
 			clusterObjs: []*unstructured.Unstructured{obj2},
-			localInv:    inventoryObj,
+			localInv:    localInv,
 			localObjs:   []*unstructured.Unstructured{obj1, clusterScopedObj},
 			pruneObjs:   []*unstructured.Unstructured{obj2},
 			isError:     false,
 		},
 		"inventory object not at the beginning": {
-			inventory:   inventoryObj,
+			inventory:   localInv,
 			resources:   []*unstructured.Unstructured{obj1, obj2, clusterScopedObj},
 			clusterObjs: []*unstructured.Unstructured{obj2},
-			localInv:    inventoryObj,
+			localInv:    localInv,
 			localObjs:   []*unstructured.Unstructured{obj1, obj2, clusterScopedObj},
 			pruneObjs:   []*unstructured.Unstructured{},
 			isError:     false,
@@ -468,8 +470,11 @@ func TestReadAndPrepareObjects(t *testing.T) {
 				return
 			}
 			// Validate the returned ResourceObjs
-			if tc.localInv.GetNamespace() != resourceObjs.LocalInv.GetNamespace() ||
-				tc.localInv.GetName() != resourceObjs.LocalInv.GetName() {
+			expected := tc.localInv
+			actual := resourceObjs.LocalInv
+			if expected.Namespace() != actual.Namespace() ||
+				expected.Name() != actual.Name() ||
+				expected.ID() != actual.ID() {
 				t.Errorf("expected local inventory (%v), got (%v)",
 					tc.localInv, resourceObjs.LocalInv)
 			}
@@ -536,7 +541,7 @@ func toIdentifier(t *testing.T, resourceInfo resourceInfo, namespace string) obj
 	}
 }
 
-func createObjs(resources []resourceInfo) (*unstructured.Unstructured, []*unstructured.Unstructured, error) {
+func createObjs(resources []resourceInfo) (inventory.InventoryInfo, []*unstructured.Unstructured, error) {
 	var objs []*unstructured.Unstructured
 	for _, ri := range resources {
 		u := &unstructured.Unstructured{}
@@ -546,7 +551,8 @@ func createObjs(resources []resourceInfo) (*unstructured.Unstructured, []*unstru
 		}
 		objs = append(objs, u)
 	}
-	return inventory.SplitUnstructureds(objs)
+	inv, objs, err := inventory.SplitUnstructureds(objs)
+	return inventory.WrapInventoryInfoObj(inv), objs, err
 }
 
 // The handler interface allows different testcases to provide

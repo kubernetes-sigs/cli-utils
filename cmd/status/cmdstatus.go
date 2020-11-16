@@ -15,19 +15,20 @@ import (
 	"sigs.k8s.io/cli-utils/cmd/status/printers"
 	"sigs.k8s.io/cli-utils/pkg/apply/poller"
 	"sigs.k8s.io/cli-utils/pkg/common"
-	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/aggregator"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/collector"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
+	"sigs.k8s.io/cli-utils/pkg/manifestreader"
 	"sigs.k8s.io/cli-utils/pkg/provider"
 	"sigs.k8s.io/cli-utils/pkg/util/factory"
 )
 
-func GetStatusRunner(provider provider.Provider) *StatusRunner {
+func GetStatusRunner(provider provider.Provider, loader manifestreader.ManifestLoader) *StatusRunner {
 	r := &StatusRunner{
 		provider:          provider,
+		loader:            loader,
 		pollerFactoryFunc: pollerFactoryFunc,
 	}
 	c := &cobra.Command{
@@ -48,7 +49,8 @@ func GetStatusRunner(provider provider.Provider) *StatusRunner {
 
 func StatusCommand(f cmdutil.Factory) *cobra.Command {
 	provider := provider.NewProvider(f)
-	return GetStatusRunner(provider).Command
+	loader := manifestreader.NewManifestLoader(f)
+	return GetStatusRunner(provider, loader).Command
 }
 
 // StatusRunner captures the parameters for the command and contains
@@ -56,6 +58,7 @@ func StatusCommand(f cmdutil.Factory) *cobra.Command {
 type StatusRunner struct {
 	Command  *cobra.Command
 	provider provider.Provider
+	loader   manifestreader.ManifestLoader
 
 	period    time.Duration
 	pollUntil string
@@ -74,7 +77,7 @@ func (r *StatusRunner) runE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	reader, err := r.provider.ManifestReader(cmd.InOrStdin(), args)
+	reader, err := r.loader.ManifestReader(cmd.InOrStdin(), args)
 	if err != nil {
 		return err
 	}
@@ -83,8 +86,7 @@ func (r *StatusRunner) runE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// Find the inventory template among the manifests.
-	inv, _, err := inventory.SplitUnstructureds(objs)
+	inv, _, err := r.loader.InventoryInfo(objs)
 	if err != nil {
 		return err
 	}

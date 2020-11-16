@@ -15,6 +15,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/apply/task"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
 	"sigs.k8s.io/cli-utils/pkg/common"
+	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/testutil"
 )
@@ -309,7 +310,7 @@ func getType(task taskrunner.Task) reflect.Type {
 
 type fakeResourceObjects struct {
 	objsForApply []*unstructured.Unstructured
-	inventory    *unstructured.Unstructured
+	inventory    inventory.InventoryInfo
 	idsForApply  []object.ObjMetadata
 	idsForPrune  []object.ObjMetadata
 }
@@ -318,7 +319,7 @@ func (f *fakeResourceObjects) ObjsForApply() []*unstructured.Unstructured {
 	return f.objsForApply
 }
 
-func (f *fakeResourceObjects) Inventory() *unstructured.Unstructured {
+func (f *fakeResourceObjects) Inventory() inventory.InventoryInfo {
 	return f.inventory
 }
 

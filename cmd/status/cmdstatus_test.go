@@ -19,6 +19,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling"
 	pollevent "sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
+	"sigs.k8s.io/cli-utils/pkg/manifestreader"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/provider"
 )
@@ -222,8 +223,10 @@ deployment.apps/foo is InProgress: inProgress
 			defer tf.Cleanup()
 
 			provider := provider.NewFakeProvider(tf, tc.inventory)
+			loader := manifestreader.NewFakeLoader(tf, tc.inventory)
 			runner := &StatusRunner{
 				provider: provider,
+				loader:   loader,
 				pollerFactoryFunc: func(c cmdutil.Factory) (poller.Poller, error) {
 					return &fakePoller{tc.events}, nil
 				},

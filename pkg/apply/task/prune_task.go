@@ -9,6 +9,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/apply/prune"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
 	"sigs.k8s.io/cli-utils/pkg/common"
+	"sigs.k8s.io/cli-utils/pkg/inventory"
 )
 
 // PruneTask prunes objects from the cluster
@@ -16,7 +17,7 @@ import (
 // set of resources that have just been applied.
 type PruneTask struct {
 	PruneOptions      *prune.PruneOptions
-	InventoryObject   *unstructured.Unstructured
+	InventoryObject   inventory.InventoryInfo
 	Objects           []*unstructured.Unstructured
 	DryRunStrategy    common.DryRunStrategy
 	PropagationPolicy metav1.DeletionPropagation

@@ -4,7 +4,6 @@
 package inventory
 
 import (
-	"reflect"
 	"regexp"
 	"testing"
 
@@ -50,6 +49,8 @@ var legacyInvObj = &unstructured.Unstructured{
 		},
 	},
 }
+
+var localInv = WrapInventoryInfoObj(inventoryObj)
 
 var invInfo = &resource.Info{
 	Namespace: testNamespace,
@@ -270,37 +271,37 @@ func TestRetrieveInventoryLabel(t *testing.T) {
 func TestSplitUnstructureds(t *testing.T) {
 	tests := map[string]struct {
 		allObjs []*unstructured.Unstructured
-		inv     *unstructured.Unstructured
+		invObj  *unstructured.Unstructured
 		objs    []*unstructured.Unstructured
 		isError bool
 	}{
 		"No objects is an error": {
 			allObjs: []*unstructured.Unstructured{},
-			inv:     nil,
+			invObj:  nil,
 			objs:    []*unstructured.Unstructured{},
 			isError: true,
 		},
 		"Only inventory object is true": {
 			allObjs: []*unstructured.Unstructured{inventoryObj},
-			inv:     inventoryObj,
+			invObj:  inventoryObj,
 			objs:    []*unstructured.Unstructured{},
 			isError: false,
 		},
 		"Missing inventory object is false": {
 			allObjs: []*unstructured.Unstructured{pod1},
-			inv:     nil,
+			invObj:  nil,
 			objs:    []*unstructured.Unstructured{pod1},
 			isError: true,
 		},
 		"Multiple non-inventory objects is false": {
 			allObjs: []*unstructured.Unstructured{pod1, pod2, pod3},
-			inv:     nil,
+			invObj:  nil,
 			objs:    []*unstructured.Unstructured{pod1, pod2, pod3},
 			isError: true,
 		},
 		"Inventory object with multiple others is true": {
 			allObjs: []*unstructured.Unstructured{pod1, pod2, inventoryObj, pod3},
-			inv:     inventoryObj,
+			invObj:  inventoryObj,
 			objs:    []*unstructured.Unstructured{pod1, pod2, pod3},
 			isError: false,
 		},
@@ -308,7 +309,8 @@ func TestSplitUnstructureds(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			inv, infos, err := SplitUnstructureds(tc.allObjs)
+			invObj, infos, err := SplitUnstructureds(tc.allObjs)
+			inv := WrapInventoryInfoObj(invObj)
 			if !tc.isError && err != nil {
 				t.Fatalf("unexpected error received: %s", err)
 			}
@@ -318,8 +320,10 @@ func TestSplitUnstructureds(t *testing.T) {
 				}
 				return
 			}
-			if !reflect.DeepEqual(tc.inv.Object, inv.Object) {
-				t.Errorf("expected inventory (%v); got (%v)", *tc.inv, *inv)
+
+			if tc.invObj.GetName() != inv.Name() ||
+				tc.invObj.GetNamespace() != inv.Namespace() {
+				t.Errorf("expected inventory (%v); got (%v)", tc.invObj, inv)
 			}
 			if len(tc.objs) != len(infos) {
 				t.Errorf("expected %d objects; got %d", len(tc.objs), len(infos))
@@ -438,9 +442,14 @@ func copyInventoryInfo() *unstructured.Unstructured {
 	return inventoryObj.DeepCopy()
 }
 
-func storeObjsInInventory(inv *unstructured.Unstructured, objs []object.ObjMetadata) *unstructured.Unstructured {
-	wrapped := WrapInventoryObj(inv)
+func copyInventory() InventoryInfo {
+	u := inventoryObj.DeepCopy()
+	return WrapInventoryInfoObj(u)
+}
+
+func storeObjsInInventory(info InventoryInfo, objs []object.ObjMetadata) *unstructured.Unstructured {
+	wrapped := WrapInventoryObj(InvInfoToConfigMap(info))
 	_ = wrapped.Store(objs)
-	inv, _ = wrapped.GetObject()
+	inv, _ := wrapped.GetObject()
 	return inv
 }
