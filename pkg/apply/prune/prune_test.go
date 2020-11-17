@@ -4,12 +4,20 @@
 package prune
 
 import (
+	"context"
+	"fmt"
+	"reflect"
+	"strings"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/dynamic/fake"
 	"k8s.io/kubectl/pkg/scheme"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
@@ -46,7 +54,7 @@ var namespace = &unstructured.Unstructured{
 		"kind":       "Namespace",
 		"metadata": map[string]interface{}{
 			"name": testNamespace,
-			"uid":  "uid1",
+			"uid":  "uid-namespace",
 		},
 	},
 }
@@ -69,6 +77,30 @@ var pdb = &unstructured.Unstructured{
 		"kind":       "PodDisruptionBudget",
 		"metadata": map[string]interface{}{
 			"name":      pdbName,
+			"namespace": testNamespace,
+			"uid":       "uid2",
+		},
+	},
+}
+
+var pdbGetFailure = &unstructured.Unstructured{
+	Object: map[string]interface{}{
+		"apiVersion": "policy/v1beta1",
+		"kind":       "PodDisruptionBudget",
+		"metadata": map[string]interface{}{
+			"name":      pdbName + "get-failure",
+			"namespace": testNamespace,
+			"uid":       "uid2",
+		},
+	},
+}
+
+var pdbDeleteFailure = &unstructured.Unstructured{
+	Object: map[string]interface{}{
+		"apiVersion": "policy/v1beta1",
+		"kind":       "PodDisruptionBudget",
+		"metadata": map[string]interface{}{
+			"name":      pdbName + "delete-failure",
 			"namespace": testNamespace,
 			"uid":       "uid2",
 		},
@@ -123,52 +155,60 @@ func TestPrune(t *testing.T) {
 	tests := map[string]struct {
 		// pastObjs/currentObjs do NOT contain the inventory object.
 		// Inventory object is generated from these past/current objects.
-		pastObjs    []*unstructured.Unstructured
-		currentObjs []*unstructured.Unstructured
-		prunedObjs  []*unstructured.Unstructured
-		isError     bool
+		pastObjs       []*unstructured.Unstructured
+		currentObjs    []*unstructured.Unstructured
+		prunedObjs     []*unstructured.Unstructured
+		pruneEventObjs []*unstructured.Unstructured
+		isError        bool
 	}{
 		"Past and current objects are empty; no pruned objects": {
-			pastObjs:    []*unstructured.Unstructured{},
-			currentObjs: []*unstructured.Unstructured{},
-			prunedObjs:  []*unstructured.Unstructured{},
-			isError:     false,
+			pastObjs:       []*unstructured.Unstructured{},
+			currentObjs:    []*unstructured.Unstructured{},
+			prunedObjs:     []*unstructured.Unstructured{},
+			pruneEventObjs: []*unstructured.Unstructured{},
+			isError:        false,
 		},
 		"Past and current objects are the same; no pruned objects": {
-			pastObjs:    []*unstructured.Unstructured{namespace, pdb},
-			currentObjs: []*unstructured.Unstructured{pdb, namespace},
-			prunedObjs:  []*unstructured.Unstructured{},
-			isError:     false,
+			pastObjs:       []*unstructured.Unstructured{namespace, pdb},
+			currentObjs:    []*unstructured.Unstructured{pdb, namespace},
+			prunedObjs:     []*unstructured.Unstructured{},
+			pruneEventObjs: []*unstructured.Unstructured{},
+			isError:        false,
 		},
 		"No past objects; no pruned objects": {
-			pastObjs:    []*unstructured.Unstructured{},
-			currentObjs: []*unstructured.Unstructured{pdb, namespace},
-			prunedObjs:  []*unstructured.Unstructured{},
-			isError:     false,
+			pastObjs:       []*unstructured.Unstructured{},
+			currentObjs:    []*unstructured.Unstructured{pdb, namespace},
+			pruneEventObjs: []*unstructured.Unstructured{},
+			prunedObjs:     []*unstructured.Unstructured{},
+			isError:        false,
 		},
 		"No current objects; all previous objects pruned in correct order": {
-			pastObjs:    []*unstructured.Unstructured{namespace, pdb, role},
-			currentObjs: []*unstructured.Unstructured{},
-			prunedObjs:  []*unstructured.Unstructured{pdb, role, namespace},
-			isError:     false,
+			pastObjs:       []*unstructured.Unstructured{namespace, pdb, role},
+			currentObjs:    []*unstructured.Unstructured{},
+			prunedObjs:     []*unstructured.Unstructured{pdb, role, namespace},
+			pruneEventObjs: []*unstructured.Unstructured{pdb, role, namespace},
+			isError:        false,
 		},
 		"Omitted object is pruned": {
-			pastObjs:    []*unstructured.Unstructured{namespace, pdb},
-			currentObjs: []*unstructured.Unstructured{pdb, role},
-			prunedObjs:  []*unstructured.Unstructured{namespace},
-			isError:     false,
+			pastObjs:       []*unstructured.Unstructured{namespace, pdb},
+			currentObjs:    []*unstructured.Unstructured{pdb, role},
+			prunedObjs:     []*unstructured.Unstructured{namespace},
+			pruneEventObjs: []*unstructured.Unstructured{namespace},
+			isError:        false,
 		},
 		"Prevent delete lifecycle annotation stops pruning": {
-			pastObjs:    []*unstructured.Unstructured{preventDelete, pdb},
-			currentObjs: []*unstructured.Unstructured{pdb, role},
-			prunedObjs:  []*unstructured.Unstructured{},
-			isError:     false,
+			pastObjs:       []*unstructured.Unstructured{preventDelete, pdb},
+			currentObjs:    []*unstructured.Unstructured{pdb, role},
+			prunedObjs:     []*unstructured.Unstructured{},
+			pruneEventObjs: []*unstructured.Unstructured{preventDelete},
+			isError:        false,
 		},
 		"Namespace not pruned if objects are still in it": {
-			pastObjs:    []*unstructured.Unstructured{namespace, pdb, pod},
-			currentObjs: []*unstructured.Unstructured{pod},
-			prunedObjs:  []*unstructured.Unstructured{pdb},
-			isError:     false,
+			pastObjs:       []*unstructured.Unstructured{namespace, pdb, pod},
+			currentObjs:    []*unstructured.Unstructured{pod},
+			prunedObjs:     []*unstructured.Unstructured{pdb},
+			pruneEventObjs: []*unstructured.Unstructured{pdb, namespace},
+			isError:        false,
 		},
 	}
 	for name, tc := range tests {
@@ -182,8 +222,11 @@ func TestPrune(t *testing.T) {
 				// Set up the currently applied objects.
 				currentInventory := createInventoryInfo(tc.currentObjs...)
 				// Set up the fake dynamic client to recognize all objects, and the RESTMapper.
-				po.client = fake.NewSimpleDynamicClient(scheme.Scheme,
-					namespace, pdb, role)
+				objs := []runtime.Object{}
+				for _, obj := range tc.pastObjs {
+					objs = append(objs, obj)
+				}
+				po.client = fake.NewSimpleDynamicClient(scheme.Scheme, objs...)
 				po.mapper = testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme,
 					scheme.Scheme.PrioritizedVersionsAllGroups()...)
 				// The event channel can not block; make sure its bigger than all
@@ -205,14 +248,14 @@ func TestPrune(t *testing.T) {
 					for e := range eventChannel {
 						actualPruneEvents = append(actualPruneEvents, e)
 					}
-					if want, got := len(tc.prunedObjs), len(actualPruneEvents); want != got {
+					if want, got := len(tc.pruneEventObjs), len(actualPruneEvents); want != got {
 						t.Errorf("Expected (%d) prune events, got (%d)", want, got)
 					}
 
-					for i, obj := range tc.prunedObjs {
+					for i, obj := range tc.pruneEventObjs {
 						e := actualPruneEvents[i]
 						expKind := obj.GetObjectKind().GroupVersionKind().Kind
-						actKind := e.PruneEvent.Object.GetObjectKind().GroupVersionKind().Kind
+						actKind := e.PruneEvent.Identifier.GroupKind.Kind
 						if expKind != actKind {
 							t.Errorf("Expected kind %s, got %s", expKind, actKind)
 						}
@@ -292,4 +335,182 @@ func TestPreventDeleteAnnotation(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestPruneWithError(t *testing.T) {
+	tests := map[string]struct {
+		// pastObjs/currentObjs do NOT contain the inventory object.
+		// Inventory object is generated from these past/current objects.
+		pastObjs    []*unstructured.Unstructured
+		currentObjs []*unstructured.Unstructured
+		prunedEvent []event.Event
+		isError     bool
+	}{
+		"some objects have failure to get": {
+			pastObjs:    []*unstructured.Unstructured{pdbGetFailure, role},
+			currentObjs: []*unstructured.Unstructured{},
+			prunedEvent: []event.Event{
+				{
+					Type: event.PruneType,
+					PruneEvent: event.PruneEvent{
+						Identifier: object.ObjMetadata{
+							Name:      pdbName + "get-failure",
+							Namespace: testNamespace,
+							GroupKind: schema.GroupKind{
+								Group: "policy/v1beta1",
+								Kind:  "PodDisruptionBudget",
+							},
+						},
+						Error: fmt.Errorf("expected get error"),
+					},
+				},
+				{
+					Type: event.PruneType,
+					PruneEvent: event.PruneEvent{
+						Identifier: object.ObjMetadata{
+							Name:      roleName,
+							Namespace: testNamespace,
+							GroupKind: schema.GroupKind{
+								Group: "v1",
+								Kind:  "Role",
+							},
+						},
+						Error: nil,
+					},
+				},
+			},
+			isError: false,
+		},
+		"some objects have failure to delete": {
+			pastObjs:    []*unstructured.Unstructured{pdbDeleteFailure, role},
+			currentObjs: []*unstructured.Unstructured{},
+			prunedEvent: []event.Event{
+				{
+					Type: event.PruneType,
+					PruneEvent: event.PruneEvent{
+						Identifier: object.ObjMetadata{
+							Name:      pdbName + "delete-failure",
+							Namespace: testNamespace,
+							GroupKind: schema.GroupKind{
+								Group: "policy/v1beta1",
+								Kind:  "PodDisruptionBudget",
+							},
+						},
+						Error: fmt.Errorf("expected delete error"),
+					},
+				},
+				{
+					Type: event.PruneType,
+					PruneEvent: event.PruneEvent{
+						Identifier: object.ObjMetadata{
+							Name:      roleName,
+							Namespace: testNamespace,
+							GroupKind: schema.GroupKind{
+								Group: "v1",
+								Kind:  "Role",
+							},
+						},
+						Error: nil,
+					},
+				},
+			},
+			isError: false,
+		},
+	}
+	for name, tc := range tests {
+		drs := common.DryRunNone
+		t.Run(name, func(t *testing.T) {
+			po := NewPruneOptions()
+			// Set up the previously applied objects.
+			clusterObjs := object.UnstructuredsToObjMetas(tc.pastObjs)
+			po.InvClient = inventory.NewFakeInventoryClient(clusterObjs)
+			// Set up the currently applied objects.
+			currentInventory := createInventoryInfo(tc.currentObjs...)
+			// Set up the fake dynamic client to recognize all objects, and the RESTMapper.
+			po.client = &fakeDynamicFailureClient{dynamic: fake.NewSimpleDynamicClient(scheme.Scheme,
+				namespace, pdb, role)}
+			// po.client = fake.NewSimpleDynamicClient(scheme.Scheme, namespace, pdb, role)
+			po.mapper = testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme,
+				scheme.Scheme.PrioritizedVersionsAllGroups()...)
+			// The event channel can not block; make sure its bigger than all
+			// the events that can be put on it.
+			eventChannel := make(chan event.Event, len(tc.pastObjs)+1) // Add one for inventory object
+			err := func() error {
+				defer close(eventChannel)
+				// Run the prune and validate.
+				return po.Prune(currentInventory, tc.currentObjs, populateObjectIds(tc.currentObjs, t), eventChannel, Options{
+					DryRunStrategy: drs,
+				})
+			}()
+			if !tc.isError {
+				if err != nil {
+					t.Fatalf("Unexpected error during Prune(): %#v", err)
+				}
+
+				var actualPruneEvents []event.Event
+				for e := range eventChannel {
+					actualPruneEvents = append(actualPruneEvents, e)
+				}
+				if want, got := len(tc.prunedEvent), len(actualPruneEvents); want != got {
+					t.Errorf("Expected (%d) prune events, got (%d)", want, got)
+				}
+
+				for i, expectedEvt := range tc.prunedEvent {
+					e := actualPruneEvents[i]
+					expKind := expectedEvt.PruneEvent.Identifier.GroupKind.Kind
+					actKind := e.PruneEvent.Identifier.GroupKind.Kind
+					if expKind != actKind {
+						t.Errorf("Expected kind %s, got %s", expKind, actKind)
+					}
+					if !reflect.DeepEqual(e.PruneEvent.Error, expectedEvt.PruneEvent.Error) {
+						t.Errorf("Expected error %q, got %q", expectedEvt.PruneEvent.Error, e.PruneEvent.Error)
+					}
+				}
+			} else if err == nil {
+				t.Fatalf("Expected error during Prune() but received none")
+			}
+		})
+	}
+}
+
+type fakeDynamicFailureClient struct {
+	dynamic dynamic.Interface
+}
+
+var _ dynamic.Interface = &fakeDynamicFailureClient{}
+
+func (c *fakeDynamicFailureClient) Resource(resource schema.GroupVersionResource) dynamic.NamespaceableResourceInterface {
+	if resource.Resource == "poddisruptionbudgets" {
+		return &fakeDynamicResourceClient{NamespaceableResourceInterface: c.dynamic.Resource(resource)}
+	}
+	return c.dynamic.Resource(resource)
+}
+
+type fakeDynamicResourceClient struct {
+	dynamic.NamespaceableResourceInterface
+}
+
+func (c *fakeDynamicResourceClient) Namespace(ns string) dynamic.ResourceInterface {
+	return &fakeNamespaceClient{ResourceInterface: c.NamespaceableResourceInterface.Namespace(ns)}
+}
+
+// fakeNamespaceClient wrappers around a namespaceClient with the overwriting to Get and Delete functions.
+type fakeNamespaceClient struct {
+	dynamic.ResourceInterface
+}
+
+var _ dynamic.ResourceInterface = &fakeNamespaceClient{}
+
+func (c *fakeNamespaceClient) Delete(ctx context.Context, name string, options metav1.DeleteOptions, subresources ...string) error {
+	if strings.Contains(name, "delete-failure") {
+		return fmt.Errorf("expected delete error")
+	}
+	return nil
+}
+
+func (c *fakeNamespaceClient) Get(ctx context.Context, name string, options metav1.GetOptions, subresources ...string) (*unstructured.Unstructured, error) {
+	if strings.Contains(name, "get-failure") {
+		return nil, fmt.Errorf("expected get error")
+	}
+	return pdb, nil
 }
