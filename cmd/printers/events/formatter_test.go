@@ -10,7 +10,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
@@ -241,7 +240,7 @@ func TestFormatter_FormatDeleteEvent(t *testing.T) {
 	}
 }
 
-func createObject(group, kind, namespace, name string) runtime.Object {
+func createObject(group, kind, namespace, name string) *unstructured.Unstructured {
 	return &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"apiVersion": fmt.Sprintf("%s/v1", group),

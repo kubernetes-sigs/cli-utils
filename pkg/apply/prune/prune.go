@@ -21,7 +21,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/klog"
@@ -188,7 +187,7 @@ func preventDeleteAnnotation(annotations map[string]string) bool {
 }
 
 // createPruneEvent is a helper function to package a prune event.
-func createPruneEvent(obj runtime.Object, op event.PruneEventOperation) event.Event {
+func createPruneEvent(obj *unstructured.Unstructured, op event.PruneEventOperation) event.Event {
 	return event.Event{
 		Type: event.PruneType,
 		PruneEvent: event.PruneEvent{

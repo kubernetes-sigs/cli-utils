@@ -13,11 +13,12 @@ func _() {
 	var x [1]struct{}
 	_ = x[DeleteEventResourceUpdate-0]
 	_ = x[DeleteEventCompleted-1]
+	_ = x[DeleteEventFailed-2]
 }
 
-const _DeleteEventType_name = "DeleteEventResourceUpdateDeleteEventCompleted"
+const _DeleteEventType_name = "DeleteEventResourceUpdateDeleteEventCompletedDeleteEventFailed"
 
-var _DeleteEventType_index = [...]uint8{0, 25, 45}
+var _DeleteEventType_index = [...]uint8{0, 25, 45, 62}
 
 func (i DeleteEventType) String() string {
 	if i < 0 || i >= DeleteEventType(len(_DeleteEventType_index)-1) {
