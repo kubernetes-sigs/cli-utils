@@ -4,7 +4,7 @@
 package event
 
 import (
-	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	pollevent "sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
@@ -81,6 +81,7 @@ type ApplyEventType int
 const (
 	ApplyEventResourceUpdate ApplyEventType = iota
 	ApplyEventCompleted
+	ApplyEventFailed
 )
 
 //go:generate stringer -type=ApplyEventOperation
@@ -94,9 +95,11 @@ const (
 )
 
 type ApplyEvent struct {
-	Type      ApplyEventType
-	Operation ApplyEventOperation
-	Object    runtime.Object
+	Type       ApplyEventType
+	Operation  ApplyEventOperation
+	Object     *unstructured.Unstructured
+	Identifier object.ObjMetadata
+	Error      error
 }
 
 //go:generate stringer -type=StatusEventType
@@ -110,6 +113,7 @@ const (
 type StatusEvent struct {
 	Type     StatusEventType
 	Resource *pollevent.ResourceStatus
+	Error    error
 }
 
 //go:generate stringer -type=PruneEventType
@@ -118,6 +122,7 @@ type PruneEventType int
 const (
 	PruneEventResourceUpdate PruneEventType = iota
 	PruneEventCompleted
+	PruneEventFailed
 )
 
 //go:generate stringer -type=PruneEventOperation
@@ -129,9 +134,11 @@ const (
 )
 
 type PruneEvent struct {
-	Type      PruneEventType
-	Operation PruneEventOperation
-	Object    runtime.Object
+	Type       PruneEventType
+	Operation  PruneEventOperation
+	Object     *unstructured.Unstructured
+	Identifier object.ObjMetadata
+	Error      error
 }
 
 //go:generate stringer -type=DeleteEventType
@@ -140,6 +147,7 @@ type DeleteEventType int
 const (
 	DeleteEventResourceUpdate DeleteEventType = iota
 	DeleteEventCompleted
+	DeleteEventFailed
 )
 
 //go:generate stringer -type=DeleteEventOperation
@@ -151,7 +159,9 @@ const (
 )
 
 type DeleteEvent struct {
-	Type      DeleteEventType
-	Operation DeleteEventOperation
-	Object    runtime.Object
+	Type       DeleteEventType
+	Operation  DeleteEventOperation
+	Object     *unstructured.Unstructured
+	Identifier object.ObjMetadata
+	Error      error
 }
