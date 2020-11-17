@@ -268,35 +268,22 @@ func TestCreateInventory(t *testing.T) {
 
 func TestReplace(t *testing.T) {
 	tests := map[string]struct {
-		localInv    InventoryInfo
 		localObjs   []object.ObjMetadata
 		clusterObjs []object.ObjMetadata
-		isError     bool
 	}{
-		"Local inventory nil is error": {
-			localInv:    nil,
+		"Cluster and local inventories empty": {
 			localObjs:   []object.ObjMetadata{},
 			clusterObjs: []object.ObjMetadata{},
-			isError:     true,
 		},
-		"Cluster and local inventories empty: no error": {
-			localInv:    copyInventory(),
-			localObjs:   []object.ObjMetadata{},
-			clusterObjs: []object.ObjMetadata{},
-			isError:     false,
-		},
-		"Cluster and local inventories same: no error": {
-			localInv: copyInventory(),
+		"Cluster and local inventories same": {
 			localObjs: []object.ObjMetadata{
 				ignoreErrInfoToObjMeta(pod1Info),
 			},
 			clusterObjs: []object.ObjMetadata{
 				ignoreErrInfoToObjMeta(pod1Info),
 			},
-			isError: false,
 		},
-		"Cluster two obj, local one: no error": {
-			localInv: copyInventory(),
+		"Cluster two obj, local one": {
 			localObjs: []object.ObjMetadata{
 				ignoreErrInfoToObjMeta(pod1Info),
 			},
@@ -304,10 +291,8 @@ func TestReplace(t *testing.T) {
 				ignoreErrInfoToObjMeta(pod1Info),
 				ignoreErrInfoToObjMeta(pod3Info),
 			},
-			isError: false,
 		},
-		"Cluster multiple objs, local multiple different objs: no error": {
-			localInv: copyInventory(),
+		"Cluster multiple objs, local multiple different objs": {
 			localObjs: []object.ObjMetadata{
 				ignoreErrInfoToObjMeta(pod2Info),
 			},
@@ -315,38 +300,53 @@ func TestReplace(t *testing.T) {
 				ignoreErrInfoToObjMeta(pod1Info),
 				ignoreErrInfoToObjMeta(pod2Info),
 				ignoreErrInfoToObjMeta(pod3Info)},
-			isError: false,
 		},
 	}
 
 	tf := cmdtesting.NewTestFactory().WithNamespace(testNamespace)
 	defer tf.Cleanup()
 
+	// Client and server dry-run do not throw errors.
+	invClient, _ := NewInventoryClient(tf, WrapInventoryObj, InvInfoToConfigMap)
+	invClient.SetDryRunStrategy(common.DryRunClient)
+	err := invClient.Replace(copyInventory(), []object.ObjMetadata{})
+	if err != nil {
+		t.Fatalf("unexpected error received: %s", err)
+	}
+	invClient.SetDryRunStrategy(common.DryRunServer)
+	err = invClient.Replace(copyInventory(), []object.ObjMetadata{})
+	if err != nil {
+		t.Fatalf("unexpected error received: %s", err)
+	}
+
 	for name, tc := range tests {
-		for i := range common.Strategies {
-			drs := common.Strategies[i]
-			t.Run(name, func(t *testing.T) {
-				invClient, _ := NewInventoryClient(tf,
-					WrapInventoryObj, InvInfoToConfigMap)
-				invClient.SetDryRunStrategy(drs)
-				// Create fake builder returning the cluster inventory object
-				// storing the "tc.clusterObjs" objects.
-				fakeBuilder := FakeBuilder{}
-				fakeBuilder.SetInventoryObjs(tc.clusterObjs)
-				invClient.builderFunc = fakeBuilder.GetBuilder()
-				// Call "Replace", passing in the new local inventory objects
-				err := invClient.Replace(tc.localInv, tc.localObjs)
-				if tc.isError {
-					if err == nil {
-						t.Fatalf("expected error but received none")
-					}
-					return
-				}
-				if !tc.isError && err != nil {
-					t.Fatalf("unexpected error received: %s", err)
-				}
-			})
-		}
+		t.Run(name, func(t *testing.T) {
+			// Create inventory client, and store the cluster objs in the inventory object.
+			invClient, _ := NewInventoryClient(tf,
+				WrapInventoryObj, InvInfoToConfigMap)
+			wrappedInv := invClient.InventoryFactoryFunc(inventoryObj)
+			if err := wrappedInv.Store(tc.clusterObjs); err != nil {
+				t.Fatalf("unexpected error storing inventory objects: %s", err)
+			}
+			inv, err := wrappedInv.GetObject()
+			if err != nil {
+				t.Fatalf("unexpected error storing inventory objects: %s", err)
+			}
+			// Call replaceInventory with the new set of "localObjs"
+			inv, err = invClient.replaceInventory(inv, tc.localObjs)
+			if err != nil {
+				t.Fatalf("unexpected error received: %s", err)
+			}
+			wrappedInv = invClient.InventoryFactoryFunc(inv)
+			// Validate that the stored objects are now the "localObjs".
+			actualObjs, err := wrappedInv.Load()
+			if err != nil {
+				t.Fatalf("unexpected error received: %s", err)
+			}
+			if !object.SetEquals(tc.localObjs, actualObjs) {
+				t.Errorf("expected objects (%s), got (%s)", tc.localObjs, actualObjs)
+			}
+		})
 	}
 }
 

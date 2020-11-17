@@ -151,6 +151,11 @@ func (cic *ClusterInventoryClient) Merge(localInv InventoryInfo, objs []object.O
 // Replace stores the passed objects in the cluster inventory object, or
 // an error if one occurred.
 func (cic *ClusterInventoryClient) Replace(localInv InventoryInfo, objs []object.ObjMetadata) error {
+	// Skip entire function for dry-run.
+	if cic.dryRunStrategy.ClientOrServerDryRun() {
+		klog.V(4).Infoln("dry-run replace inventory object: not applied")
+		return nil
+	}
 	clusterObjs, err := cic.GetClusterObjs(localInv)
 	if err != nil {
 		return err
@@ -163,22 +168,29 @@ func (cic *ClusterInventoryClient) Replace(localInv InventoryInfo, objs []object
 	if err != nil {
 		return err
 	}
-	wrappedInv := cic.InventoryFactoryFunc(clusterInv)
-	if err = wrappedInv.Store(objs); err != nil {
+	clusterInv, err = cic.replaceInventory(clusterInv, objs)
+	if err != nil {
 		return err
 	}
-	if !cic.dryRunStrategy.ClientOrServerDryRun() {
-		clusterInv, err = wrappedInv.GetObject()
-		if err != nil {
-			return err
-		}
-		klog.V(4).Infof("replace cluster inventory: %s/%s", clusterInv.GetNamespace(), clusterInv.GetName())
-		klog.V(4).Infof("replace cluster inventory %d objects", len(objs))
-		if err := cic.applyInventoryObj(clusterInv); err != nil {
-			return err
-		}
+	klog.V(4).Infof("replace cluster inventory: %s/%s", clusterInv.GetNamespace(), clusterInv.GetName())
+	klog.V(4).Infof("replace cluster inventory %d objects", len(objs))
+	if err := cic.applyInventoryObj(clusterInv); err != nil {
+		return err
 	}
 	return nil
+}
+
+// replaceInventory stores the passed objects into the passed inventory object.
+func (cic *ClusterInventoryClient) replaceInventory(inv *unstructured.Unstructured, objs []object.ObjMetadata) (*unstructured.Unstructured, error) {
+	wrappedInv := cic.InventoryFactoryFunc(inv)
+	if err := wrappedInv.Store(objs); err != nil {
+		return nil, err
+	}
+	clusterInv, err := wrappedInv.GetObject()
+	if err != nil {
+		return nil, err
+	}
+	return clusterInv, nil
 }
 
 // DeleteInventoryObj deletes the inventory object from the cluster.
