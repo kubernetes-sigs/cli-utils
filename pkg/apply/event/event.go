@@ -113,7 +113,6 @@ const (
 type StatusEvent struct {
 	Type     StatusEventType
 	Resource *pollevent.ResourceStatus
-	Error    error
 }
 
 //go:generate stringer -type=PruneEventType
