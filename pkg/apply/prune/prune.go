@@ -89,6 +89,8 @@ func (po *PruneOptions) Prune(localInv inventory.InventoryInfo, localObjs []*uns
 	}
 	invNamespace := localInv.Namespace()
 	klog.V(4).Infof("prune local inventory object: %s/%s", invNamespace, localInv.Name())
+	// Get the list of Object Meta from the local objects.
+	localIds := object.UnstructuredsToObjMetas(localObjs)
 	// Create the set of namespaces for currently (locally) applied objects, including
 	// the namespace the inventory object lives in (if it's not cluster-scoped). When
 	// pruning, check this set of namespaces to ensure these namespaces are not deleted.
@@ -108,7 +110,9 @@ func (po *PruneOptions) Prune(localInv inventory.InventoryInfo, localObjs []*uns
 	for _, clusterObj := range clusterObjs {
 		mapping, err := po.mapper.RESTMapping(clusterObj.GroupKind)
 		if err != nil {
-			return err
+			localIds = append(localIds, clusterObj)
+			eventChannel <- createPruneFailedEvent(clusterObj, err)
+			continue
 		}
 		namespacedClient := po.client.Resource(mapping.Resource).Namespace(clusterObj.Namespace)
 		obj, err := namespacedClient.Get(context.TODO(), clusterObj.Name, metav1.GetOptions{})
@@ -117,11 +121,15 @@ func (po *PruneOptions) Prune(localInv inventory.InventoryInfo, localObjs []*uns
 			if apierrors.IsNotFound(err) {
 				continue
 			}
-			return err
+			localIds = append(localIds, clusterObj)
+			eventChannel <- createPruneFailedEvent(clusterObj, err)
+			continue
 		}
 		metadata, err := meta.Accessor(obj)
 		if err != nil {
-			return err
+			localIds = append(localIds, clusterObj)
+			eventChannel <- createPruneFailedEvent(clusterObj, err)
+			continue
 		}
 		// If this cluster object is not also a currently applied
 		// object, then it has been omitted--prune it. If the cluster
@@ -135,16 +143,18 @@ func (po *PruneOptions) Prune(localInv inventory.InventoryInfo, localObjs []*uns
 		// Handle lifecycle directive preventing deletion.
 		if preventDeleteAnnotation(metadata.GetAnnotations()) {
 			klog.V(7).Infof("prune object lifecycle directive; do not prune: %s", uid)
-			eventChannel <- createPruneEvent(obj, event.PruneSkipped)
+			eventChannel <- createPruneEvent(clusterObj, obj, event.PruneSkipped)
+			localIds = append(localIds, clusterObj)
 			continue
 		}
 		// If regular pruning (not destroying), skip deleting namespace containing
 		// currently applied objects.
 		if !po.Destroy {
 			if clusterObj.GroupKind == object.CoreV1Namespace.GroupKind() &&
-				clusterObj.Name == localInv.Namespace() {
+				localNamespaces.Has(clusterObj.Name) {
 				klog.V(7).Infof("skip pruning inventory namespace: %s", obj)
-				eventChannel <- createPruneEvent(obj, event.PruneSkipped)
+				eventChannel <- createPruneEvent(clusterObj, obj, event.PruneSkipped)
+				localIds = append(localIds, clusterObj)
 				continue
 			}
 		}
@@ -152,12 +162,13 @@ func (po *PruneOptions) Prune(localInv inventory.InventoryInfo, localObjs []*uns
 			klog.V(4).Infof("prune object delete: %s/%s", clusterObj.Namespace, clusterObj.Name)
 			err = namespacedClient.Delete(context.TODO(), clusterObj.Name, metav1.DeleteOptions{})
 			if err != nil {
-				return err
+				eventChannel <- createPruneFailedEvent(clusterObj, err)
+				localIds = append(localIds, clusterObj)
+				continue
 			}
 		}
-		eventChannel <- createPruneEvent(obj, event.Pruned)
+		eventChannel <- createPruneEvent(clusterObj, obj, event.Pruned)
 	}
-	localIds := object.UnstructuredsToObjMetas(localObjs)
 	return po.InvClient.Replace(localInv, localIds)
 }
 
@@ -187,13 +198,26 @@ func preventDeleteAnnotation(annotations map[string]string) bool {
 }
 
 // createPruneEvent is a helper function to package a prune event.
-func createPruneEvent(obj *unstructured.Unstructured, op event.PruneEventOperation) event.Event {
+func createPruneEvent(id object.ObjMetadata, obj *unstructured.Unstructured, op event.PruneEventOperation) event.Event {
 	return event.Event{
 		Type: event.PruneType,
 		PruneEvent: event.PruneEvent{
-			Type:      event.PruneEventResourceUpdate,
-			Operation: op,
-			Object:    obj,
+			Type:       event.PruneEventResourceUpdate,
+			Operation:  op,
+			Object:     obj,
+			Identifier: id,
+		},
+	}
+}
+
+// createPruneEvent is a helper function to package a prune event for a failure.
+func createPruneFailedEvent(objMeta object.ObjMetadata, err error) event.Event {
+	return event.Event{
+		Type: event.PruneType,
+		PruneEvent: event.PruneEvent{
+			Type:       event.PruneEventFailed,
+			Identifier: objMeta,
+			Error:      err,
 		},
 	}
 }
