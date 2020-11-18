@@ -142,7 +142,7 @@ func (po *PruneOptions) Prune(localInv inventory.InventoryInfo, localObjs []*uns
 		}
 		// Handle lifecycle directive preventing deletion.
 		if preventDeleteAnnotation(metadata.GetAnnotations()) {
-			klog.V(7).Infof("prune object lifecycle directive; do not prune: %s", uid)
+			klog.V(4).Infof("prune object lifecycle directive; do not prune: %s", uid)
 			eventChannel <- createPruneEvent(clusterObj, obj, event.PruneSkipped)
 			localIds = append(localIds, clusterObj)
 			continue
@@ -152,7 +152,7 @@ func (po *PruneOptions) Prune(localInv inventory.InventoryInfo, localObjs []*uns
 		if !po.Destroy {
 			if clusterObj.GroupKind == object.CoreV1Namespace.GroupKind() &&
 				localNamespaces.Has(clusterObj.Name) {
-				klog.V(7).Infof("skip pruning inventory namespace: %s", obj)
+				klog.V(4).Infof("skip pruning namespace: %s", clusterObj.Name)
 				eventChannel <- createPruneEvent(clusterObj, obj, event.PruneSkipped)
 				localIds = append(localIds, clusterObj)
 				continue
