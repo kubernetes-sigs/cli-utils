@@ -157,6 +157,7 @@ func allInSameNamespace(packageDir string) (string, bool, error) {
 		// Skip found cluster-scoped resources. If not found, just assume namespaced.
 		namespaced, found := openapi.IsNamespaceScoped(rm.TypeMeta)
 		if found && !namespaced {
+			klog.V(6).Infof("cluster-scoped resource %s--skip namespace calc", rm.TypeMeta)
 			continue
 		}
 		if rm.Namespace == "" {
