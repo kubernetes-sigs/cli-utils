@@ -93,6 +93,8 @@ func (ef *formatter) FormatDeleteEvent(de event.DeleteEvent, ds *list.DeleteStat
 		case event.DeleteSkipped:
 			ef.print("%s %s", resourceIDToString(gvk.GroupKind(), name), "delete skipped")
 		}
+	case event.DeleteEventFailed:
+		ef.print("%s %s", resourceIDToString(de.Identifier.GroupKind, de.Identifier.Name), "deletion failed")
 	}
 	return nil
 }
