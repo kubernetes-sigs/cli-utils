@@ -15,12 +15,12 @@ import (
 
 // InfoHelper provides functions for interacting with Info objects.
 type InfoHelper interface {
-	// UpdateInfos sets the mapping and client for the provided Info
+	// UpdateInfo sets the mapping and client for the provided Info
 	// objects. This must be called at a time when all needed resource
 	// types are available in the RESTMapper.
-	UpdateInfos(infos []*resource.Info) error
+	UpdateInfo(infos *resource.Info) error
 
-	BuildInfos(objs []*unstructured.Unstructured) ([]*resource.Info, error)
+	BuildInfo(obj *unstructured.Unstructured) (*resource.Info, error)
 }
 
 func NewInfoHelper(factory util.Factory) *infoHelper {
@@ -55,6 +55,26 @@ func (ih *infoHelper) UpdateInfos(infos []*resource.Info) error {
 	return nil
 }
 
+func (ih *infoHelper) UpdateInfo(info *resource.Info) error {
+	mapper, err := ih.factory.ToRESTMapper()
+	if err != nil {
+		return err
+	}
+	gvk := info.Object.GetObjectKind().GroupVersionKind()
+	mapping, err := mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+	if err != nil {
+		return err
+	}
+	info.Mapping = mapping
+
+	c, err := ih.getClient(gvk.GroupVersion())
+	if err != nil {
+		return err
+	}
+	info.Client = c
+	return nil
+}
+
 func (ih *infoHelper) BuildInfos(objs []*unstructured.Unstructured) ([]*resource.Info, error) {
 	infos, err := object.UnstructuredsToInfos(objs)
 	if err != nil {
@@ -65,6 +85,15 @@ func (ih *infoHelper) BuildInfos(objs []*unstructured.Unstructured) ([]*resource
 		return nil, err
 	}
 	return infos, nil
+}
+
+func (ih *infoHelper) BuildInfo(obj *unstructured.Unstructured) (*resource.Info, error) {
+	info, err := object.UnstructuredToInfo(obj)
+	if err != nil {
+		return nil, err
+	}
+	err = ih.UpdateInfo(info)
+	return info, err
 }
 
 func (ih *infoHelper) ToRESTMapper() (meta.RESTMapper, error) {

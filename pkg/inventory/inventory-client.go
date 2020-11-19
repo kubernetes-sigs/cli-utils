@@ -444,11 +444,7 @@ func (cic *ClusterInventoryClient) ApplyInventoryNamespace(obj *unstructured.Uns
 }
 
 func (cic *ClusterInventoryClient) toInfo(obj *unstructured.Unstructured) (*resource.Info, error) {
-	invInfos, err := cic.infoHelper.BuildInfos([]*unstructured.Unstructured{obj})
-	if err != nil {
-		return nil, err
-	}
-	return invInfos[0], nil
+	return cic.infoHelper.BuildInfo(obj)
 }
 
 // helperFromInfo returns the resource.Helper to talk to the APIServer based

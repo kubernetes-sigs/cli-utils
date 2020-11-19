@@ -15,6 +15,7 @@ import (
 	"k8s.io/kubectl/pkg/cmd/delete"
 	"k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/slice"
+	applyerror "sigs.k8s.io/cli-utils/pkg/apply/error"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/info"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
@@ -72,7 +73,8 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 			// the resource set.
 			objs, objsWithCRD, err := a.filterCRsWithCRDInSet(objects)
 			if err != nil {
-				a.sendTaskResult(taskContext, err)
+				taskContext.EventChannel() <- createApplyFailedEvent(object.ObjMetadata{}, err)
+				a.sendTaskResult(taskContext)
 				return
 			}
 
@@ -97,15 +99,7 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 		// for that here. It could happen if this is dry-run and we removed
 		// all resources in the previous step.
 		if len(objects) == 0 {
-			a.sendTaskResult(taskContext, nil)
-			return
-		}
-
-		// Set the client and mapping fields on the provided
-		// infos so they can be applied to the cluster.
-		infos, err := a.InfoHelper.BuildInfos(objects)
-		if err != nil {
-			a.sendTaskResult(taskContext, err)
+			a.sendTaskResult(taskContext)
 			return
 		}
 
@@ -114,15 +108,31 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 		ao, err := applyOptionsFactoryFunc(taskContext.EventChannel(),
 			a.ServerSideOptions, a.DryRunStrategy, a.Factory)
 		if err != nil {
-			a.sendTaskResult(taskContext, err)
+			taskContext.EventChannel() <- createApplyFailedEvent(object.ObjMetadata{},
+				applyerror.NewInitializeApplyOptionError(err))
+			a.sendTaskResult(taskContext)
 			return
 		}
-		ao.SetObjects(infos)
-		err = ao.Run()
-		if err != nil {
-			a.sendTaskResult(taskContext, err)
-			return
+
+		var infos []*resource.Info
+		for _, obj := range objects {
+			// Set the client and mapping fields on the provided
+			// info so they can be applied to the cluster.
+			info, err := a.InfoHelper.BuildInfo(obj)
+			if err != nil {
+				taskContext.EventChannel() <- createApplyFailedEvent(object.UnstructuredToObjMeta(obj),
+					applyerror.NewUnknwonTypeError(err))
+				continue
+			}
+			infos = append(infos, info)
+			ao.SetObjects([]*resource.Info{info})
+			err = ao.Run()
+			if err != nil {
+				taskContext.EventChannel() <- createApplyFailedEvent(object.UnstructuredToObjMeta(obj),
+					applyerror.NewApplyRunError(err))
+			}
 		}
+
 		// Fetch the Generation from all Infos after they have been
 		// applied.
 		for _, inf := range infos {
@@ -140,7 +150,7 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 				taskContext.ResourceApplied(id, uid, gen)
 			}
 		}
-		a.sendTaskResult(taskContext, nil)
+		a.sendTaskResult(taskContext)
 	}()
 }
 
@@ -187,9 +197,9 @@ func newApplyOptions(eventChannel chan event.Event, serverSideOptions common.Ser
 	}, nil
 }
 
-func (a *ApplyTask) sendTaskResult(taskContext *taskrunner.TaskContext, err error) {
+func (a *ApplyTask) sendTaskResult(taskContext *taskrunner.TaskContext) {
 	taskContext.TaskChannel() <- taskrunner.TaskResult{
-		Err: err,
+		Err: nil,
 	}
 }
 
@@ -277,3 +287,15 @@ func buildCRDsInfo(crds []*unstructured.Unstructured) *crdsInfo {
 
 // ClearTimeout is not supported by the ApplyTask.
 func (a *ApplyTask) ClearTimeout() {}
+
+// createApplyFailedEvent is a helper function to package an apply failure event.
+func createApplyFailedEvent(id object.ObjMetadata, err error) event.Event {
+	return event.Event{
+		Type: event.ApplyType,
+		ApplyEvent: event.ApplyEvent{
+			Type:       event.ApplyEventFailed,
+			Identifier: id,
+			Error:      err,
+		},
+	}
+}
