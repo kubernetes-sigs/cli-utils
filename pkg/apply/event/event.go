@@ -81,7 +81,6 @@ type ApplyEventType int
 const (
 	ApplyEventResourceUpdate ApplyEventType = iota
 	ApplyEventCompleted
-	ApplyEventFailed
 )
 
 //go:generate stringer -type=ApplyEventOperation

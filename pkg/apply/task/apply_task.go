@@ -73,7 +73,7 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 			// the resource set.
 			objs, objsWithCRD, err := a.filterCRsWithCRDInSet(objects)
 			if err != nil {
-				taskContext.EventChannel() <- createApplyFailedEvent(object.ObjMetadata{}, err)
+				sendBatchApplyEvents(taskContext, objs, err)
 				a.sendTaskResult(taskContext)
 				return
 			}
@@ -82,14 +82,7 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 			// Created event since the type didn't already exist in the
 			// cluster.
 			for _, obj := range objsWithCRD {
-				taskContext.EventChannel() <- event.Event{
-					Type: event.ApplyType,
-					ApplyEvent: event.ApplyEvent{
-						Type:      event.ApplyEventResourceUpdate,
-						Operation: event.Created,
-						Object:    obj,
-					},
-				}
+				taskContext.EventChannel() <- createApplyEvent(object.UnstructuredToObjMeta(obj), event.Created, nil)
 			}
 			// Update the resource set to no longer include the CRs.
 			objects = objs
@@ -108,8 +101,7 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 		ao, err := applyOptionsFactoryFunc(taskContext.EventChannel(),
 			a.ServerSideOptions, a.DryRunStrategy, a.Factory)
 		if err != nil {
-			taskContext.EventChannel() <- createApplyFailedEvent(object.ObjMetadata{},
-				applyerror.NewInitializeApplyOptionError(err))
+			sendBatchApplyEvents(taskContext, objects, err)
 			a.sendTaskResult(taskContext)
 			return
 		}
@@ -120,16 +112,16 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 			// info so they can be applied to the cluster.
 			info, err := a.InfoHelper.BuildInfo(obj)
 			if err != nil {
-				taskContext.EventChannel() <- createApplyFailedEvent(object.UnstructuredToObjMeta(obj),
-					applyerror.NewUnknwonTypeError(err))
+				taskContext.EventChannel() <- createApplyEvent(
+					object.UnstructuredToObjMeta(obj), event.Unchanged, applyerror.NewUnknownTypeError(err))
 				continue
 			}
 			infos = append(infos, info)
 			ao.SetObjects([]*resource.Info{info})
 			err = ao.Run()
 			if err != nil {
-				taskContext.EventChannel() <- createApplyFailedEvent(object.UnstructuredToObjMeta(obj),
-					applyerror.NewApplyRunError(err))
+				taskContext.EventChannel() <- createApplyEvent(
+					object.UnstructuredToObjMeta(obj), event.Unchanged, applyerror.NewApplyRunError(err))
 			}
 		}
 
@@ -198,9 +190,7 @@ func newApplyOptions(eventChannel chan event.Event, serverSideOptions common.Ser
 }
 
 func (a *ApplyTask) sendTaskResult(taskContext *taskrunner.TaskContext) {
-	taskContext.TaskChannel() <- taskrunner.TaskResult{
-		Err: nil,
-	}
+	taskContext.TaskChannel() <- taskrunner.TaskResult{}
 }
 
 // filterCRsWithCRDInSet loops through all the resources and filters out the
@@ -288,14 +278,24 @@ func buildCRDsInfo(crds []*unstructured.Unstructured) *crdsInfo {
 // ClearTimeout is not supported by the ApplyTask.
 func (a *ApplyTask) ClearTimeout() {}
 
-// createApplyFailedEvent is a helper function to package an apply failure event.
-func createApplyFailedEvent(id object.ObjMetadata, err error) event.Event {
+// createApplyEvent is a helper function to package an apply event for a single resource.
+func createApplyEvent(id object.ObjMetadata, operation event.ApplyEventOperation, err error) event.Event {
 	return event.Event{
 		Type: event.ApplyType,
 		ApplyEvent: event.ApplyEvent{
-			Type:       event.ApplyEventFailed,
+			Type:       event.ApplyEventResourceUpdate,
+			Operation:  operation,
 			Identifier: id,
 			Error:      err,
 		},
+	}
+}
+
+// sendBatchApplyEvents is a helper function to send out multiple apply events for
+// a list of resources when failed to initialize the apply process.
+func sendBatchApplyEvents(taskContext *taskrunner.TaskContext, objects []*unstructured.Unstructured, err error) {
+	for _, obj := range objects {
+		taskContext.EventChannel() <- createApplyEvent(
+			object.UnstructuredToObjMeta(obj), event.Unchanged, applyerror.NewInitializeApplyOptionError(err))
 	}
 }

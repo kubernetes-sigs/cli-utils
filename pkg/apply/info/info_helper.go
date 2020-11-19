@@ -16,9 +16,9 @@ import (
 // InfoHelper provides functions for interacting with Info objects.
 type InfoHelper interface {
 	// UpdateInfo sets the mapping and client for the provided Info
-	// objects. This must be called at a time when all needed resource
+	// object. This must be called at a time when all needed resource
 	// types are available in the RESTMapper.
-	UpdateInfo(infos *resource.Info) error
+	UpdateInfo(info *resource.Info) error
 
 	BuildInfo(obj *unstructured.Unstructured) (*resource.Info, error)
 }

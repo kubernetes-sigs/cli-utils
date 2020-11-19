@@ -2,16 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 package error
 
-type UnknwonTypeError struct {
+type UnknownTypeError struct {
 	err error
 }
 
-func (e *UnknwonTypeError) Error() string {
+func (e *UnknownTypeError) Error() string {
 	return e.err.Error()
 }
 
-func NewUnknwonTypeError(err error) *UnknwonTypeError {
-	return &UnknwonTypeError{err: err}
+func NewUnknownTypeError(err error) *UnknownTypeError {
+	return &UnknownTypeError{err: err}
 }
 
 type ApplyRunError struct {
