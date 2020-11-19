@@ -124,6 +124,18 @@ func runPruneEventTransformer(eventChannel chan event.Event) (chan event.Event, 
 	go func() {
 		defer close(completedChannel)
 		for msg := range tempEventChannel {
+			if msg.PruneEvent.Type == event.PruneEventFailed {
+				eventChannel <- event.Event{
+					Type: event.DeleteType,
+					DeleteEvent: event.DeleteEvent{
+						Type:       event.DeleteEventFailed,
+						Operation:  transformPruneOperation(msg.PruneEvent.Operation),
+						Object:     msg.PruneEvent.Object,
+						Identifier: msg.PruneEvent.Identifier,
+					},
+				}
+				continue
+			}
 			eventChannel <- event.Event{
 				Type: event.DeleteType,
 				DeleteEvent: event.DeleteEvent{
