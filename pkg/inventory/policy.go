@@ -3,6 +3,10 @@
 
 package inventory
 
+import (
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+)
+
 // InventoryPolicy defines if an inventory object can take over
 // objects that belong to another inventory object or don't
 // belong to any inventory object.
@@ -56,3 +60,59 @@ const (
 	//   in the package.
 	AdoptAll
 )
+
+const owningInventoryKey = "config.kubernetes.io/owning-inventory"
+
+// inventoryIDMatchStatus represents the result of comparing the
+// id from current inventory info and the inventory-id from a live object.
+type inventoryIDMatchStatus int
+
+const (
+	Empty inventoryIDMatchStatus = iota
+	Match
+	Unmatch
+)
+
+func inventoryIDMatch(inv InventoryInfo, obj *unstructured.Unstructured) inventoryIDMatchStatus {
+	annotations := obj.GetAnnotations()
+	value, found := annotations[owningInventoryKey]
+	if !found {
+		return Empty
+	}
+	if value == inv.ID() {
+		return Match
+	}
+	return Unmatch
+}
+
+func CanApply(inv InventoryInfo, obj *unstructured.Unstructured, policy InventoryPolicy) bool {
+	if obj == nil {
+		return true
+	}
+	matchStatus := inventoryIDMatch(inv, obj)
+	switch matchStatus {
+	case Empty:
+		return policy != InventoryPolicyMustMatch
+	case Match:
+		return true
+	case Unmatch:
+		return policy == AdoptAll
+	}
+	return false
+}
+
+func CanPrune(inv InventoryInfo, obj *unstructured.Unstructured, policy InventoryPolicy) bool {
+	if obj == nil {
+		return false
+	}
+	matchStatus := inventoryIDMatch(inv, obj)
+	switch matchStatus {
+	case Empty:
+		return false
+	case Match:
+		return true
+	case Unmatch:
+		return false
+	}
+	return false
+}
