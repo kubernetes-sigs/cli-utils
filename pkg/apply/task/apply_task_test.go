@@ -4,6 +4,8 @@
 package task
 
 import (
+	"fmt"
+	"strings"
 	"sync"
 	"testing"
 
@@ -288,6 +290,137 @@ func TestApplyTask_DryRun(t *testing.T) {
 	}
 }
 
+func TestApplyTaskWithError(t *testing.T) {
+	testCases := map[string]struct {
+		objs            []*unstructured.Unstructured
+		crds            []*unstructured.Unstructured
+		expectedObjects []object.ObjMetadata
+		expectedEvents  []event.Event
+	}{
+		"some resources have apply error": {
+			crds: []*unstructured.Unstructured{
+				toUnstructured(map[string]interface{}{
+					"apiVersion": "apiextensions.k8s.io/v1",
+					"kind":       "CustomResourceDefinition",
+					"metadata": map[string]interface{}{
+						"name": "foo",
+					},
+					"spec": map[string]interface{}{
+						"group": "anothercustom.io",
+						"names": map[string]interface{}{
+							"kind": "AnotherCustom",
+						},
+						"versions": []interface{}{
+							map[string]interface{}{
+								"name": "v2",
+							},
+						},
+					},
+				}),
+			},
+			objs: []*unstructured.Unstructured{
+				toUnstructured(map[string]interface{}{
+					"apiVersion": "anothercustom.io/v2",
+					"kind":       "AnotherCustom",
+					"metadata": map[string]interface{}{
+						"name":      "bar",
+						"namespace": "barbar",
+					},
+				}),
+				toUnstructured(map[string]interface{}{
+					"apiVersion": "anothercustom.io/v2",
+					"kind":       "AnotherCustom",
+					"metadata": map[string]interface{}{
+						"name":      "bar-with-failure",
+						"namespace": "barbar",
+					},
+				}),
+			},
+			expectedObjects: []object.ObjMetadata{
+				{
+					GroupKind: schema.GroupKind{
+						Group: "anothercustom.io",
+						Kind:  "AnotherCustom",
+					},
+					Name:      "bar",
+					Namespace: "barbar",
+				},
+			},
+			expectedEvents: []event.Event{
+				{
+					Type: event.ApplyType,
+					ApplyEvent: event.ApplyEvent{
+						Error: fmt.Errorf("expected apply error"),
+					},
+				},
+			},
+		},
+	}
+
+	for tn, tc := range testCases {
+		drs := common.DryRunNone
+		t.Run(tn, func(t *testing.T) {
+			eventChannel := make(chan event.Event)
+			taskContext := taskrunner.NewTaskContext(eventChannel)
+
+			restMapper := testutil.NewFakeRESTMapper(schema.GroupVersionKind{
+				Group:   "apps",
+				Version: "v1",
+				Kind:    "Deployment",
+			}, schema.GroupVersionKind{
+				Group:   "anothercustom.io",
+				Version: "v2",
+				Kind:    "AnotherCustom",
+			})
+
+			ao := &fakeApplyOptions{}
+			oldAO := applyOptionsFactoryFunc
+			applyOptionsFactoryFunc = func(chan event.Event, common.ServerSideOptions, common.DryRunStrategy, util.Factory) (applyOptions, error) {
+				return ao, nil
+			}
+			defer func() { applyOptionsFactoryFunc = oldAO }()
+
+			applyTask := &ApplyTask{
+				Objects:        tc.objs,
+				InfoHelper:     &fakeInfoHelper{},
+				Mapper:         restMapper,
+				DryRunStrategy: drs,
+				CRDs:           tc.crds,
+			}
+
+			var events []event.Event
+			var wg sync.WaitGroup
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				for msg := range eventChannel {
+					events = append(events, msg)
+				}
+			}()
+
+			applyTask.Start(taskContext)
+			<-taskContext.TaskChannel()
+			close(eventChannel)
+			wg.Wait()
+
+			assert.Equal(t, len(tc.expectedObjects), len(ao.passedObjects))
+			for i, obj := range ao.passedObjects {
+				actual, err := object.InfoToObjMeta(obj)
+				if err != nil {
+					continue
+				}
+				assert.Equal(t, tc.expectedObjects[i], actual)
+			}
+
+			assert.Equal(t, len(tc.expectedEvents), len(events))
+			for i, e := range events {
+				assert.Equal(t, tc.expectedEvents[i].Type, e.Type)
+				assert.Equal(t, tc.expectedEvents[i].ApplyEvent.Error.Error(), e.ApplyEvent.Error.Error())
+			}
+		})
+	}
+}
+
 func toUnstructured(obj map[string]interface{}) *unstructured.Unstructured {
 	return &unstructured.Unstructured{
 		Object: obj,
@@ -315,11 +448,20 @@ func toUnstructureds(rss []resourceInfo) []*unstructured.Unstructured {
 }
 
 type fakeApplyOptions struct {
-	objects []*resource.Info
+	objects       []*resource.Info
+	passedObjects []*resource.Info
 }
 
 func (f *fakeApplyOptions) Run() error {
-	return nil
+	var err error
+	for _, obj := range f.objects {
+		if strings.Contains(obj.Name, "failure") {
+			err = fmt.Errorf("expected apply error")
+		} else {
+			f.passedObjects = append(f.passedObjects, obj)
+		}
+	}
+	return err
 }
 
 func (f *fakeApplyOptions) SetObjects(objects []*resource.Info) {
@@ -328,10 +470,14 @@ func (f *fakeApplyOptions) SetObjects(objects []*resource.Info) {
 
 type fakeInfoHelper struct{}
 
-func (f *fakeInfoHelper) UpdateInfos([]*resource.Info) error {
+func (f *fakeInfoHelper) UpdateInfo(*resource.Info) error {
 	return nil
 }
 
 func (f *fakeInfoHelper) BuildInfos(objs []*unstructured.Unstructured) ([]*resource.Info, error) {
 	return object.UnstructuredsToInfos(objs)
+}
+
+func (f *fakeInfoHelper) BuildInfo(obj *unstructured.Unstructured) (*resource.Info, error) {
+	return object.UnstructuredToInfo(obj)
 }

@@ -13,12 +13,11 @@ func _() {
 	var x [1]struct{}
 	_ = x[ApplyEventResourceUpdate-0]
 	_ = x[ApplyEventCompleted-1]
-	_ = x[ApplyEventFailed-2]
 }
 
-const _ApplyEventType_name = "ApplyEventResourceUpdateApplyEventCompletedApplyEventFailed"
+const _ApplyEventType_name = "ApplyEventResourceUpdateApplyEventCompleted"
 
-var _ApplyEventType_index = [...]uint8{0, 24, 43, 59}
+var _ApplyEventType_index = [...]uint8{0, 24, 43}
 
 func (i ApplyEventType) String() string {
 	if i < 0 || i >= ApplyEventType(len(_ApplyEventType_index)-1) {

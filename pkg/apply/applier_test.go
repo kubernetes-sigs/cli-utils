@@ -708,43 +708,35 @@ type fakeInfoHelper struct {
 // TODO(mortent): This has too much code in common with the
 // infoHelper implementation. We need to find a better way to structure
 // this.
-func (f *fakeInfoHelper) UpdateInfos(infos []*resource.Info) error {
+func (f *fakeInfoHelper) UpdateInfo(info *resource.Info) error {
 	mapper, err := f.factory.ToRESTMapper()
 	if err != nil {
 		return err
 	}
-	for _, info := range infos {
-		gvk := info.Object.GetObjectKind().GroupVersionKind()
-		mapping, err := mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
-		if err != nil {
-			return err
-		}
-		info.Mapping = mapping
-
-		c, err := f.getClient(gvk.GroupVersion())
-		if err != nil {
-			return err
-		}
-		info.Client = c
+	gvk := info.Object.GetObjectKind().GroupVersionKind()
+	mapping, err := mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+	if err != nil {
+		return err
 	}
+	info.Mapping = mapping
+
+	c, err := f.getClient(gvk.GroupVersion())
+	if err != nil {
+		return err
+	}
+	info.Client = c
 	return nil
 }
 
-func (f *fakeInfoHelper) BuildInfos(objs []*unstructured.Unstructured) ([]*resource.Info, error) {
-	var infos []*resource.Info
-	for _, obj := range objs {
-		infos = append(infos, &resource.Info{
-			Name:      obj.GetName(),
-			Namespace: obj.GetNamespace(),
-			Source:    "unstructured",
-			Object:    obj,
-		})
+func (f *fakeInfoHelper) BuildInfo(obj *unstructured.Unstructured) (*resource.Info, error) {
+	info := &resource.Info{
+		Name:      obj.GetName(),
+		Namespace: obj.GetNamespace(),
+		Source:    "unstructured",
+		Object:    obj,
 	}
-	err := f.UpdateInfos(infos)
-	if err != nil {
-		return nil, err
-	}
-	return infos, nil
+	err := f.UpdateInfo(info)
+	return info, err
 }
 
 func (f *fakeInfoHelper) getClient(gv schema.GroupVersion) (resource.RESTClient, error) {
