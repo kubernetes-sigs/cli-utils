@@ -61,7 +61,7 @@ const (
 	AdoptAll
 )
 
-const owningInventoryKey = "config.kubernetes.io/owning-inventory"
+const owningInventoryKey = "config.k8s.io/owning-inventory"
 
 // inventoryIDMatchStatus represents the result of comparing the
 // id from current inventory info and the inventory-id from a live object.
@@ -70,7 +70,7 @@ type inventoryIDMatchStatus int
 const (
 	Empty inventoryIDMatchStatus = iota
 	Match
-	Unmatch
+	NoMatch
 )
 
 func inventoryIDMatch(inv InventoryInfo, obj *unstructured.Unstructured) inventoryIDMatchStatus {
@@ -82,7 +82,7 @@ func inventoryIDMatch(inv InventoryInfo, obj *unstructured.Unstructured) invento
 	if value == inv.ID() {
 		return Match
 	}
-	return Unmatch
+	return NoMatch
 }
 
 func CanApply(inv InventoryInfo, obj *unstructured.Unstructured, policy InventoryPolicy) bool {
@@ -95,7 +95,7 @@ func CanApply(inv InventoryInfo, obj *unstructured.Unstructured, policy Inventor
 		return policy != InventoryPolicyMustMatch
 	case Match:
 		return true
-	case Unmatch:
+	case NoMatch:
 		return policy == AdoptAll
 	}
 	return false
@@ -111,7 +111,7 @@ func CanPrune(inv InventoryInfo, obj *unstructured.Unstructured, policy Inventor
 		return false
 	case Match:
 		return true
-	case Unmatch:
+	case NoMatch:
 		return false
 	}
 	return false
