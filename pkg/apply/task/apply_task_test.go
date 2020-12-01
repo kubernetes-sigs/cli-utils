@@ -14,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/cli-runtime/pkg/resource"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
@@ -80,16 +81,19 @@ func TestApplyTask_FetchGeneration(t *testing.T) {
 			objs := toUnstructureds(tc.rss)
 
 			oldAO := applyOptionsFactoryFunc
-			applyOptionsFactoryFunc = func(chan event.Event, common.ServerSideOptions, common.DryRunStrategy, util.Factory) (applyOptions, error) {
-				return &fakeApplyOptions{}, nil
+			applyOptionsFactoryFunc = func(chan event.Event, common.ServerSideOptions, common.DryRunStrategy, util.Factory) (applyOptions, dynamic.Interface, error) {
+				return &fakeApplyOptions{}, nil, nil
 			}
 			defer func() { applyOptionsFactoryFunc = oldAO }()
-
 			applyTask := &ApplyTask{
 				Objects:    objs,
 				InfoHelper: &fakeInfoHelper{},
+				InvInfo:    &fakeInventoryInfo{},
 			}
 
+			getClusterObj = func(d dynamic.Interface, info *resource.Info) (*unstructured.Unstructured, error) {
+				return objs[0], nil
+			}
 			applyTask.Start(taskContext)
 
 			<-taskContext.TaskChannel()
@@ -244,10 +248,13 @@ func TestApplyTask_DryRun(t *testing.T) {
 
 				ao := &fakeApplyOptions{}
 				oldAO := applyOptionsFactoryFunc
-				applyOptionsFactoryFunc = func(chan event.Event, common.ServerSideOptions, common.DryRunStrategy, util.Factory) (applyOptions, error) {
-					return ao, nil
+				applyOptionsFactoryFunc = func(chan event.Event, common.ServerSideOptions, common.DryRunStrategy, util.Factory) (applyOptions, dynamic.Interface, error) {
+					return ao, nil, nil
 				}
 				defer func() { applyOptionsFactoryFunc = oldAO }()
+				getClusterObj = func(d dynamic.Interface, info *resource.Info) (*unstructured.Unstructured, error) {
+					return tc.objs[0], nil
+				}
 
 				applyTask := &ApplyTask{
 					Objects:        tc.objs,
@@ -255,6 +262,7 @@ func TestApplyTask_DryRun(t *testing.T) {
 					Mapper:         restMapper,
 					DryRunStrategy: drs,
 					CRDs:           tc.crds,
+					InvInfo:        &fakeInventoryInfo{},
 				}
 
 				var events []event.Event
@@ -375,17 +383,21 @@ func TestApplyTaskWithError(t *testing.T) {
 
 			ao := &fakeApplyOptions{}
 			oldAO := applyOptionsFactoryFunc
-			applyOptionsFactoryFunc = func(chan event.Event, common.ServerSideOptions, common.DryRunStrategy, util.Factory) (applyOptions, error) {
-				return ao, nil
+			applyOptionsFactoryFunc = func(chan event.Event, common.ServerSideOptions, common.DryRunStrategy, util.Factory) (applyOptions, dynamic.Interface, error) {
+				return ao, nil, nil
 			}
 			defer func() { applyOptionsFactoryFunc = oldAO }()
 
+			getClusterObj = func(d dynamic.Interface, info *resource.Info) (*unstructured.Unstructured, error) {
+				return tc.objs[0], nil
+			}
 			applyTask := &ApplyTask{
 				Objects:        tc.objs,
 				InfoHelper:     &fakeInfoHelper{},
 				Mapper:         restMapper,
 				DryRunStrategy: drs,
 				CRDs:           tc.crds,
+				InvInfo:        &fakeInventoryInfo{},
 			}
 
 			var events []event.Event
@@ -480,4 +492,18 @@ func (f *fakeInfoHelper) BuildInfos(objs []*unstructured.Unstructured) ([]*resou
 
 func (f *fakeInfoHelper) BuildInfo(obj *unstructured.Unstructured) (*resource.Info, error) {
 	return object.UnstructuredToInfo(obj)
+}
+
+type fakeInventoryInfo struct{}
+
+func (fi *fakeInventoryInfo) Name() string {
+	return "name"
+}
+
+func (fi *fakeInventoryInfo) Namespace() string {
+	return "namespace"
+}
+
+func (fi *fakeInventoryInfo) ID() string {
+	return "id"
 }

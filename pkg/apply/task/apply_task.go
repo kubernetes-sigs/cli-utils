@@ -4,13 +4,17 @@
 package task
 
 import (
+	"context"
 	"io/ioutil"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/kubectl/pkg/cmd/apply"
 	"k8s.io/kubectl/pkg/cmd/delete"
 	"k8s.io/kubectl/pkg/cmd/util"
@@ -20,6 +24,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/apply/info"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
 	"sigs.k8s.io/cli-utils/pkg/common"
+	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
@@ -46,11 +51,16 @@ type ApplyTask struct {
 	CRDs              []*unstructured.Unstructured
 	DryRunStrategy    common.DryRunStrategy
 	ServerSideOptions common.ServerSideOptions
+	InventoryPolicy   inventory.InventoryPolicy
+	InvInfo           inventory.InventoryInfo
 }
 
 // applyOptionsFactoryFunc is a factory function for creating a new
 // applyOptions implementation. Used to allow unit testing.
 var applyOptionsFactoryFunc = newApplyOptions
+
+// getClusterObj gets the cluster object. Used for allow unit testing.
+var getClusterObj = getClusterObject
 
 // Start creates a new goroutine that will invoke
 // the Run function on the ApplyOptions to update
@@ -98,7 +108,7 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 
 		// Create a new instance of the applyOptions interface and use it
 		// to apply the objects.
-		ao, err := applyOptionsFactoryFunc(taskContext.EventChannel(),
+		ao, dynamic, err := applyOptionsFactoryFunc(taskContext.EventChannel(),
 			a.ServerSideOptions, a.DryRunStrategy, a.Factory)
 		if err != nil {
 			sendBatchApplyEvents(taskContext, objects, err)
@@ -116,6 +126,22 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 					object.UnstructuredToObjMeta(obj), event.Unchanged, applyerror.NewUnknownTypeError(err))
 				continue
 			}
+
+			clusterObj, err := getClusterObj(dynamic, info)
+			if err != nil {
+				if !apierrors.IsNotFound(err) {
+					canApply, err := inventory.CanApply(a.InvInfo, clusterObj, a.InventoryPolicy)
+					if !canApply {
+						taskContext.EventChannel() <- createApplyEvent(
+							object.UnstructuredToObjMeta(obj),
+							event.Unchanged,
+							applyerror.NewInventoryOverlapError(err))
+						continue
+					}
+				}
+			}
+			// add the inventory annotation to the resource being applied.
+			inventory.AddInventoryIDAnnotation(obj, a.InvInfo)
 			infos = append(infos, info)
 			ao.SetObjects([]*resource.Info{info})
 			err = ao.Run()
@@ -147,14 +173,14 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 }
 
 func newApplyOptions(eventChannel chan event.Event, serverSideOptions common.ServerSideOptions,
-	strategy common.DryRunStrategy, factory util.Factory) (applyOptions, error) {
+	strategy common.DryRunStrategy, factory util.Factory) (applyOptions, dynamic.Interface, error) {
 	discovery, err := factory.ToDiscoveryClient()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	dynamic, err := factory.DynamicClient()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	emptyString := ""
@@ -186,7 +212,12 @@ func newApplyOptions(eventChannel chan event.Event, serverSideOptions common.Ser
 		}).toPrinterFunc(),
 		DynamicClient:  dynamic,
 		DryRunVerifier: resource.NewDryRunVerifier(dynamic, discovery),
-	}, nil
+	}, dynamic, nil
+}
+
+func getClusterObject(p dynamic.Interface, info *resource.Info) (*unstructured.Unstructured, error) {
+	namespacedClient := p.Resource(info.Mapping.Resource).Namespace(info.Namespace)
+	return namespacedClient.Get(context.TODO(), info.Name, metav1.GetOptions{})
 }
 
 func (a *ApplyTask) sendTaskResult(taskContext *taskrunner.TaskContext) {

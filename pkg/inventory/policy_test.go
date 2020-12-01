@@ -157,7 +157,7 @@ func TestCanApply(t *testing.T) {
 		},
 	}
 	for _, tc := range testcases {
-		actual := CanApply(tc.inv, tc.obj, tc.policy)
+		actual, _ := CanApply(tc.inv, tc.obj, tc.policy)
 		if actual != tc.canApply {
 			t.Errorf("expected %v, but got %v", tc.canApply, actual)
 		}

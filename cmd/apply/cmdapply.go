@@ -17,6 +17,7 @@ import (
 	"sigs.k8s.io/cli-utils/cmd/printers"
 	"sigs.k8s.io/cli-utils/pkg/apply"
 	"sigs.k8s.io/cli-utils/pkg/common"
+	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/manifestreader"
 	"sigs.k8s.io/cli-utils/pkg/provider"
 	"sigs.k8s.io/kustomize/kyaml/openapi"
@@ -137,6 +138,7 @@ func (r *ApplyRunner) RunE(cmd *cobra.Command, args []string) error {
 		DryRunStrategy:         common.DryRunNone,
 		PrunePropagationPolicy: prunePropPolicy,
 		PruneTimeout:           r.pruneTimeout,
+		InventoryPolicy:        inventory.AdoptIfNoInventory,
 	})
 
 	// The printer will print updates from the channel. It will block

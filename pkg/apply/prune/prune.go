@@ -161,6 +161,13 @@ func (po *PruneOptions) Prune(localInv inventory.InventoryInfo, localObjs []*uns
 				continue
 			}
 		}
+		if !inventory.CanPrune(localInv, obj, o.InventoryPolicy) {
+			klog.V(4).Infof("skip pruning object that doesn't belong to current inventory: %s/%s",
+				clusterObj.Namespace, clusterObj.Name)
+			eventChannel <- createPruneEvent(clusterObj, obj, event.PruneSkipped)
+			localIds = append(localIds, clusterObj)
+			continue
+		}
 		if !o.DryRunStrategy.ClientOrServerDryRun() {
 			klog.V(4).Infof("prune object delete: %s/%s", clusterObj.Namespace, clusterObj.Name)
 			err = namespacedClient.Delete(context.TODO(), clusterObj.Name, metav1.DeleteOptions{})

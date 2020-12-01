@@ -4,6 +4,8 @@
 package inventory
 
 import (
+	"fmt"
+
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
@@ -85,20 +87,27 @@ func inventoryIDMatch(inv InventoryInfo, obj *unstructured.Unstructured) invento
 	return NoMatch
 }
 
-func CanApply(inv InventoryInfo, obj *unstructured.Unstructured, policy InventoryPolicy) bool {
+func CanApply(inv InventoryInfo, obj *unstructured.Unstructured, policy InventoryPolicy) (bool, error) {
 	if obj == nil {
-		return true
+		return true, nil
 	}
 	matchStatus := inventoryIDMatch(inv, obj)
 	switch matchStatus {
 	case Empty:
-		return policy != InventoryPolicyMustMatch
+		if policy != InventoryPolicyMustMatch {
+			return true, nil
+		}
+		return false, fmt.Errorf("%v can't adopt an object without the annotation %s", InventoryPolicyMustMatch, owningInventoryKey)
 	case Match:
-		return true
+		return true, nil
 	case NoMatch:
-		return policy == AdoptAll
+		if policy == AdoptAll {
+			return true, nil
+		}
+		return false, fmt.Errorf("can't apply the resource since its annotation %s is a different inventory object", owningInventoryKey)
 	}
-	return false
+	// shouldn't reach here
+	return false, nil
 }
 
 func CanPrune(inv InventoryInfo, obj *unstructured.Unstructured, policy InventoryPolicy) bool {
@@ -115,4 +124,13 @@ func CanPrune(inv InventoryInfo, obj *unstructured.Unstructured, policy Inventor
 		return false
 	}
 	return false
+}
+
+func AddInventoryIDAnnotation(obj *unstructured.Unstructured, inv InventoryInfo) {
+	annotations := obj.GetAnnotations()
+	if annotations == nil {
+		annotations = make(map[string]string)
+	}
+	annotations[owningInventoryKey] = inv.ID()
+	obj.SetAnnotations(annotations)
 }
