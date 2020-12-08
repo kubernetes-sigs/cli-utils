@@ -76,6 +76,9 @@ type Options struct {
 	DryRunStrategy common.DryRunStrategy
 
 	PropagationPolicy metav1.DeletionPropagation
+
+	// InventoryPolicy defines the inventory policy of prune.
+	InventoryPolicy inventory.InventoryPolicy
 }
 
 // Prune deletes the set of resources which were previously applied

@@ -275,6 +275,9 @@ type Options struct {
 	// to be fully deleted after pruning, and if so, how long we should
 	// wait.
 	PruneTimeout time.Duration
+
+	// InventoryPolicy defines the inventory policy of apply.
+	InventoryPolicy inventory.InventoryPolicy
 }
 
 // setDefaults set the options to the default values if they
