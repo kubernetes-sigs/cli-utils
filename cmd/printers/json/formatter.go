@@ -8,8 +8,6 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/common"
@@ -39,6 +37,7 @@ func (jf *formatter) FormatApplyEvent(ae event.ApplyEvent, as *list.ApplyStats, 
 			"unchangedCount":  as.Unchanged,
 			"configuredCount": as.Configured,
 			"serverSideCount": as.ServersideApplied,
+			"failedCount":     as.Failed,
 		}); err != nil {
 			return err
 		}
@@ -49,13 +48,12 @@ func (jf *formatter) FormatApplyEvent(ae event.ApplyEvent, as *list.ApplyStats, 
 			}
 		}
 	case event.ApplyEventResourceUpdate:
-		obj := ae.Object
-		gvk := obj.GetObjectKind().GroupVersionKind()
+		gk := ae.Identifier.GroupKind
 		return jf.printEvent("apply", "resourceApplied", map[string]interface{}{
-			"group":     gvk.Group,
-			"kind":      gvk.Kind,
-			"namespace": getNamespace(obj),
-			"name":      getName(obj),
+			"group":     gk.Group,
+			"kind":      gk.Kind,
+			"namespace": ae.Identifier.Namespace,
+			"name":      ae.Identifier.Name,
 			"operation": ae.Operation.String(),
 		})
 	}
@@ -90,14 +88,22 @@ func (jf *formatter) FormatPruneEvent(pe event.PruneEvent, ps *list.PruneStats) 
 			"skipped": ps.Skipped,
 		})
 	case event.PruneEventResourceUpdate:
-		obj := pe.Object
-		gvk := obj.GetObjectKind().GroupVersionKind()
+		gk := pe.Identifier.GroupKind
 		return jf.printEvent("prune", "resourcePruned", map[string]interface{}{
-			"group":     gvk.Group,
-			"kind":      gvk.Kind,
-			"namespace": getNamespace(obj),
-			"name":      getName(obj),
+			"group":     gk.Group,
+			"kind":      gk.Kind,
+			"namespace": pe.Identifier.Namespace,
+			"name":      pe.Identifier.Name,
 			"operation": pe.Operation.String(),
+		})
+	case event.PruneEventFailed:
+		gk := pe.Identifier.GroupKind
+		return jf.printEvent("prune", "resourceFailed", map[string]interface{}{
+			"group":     gk.Group,
+			"kind":      gk.Kind,
+			"namespace": pe.Identifier.Namespace,
+			"name":      pe.Identifier.Name,
+			"error":     pe.Error.Error(),
 		})
 	}
 	return nil
@@ -111,14 +117,22 @@ func (jf *formatter) FormatDeleteEvent(de event.DeleteEvent, ds *list.DeleteStat
 			"skipped": ds.Skipped,
 		})
 	case event.DeleteEventResourceUpdate:
-		obj := de.Object
-		gvk := obj.GetObjectKind().GroupVersionKind()
+		gk := de.Identifier.GroupKind
 		return jf.printEvent("delete", "resourceDeleted", map[string]interface{}{
-			"group":     gvk.Group,
-			"kind":      gvk.Kind,
-			"namespace": getNamespace(obj),
-			"name":      getName(obj),
+			"group":     gk.Group,
+			"kind":      gk.Kind,
+			"namespace": de.Identifier.Namespace,
+			"name":      de.Identifier.Name,
 			"operation": de.Operation.String(),
+		})
+	case event.DeleteEventFailed:
+		gk := de.Identifier.GroupKind
+		return jf.printEvent("delete", "resourceFailed", map[string]interface{}{
+			"group":     gk.Group,
+			"kind":      gk.Kind,
+			"namespace": de.Identifier.Namespace,
+			"name":      de.Identifier.Name,
+			"error":     de.Error.Error(),
 		})
 	}
 	return nil
@@ -144,14 +158,4 @@ func (jf *formatter) printEvent(t, eventType string, content map[string]interfac
 	}
 	_, err = fmt.Fprint(jf.ioStreams.Out, string(b)+"\n")
 	return err
-}
-
-func getName(obj runtime.Object) string {
-	acc, _ := meta.Accessor(obj)
-	return acc.GetName()
-}
-
-func getNamespace(obj runtime.Object) string {
-	acc, _ := meta.Accessor(obj)
-	return acc.GetNamespace()
 }

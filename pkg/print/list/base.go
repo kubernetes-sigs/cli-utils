@@ -33,6 +33,7 @@ type ApplyStats struct {
 	Created           int
 	Unchanged         int
 	Configured        int
+	Failed            int
 }
 
 func (a *ApplyStats) inc(op event.ApplyEventOperation) {
@@ -45,18 +46,21 @@ func (a *ApplyStats) inc(op event.ApplyEventOperation) {
 		a.Unchanged++
 	case event.Configured:
 		a.Configured++
+	case event.Failed:
+		a.Failed++
 	default:
 		panic(fmt.Errorf("unknown apply operation %s", op.String()))
 	}
 }
 
 func (a *ApplyStats) Sum() int {
-	return a.ServersideApplied + a.Configured + a.Unchanged + a.Created
+	return a.ServersideApplied + a.Configured + a.Unchanged + a.Created + a.Failed
 }
 
 type PruneStats struct {
 	Pruned  int
 	Skipped int
+	Failed  int
 }
 
 func (p *PruneStats) incPruned() {
@@ -67,9 +71,14 @@ func (p *PruneStats) incSkipped() {
 	p.Skipped++
 }
 
+func (p *PruneStats) incFailed() {
+	p.Failed++
+}
+
 type DeleteStats struct {
 	Deleted int
 	Skipped int
+	Failed  int
 }
 
 func (d *DeleteStats) incDeleted() {
@@ -78,6 +87,10 @@ func (d *DeleteStats) incDeleted() {
 
 func (d *DeleteStats) incSkipped() {
 	d.Skipped++
+}
+
+func (d *DeleteStats) incFailed() {
+	d.Failed++
 }
 
 type Collector interface {
@@ -142,6 +155,9 @@ func (b *BaseListPrinter) Print(ch <-chan event.Event, previewStrategy common.Dr
 					pruneStats.incSkipped()
 				}
 			}
+			if e.PruneEvent.Type == event.PruneEventFailed {
+				pruneStats.incFailed()
+			}
 			if err := formatter.FormatPruneEvent(e.PruneEvent, pruneStats); err != nil {
 				return err
 			}
@@ -153,6 +169,9 @@ func (b *BaseListPrinter) Print(ch <-chan event.Event, previewStrategy common.Dr
 				case event.DeleteSkipped:
 					deleteStats.incSkipped()
 				}
+			}
+			if e.DeleteEvent.Type == event.DeleteEventFailed {
+				deleteStats.incFailed()
 			}
 			if err := formatter.FormatDeleteEvent(e.DeleteEvent, deleteStats); err != nil {
 				return err

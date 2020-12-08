@@ -32,8 +32,8 @@ type formatter struct {
 func (ef *formatter) FormatApplyEvent(ae event.ApplyEvent, as *list.ApplyStats, c list.Collector) error {
 	switch ae.Type {
 	case event.ApplyEventCompleted:
-		output := fmt.Sprintf("%d resource(s) applied. %d created, %d unchanged, %d configured",
-			as.Sum(), as.Created, as.Unchanged, as.Configured)
+		output := fmt.Sprintf("%d resource(s) applied. %d created, %d unchanged, %d configured, %d failed",
+			as.Sum(), as.Created, as.Unchanged, as.Configured, as.Failed)
 		// Only print information about serverside apply if some of the
 		// resources actually were applied serverside.
 		if as.ServersideApplied > 0 {
@@ -44,10 +44,9 @@ func (ef *formatter) FormatApplyEvent(ae event.ApplyEvent, as *list.ApplyStats, 
 			ef.printResourceStatus(id, se)
 		}
 	case event.ApplyEventResourceUpdate:
-		obj := ae.Object
-		gvk := obj.GetObjectKind().GroupVersionKind()
-		name := getName(obj)
-		ef.print("%s %s", resourceIDToString(gvk.GroupKind(), name),
+		gk := ae.Identifier.GroupKind
+		name := ae.Identifier.Name
+		ef.print("%s %s", resourceIDToString(gk, name),
 			strings.ToLower(ae.Operation.String()))
 	}
 	return nil
@@ -64,17 +63,17 @@ func (ef *formatter) FormatStatusEvent(se event.StatusEvent, _ list.Collector) e
 func (ef *formatter) FormatPruneEvent(pe event.PruneEvent, ps *list.PruneStats) error {
 	switch pe.Type {
 	case event.PruneEventCompleted:
-		ef.print("%d resource(s) pruned, %d skipped", ps.Pruned, ps.Skipped)
+		ef.print("%d resource(s) pruned, %d skipped, %d failed", ps.Pruned, ps.Skipped, ps.Failed)
 	case event.PruneEventResourceUpdate:
-		obj := pe.Object
-		gvk := obj.GetObjectKind().GroupVersionKind()
-		name := getName(obj)
+		gk := pe.Identifier.GroupKind
 		switch pe.Operation {
 		case event.Pruned:
-			ef.print("%s %s", resourceIDToString(gvk.GroupKind(), name), "pruned")
+			ef.print("%s %s", resourceIDToString(gk, pe.Identifier.Name), "pruned")
 		case event.PruneSkipped:
-			ef.print("%s %s", resourceIDToString(gvk.GroupKind(), name), "prune skipped")
+			ef.print("%s %s", resourceIDToString(gk, pe.Identifier.Name), "prune skipped")
 		}
+	case event.PruneEventFailed:
+		ef.print("%s %s", resourceIDToString(pe.Identifier.GroupKind, pe.Identifier.Name), "prune failed")
 	}
 	return nil
 }

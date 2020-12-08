@@ -31,27 +31,27 @@ func TestFormatter_FormatApplyEvent(t *testing.T) {
 		"resource created without no dryrun": {
 			previewStrategy: common.DryRunNone,
 			event: event.ApplyEvent{
-				Operation: event.Created,
-				Type:      event.ApplyEventResourceUpdate,
-				Object:    createObject("apps", "Deployment", "default", "my-dep"),
+				Operation:  event.Created,
+				Type:       event.ApplyEventResourceUpdate,
+				Identifier: createIdentifier("apps", "Deployment", "default", "my-dep"),
 			},
 			expected: "deployment.apps/my-dep created",
 		},
 		"resource updated with client dryrun": {
 			previewStrategy: common.DryRunClient,
 			event: event.ApplyEvent{
-				Operation: event.Configured,
-				Type:      event.ApplyEventResourceUpdate,
-				Object:    createObject("apps", "Deployment", "", "my-dep"),
+				Operation:  event.Configured,
+				Type:       event.ApplyEventResourceUpdate,
+				Identifier: createIdentifier("apps", "Deployment", "", "my-dep"),
 			},
 			expected: "deployment.apps/my-dep configured (preview)",
 		},
 		"resource updated with server dryrun": {
 			previewStrategy: common.DryRunServer,
 			event: event.ApplyEvent{
-				Operation: event.Configured,
-				Type:      event.ApplyEventResourceUpdate,
-				Object:    createObject("batch", "CronJob", "foo", "my-cron"),
+				Operation:  event.Configured,
+				Type:       event.ApplyEventResourceUpdate,
+				Identifier: createIdentifier("batch", "CronJob", "foo", "my-cron"),
 			},
 			expected: "cronjob.batch/my-cron configured (preview-server)",
 		},
@@ -81,7 +81,7 @@ func TestFormatter_FormatApplyEvent(t *testing.T) {
 				},
 			},
 			expected: `
-1 resource(s) applied. 0 created, 0 unchanged, 0 configured, 1 serverside applied
+1 resource(s) applied. 0 created, 0 unchanged, 0 configured, 0 failed, 1 serverside applied
 deployment.apps/my-dep is Current: Resource is Current
 `,
 		},
@@ -149,18 +149,18 @@ func TestFormatter_FormatPruneEvent(t *testing.T) {
 		"resource pruned without no dryrun": {
 			previewStrategy: common.DryRunNone,
 			event: event.PruneEvent{
-				Operation: event.Pruned,
-				Type:      event.PruneEventResourceUpdate,
-				Object:    createObject("apps", "Deployment", "default", "my-dep"),
+				Operation:  event.Pruned,
+				Type:       event.PruneEventResourceUpdate,
+				Identifier: createIdentifier("apps", "Deployment", "default", "my-dep"),
 			},
 			expected: "deployment.apps/my-dep pruned",
 		},
 		"resource skipped with client dryrun": {
 			previewStrategy: common.DryRunClient,
 			event: event.PruneEvent{
-				Operation: event.PruneSkipped,
-				Type:      event.PruneEventResourceUpdate,
-				Object:    createObject("apps", "Deployment", "", "my-dep"),
+				Operation:  event.PruneSkipped,
+				Type:       event.PruneEventResourceUpdate,
+				Identifier: createIdentifier("apps", "Deployment", "", "my-dep"),
 			},
 			expected: "deployment.apps/my-dep prune skipped (preview)",
 		},
@@ -173,7 +173,7 @@ func TestFormatter_FormatPruneEvent(t *testing.T) {
 				Pruned:  1,
 				Skipped: 2,
 			},
-			expected: "1 resource(s) pruned, 2 skipped",
+			expected: "1 resource(s) pruned, 2 skipped, 0 failed",
 		},
 	}
 
@@ -249,6 +249,17 @@ func createObject(group, kind, namespace, name string) *unstructured.Unstructure
 				"name":      name,
 				"namespace": namespace,
 			},
+		},
+	}
+}
+
+func createIdentifier(group, kind, namespace, name string) object.ObjMetadata {
+	return object.ObjMetadata{
+		Namespace: namespace,
+		Name:      name,
+		GroupKind: schema.GroupKind{
+			Group: group,
+			Kind:  kind,
 		},
 	}
 }

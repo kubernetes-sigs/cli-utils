@@ -15,11 +15,12 @@ func _() {
 	_ = x[Created-1]
 	_ = x[Unchanged-2]
 	_ = x[Configured-3]
+	_ = x[Failed-4]
 }
 
-const _ApplyEventOperation_name = "ServersideAppliedCreatedUnchangedConfigured"
+const _ApplyEventOperation_name = "ServersideAppliedCreatedUnchangedConfiguredFailed"
 
-var _ApplyEventOperation_index = [...]uint8{0, 17, 24, 33, 43}
+var _ApplyEventOperation_index = [...]uint8{0, 17, 24, 33, 43, 49}
 
 func (i ApplyEventOperation) String() string {
 	if i < 0 || i >= ApplyEventOperation(len(_ApplyEventOperation_index)-1) {

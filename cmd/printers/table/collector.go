@@ -7,8 +7,6 @@ import (
 	"sort"
 	"sync"
 
-	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	pe "sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
@@ -193,7 +191,7 @@ func (r *ResourceStateCollector) processStatusEvent(e event.StatusEvent) {
 // processApplyEvent handles events relating to apply operations
 func (r *ResourceStateCollector) processApplyEvent(e event.ApplyEvent) {
 	if e.Type == event.ApplyEventResourceUpdate {
-		identifier := toIdentifier(e.Object)
+		identifier := e.Identifier
 		previous, found := r.resourceInfos[identifier]
 		if !found {
 			return
@@ -205,23 +203,12 @@ func (r *ResourceStateCollector) processApplyEvent(e event.ApplyEvent) {
 // processPruneEvent handles event related to prune operations.
 func (r *ResourceStateCollector) processPruneEvent(e event.PruneEvent) {
 	if e.Type == event.PruneEventResourceUpdate {
-		identifier := toIdentifier(e.Object)
+		identifier := e.Identifier
 		previous, found := r.resourceInfos[identifier]
 		if !found {
 			return
 		}
 		previous.PruneOpResult = &e.Operation
-	}
-}
-
-// toIdentifier extracts the identifying information from an
-// object.
-func toIdentifier(o runtime.Object) object.ObjMetadata {
-	accessor, _ := meta.Accessor(o)
-	return object.ObjMetadata{
-		GroupKind: o.GetObjectKind().GroupVersionKind().GroupKind(),
-		Namespace: accessor.GetNamespace(),
-		Name:      accessor.GetName(),
 	}
 }
 
