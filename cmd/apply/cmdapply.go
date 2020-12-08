@@ -19,6 +19,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/manifestreader"
 	"sigs.k8s.io/cli-utils/pkg/provider"
+	"sigs.k8s.io/kustomize/kyaml/openapi"
 	"sigs.k8s.io/kustomize/kyaml/setters2"
 )
 
@@ -83,7 +84,7 @@ type ApplyRunner struct {
 }
 
 func (r *ApplyRunner) RunE(cmd *cobra.Command, args []string) error {
-	if err := setters2.CheckRequiredSettersSet(); err != nil {
+	if err := setters2.CheckRequiredSettersSet(openapi.Schema()); err != nil {
 		return err
 	}
 	prunePropPolicy, err := convertPropagationPolicy(r.prunePropagationPolicy)
