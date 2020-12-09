@@ -26,18 +26,6 @@ func NewApplyRunError(err error) *ApplyRunError {
 	return &ApplyRunError{err: err}
 }
 
-type InventoryOverlapError struct {
-	err error
-}
-
-func (e *InventoryOverlapError) Error() string {
-	return e.err.Error()
-}
-
-func NewInventoryOverlapError(err error) *InventoryOverlapError {
-	return &InventoryOverlapError{err: err}
-}
-
 type InitializeApplyOptionError struct {
 	err error
 }

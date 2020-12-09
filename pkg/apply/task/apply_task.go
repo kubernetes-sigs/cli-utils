@@ -135,7 +135,7 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 						taskContext.EventChannel() <- createApplyEvent(
 							object.UnstructuredToObjMeta(obj),
 							event.Unchanged,
-							applyerror.NewInventoryOverlapError(err))
+							err)
 						continue
 					}
 				}

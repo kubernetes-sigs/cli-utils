@@ -97,14 +97,16 @@ func CanApply(inv InventoryInfo, obj *unstructured.Unstructured, policy Inventor
 		if policy != InventoryPolicyMustMatch {
 			return true, nil
 		}
-		return false, fmt.Errorf("%v can't adopt an object without the annotation %s", InventoryPolicyMustMatch, owningInventoryKey)
+		err := fmt.Errorf("%v can't adopt an object without the annotation %s", InventoryPolicyMustMatch, owningInventoryKey)
+		return false, NewNeedAdoptionError(err)
 	case Match:
 		return true, nil
 	case NoMatch:
 		if policy == AdoptAll {
 			return true, nil
 		}
-		return false, fmt.Errorf("can't apply the resource since its annotation %s is a different inventory object", owningInventoryKey)
+		err := fmt.Errorf("can't apply the resource since its annotation %s is a different inventory object", owningInventoryKey)
+		return false, NewInventoryOverlapError(err)
 	}
 	// shouldn't reach here
 	return false, nil
@@ -133,4 +135,28 @@ func AddInventoryIDAnnotation(obj *unstructured.Unstructured, inv InventoryInfo)
 	}
 	annotations[owningInventoryKey] = inv.ID()
 	obj.SetAnnotations(annotations)
+}
+
+type InventoryOverlapError struct {
+	err error
+}
+
+func (e *InventoryOverlapError) Error() string {
+	return e.err.Error()
+}
+
+func NewInventoryOverlapError(err error) *InventoryOverlapError {
+	return &InventoryOverlapError{err: err}
+}
+
+type NeedAdoptionError struct {
+	err error
+}
+
+func (e *NeedAdoptionError) Error() string {
+	return e.err.Error()
+}
+
+func NewNeedAdoptionError(err error) *NeedAdoptionError {
+	return &NeedAdoptionError{err: err}
 }
