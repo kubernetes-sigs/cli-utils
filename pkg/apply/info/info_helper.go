@@ -33,28 +33,6 @@ type infoHelper struct {
 	factory util.Factory
 }
 
-func (ih *infoHelper) UpdateInfos(infos []*resource.Info) error {
-	mapper, err := ih.factory.ToRESTMapper()
-	if err != nil {
-		return err
-	}
-	for _, info := range infos {
-		gvk := info.Object.GetObjectKind().GroupVersionKind()
-		mapping, err := mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
-		if err != nil {
-			return err
-		}
-		info.Mapping = mapping
-
-		c, err := ih.getClient(gvk.GroupVersion())
-		if err != nil {
-			return err
-		}
-		info.Client = c
-	}
-	return nil
-}
-
 func (ih *infoHelper) UpdateInfo(info *resource.Info) error {
 	mapper, err := ih.factory.ToRESTMapper()
 	if err != nil {
@@ -73,18 +51,6 @@ func (ih *infoHelper) UpdateInfo(info *resource.Info) error {
 	}
 	info.Client = c
 	return nil
-}
-
-func (ih *infoHelper) BuildInfos(objs []*unstructured.Unstructured) ([]*resource.Info, error) {
-	infos, err := object.UnstructuredsToInfos(objs)
-	if err != nil {
-		return nil, err
-	}
-	err = ih.UpdateInfos(infos)
-	if err != nil {
-		return nil, err
-	}
-	return infos, nil
 }
 
 func (ih *infoHelper) BuildInfo(obj *unstructured.Unstructured) (*resource.Info, error) {

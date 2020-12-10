@@ -16,6 +16,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/apply"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/common"
+	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/manifestreader"
 	"sigs.k8s.io/cli-utils/pkg/provider"
 	"sigs.k8s.io/kustomize/kyaml/openapi"
@@ -133,6 +134,7 @@ func (r *PreviewRunner) RunE(cmd *cobra.Command, args []string) error {
 			NoPrune:           noPrune,
 			DryRunStrategy:    drs,
 			ServerSideOptions: r.serverSideOptions,
+			InventoryPolicy:   inventory.AdoptIfNoInventory,
 		})
 	} else {
 		err = r.Destroyer.Initialize()

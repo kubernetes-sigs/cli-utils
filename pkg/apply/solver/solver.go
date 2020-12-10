@@ -48,6 +48,7 @@ type Options struct {
 	DryRunStrategy         common.DryRunStrategy
 	PrunePropagationPolicy metav1.DeletionPropagation
 	PruneTimeout           time.Duration
+	InventoryPolicy        inventory.InventoryPolicy
 }
 
 type resourceObjects interface {
@@ -75,6 +76,8 @@ func (t *TaskQueueSolver) BuildTaskQueue(ro resourceObjects,
 			InfoHelper:        t.InfoHelper,
 			Factory:           t.Factory,
 			Mapper:            t.Mapper,
+			InventoryPolicy:   o.InventoryPolicy,
+			InvInfo:           ro.Inventory(),
 		})
 		if !o.DryRunStrategy.ClientOrServerDryRun() {
 			objs := object.UnstructuredsToObjMetas(crdSplitRes.crds)
@@ -98,6 +101,8 @@ func (t *TaskQueueSolver) BuildTaskQueue(ro resourceObjects,
 			InfoHelper:        t.InfoHelper,
 			Factory:           t.Factory,
 			Mapper:            t.Mapper,
+			InventoryPolicy:   o.InventoryPolicy,
+			InvInfo:           ro.Inventory(),
 		},
 		&task.SendEventTask{
 			Event: event.Event{
@@ -134,6 +139,7 @@ func (t *TaskQueueSolver) BuildTaskQueue(ro resourceObjects,
 				PruneOptions:      t.PruneOptions,
 				PropagationPolicy: o.PrunePropagationPolicy,
 				DryRunStrategy:    o.DryRunStrategy,
+				InventoryPolicy:   o.InventoryPolicy,
 			},
 			&task.SendEventTask{
 				Event: event.Event{

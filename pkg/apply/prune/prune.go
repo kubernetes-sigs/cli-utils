@@ -144,8 +144,7 @@ func (po *PruneOptions) Prune(localInv inventory.InventoryInfo, localObjs []*uns
 			continue
 		}
 		// Handle lifecycle directive preventing deletion.
-		if preventDeleteAnnotation(metadata.GetAnnotations()) {
-			klog.V(4).Infof("prune object lifecycle directive; do not prune: %s", uid)
+		if !canPrune(localInv, obj, o.InventoryPolicy, uid) {
 			eventChannel <- createPruneEvent(clusterObj, obj, event.PruneSkipped)
 			localIds = append(localIds, clusterObj)
 			continue
@@ -223,4 +222,17 @@ func createPruneFailedEvent(objMeta object.ObjMetadata, err error) event.Event {
 			Error:      err,
 		},
 	}
+}
+
+func canPrune(localInv inventory.InventoryInfo, obj *unstructured.Unstructured,
+	policy inventory.InventoryPolicy, uid string) bool {
+	if !inventory.CanPrune(localInv, obj, policy) {
+		klog.V(4).Infof("skip pruning object that doesn't belong to current inventory: %s", uid)
+		return false
+	}
+	if preventDeleteAnnotation(obj.GetAnnotations()) {
+		klog.V(4).Infof("prune object lifecycle directive; do not prune: %s", uid)
+		return false
+	}
+	return true
 }

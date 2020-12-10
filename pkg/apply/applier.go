@@ -207,6 +207,7 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.InventoryInfo, obje
 			DryRunStrategy:         options.DryRunStrategy,
 			PrunePropagationPolicy: options.PrunePropagationPolicy,
 			PruneTimeout:           options.PruneTimeout,
+			InventoryPolicy:        options.InventoryPolicy,
 		})
 
 		// Send event to inform the caller about the resources that
@@ -313,6 +314,7 @@ func inventoryNamespaceInSet(inv inventory.InventoryInfo, objs []*unstructured.U
 		acc, _ := meta.Accessor(obj)
 		gvk := obj.GetObjectKind().GroupVersionKind()
 		if gvk == object.CoreV1Namespace && acc.GetName() == invNamespace {
+			inventory.AddInventoryIDAnnotation(obj, inv)
 			return obj
 		}
 	}

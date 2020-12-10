@@ -55,6 +55,9 @@ var namespace = &unstructured.Unstructured{
 		"metadata": map[string]interface{}{
 			"name": testNamespace,
 			"uid":  "uid-namespace",
+			"annotations": map[string]interface{}{
+				"config.k8s.io/owning-inventory": testInventoryLabel,
+			},
 		},
 	},
 }
@@ -67,6 +70,9 @@ var pod = &unstructured.Unstructured{
 			"name":      podName,
 			"namespace": testNamespace,
 			"uid":       "uid1",
+			"annotations": map[string]interface{}{
+				"config.k8s.io/owning-inventory": testInventoryLabel,
+			},
 		},
 	},
 }
@@ -79,6 +85,9 @@ var pdb = &unstructured.Unstructured{
 			"name":      pdbName,
 			"namespace": testNamespace,
 			"uid":       "uid2",
+			"annotations": map[string]interface{}{
+				"config.k8s.io/owning-inventory": testInventoryLabel,
+			},
 		},
 	},
 }
@@ -91,6 +100,9 @@ var pdbGetFailure = &unstructured.Unstructured{
 			"name":      pdbName + "get-failure",
 			"namespace": testNamespace,
 			"uid":       "uid2",
+			"annotations": map[string]interface{}{
+				"config.k8s.io/owning-inventory": testInventoryLabel,
+			},
 		},
 	},
 }
@@ -103,6 +115,9 @@ var pdbDeleteFailure = &unstructured.Unstructured{
 			"name":      pdbName + "delete-failure",
 			"namespace": testNamespace,
 			"uid":       "uid2",
+			"annotations": map[string]interface{}{
+				"config.k8s.io/owning-inventory": testInventoryLabel,
+			},
 		},
 	},
 }
@@ -115,6 +130,9 @@ var role = &unstructured.Unstructured{
 			"name":      roleName,
 			"namespace": testNamespace,
 			"uid":       "uid3",
+			"annotations": map[string]interface{}{
+				"config.k8s.io/owning-inventory": testInventoryLabel,
+			},
 		},
 	},
 }
