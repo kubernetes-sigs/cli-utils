@@ -91,6 +91,7 @@ const (
 	Created
 	Unchanged
 	Configured
+	Failed
 )
 
 type ApplyEvent struct {

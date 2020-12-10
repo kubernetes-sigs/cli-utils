@@ -5,12 +5,10 @@ package json
 
 import (
 	"encoding/json"
-	"fmt"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
@@ -32,9 +30,9 @@ func TestFormatter_FormatApplyEvent(t *testing.T) {
 		"resource created without dryrun": {
 			previewStrategy: common.DryRunNone,
 			event: event.ApplyEvent{
-				Operation: event.Created,
-				Type:      event.ApplyEventResourceUpdate,
-				Object:    createObject("apps", "Deployment", "default", "my-dep"),
+				Operation:  event.Created,
+				Type:       event.ApplyEventResourceUpdate,
+				Identifier: createIdentifier("apps", "Deployment", "default", "my-dep"),
 			},
 			expected: []map[string]interface{}{
 				{
@@ -52,9 +50,9 @@ func TestFormatter_FormatApplyEvent(t *testing.T) {
 		"resource updated with client dryrun": {
 			previewStrategy: common.DryRunClient,
 			event: event.ApplyEvent{
-				Operation: event.Configured,
-				Type:      event.ApplyEventResourceUpdate,
-				Object:    createObject("apps", "Deployment", "", "my-dep"),
+				Operation:  event.Configured,
+				Type:       event.ApplyEventResourceUpdate,
+				Identifier: createIdentifier("apps", "Deployment", "", "my-dep"),
 			},
 			expected: []map[string]interface{}{
 				{
@@ -72,9 +70,9 @@ func TestFormatter_FormatApplyEvent(t *testing.T) {
 		"resource updated with server dryrun": {
 			previewStrategy: common.DryRunServer,
 			event: event.ApplyEvent{
-				Operation: event.Configured,
-				Type:      event.ApplyEventResourceUpdate,
-				Object:    createObject("batch", "CronJob", "foo", "my-cron"),
+				Operation:  event.Configured,
+				Type:       event.ApplyEventResourceUpdate,
+				Identifier: createIdentifier("batch", "CronJob", "foo", "my-cron"),
 			},
 			expected: []map[string]interface{}{
 				{
@@ -120,6 +118,7 @@ func TestFormatter_FormatApplyEvent(t *testing.T) {
 					"count":           1,
 					"createdCount":    0,
 					"eventType":       "completed",
+					"failedCount":     0,
 					"serverSideCount": 1,
 					"type":            "apply",
 					"unchangedCount":  0,
@@ -219,9 +218,9 @@ func TestFormatter_FormatPruneEvent(t *testing.T) {
 		"resource pruned without dryrun": {
 			previewStrategy: common.DryRunNone,
 			event: event.PruneEvent{
-				Operation: event.Pruned,
-				Type:      event.PruneEventResourceUpdate,
-				Object:    createObject("apps", "Deployment", "default", "my-dep"),
+				Operation:  event.Pruned,
+				Type:       event.PruneEventResourceUpdate,
+				Identifier: createIdentifier("apps", "Deployment", "default", "my-dep"),
 			},
 			expected: map[string]interface{}{
 				"eventType": "resourcePruned",
@@ -237,9 +236,9 @@ func TestFormatter_FormatPruneEvent(t *testing.T) {
 		"resource skipped with client dryrun": {
 			previewStrategy: common.DryRunClient,
 			event: event.PruneEvent{
-				Operation: event.PruneSkipped,
-				Type:      event.PruneEventResourceUpdate,
-				Object:    createObject("apps", "Deployment", "", "my-dep"),
+				Operation:  event.PruneSkipped,
+				Type:       event.PruneEventResourceUpdate,
+				Identifier: createIdentifier("apps", "Deployment", "", "my-dep"),
 			},
 			expected: map[string]interface{}{
 				"eventType": "resourcePruned",
@@ -294,9 +293,9 @@ func TestFormatter_FormatDeleteEvent(t *testing.T) {
 		"resource deleted without no dryrun": {
 			previewStrategy: common.DryRunNone,
 			event: event.DeleteEvent{
-				Operation: event.Deleted,
-				Type:      event.DeleteEventResourceUpdate,
-				Object:    createObject("apps", "Deployment", "default", "my-dep"),
+				Operation:  event.Deleted,
+				Type:       event.DeleteEventResourceUpdate,
+				Identifier: createIdentifier("apps", "Deployment", "default", "my-dep"),
 			},
 			expected: map[string]interface{}{
 				"eventType": "resourceDeleted",
@@ -312,9 +311,9 @@ func TestFormatter_FormatDeleteEvent(t *testing.T) {
 		"resource skipped with client dryrun": {
 			previewStrategy: common.DryRunClient,
 			event: event.DeleteEvent{
-				Operation: event.DeleteSkipped,
-				Type:      event.DeleteEventResourceUpdate,
-				Object:    createObject("apps", "Deployment", "", "my-dep"),
+				Operation:  event.DeleteSkipped,
+				Type:       event.DeleteEventResourceUpdate,
+				Identifier: createIdentifier("apps", "Deployment", "", "my-dep"),
 			},
 			expected: map[string]interface{}{
 				"eventType": "resourceDeleted",
@@ -385,15 +384,13 @@ func assertOutput(t *testing.T, expectedMap map[string]interface{}, actual strin
 	return assert.Equal(t, expectedMap, m)
 }
 
-func createObject(group, kind, namespace, name string) *unstructured.Unstructured {
-	return &unstructured.Unstructured{
-		Object: map[string]interface{}{
-			"apiVersion": fmt.Sprintf("%s/v1", group),
-			"kind":       kind,
-			"metadata": map[string]interface{}{
-				"name":      name,
-				"namespace": namespace,
-			},
+func createIdentifier(group, kind, namespace, name string) object.ObjMetadata {
+	return object.ObjMetadata{
+		Namespace: namespace,
+		Name:      name,
+		GroupKind: schema.GroupKind{
+			Group: group,
+			Kind:  kind,
 		},
 	}
 }

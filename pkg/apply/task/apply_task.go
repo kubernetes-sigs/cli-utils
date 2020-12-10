@@ -123,7 +123,7 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 			info, err := a.InfoHelper.BuildInfo(obj)
 			if err != nil {
 				taskContext.EventChannel() <- createApplyEvent(
-					object.UnstructuredToObjMeta(obj), event.Unchanged, applyerror.NewUnknownTypeError(err))
+					object.UnstructuredToObjMeta(obj), event.Failed, applyerror.NewUnknownTypeError(err))
 				continue
 			}
 
@@ -152,7 +152,7 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 			err = ao.Run()
 			if err != nil {
 				taskContext.EventChannel() <- createApplyEvent(
-					object.UnstructuredToObjMeta(obj), event.Unchanged, applyerror.NewApplyRunError(err))
+					object.UnstructuredToObjMeta(obj), event.Failed, applyerror.NewApplyRunError(err))
 			}
 		}
 
@@ -332,6 +332,6 @@ func createApplyEvent(id object.ObjMetadata, operation event.ApplyEventOperation
 func sendBatchApplyEvents(taskContext *taskrunner.TaskContext, objects []*unstructured.Unstructured, err error) {
 	for _, obj := range objects {
 		taskContext.EventChannel() <- createApplyEvent(
-			object.UnstructuredToObjMeta(obj), event.Unchanged, applyerror.NewInitializeApplyOptionError(err))
+			object.UnstructuredToObjMeta(obj), event.Failed, applyerror.NewInitializeApplyOptionError(err))
 	}
 }

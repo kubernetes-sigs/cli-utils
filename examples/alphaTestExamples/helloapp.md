@@ -163,11 +163,11 @@ Run preview to check which commands will be executed
 ```
 kapply preview $BASE > $OUTPUT/status
 
-expectedOutputLine "3 resource(s) applied. 3 created, 0 unchanged, 0 configured (preview)"
+expectedOutputLine "3 resource(s) applied. 3 created, 0 unchanged, 0 configured, 0 failed (preview)"
 
 kapply preview $BASE --server-side > $OUTPUT/status
 
-expectedOutputLine "3 resource(s) applied. 0 created, 0 unchanged, 0 configured, 3 serverside applied (preview-server)"
+expectedOutputLine "3 resource(s) applied. 0 created, 0 unchanged, 0 configured, 0 failed, 3 serverside applied (preview-server)"
 
 # Verify that preview didn't create any resources.
 kubectl get all -n hellospace > $OUTPUT/status 2>&1
