@@ -239,17 +239,13 @@ func (c *CachingClusterReader) Sync(ctx context.Context) error {
 		list.SetGroupVersionKind(mapping.GroupVersionKind)
 		err = c.reader.List(ctx, &list, listOptions...)
 		if err != nil {
-			// If we get an IsNotFound error here, it means the type
-			// we are listing doesn't exist on the server. This is ok,
-			// because it might be that a CRD is part of the set of
-			// resources that are being applied.
-			if errors.IsNotFound(err) {
-				cache[gn] = cacheEntry{
-					err: err,
-				}
-				continue
+			// We continue even if there is an error. Whenever any pollers
+			// request a resource covered by this gns, we just return the
+			// error.
+			cache[gn] = cacheEntry{
+				err: err,
 			}
-			return err
+			continue
 		}
 		cache[gn] = cacheEntry{
 			resources: list,
