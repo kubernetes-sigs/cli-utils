@@ -97,7 +97,7 @@ func CanApply(inv InventoryInfo, obj *unstructured.Unstructured, policy Inventor
 		if policy != InventoryPolicyMustMatch {
 			return true, nil
 		}
-		err := fmt.Errorf("%v can't adopt an object without the annotation %s", InventoryPolicyMustMatch, owningInventoryKey)
+		err := fmt.Errorf("can't adopt an object without the annotation %s", owningInventoryKey)
 		return false, NewNeedAdoptionError(err)
 	case Match:
 		return true, nil

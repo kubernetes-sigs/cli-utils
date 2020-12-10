@@ -130,15 +130,20 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 			clusterObj, err := getClusterObj(dynamic, info)
 			if err != nil {
 				if !apierrors.IsNotFound(err) {
-					canApply, err := inventory.CanApply(a.InvInfo, clusterObj, a.InventoryPolicy)
-					if !canApply {
-						taskContext.EventChannel() <- createApplyEvent(
-							object.UnstructuredToObjMeta(obj),
-							event.Unchanged,
-							err)
-						continue
-					}
+					taskContext.EventChannel() <- createApplyEvent(
+						object.UnstructuredToObjMeta(obj),
+						event.Unchanged,
+						err)
+					continue
 				}
+			}
+			canApply, err := inventory.CanApply(a.InvInfo, clusterObj, a.InventoryPolicy)
+			if !canApply {
+				taskContext.EventChannel() <- createApplyEvent(
+					object.UnstructuredToObjMeta(obj),
+					event.Unchanged,
+					err)
+				continue
 			}
 			// add the inventory annotation to the resource being applied.
 			inventory.AddInventoryIDAnnotation(obj, a.InvInfo)
