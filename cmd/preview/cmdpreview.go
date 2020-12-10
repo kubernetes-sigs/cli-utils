@@ -13,13 +13,12 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"sigs.k8s.io/cli-utils/cmd/printers"
+	"sigs.k8s.io/cli-utils/cmd/util"
 	"sigs.k8s.io/cli-utils/pkg/apply"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/manifestreader"
 	"sigs.k8s.io/cli-utils/pkg/provider"
-	"sigs.k8s.io/kustomize/kyaml/openapi"
-	"sigs.k8s.io/kustomize/kyaml/setters2"
 )
 
 var (
@@ -81,9 +80,10 @@ type PreviewRunner struct {
 
 // RunE is the function run from the cobra command.
 func (r *PreviewRunner) RunE(cmd *cobra.Command, args []string) error {
-	err := setters2.CheckRequiredSettersSet(openapi.Schema())
-	if err != nil {
-		return err
+	if len(args) > 0 {
+		if err := util.CheckForRequiredSetters(args[0]); err != nil {
+			return err
+		}
 	}
 	var ch <-chan event.Event
 
