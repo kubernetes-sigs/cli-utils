@@ -19,8 +19,6 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/manifestreader"
 	"sigs.k8s.io/cli-utils/pkg/provider"
-	"sigs.k8s.io/kustomize/kyaml/openapi"
-	"sigs.k8s.io/kustomize/kyaml/setters2"
 )
 
 var (
@@ -82,10 +80,6 @@ type PreviewRunner struct {
 
 // RunE is the function run from the cobra command.
 func (r *PreviewRunner) RunE(cmd *cobra.Command, args []string) error {
-	err := setters2.CheckRequiredSettersSet(openapi.Schema())
-	if err != nil {
-		return err
-	}
 	var ch <-chan event.Event
 
 	drs := common.DryRunClient

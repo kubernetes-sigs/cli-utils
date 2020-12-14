@@ -20,8 +20,6 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/manifestreader"
 	"sigs.k8s.io/cli-utils/pkg/provider"
-	"sigs.k8s.io/kustomize/kyaml/openapi"
-	"sigs.k8s.io/kustomize/kyaml/setters2"
 )
 
 func GetApplyRunner(provider provider.Provider, loader manifestreader.ManifestLoader, ioStreams genericclioptions.IOStreams) *ApplyRunner {
@@ -85,9 +83,6 @@ type ApplyRunner struct {
 }
 
 func (r *ApplyRunner) RunE(cmd *cobra.Command, args []string) error {
-	if err := setters2.CheckRequiredSettersSet(openapi.Schema()); err != nil {
-		return err
-	}
 	prunePropPolicy, err := convertPropagationPolicy(r.prunePropagationPolicy)
 	if err != nil {
 		return err
