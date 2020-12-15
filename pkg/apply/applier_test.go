@@ -265,20 +265,6 @@ func TestApplier(t *testing.T) {
 						Status: status.CurrentStatus,
 					},
 				},
-				{
-					EventType: pollevent.ResourceUpdateEvent,
-					Resource: &pollevent.ResourceStatus{
-						Identifier: toIdentifier(t, resources["deployment"]),
-						Status:     status.InProgressStatus,
-					},
-				},
-				{
-					EventType: pollevent.ResourceUpdateEvent,
-					Resource: &pollevent.ResourceStatus{
-						Identifier: toIdentifier(t, resources["deployment"]),
-						Status:     status.CurrentStatus,
-					},
-				},
 			},
 			expectedEventTypes: []expectedEvent{
 				{
@@ -299,17 +285,10 @@ func TestApplier(t *testing.T) {
 				},
 				{
 					eventType:       event.StatusType,
-					statusEventType: event.StatusEventResourceUpdate,
-				},
-				{
-					eventType:       event.StatusType,
-					statusEventType: event.StatusEventResourceUpdate,
-				},
-				{
-					eventType:       event.StatusType,
 					statusEventType: event.StatusEventCompleted,
 				},
 			},
+			prune:      false,
 			clusterObj: deploymentUnmatched,
 		},
 		"prune with inventory object annotation unmatched": {
