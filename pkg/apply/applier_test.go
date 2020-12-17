@@ -10,7 +10,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"path"
-	"reflect"
 	"regexp"
 	"testing"
 	"time"
@@ -24,9 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/resource"
-	dynamicfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/rest/fake"
-	clienttesting "k8s.io/client-go/testing"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	"k8s.io/kubectl/pkg/scheme"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
@@ -69,34 +66,6 @@ var (
 	}
 )
 
-var deploymentUnmatched = &unstructured.Unstructured{
-	Object: map[string]interface{}{
-		"apiVersion": "apps/v1",
-		"kind":       "Deployment",
-		"metadata": map[string]interface{}{
-			"name":      "foo",
-			"namespace": "default",
-			"annotations": map[string]interface{}{
-				"config.k8s.io/owning-inventory": "unmatched",
-			},
-		},
-	},
-}
-
-var deploymentMatched = &unstructured.Unstructured{
-	Object: map[string]interface{}{
-		"apiVersion": "apps/v1",
-		"kind":       "Deployment",
-		"metadata": map[string]interface{}{
-			"name":      "foo",
-			"namespace": "default",
-			"annotations": map[string]interface{}{
-				"config.k8s.io/owning-inventory": "test",
-			},
-		},
-	},
-}
-
 // resourceStatus contains information about a specific resource, such
 // as the manifest yaml and the URL path for this resource in the
 // client. It also contains a factory function for creating a new
@@ -114,9 +83,6 @@ type expectedEvent struct {
 	statusEventType event.StatusEventType
 	pruneEventType  event.PruneEventType
 	deleteEventType event.DeleteEventType
-
-	applyErrorType error
-	pruneEventOp   event.PruneEventOperation
 }
 
 func TestApplier(t *testing.T) {
@@ -128,7 +94,6 @@ func TestApplier(t *testing.T) {
 		prune              bool
 		statusEvents       []pollevent.Event
 		expectedEventTypes []expectedEvent
-		clusterObj         *unstructured.Unstructured
 	}{
 		"apply without status or prune": {
 			namespace: "default",
@@ -193,14 +158,14 @@ func TestApplier(t *testing.T) {
 				{
 					EventType: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
-						Identifier: toIdentifier(t, resources["deployment"]),
+						Identifier: toIdentifier(t, resources["deployment"], "default"),
 						Status:     status.InProgressStatus,
 					},
 				},
 				{
 					EventType: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
-						Identifier: toIdentifier(t, resources["deployment"]),
+						Identifier: toIdentifier(t, resources["deployment"], "default"),
 						Status:     status.CurrentStatus,
 					},
 				},
@@ -234,152 +199,6 @@ func TestApplier(t *testing.T) {
 					statusEventType: event.StatusEventCompleted,
 				},
 			},
-		},
-		"apply with inventory object and cluster object": {
-			namespace: "default",
-			resources: []resourceInfo{
-				resources["deployment"],
-				resources["inventoryObject"],
-			},
-			handlers: []handler{
-				&nsHandler{},
-				&inventoryObjectHandler{},
-				&genericHandler{
-					resourceInfo: resources["deployment"],
-					namespace:    "default",
-				},
-			},
-			reconcileTimeout: time.Minute,
-			statusEvents: []pollevent.Event{
-				{
-					EventType: pollevent.ResourceUpdateEvent,
-					Resource: &pollevent.ResourceStatus{
-						Identifier: object.ObjMetadata{
-							Name:      "foo-dcf2c498",
-							Namespace: "default",
-							GroupKind: schema.GroupKind{
-								Group: "",
-								Kind:  "ConfigMap",
-							},
-						},
-						Status: status.CurrentStatus,
-					},
-				},
-				{
-					EventType: pollevent.ResourceUpdateEvent,
-					Resource: &pollevent.ResourceStatus{
-						Identifier: toIdentifier(t, resources["deployment"]),
-						Status:     status.InProgressStatus,
-					},
-				},
-				{
-					EventType: pollevent.ResourceUpdateEvent,
-					Resource: &pollevent.ResourceStatus{
-						Identifier: toIdentifier(t, resources["deployment"]),
-						Status:     status.CurrentStatus,
-					},
-				},
-			},
-			expectedEventTypes: []expectedEvent{
-				{
-					eventType: event.InitType,
-				},
-				{
-					eventType:      event.ApplyType,
-					applyEventType: event.ApplyEventResourceUpdate,
-					applyErrorType: inventory.NewInventoryOverlapError(fmt.Errorf("")),
-				},
-				{
-					eventType:      event.ApplyType,
-					applyEventType: event.ApplyEventCompleted,
-				},
-				{
-					eventType:       event.StatusType,
-					statusEventType: event.StatusEventResourceUpdate,
-				},
-				{
-					eventType:       event.StatusType,
-					statusEventType: event.StatusEventResourceUpdate,
-				},
-				{
-					eventType:       event.StatusType,
-					statusEventType: event.StatusEventResourceUpdate,
-				},
-				{
-					eventType:       event.StatusType,
-					statusEventType: event.StatusEventCompleted,
-				},
-			},
-			clusterObj: deploymentUnmatched,
-		},
-		"prune with inventory object annotation unmatched": {
-			namespace: "default",
-			resources: []resourceInfo{
-				resources["inventoryObject"],
-			},
-			handlers: []handler{
-				&nsHandler{},
-				&inventoryObjectHandler{},
-				&genericHandler{
-					namespace: "default",
-				},
-			},
-			reconcileTimeout: 0,
-			expectedEventTypes: []expectedEvent{
-				{
-					eventType: event.InitType,
-				},
-				{
-					eventType:      event.ApplyType,
-					applyEventType: event.ApplyEventCompleted,
-				},
-				{
-					eventType:      event.PruneType,
-					pruneEventType: event.PruneEventResourceUpdate,
-					pruneEventOp:   event.PruneSkipped,
-				},
-				{
-					eventType:      event.PruneType,
-					pruneEventType: event.PruneEventCompleted,
-				},
-			},
-			clusterObj: deploymentUnmatched,
-			prune:      true,
-		},
-		"prune with inventory object annotation matched": {
-			namespace: "default",
-			resources: []resourceInfo{
-				resources["inventoryObject"],
-			},
-			handlers: []handler{
-				&nsHandler{},
-				&inventoryObjectHandler{},
-				&genericHandler{
-					resourceInfo: resources["deployment"],
-					namespace:    "default",
-				},
-			},
-			reconcileTimeout: 0,
-			expectedEventTypes: []expectedEvent{
-				{
-					eventType: event.InitType,
-				},
-				{
-					eventType:      event.ApplyType,
-					applyEventType: event.ApplyEventCompleted,
-				},
-				{
-					eventType:      event.PruneType,
-					pruneEventType: event.PruneEventResourceUpdate,
-					pruneEventOp:   event.Pruned,
-				},
-				{
-					eventType:      event.PruneType,
-					pruneEventType: event.PruneEventCompleted,
-				},
-			},
-			clusterObj: deploymentMatched,
-			prune:      true,
 		},
 	}
 
@@ -392,9 +211,6 @@ func TestApplier(t *testing.T) {
 			defer tf.Cleanup()
 
 			tf.UnstructuredClient = newFakeRESTClient(t, tc.handlers)
-			if tc.clusterObj != nil {
-				tf.FakeDynamicClient = fakeDynamicClient(tc.clusterObj)
-			}
 
 			cf := provider.NewProvider(tf)
 			applier := NewApplier(cf)
@@ -406,17 +222,7 @@ func TestApplier(t *testing.T) {
 			if !assert.NoError(t, err) {
 				return
 			}
-
-			objmeta := []object.ObjMetadata{}
-			if tc.clusterObj != nil {
-				objmeta = append(objmeta, object.UnstructuredToObjMeta(tc.clusterObj))
-			}
-			invClient := inventory.NewFakeInventoryClient(objmeta)
-			applier.invClient = invClient
-			err = applier.PruneOptions.Initialize(cf.Factory(), invClient)
-			if !assert.NoError(t, err) {
-				return
-			}
+			applier.invClient = inventory.NewFakeInventoryClient([]object.ObjMetadata{})
 
 			poller := &fakePoller{
 				events: tc.statusEvents,
@@ -449,12 +255,10 @@ func TestApplier(t *testing.T) {
 				case event.InitType:
 				case event.ApplyType:
 					assert.Equal(t, expected.applyEventType.String(), e.ApplyEvent.Type.String())
-					assert.Equal(t, reflect.TypeOf(expected.applyErrorType), reflect.TypeOf(e.ApplyEvent.Error))
 				case event.StatusType:
 					assert.Equal(t, expected.statusEventType.String(), e.StatusEvent.Type.String())
 				case event.PruneType:
 					assert.Equal(t, expected.pruneEventType.String(), e.PruneEvent.Type.String())
-					assert.Equal(t, expected.pruneEventOp.String(), e.PruneEvent.Operation.String())
 				case event.DeleteType:
 					assert.Equal(t, expected.deleteEventType.String(), e.DeleteEvent.Type.String())
 				default:
@@ -719,7 +523,7 @@ func newFakeRESTClient(t *testing.T, handlers []handler) *fake.RESTClient {
 	}
 }
 
-func toIdentifier(t *testing.T, resourceInfo resourceInfo) object.ObjMetadata {
+func toIdentifier(t *testing.T, resourceInfo resourceInfo, namespace string) object.ObjMetadata {
 	obj := resourceInfo.factoryFunc()
 	err := runtime.DecodeInto(codec, []byte(resourceInfo.manifest), obj)
 	if err != nil {
@@ -733,7 +537,7 @@ func toIdentifier(t *testing.T, resourceInfo resourceInfo) object.ObjMetadata {
 	return object.ObjMetadata{
 		GroupKind: obj.GetObjectKind().GroupVersionKind().GroupKind(),
 		Name:      accessor.GetName(),
-		Namespace: "default",
+		Namespace: namespace,
 	}
 }
 
@@ -963,18 +767,4 @@ func objSetsEqual(setA []*unstructured.Unstructured, setB []*unstructured.Unstru
 		}
 	}
 	return true
-}
-
-// fakeDynamicClient returns a fake dynamic client.
-func fakeDynamicClient(obj *unstructured.Unstructured) *dynamicfake.FakeDynamicClient {
-	fakeClient := dynamicfake.NewSimpleDynamicClient(runtime.NewScheme())
-
-	fakeClient.PrependReactor("get", "deployments", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
-		return true, obj, nil
-	})
-	fakeClient.PrependReactor("delete", "deployments", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
-		return true, nil, nil
-	})
-
-	return fakeClient
 }
