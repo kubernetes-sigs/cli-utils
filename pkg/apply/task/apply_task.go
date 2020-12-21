@@ -137,6 +137,7 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 					continue
 				}
 			}
+			infos = append(infos, info)
 			canApply, err := inventory.CanApply(a.InvInfo, clusterObj, a.InventoryPolicy)
 			if !canApply {
 				taskContext.EventChannel() <- createApplyEvent(
@@ -147,7 +148,6 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 			}
 			// add the inventory annotation to the resource being applied.
 			inventory.AddInventoryIDAnnotation(obj, a.InvInfo)
-			infos = append(infos, info)
 			ao.SetObjects([]*resource.Info{info})
 			err = ao.Run()
 			if err != nil {
