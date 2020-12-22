@@ -46,7 +46,11 @@ lint:
 	$(GOPATH)/bin/golangci-lint run ./...
 
 test:
-	go test -race -cover ./...
+	go test -race -cover ./cmd/... ./pkg/...
+
+test-e2e: $(MYGOBIN)/ginkgo $(MYGOBIN)/kind
+	kind delete cluster --name=cli-utils-e2e && kind create cluster --name=cli-utils-e2e
+	$(GOPATH)/bin/ginkgo ./test/e2e/...
 
 vet:
 	go vet ./...
@@ -61,6 +65,9 @@ build-with-race-detector:
 
 .PHONY: verify-kapply-e2e
 verify-kapply-e2e: test-examples-e2e-kapply
+
+$(MYGOBIN)/ginkgo:
+	go get github.com/onsi/ginkgo/ginkgo@v1.14.2
 
 $(MYGOBIN)/mdrip:
 	go install github.com/monopole/mdrip
@@ -77,14 +84,7 @@ test-examples-e2e-kapply: $(MYGOBIN)/mdrip $(MYGOBIN)/kind
 	)
 
 $(MYGOBIN)/kind:
-	( \
-        set -e; \
-        d=$(shell mktemp -d); cd $$d; \
-        wget -O ./kind https://github.com/kubernetes-sigs/kind/releases/download/v0.7.0/kind-$(shell uname)-amd64; \
-        chmod +x ./kind; \
-        mv ./kind $(MYGOBIN); \
-        rm -rf $$d; \
-	)
+	go get sigs.k8s.io/kind@v0.9.0
 
 .PHONY: nuke
 nuke: clean
