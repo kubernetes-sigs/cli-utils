@@ -32,7 +32,6 @@ const (
 	// The prune operation can go through when
 	// - The owning-inventory annotation in the live object match with that
 	//   in the package.
-	// - The live object doesn't have the owning-inventory annotation.
 	InventoryPolicyMustMatch InventoryPolicy = iota
 
 	// AdoptIfNoInventory: This policy enforces that resources being applied
@@ -60,7 +59,7 @@ const (
 	// live object has an unmatched owning-inventory annotation.
 	//
 	// The prune operation can go through when
-	// - The owning-inventory annotation in the live object match with that
+	// - The owning-inventory annotation in the live object match or doesn't match with that
 	//   in the package.
 	// - The live object doesn't have the owning-inventory annotation.
 	AdoptAll
@@ -122,11 +121,11 @@ func CanPrune(inv InventoryInfo, obj *unstructured.Unstructured, policy Inventor
 	matchStatus := inventoryIDMatch(inv, obj)
 	switch matchStatus {
 	case Empty:
-		return true
+		return policy == AdoptIfNoInventory || policy == AdoptAll
 	case Match:
 		return true
 	case NoMatch:
-		return false
+		return policy == AdoptAll
 	}
 	return false
 }

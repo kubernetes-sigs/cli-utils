@@ -197,7 +197,7 @@ func TestCanPrune(t *testing.T) {
 			obj:      testObjectWithAnnotation("", ""),
 			inv:      &fakeInventoryInfo{id: "random-id"},
 			policy:   InventoryPolicyMustMatch,
-			canPrune: true,
+			canPrune: false,
 		},
 		{
 			name:     "matched with InventoryPolicyMustMatch",
@@ -239,7 +239,7 @@ func TestCanPrune(t *testing.T) {
 			obj:      testObjectWithAnnotation(owningInventoryKey, "unmatched"),
 			inv:      &fakeInventoryInfo{id: "random-id"},
 			policy:   AdoptAll,
-			canPrune: false,
+			canPrune: true,
 		},
 	}
 	for _, tc := range testcases {
