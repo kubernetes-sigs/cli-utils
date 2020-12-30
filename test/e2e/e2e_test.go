@@ -56,6 +56,10 @@ var _ = Describe("Applier", func() {
 		It("Apply and destroy", func() {
 			applyAndDestroyTest(c, inventoryName, namespace.GetName())
 		})
+
+		It("Apply CRD and CR", func() {
+			crdTest(c, inventoryName, namespace.GetName())
+		})
 	})
 
 	Context("Inventory policy", func() {
@@ -112,14 +116,31 @@ func newApplier() *apply.Applier {
 	return applier
 }
 
-func applyWithNoErr(ch <-chan event.Event) {
+func runWithNoErr(ch <-chan event.Event) {
+	runCollectNoErr(ch)
+}
+
+func runCollect(ch <-chan event.Event) []event.Event {
+	var events []event.Event
 	for e := range ch {
+		events = append(events, e)
+	}
+	return events
+}
+
+func runCollectNoErr(ch <-chan event.Event) []event.Event {
+	events := runCollect(ch)
+	for _, e := range events {
 		Expect(e.Type).NotTo(Equal(event.ErrorType))
 	}
+	return events
 }
 
 func newDestroyer() *apply.Destroyer {
-	return apply.NewDestroyer(newProvider())
+	destroyer := apply.NewDestroyer(newProvider())
+	err := destroyer.Initialize()
+	Expect(err).NotTo(HaveOccurred())
+	return destroyer
 }
 
 func newProvider() provider.Provider {
