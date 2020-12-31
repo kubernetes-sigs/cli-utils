@@ -103,10 +103,8 @@ func crdTest(_ client.Client, inventoryName, namespaceName string) {
 			deleteEvent: &expDeleteEvent{
 				deleteEventType: event.DeleteEventResourceUpdate,
 				operation:       event.Deleted,
-				// TODO(mortent): The identifier isn't populated in the Delete
-				// events. This should be fixed.
-				// identifier: object.UnstructuredToObjMeta(manifestToUnstructured(crd)),
-				error: nil,
+				identifier:      object.UnstructuredToObjMeta(manifestToUnstructured(crd)),
+				error:           nil,
 			},
 		},
 	}, destroyerEvents)

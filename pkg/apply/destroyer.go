@@ -139,9 +139,10 @@ func runPruneEventTransformer(eventChannel chan event.Event) (chan event.Event, 
 			eventChannel <- event.Event{
 				Type: event.DeleteType,
 				DeleteEvent: event.DeleteEvent{
-					Type:      event.DeleteEventResourceUpdate,
-					Operation: transformPruneOperation(msg.PruneEvent.Operation),
-					Object:    msg.PruneEvent.Object,
+					Type:       event.DeleteEventResourceUpdate,
+					Operation:  transformPruneOperation(msg.PruneEvent.Operation),
+					Object:     msg.PruneEvent.Object,
+					Identifier: msg.PruneEvent.Identifier,
 				},
 			}
 		}
