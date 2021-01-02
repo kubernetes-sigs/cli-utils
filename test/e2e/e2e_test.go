@@ -5,22 +5,62 @@ package e2e
 
 import (
 	"context"
+	"fmt"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
 	"sigs.k8s.io/cli-utils/pkg/apply"
-	"sigs.k8s.io/cli-utils/pkg/apply/event"
+	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/provider"
 	"sigs.k8s.io/cli-utils/pkg/util/factory"
+	"sigs.k8s.io/cli-utils/test/e2e/customprovider"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 )
+
+type inventoryFactoryFunc func(name, namespace, id string) *unstructured.Unstructured
+type invWrapperFunc func(*unstructured.Unstructured) inventory.InventoryInfo
+type applierFactoryFunc func() *apply.Applier
+type destroyerFactoryFunc func() *apply.Destroyer
+type invSizeVerifyFunc func(c client.Client, name, namespace string, count int)
+type invCountVerifyFunc func(c client.Client, namespace string, count int)
+
+type InventoryConfig struct {
+	InventoryFactoryFunc inventoryFactoryFunc
+	InvWrapperFunc       invWrapperFunc
+	ApplierFactoryFunc   applierFactoryFunc
+	DestroyerFactoryFunc destroyerFactoryFunc
+	InvSizeVerifyFunc    invSizeVerifyFunc
+	InvCountVerifyFunc   invCountVerifyFunc
+}
+
+var inventoryConfigs = map[string]InventoryConfig{
+	"ConfigMap (default)": {
+		InventoryFactoryFunc: cmInventoryManifest,
+		InvWrapperFunc:       inventory.WrapInventoryInfoObj,
+		ApplierFactoryFunc:   newDefaultInvApplier,
+		DestroyerFactoryFunc: newDefaultInvDestroyer,
+		InvSizeVerifyFunc:    defaultInvSizeVerifyFunc,
+		InvCountVerifyFunc:   defaultInvCountVerifyFunc,
+	},
+	"Custom Type": {
+		InventoryFactoryFunc: customInventoryManifest,
+		InvWrapperFunc:       customprovider.WrapInventoryInfoObj,
+		ApplierFactoryFunc:   newCustomInvApplier,
+		DestroyerFactoryFunc: newCustomInvDestroyer,
+		InvSizeVerifyFunc:    customInvSizeVerifyFunc,
+		InvCountVerifyFunc:   customInvCountVerifyFunc,
+	},
+}
 
 var _ = Describe("Applier", func() {
 
@@ -38,54 +78,74 @@ var _ = Describe("Applier", func() {
 			Mapper: mapper,
 		})
 		Expect(err).NotTo(HaveOccurred())
+
+		createInventoryCRD(c)
 	})
 
-	Context("Apply and destroy", func() {
-		var namespace *v1.Namespace
-		var inventoryName string
+	for name := range inventoryConfigs {
+		invConfig := inventoryConfigs[name]
+		Context(fmt.Sprintf("Inventory: %s", name), func() {
+			Context("Apply and destroy", func() {
+				var namespace *v1.Namespace
+				var inventoryName string
 
-		BeforeEach(func() {
-			inventoryName = randomString("test-inv-")
-			namespace = createRandomNamespace(c)
+				BeforeEach(func() {
+					inventoryName = randomString("test-inv-")
+					namespace = createRandomNamespace(c)
+				})
+
+				AfterEach(func() {
+					deleteNamespace(c, namespace)
+				})
+
+				It("Apply and destroy", func() {
+					applyAndDestroyTest(c, invConfig, inventoryName, namespace.GetName())
+				})
+
+				It("Apply CRD and CR", func() {
+					crdTest(c, invConfig, inventoryName, namespace.GetName())
+				})
+			})
+
+			Context("Inventory policy", func() {
+				var namespace *v1.Namespace
+
+				BeforeEach(func() {
+					namespace = createRandomNamespace(c)
+				})
+
+				AfterEach(func() {
+					deleteNamespace(c, namespace)
+				})
+
+				It("MustMatch policy", func() {
+					inventoryPolicyMustMatchTest(c, invConfig, namespace.GetName())
+				})
+
+				It("AdoptIfNoInventory policy", func() {
+					inventoryPolicyAdoptIfNoInventoryTest(c, invConfig, namespace.GetName())
+				})
+
+				It("AdoptAll policy", func() {
+					inventoryPolicyAdoptAllTest(c, invConfig, namespace.GetName())
+				})
+			})
 		})
-
-		AfterEach(func() {
-			deleteNamespace(c, namespace)
-		})
-
-		It("Apply and destroy", func() {
-			applyAndDestroyTest(c, inventoryName, namespace.GetName())
-		})
-
-		It("Apply CRD and CR", func() {
-			crdTest(c, inventoryName, namespace.GetName())
-		})
-	})
-
-	Context("Inventory policy", func() {
-		var namespace *v1.Namespace
-
-		BeforeEach(func() {
-			namespace = createRandomNamespace(c)
-		})
-
-		AfterEach(func() {
-			deleteNamespace(c, namespace)
-		})
-
-		It("MustMatch policy", func() {
-			inventoryPolicyMustMatchTest(c, namespace.GetName())
-		})
-
-		It("AdoptIfNoInventory policy", func() {
-			inventoryPolicyAdoptIfNoInventoryTest(c, namespace.GetName())
-		})
-
-		It("AdoptAll policy", func() {
-			inventoryPolicyAdoptAllTest(c, namespace.GetName())
-		})
-	})
+	}
 })
+
+func createInventoryCRD(c client.Client) {
+	invCRD := manifestToUnstructured(customprovider.InventoryCRD)
+	var u unstructured.Unstructured
+	u.SetGroupVersionKind(invCRD.GroupVersionKind())
+	err := c.Get(context.TODO(), types.NamespacedName{
+		Name: invCRD.GetName(),
+	}, &u)
+	if apierrors.IsNotFound(err) {
+		err = c.Create(context.TODO(), invCRD)
+	}
+	Expect(err).NotTo(HaveOccurred())
+}
 
 func createRandomNamespace(c client.Client) *v1.Namespace {
 	namespaceName := randomString("e2e-test-")
@@ -109,45 +169,93 @@ func deleteNamespace(c client.Client, namespace *v1.Namespace) {
 	Expect(err).ToNot(HaveOccurred())
 }
 
-func newApplier() *apply.Applier {
-	applier := apply.NewApplier(newProvider())
+func newDefaultInvApplier() *apply.Applier {
+	applier := apply.NewApplier(newDefaultInvProvider())
 	err := applier.Initialize()
 	Expect(err).NotTo(HaveOccurred())
 	return applier
 }
 
-func runWithNoErr(ch <-chan event.Event) {
-	runCollectNoErr(ch)
-}
-
-func runCollect(ch <-chan event.Event) []event.Event {
-	var events []event.Event
-	for e := range ch {
-		events = append(events, e)
-	}
-	return events
-}
-
-func runCollectNoErr(ch <-chan event.Event) []event.Event {
-	events := runCollect(ch)
-	for _, e := range events {
-		Expect(e.Type).NotTo(Equal(event.ErrorType))
-	}
-	return events
-}
-
-func newDestroyer() *apply.Destroyer {
-	destroyer := apply.NewDestroyer(newProvider())
+func newDefaultInvDestroyer() *apply.Destroyer {
+	destroyer := apply.NewDestroyer(newDefaultInvProvider())
 	err := destroyer.Initialize()
 	Expect(err).NotTo(HaveOccurred())
 	return destroyer
 }
 
-func newProvider() provider.Provider {
+func newDefaultInvProvider() provider.Provider {
+	return provider.NewProvider(newFactory())
+}
+
+func defaultInvSizeVerifyFunc(c client.Client, name, namespace string, count int) {
+	var cm v1.ConfigMap
+	err := c.Get(context.TODO(), types.NamespacedName{
+		Name:      name,
+		Namespace: namespace,
+	}, &cm)
+	Expect(err).ToNot(HaveOccurred())
+
+	data := cm.Data
+	Expect(len(data)).To(Equal(count))
+}
+
+func defaultInvCountVerifyFunc(c client.Client, namespace string, count int) {
+	var cmList v1.ConfigMapList
+	err := c.List(context.TODO(), &cmList, client.InNamespace(namespace))
+	Expect(err).NotTo(HaveOccurred())
+	Expect(len(cmList.Items)).To(Equal(count))
+}
+
+func newCustomInvApplier() *apply.Applier {
+	applier := apply.NewApplier(newCustomInvProvider())
+	err := applier.Initialize()
+	Expect(err).NotTo(HaveOccurred())
+	return applier
+}
+
+func newCustomInvDestroyer() *apply.Destroyer {
+	destroyer := apply.NewDestroyer(newCustomInvProvider())
+	err := destroyer.Initialize()
+	Expect(err).NotTo(HaveOccurred())
+	return destroyer
+}
+
+func newCustomInvProvider() provider.Provider {
+	return customprovider.NewCustomProvider(newFactory())
+}
+
+func newFactory() util.Factory {
 	kubeConfigFlags := genericclioptions.NewConfigFlags(true).WithDeprecatedPasswordFlag()
 	matchVersionKubeConfigFlags := util.NewMatchVersionFlags(&factory.CachingRESTClientGetter{
 		Delegate: kubeConfigFlags,
 	})
-	f := util.NewFactory(matchVersionKubeConfigFlags)
-	return provider.NewProvider(f)
+	return util.NewFactory(matchVersionKubeConfigFlags)
+}
+
+func customInvSizeVerifyFunc(c client.Client, name, namespace string, count int) {
+	var u unstructured.Unstructured
+	u.SetGroupVersionKind(customprovider.InventoryGVK)
+	err := c.Get(context.TODO(), types.NamespacedName{
+		Name:      name,
+		Namespace: namespace,
+	}, &u)
+	Expect(err).ToNot(HaveOccurred())
+
+	s, found, err := unstructured.NestedSlice(u.Object, "spec", "inventory")
+	Expect(err).ToNot(HaveOccurred())
+
+	if !found {
+		Expect(count).To(Equal(0))
+		return
+	}
+
+	Expect(len(s)).To(Equal(count))
+}
+
+func customInvCountVerifyFunc(c client.Client, namespace string, count int) {
+	var u unstructured.UnstructuredList
+	u.SetGroupVersionKind(customprovider.InventoryGVK)
+	err := c.List(context.TODO(), &u, client.InNamespace(namespace))
+	Expect(err).NotTo(HaveOccurred())
+	Expect(len(u.Items)).To(Equal(count))
 }
