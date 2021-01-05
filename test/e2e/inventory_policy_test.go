@@ -31,7 +31,7 @@ func inventoryPolicyMustMatchTest(c client.Client, namespaceName string) {
 		deploymentManifest(namespaceName),
 	}
 
-	applyWithNoErr(applier.Run(context.TODO(), firstInv, firstResources, apply.Options{
+	runWithNoErr(applier.Run(context.TODO(), firstInv, firstResources, apply.Options{
 		ReconcileTimeout: 2 * time.Minute,
 		EmitStatusEvents: true,
 	}))
@@ -162,7 +162,7 @@ func inventoryPolicyAdoptAllTest(c client.Client, namespaceName string) {
 		deploymentManifest(namespaceName),
 	}
 
-	applyWithNoErr(applier.Run(context.TODO(), firstInv, firstResources, apply.Options{
+	runWithNoErr(applier.Run(context.TODO(), firstInv, firstResources, apply.Options{
 		ReconcileTimeout: 2 * time.Minute,
 		EmitStatusEvents: true,
 	}))

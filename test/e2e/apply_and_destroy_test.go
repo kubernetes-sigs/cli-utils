@@ -67,16 +67,8 @@ func applyAndDestroyTest(c client.Client, inventoryName, namespaceName string) {
 
 	By("Destroy resources")
 	destroyer := newDestroyer()
-	err = destroyer.Initialize()
-	Expect(err).NotTo(HaveOccurred())
 
-	destroyCh := destroyer.Run(inv)
-
-	var destroyerEvents []event.Event
-	for e := range destroyCh {
-		Expect(e.Type).NotTo(Equal(event.ErrorType))
-		destroyerEvents = append(destroyerEvents, e)
-	}
+	destroyerEvents := runCollectNoErr(destroyer.Run(inv))
 	err = verifyEvents([]expEvent{
 		{
 			eventType: event.DeleteType,

@@ -14,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/common"
+	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
@@ -100,7 +101,10 @@ func updateReplicas(u *unstructured.Unstructured, replicas int) *unstructured.Un
 type expEvent struct {
 	eventType event.Type
 
-	applyEvent *expApplyEvent
+	applyEvent  *expApplyEvent
+	statusEvent *expStatusEvent
+	pruneEvent  *expPruneEvent
+	deleteEvent *expDeleteEvent
 }
 
 type expApplyEvent struct {
@@ -108,6 +112,27 @@ type expApplyEvent struct {
 	operation      event.ApplyEventOperation
 	identifier     object.ObjMetadata
 	error          error
+}
+
+type expStatusEvent struct {
+	statusEventType event.StatusEventType
+	identifier      object.ObjMetadata
+	status          status.Status
+	error           error
+}
+
+type expPruneEvent struct {
+	pruneEventType event.PruneEventType
+	operation      event.PruneEventOperation
+	identifier     object.ObjMetadata
+	error          error
+}
+
+type expDeleteEvent struct {
+	deleteEventType event.DeleteEventType
+	operation       event.DeleteEventOperation
+	identifier      object.ObjMetadata
+	error           error
 }
 
 func verifyEvents(expEvents []expEvent, events []event.Event) error {
@@ -127,6 +152,10 @@ func verifyEvents(expEvents []expEvent, events []event.Event) error {
 
 var nilIdentifier = object.ObjMetadata{}
 
+// nolint:gocyclo
+// TODO(mortent): This function is pretty complex and with quite a bit of
+// duplication. We should see if there is a better way to provide a flexible
+// way to verify that we go the expected events.
 func isMatch(ee expEvent, e event.Event) bool {
 	if ee.eventType != e.Type {
 		return false
@@ -136,6 +165,7 @@ func isMatch(ee expEvent, e event.Event) bool {
 	switch e.Type {
 	case event.ApplyType:
 		aee := ee.applyEvent
+		// If no more information is specified, we consider it a match.
 		if aee == nil {
 			return true
 		}
@@ -146,13 +176,13 @@ func isMatch(ee expEvent, e event.Event) bool {
 		}
 
 		if aee.applyEventType == event.ApplyEventResourceUpdate {
-			if aee.operation != ae.Operation {
-				return false
+			if aee.identifier != nilIdentifier {
+				if aee.identifier != ae.Identifier {
+					return false
+				}
 			}
-		}
 
-		if aee.identifier != nilIdentifier {
-			if aee.identifier != ae.Identifier {
+			if aee.operation != ae.Operation {
 				return false
 			}
 		}
@@ -161,6 +191,90 @@ func isMatch(ee expEvent, e event.Event) bool {
 			return ae.Error != nil
 		}
 		return ae.Error == nil
+
+	case event.StatusType:
+		see := ee.statusEvent
+		if see == nil {
+			return true
+		}
+		se := e.StatusEvent
+
+		if see.statusEventType != se.Type {
+			return false
+		}
+
+		if see.statusEventType == event.StatusEventResourceUpdate {
+			if see.identifier != nilIdentifier {
+				if see.identifier != se.Resource.Identifier {
+					return false
+				}
+			}
+
+			if see.status != se.Resource.Status {
+				return false
+			}
+
+			if see.error != nil {
+				return se.Resource.Error != nil
+			}
+			return se.Resource.Error == nil
+		}
+
+	case event.PruneType:
+		pee := ee.pruneEvent
+		if pee == nil {
+			return true
+		}
+		pe := e.PruneEvent
+
+		if pee.pruneEventType != pe.Type {
+			return false
+		}
+
+		if pee.pruneEventType == event.PruneEventResourceUpdate {
+			if pee.identifier != nilIdentifier {
+				if pee.identifier != pe.Identifier {
+					return false
+				}
+			}
+
+			if pee.operation != pe.Operation {
+				return false
+			}
+		}
+
+		if pee.error != nil {
+			return pe.Error != nil
+		}
+		return pe.Error == nil
+
+	case event.DeleteType:
+		dee := ee.deleteEvent
+		if dee == nil {
+			return true
+		}
+		de := e.DeleteEvent
+
+		if dee.deleteEventType != de.Type {
+			return false
+		}
+
+		if dee.deleteEventType == event.DeleteEventResourceUpdate {
+			if dee.identifier != nilIdentifier {
+				if dee.identifier != de.Identifier {
+					return false
+				}
+			}
+
+			if dee.operation != de.Operation {
+				return false
+			}
+		}
+
+		if dee.error != nil {
+			return de.Error != nil
+		}
+		return de.Error == nil
 	}
 	return true
 }
