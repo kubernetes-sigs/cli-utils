@@ -14,8 +14,8 @@ import (
 // belong to any inventory object.
 // This is done by determining if the apply/prune operation
 // can go through for a resource based on the comparison
-// the inventory-d annotation value in the package and that
-// in the live object.
+// the inventory-id value in the package and the owning-inventory
+// annotation in the live object.
 type InventoryPolicy int
 
 const (
@@ -26,11 +26,11 @@ const (
 	// The apply operation can go through when
 	// - A new resources in the package doesn't exist in the cluster
 	// - An existing resource in the package doesn't exist in the cluster
-	// - An existing resource exist in the cluster. The inventory-id annotation in the live object
+	// - An existing resource exist in the cluster. The owning-inventory annotation in the live object
 	//   matches with that in the package.
 	//
 	// The prune operation can go through when
-	// - The inventory-id annotation in the live object match with that
+	// - The owning-inventory annotation in the live object match with that
 	//   in the package.
 	InventoryPolicyMustMatch InventoryPolicy = iota
 
@@ -40,26 +40,28 @@ const (
 	//
 	// The apply operation can go through when
 	// - New resource in the package doesn't exist in the cluster
-	// - If a new resource exist in the cluster, its inventory-id annotation is empty
+	// - If a new resource exist in the cluster, its owning-inventory annotation is empty
 	// - Existing resource in the package doesn't exist in the cluster
-	// - If existing resource exist in the cluster, its inventory-id annotation in the live object
+	// - If existing resource exist in the cluster, its owning-inventory annotation in the live object
 	//   is empty
-	// - An existing resource exist in the cluster. The inventory-id annotation in the live object
+	// - An existing resource exist in the cluster. The owning-inventory annotation in the live object
 	//   matches with that in the package.
 	//
 	// The prune operation can go through when
-	// - The inventory-id annotation in the live object match with that
+	// - The owning-inventory annotation in the live object match with that
 	//   in the package.
+	// - The live object doesn't have the owning-inventory annotation.
 	AdoptIfNoInventory
 
 	// AdoptAll: This policy will let the current inventory take ownership of any objects.
 	//
 	// The apply operation can go through for any resource in the package even if the
-	// live object has an unmatched inventory-id annotation.
+	// live object has an unmatched owning-inventory annotation.
 	//
 	// The prune operation can go through when
-	// - The inventory-id annotation in the live object match with that
+	// - The owning-inventory annotation in the live object match or doesn't match with that
 	//   in the package.
+	// - The live object doesn't have the owning-inventory annotation.
 	AdoptAll
 )
 
@@ -119,11 +121,11 @@ func CanPrune(inv InventoryInfo, obj *unstructured.Unstructured, policy Inventor
 	matchStatus := inventoryIDMatch(inv, obj)
 	switch matchStatus {
 	case Empty:
-		return false
+		return policy == AdoptIfNoInventory || policy == AdoptAll
 	case Match:
 		return true
 	case NoMatch:
-		return false
+		return policy == AdoptAll
 	}
 	return false
 }
