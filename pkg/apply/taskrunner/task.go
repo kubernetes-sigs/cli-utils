@@ -112,6 +112,9 @@ func (w *WaitTask) checkCondition(taskContext *TaskContext, coll *resourceStatus
 func (w *WaitTask) computeResourceWaitData(taskContext *TaskContext) []resourceWaitData {
 	var rwd []resourceWaitData
 	for _, id := range w.Identifiers {
+		if taskContext.ResourceFailed(id) {
+			continue
+		}
 		gen, _ := taskContext.ResourceGeneration(id)
 		rwd = append(rwd, resourceWaitData{
 			identifier: id,

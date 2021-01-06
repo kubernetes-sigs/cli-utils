@@ -32,7 +32,7 @@ func (p *PruneTask) Start(taskContext *taskrunner.TaskContext) {
 	go func() {
 		currentUIDs := taskContext.AllResourceUIDs()
 		err := p.PruneOptions.Prune(p.InventoryObject, p.Objects,
-			currentUIDs, taskContext.EventChannel(), prune.Options{
+			currentUIDs, taskContext, prune.Options{
 				DryRunStrategy:    p.DryRunStrategy,
 				PropagationPolicy: p.PropagationPolicy,
 				InventoryPolicy:   p.InventoryPolicy,

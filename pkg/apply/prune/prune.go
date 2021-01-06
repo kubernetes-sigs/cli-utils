@@ -26,6 +26,7 @@ import (
 	"k8s.io/klog"
 	"k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
+	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/object"
@@ -86,7 +87,7 @@ type Options struct {
 // the current apply. Prune also delete all previous inventory
 // objects. Returns an error if there was a problem.
 func (po *PruneOptions) Prune(localInv inventory.InventoryInfo, localObjs []*unstructured.Unstructured, currentUIDs sets.String,
-	eventChannel chan<- event.Event, o Options) error {
+	taskContext *taskrunner.TaskContext, o Options) error {
 	if localInv == nil {
 		return fmt.Errorf("the local inventory object can't be nil")
 	}
@@ -114,7 +115,8 @@ func (po *PruneOptions) Prune(localInv inventory.InventoryInfo, localObjs []*uns
 		mapping, err := po.mapper.RESTMapping(clusterObj.GroupKind)
 		if err != nil {
 			localIds = append(localIds, clusterObj)
-			eventChannel <- createPruneFailedEvent(clusterObj, err)
+			taskContext.EventChannel() <- createPruneFailedEvent(clusterObj, err)
+			taskContext.CaptureResourceFailure(clusterObj)
 			continue
 		}
 		namespacedClient := po.client.Resource(mapping.Resource).Namespace(clusterObj.Namespace)
@@ -125,13 +127,15 @@ func (po *PruneOptions) Prune(localInv inventory.InventoryInfo, localObjs []*uns
 				continue
 			}
 			localIds = append(localIds, clusterObj)
-			eventChannel <- createPruneFailedEvent(clusterObj, err)
+			taskContext.EventChannel() <- createPruneFailedEvent(clusterObj, err)
+			taskContext.CaptureResourceFailure(clusterObj)
 			continue
 		}
 		metadata, err := meta.Accessor(obj)
 		if err != nil {
 			localIds = append(localIds, clusterObj)
-			eventChannel <- createPruneFailedEvent(clusterObj, err)
+			taskContext.EventChannel() <- createPruneFailedEvent(clusterObj, err)
+			taskContext.CaptureResourceFailure(clusterObj)
 			continue
 		}
 		// If this cluster object is not also a currently applied
@@ -145,7 +149,7 @@ func (po *PruneOptions) Prune(localInv inventory.InventoryInfo, localObjs []*uns
 		}
 		// Handle lifecycle directive preventing deletion.
 		if !canPrune(localInv, obj, o.InventoryPolicy, uid) {
-			eventChannel <- createPruneEvent(clusterObj, obj, event.PruneSkipped)
+			taskContext.EventChannel() <- createPruneEvent(clusterObj, obj, event.PruneSkipped)
 			localIds = append(localIds, clusterObj)
 			continue
 		}
@@ -155,8 +159,9 @@ func (po *PruneOptions) Prune(localInv inventory.InventoryInfo, localObjs []*uns
 			if clusterObj.GroupKind == object.CoreV1Namespace.GroupKind() &&
 				localNamespaces.Has(clusterObj.Name) {
 				klog.V(4).Infof("skip pruning namespace: %s", clusterObj.Name)
-				eventChannel <- createPruneEvent(clusterObj, obj, event.PruneSkipped)
+				taskContext.EventChannel() <- createPruneEvent(clusterObj, obj, event.PruneSkipped)
 				localIds = append(localIds, clusterObj)
+				taskContext.CaptureResourceFailure(clusterObj)
 				continue
 			}
 		}
@@ -164,12 +169,13 @@ func (po *PruneOptions) Prune(localInv inventory.InventoryInfo, localObjs []*uns
 			klog.V(4).Infof("prune object delete: %s/%s", clusterObj.Namespace, clusterObj.Name)
 			err = namespacedClient.Delete(context.TODO(), clusterObj.Name, metav1.DeleteOptions{})
 			if err != nil {
-				eventChannel <- createPruneFailedEvent(clusterObj, err)
+				taskContext.EventChannel() <- createPruneFailedEvent(clusterObj, err)
 				localIds = append(localIds, clusterObj)
+				taskContext.CaptureResourceFailure(clusterObj)
 				continue
 			}
 		}
-		eventChannel <- createPruneEvent(clusterObj, obj, event.Pruned)
+		taskContext.EventChannel() <- createPruneEvent(clusterObj, obj, event.Pruned)
 	}
 	return po.InvClient.Replace(localInv, localIds)
 }

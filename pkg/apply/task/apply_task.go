@@ -121,9 +121,11 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 			// Set the client and mapping fields on the provided
 			// info so they can be applied to the cluster.
 			info, err := a.InfoHelper.BuildInfo(obj)
+			id := object.UnstructuredToObjMeta(obj)
 			if err != nil {
 				taskContext.EventChannel() <- createApplyEvent(
-					object.UnstructuredToObjMeta(obj), event.Failed, applyerror.NewUnknownTypeError(err))
+					id, event.Failed, applyerror.NewUnknownTypeError(err))
+				taskContext.CaptureResourceFailure(id)
 				continue
 			}
 
@@ -131,9 +133,10 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 			if err != nil {
 				if !apierrors.IsNotFound(err) {
 					taskContext.EventChannel() <- createApplyEvent(
-						object.UnstructuredToObjMeta(obj),
+						id,
 						event.Unchanged,
 						err)
+					taskContext.CaptureResourceFailure(id)
 					continue
 				}
 			}
@@ -141,9 +144,10 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 			canApply, err := inventory.CanApply(a.InvInfo, clusterObj, a.InventoryPolicy)
 			if !canApply {
 				taskContext.EventChannel() <- createApplyEvent(
-					object.UnstructuredToObjMeta(obj),
+					id,
 					event.Unchanged,
 					err)
+				taskContext.CaptureResourceFailure(id)
 				continue
 			}
 			// add the inventory annotation to the resource being applied.
@@ -152,7 +156,8 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 			err = ao.Run()
 			if err != nil {
 				taskContext.EventChannel() <- createApplyEvent(
-					object.UnstructuredToObjMeta(obj), event.Failed, applyerror.NewApplyRunError(err))
+					id, event.Failed, applyerror.NewApplyRunError(err))
+				taskContext.CaptureResourceFailure(id)
 			}
 		}
 
@@ -331,7 +336,9 @@ func createApplyEvent(id object.ObjMetadata, operation event.ApplyEventOperation
 // a list of resources when failed to initialize the apply process.
 func sendBatchApplyEvents(taskContext *taskrunner.TaskContext, objects []*unstructured.Unstructured, err error) {
 	for _, obj := range objects {
+		id := object.UnstructuredToObjMeta(obj)
 		taskContext.EventChannel() <- createApplyEvent(
-			object.UnstructuredToObjMeta(obj), event.Failed, applyerror.NewInitializeApplyOptionError(err))
+			id, event.Failed, applyerror.NewInitializeApplyOptionError(err))
+		taskContext.CaptureResourceFailure(id)
 	}
 }

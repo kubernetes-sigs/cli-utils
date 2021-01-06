@@ -21,6 +21,7 @@ import (
 	"k8s.io/client-go/dynamic/fake"
 	"k8s.io/kubectl/pkg/scheme"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
+	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/object"
@@ -250,10 +251,11 @@ func TestPrune(t *testing.T) {
 				// The event channel can not block; make sure its bigger than all
 				// the events that can be put on it.
 				eventChannel := make(chan event.Event, len(tc.pastObjs)+1) // Add one for inventory object
+				taskContext := taskrunner.NewTaskContext(eventChannel)
 				err := func() error {
 					defer close(eventChannel)
 					// Run the prune and validate.
-					return po.Prune(currentInventory, tc.currentObjs, populateObjectIds(tc.currentObjs, t), eventChannel, Options{
+					return po.Prune(currentInventory, tc.currentObjs, populateObjectIds(tc.currentObjs, t), taskContext, Options{
 						DryRunStrategy: drs,
 					})
 				}()
@@ -453,10 +455,11 @@ func TestPruneWithError(t *testing.T) {
 			// The event channel can not block; make sure its bigger than all
 			// the events that can be put on it.
 			eventChannel := make(chan event.Event, len(tc.pastObjs)+1) // Add one for inventory object
+			taskContext := taskrunner.NewTaskContext(eventChannel)
 			err := func() error {
 				defer close(eventChannel)
 				// Run the prune and validate.
-				return po.Prune(currentInventory, tc.currentObjs, populateObjectIds(tc.currentObjs, t), eventChannel, Options{
+				return po.Prune(currentInventory, tc.currentObjs, populateObjectIds(tc.currentObjs, t), taskContext, Options{
 					DryRunStrategy: drs,
 				})
 			}()

@@ -11,6 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/prune"
+	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/provider"
@@ -70,7 +71,8 @@ func (d *Destroyer) Run(inv inventory.InventoryInfo) <-chan event.Event {
 		// Events. That we use Prune to implement destroy is an
 		// implementation detail and the events should not be Prune events.
 		tempChannel, completedChannel := runPruneEventTransformer(ch)
-		err := d.PruneOptions.Prune(inv, nil, sets.NewString(), tempChannel, prune.Options{
+		taskContext := taskrunner.NewTaskContext(tempChannel)
+		err := d.PruneOptions.Prune(inv, nil, sets.NewString(), taskContext, prune.Options{
 			DryRunStrategy:    d.DryRunStrategy,
 			PropagationPolicy: metav1.DeletePropagationBackground,
 		})

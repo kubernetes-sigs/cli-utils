@@ -16,6 +16,7 @@ func NewTaskContext(eventChannel chan event.Event) *TaskContext {
 		taskChannel:      make(chan TaskResult),
 		eventChannel:     eventChannel,
 		appliedResources: make(map[object.ObjMetadata]applyInfo),
+		failedResources:  make(map[object.ObjMetadata]struct{}),
 	}
 }
 
@@ -27,6 +28,9 @@ type TaskContext struct {
 	eventChannel chan event.Event
 
 	appliedResources map[object.ObjMetadata]applyInfo
+
+	// failedResources records the IDs of resources that are failed during applying and pruning.
+	failedResources map[object.ObjMetadata]struct{}
 }
 
 func (tc *TaskContext) TaskChannel() chan TaskResult {
@@ -74,6 +78,15 @@ func (tc *TaskContext) ResourceGeneration(id object.ObjMetadata) (int64, bool) {
 		return 0, false
 	}
 	return ai.generation, true
+}
+
+func (tc *TaskContext) ResourceFailed(id object.ObjMetadata) bool {
+	_, found := tc.failedResources[id]
+	return found
+}
+
+func (tc *TaskContext) CaptureResourceFailure(id object.ObjMetadata) {
+	tc.failedResources[id] = struct{}{}
 }
 
 // applyInfo captures information about resources that have been
