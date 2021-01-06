@@ -18,7 +18,7 @@ prow-presubmit-check: \
 
 .PHONY: prow-presubmit-check-e2e
 prow-presubmit-check-e2e: \
-    verify-kapply-e2e
+	test-e2e verify-kapply-e2e
 
 fix:
 	go fix ./...
