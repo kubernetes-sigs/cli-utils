@@ -11,7 +11,6 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
-	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/cli-utils/pkg/apply"
@@ -21,12 +20,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func inventoryPolicyMustMatchTest(c client.Client, namespaceName string) {
+func inventoryPolicyMustMatchTest(c client.Client, invConfig InventoryConfig, namespaceName string) {
 	By("Apply first set of resources")
-	applier := newApplier()
+	applier := invConfig.ApplierFactoryFunc()
 
 	firstInvName := randomString("first-inv-")
-	firstInv := inventory.WrapInventoryInfoObj(cmInventoryManifest(firstInvName, namespaceName, firstInvName))
+	firstInv := invConfig.InvWrapperFunc(invConfig.InventoryFactoryFunc(firstInvName, namespaceName, firstInvName))
 	firstResources := []*unstructured.Unstructured{
 		deploymentManifest(namespaceName),
 	}
@@ -38,7 +37,7 @@ func inventoryPolicyMustMatchTest(c client.Client, namespaceName string) {
 
 	By("Apply second set of resources")
 	secondInvName := randomString("second-inv-")
-	secondInv := inventory.WrapInventoryInfoObj(cmInventoryManifest(secondInvName, namespaceName, secondInvName))
+	secondInv := invConfig.InvWrapperFunc(invConfig.InventoryFactoryFunc(secondInvName, namespaceName, secondInvName))
 	secondResources := []*unstructured.Unstructured{
 		updateReplicas(deploymentManifest(namespaceName), 6),
 	}
@@ -83,22 +82,19 @@ func inventoryPolicyMustMatchTest(c client.Client, namespaceName string) {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(d.Spec.Replicas).To(Equal(func(i int32) *int32 { return &i }(4)))
 
-	var cmList v1.ConfigMapList
-	err = c.List(context.TODO(), &cmList, client.InNamespace(namespaceName))
-	Expect(err).NotTo(HaveOccurred())
-	Expect(len(cmList.Items)).To(Equal(2))
+	invConfig.InvCountVerifyFunc(c, namespaceName, 2)
 }
 
-func inventoryPolicyAdoptIfNoInventoryTest(c client.Client, namespaceName string) {
+func inventoryPolicyAdoptIfNoInventoryTest(c client.Client, invConfig InventoryConfig, namespaceName string) {
 	By("Create unmanaged resource")
 	err := c.Create(context.TODO(), deploymentManifest(namespaceName))
 	Expect(err).NotTo(HaveOccurred())
 
 	By("Apply resources")
-	applier := newApplier()
+	applier := invConfig.ApplierFactoryFunc()
 
 	invName := randomString("test-inv-")
-	inv := inventory.WrapInventoryInfoObj(cmInventoryManifest(invName, namespaceName, invName))
+	inv := invConfig.InvWrapperFunc(invConfig.InventoryFactoryFunc(invName, namespaceName, invName))
 	resources := []*unstructured.Unstructured{
 		updateReplicas(deploymentManifest(namespaceName), 6),
 	}
@@ -144,20 +140,16 @@ func inventoryPolicyAdoptIfNoInventoryTest(c client.Client, namespaceName string
 	Expect(d.Spec.Replicas).To(Equal(func(i int32) *int32 { return &i }(6)))
 	Expect(d.ObjectMeta.Annotations["config.k8s.io/owning-inventory"]).To(Equal(invName))
 
-	var cmList v1.ConfigMapList
-	err = c.List(context.TODO(), &cmList, client.InNamespace(namespaceName))
-	Expect(err).NotTo(HaveOccurred())
-	Expect(len(cmList.Items)).To(Equal(1))
-	cm := cmList.Items[0]
-	Expect(len(cm.Data)).To(Equal(1))
+	invConfig.InvCountVerifyFunc(c, namespaceName, 1)
+	invConfig.InvSizeVerifyFunc(c, invName, namespaceName, 1)
 }
 
-func inventoryPolicyAdoptAllTest(c client.Client, namespaceName string) {
+func inventoryPolicyAdoptAllTest(c client.Client, invConfig InventoryConfig, namespaceName string) {
 	By("Apply an initial set of resources")
-	applier := newApplier()
+	applier := invConfig.ApplierFactoryFunc()
 
 	firstInvName := randomString("first-inv-")
-	firstInv := inventory.WrapInventoryInfoObj(cmInventoryManifest(firstInvName, namespaceName, firstInvName))
+	firstInv := invConfig.InvWrapperFunc(invConfig.InventoryFactoryFunc(firstInvName, namespaceName, firstInvName))
 	firstResources := []*unstructured.Unstructured{
 		deploymentManifest(namespaceName),
 	}
@@ -169,7 +161,7 @@ func inventoryPolicyAdoptAllTest(c client.Client, namespaceName string) {
 
 	By("Apply resources")
 	secondInvName := randomString("test-inv-")
-	secondInv := inventory.WrapInventoryInfoObj(cmInventoryManifest(secondInvName, namespaceName, secondInvName))
+	secondInv := invConfig.InvWrapperFunc(invConfig.InventoryFactoryFunc(secondInvName, namespaceName, secondInvName))
 	secondResources := []*unstructured.Unstructured{
 		updateReplicas(deploymentManifest(namespaceName), 6),
 	}
@@ -215,8 +207,5 @@ func inventoryPolicyAdoptAllTest(c client.Client, namespaceName string) {
 	Expect(d.Spec.Replicas).To(Equal(func(i int32) *int32 { return &i }(6)))
 	Expect(d.ObjectMeta.Annotations["config.k8s.io/owning-inventory"]).To(Equal(secondInvName))
 
-	var cmList v1.ConfigMapList
-	err = c.List(context.TODO(), &cmList, client.InNamespace(namespaceName))
-	Expect(err).NotTo(HaveOccurred())
-	Expect(len(cmList.Items)).To(Equal(2))
+	invConfig.InvCountVerifyFunc(c, namespaceName, 2)
 }

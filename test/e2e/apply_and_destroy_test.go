@@ -9,20 +9,17 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/cli-utils/pkg/apply"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
-	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func applyAndDestroyTest(c client.Client, inventoryName, namespaceName string) {
+func applyAndDestroyTest(c client.Client, invConfig InventoryConfig, inventoryName, namespaceName string) {
 	By("Apply resources")
-	applier := newApplier()
+	applier := invConfig.ApplierFactoryFunc()
 
-	inv := inventory.WrapInventoryInfoObj(cmInventoryManifest(inventoryName, namespaceName, "test"))
+	inv := invConfig.InvWrapperFunc(invConfig.InventoryFactoryFunc(inventoryName, namespaceName, "test"))
 
 	resources := []*unstructured.Unstructured{
 		deploymentManifest(namespaceName),
@@ -55,18 +52,10 @@ func applyAndDestroyTest(c client.Client, inventoryName, namespaceName string) {
 	Expect(err).ToNot(HaveOccurred())
 
 	By("Verify inventory")
-	var cm v1.ConfigMap
-	err = c.Get(context.TODO(), types.NamespacedName{
-		Name:      inventoryName,
-		Namespace: namespaceName,
-	}, &cm)
-	Expect(err).ToNot(HaveOccurred())
-
-	data := cm.Data
-	Expect(len(data)).To(Equal(1))
+	invConfig.InvSizeVerifyFunc(c, inventoryName, namespaceName, 1)
 
 	By("Destroy resources")
-	destroyer := newDestroyer()
+	destroyer := invConfig.DestroyerFactoryFunc()
 
 	destroyerEvents := runCollectNoErr(destroyer.Run(inv))
 	err = verifyEvents([]expEvent{

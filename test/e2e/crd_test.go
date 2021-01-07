@@ -13,18 +13,16 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/cli-utils/pkg/apply"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
-	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/kustomize/kyaml/yaml"
 )
 
-func crdTest(_ client.Client, inventoryName, namespaceName string) {
+func crdTest(_ client.Client, invConfig InventoryConfig, inventoryName, namespaceName string) {
 	By("apply a set of resources that includes both a crd and a cr")
-	applier := newApplier()
+	applier := invConfig.ApplierFactoryFunc()
 
-	inv := inventory.WrapInventoryInfoObj(cmInventoryManifest(inventoryName, namespaceName, "test"))
+	inv := invConfig.InvWrapperFunc(invConfig.InventoryFactoryFunc(inventoryName, namespaceName, "test"))
 
 	resources := []*unstructured.Unstructured{
 		deploymentManifest(namespaceName),
@@ -79,7 +77,7 @@ func crdTest(_ client.Client, inventoryName, namespaceName string) {
 	Expect(err).ToNot(HaveOccurred())
 
 	By("destroy the resources, including the crd")
-	destroyer := newDestroyer()
+	destroyer := invConfig.DestroyerFactoryFunc()
 	destroyerEvents := runCollectNoErr(destroyer.Run(inv))
 	err = verifyEvents([]expEvent{
 		{
@@ -161,14 +159,3 @@ metadata:
 spec:
   replicas: 4
 `))
-
-func manifestToUnstructured(manifest []byte) *unstructured.Unstructured {
-	u := make(map[string]interface{})
-	err := yaml.Unmarshal(manifest, &u)
-	if err != nil {
-		panic(err)
-	}
-	return &unstructured.Unstructured{
-		Object: u,
-	}
-}

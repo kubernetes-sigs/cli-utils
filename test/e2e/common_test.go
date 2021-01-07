@@ -5,8 +5,10 @@ package e2e
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
+	. "github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -16,12 +18,33 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
 	"sigs.k8s.io/cli-utils/pkg/object"
+	"sigs.k8s.io/kustomize/kyaml/yaml"
 )
 
 func randomString(prefix string) string {
 	seed := time.Now().UTC().UnixNano()
 	randomSuffix := common.RandomStr(seed)
 	return fmt.Sprintf("%s%s", prefix, randomSuffix)
+}
+
+func runWithNoErr(ch <-chan event.Event) {
+	runCollectNoErr(ch)
+}
+
+func runCollect(ch <-chan event.Event) []event.Event {
+	var events []event.Event
+	for e := range ch {
+		events = append(events, e)
+	}
+	return events
+}
+
+func runCollectNoErr(ch <-chan event.Event) []event.Event {
+	events := runCollect(ch)
+	for _, e := range events {
+		Expect(e.Type).NotTo(Equal(event.ErrorType))
+	}
+	return events
 }
 
 func cmInventoryManifest(name, namespace, id string) *unstructured.Unstructured {
@@ -45,6 +68,21 @@ func cmInventoryManifest(name, namespace, id string) *unstructured.Unstructured 
 	return &unstructured.Unstructured{
 		Object: u,
 	}
+}
+
+func customInventoryManifest(name, namespace, id string) *unstructured.Unstructured {
+	u := manifestToUnstructured([]byte(strings.TrimSpace(`
+apiVersion: cli-utils.example.io/v1alpha1
+kind: Inventory
+metadata:
+  name: PLACEHOLDER
+`)))
+	u.SetName(name)
+	u.SetNamespace(namespace)
+	u.SetLabels(map[string]string{
+		common.InventoryLabel: id,
+	})
+	return u
 }
 
 func deploymentManifest(namespace string) *unstructured.Unstructured {
@@ -82,6 +120,17 @@ func deploymentManifest(namespace string) *unstructured.Unstructured {
 		},
 	}
 	u, err := runtime.DefaultUnstructuredConverter.ToUnstructured(dep)
+	if err != nil {
+		panic(err)
+	}
+	return &unstructured.Unstructured{
+		Object: u,
+	}
+}
+
+func manifestToUnstructured(manifest []byte) *unstructured.Unstructured {
+	u := make(map[string]interface{})
+	err := yaml.Unmarshal(manifest, &u)
 	if err != nil {
 		panic(err)
 	}
