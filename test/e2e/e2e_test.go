@@ -105,6 +105,10 @@ var _ = Describe("Applier", func() {
 				It("Apply CRD and CR", func() {
 					crdTest(c, invConfig, inventoryName, namespace.GetName())
 				})
+
+				It("Apply continues on error", func() {
+					continueOnErrorTest(c, invConfig, inventoryName, namespace.GetName())
+				})
 			})
 
 			Context("Inventory policy", func() {
