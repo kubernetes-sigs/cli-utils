@@ -81,3 +81,7 @@ func (fic *FakeInventoryClient) SetError(err error) {
 func (fic *FakeInventoryClient) ClearError() {
 	fic.Err = nil
 }
+
+func (fic *FakeInventoryClient) GetClusterInventoryInfo(inv InventoryInfo) (*unstructured.Unstructured, error) {
+	return nil, nil
+}

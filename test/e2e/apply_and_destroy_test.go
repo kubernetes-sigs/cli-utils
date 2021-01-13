@@ -12,6 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/cli-utils/pkg/apply"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
+	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -57,7 +58,8 @@ func applyAndDestroyTest(c client.Client, invConfig InventoryConfig, inventoryNa
 	By("Destroy resources")
 	destroyer := invConfig.DestroyerFactoryFunc()
 
-	destroyerEvents := runCollectNoErr(destroyer.Run(inv))
+	option := &apply.DestroyerOption{InventoryPolicy: inventory.AdoptIfNoInventory}
+	destroyerEvents := runCollectNoErr(destroyer.Run(inv, option))
 	err = verifyEvents([]expEvent{
 		{
 			eventType: event.DeleteType,

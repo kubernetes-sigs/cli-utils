@@ -42,6 +42,8 @@ type InventoryClient interface {
 	SetDryRunStrategy(drs common.DryRunStrategy)
 	// ApplyInventoryNamespace applies the Namespace that the inventory object should be in.
 	ApplyInventoryNamespace(invNamespace *unstructured.Unstructured) error
+	// GetClusterInventoryInfo returns the cluster inventory object.
+	GetClusterInventoryInfo(inv InventoryInfo) (*unstructured.Unstructured, error)
 }
 
 // ClusterInventoryClient is a concrete implementation of the
@@ -97,7 +99,7 @@ func NewInventoryClient(factory cmdutil.Factory,
 func (cic *ClusterInventoryClient) Merge(localInv InventoryInfo, objs []object.ObjMetadata) ([]object.ObjMetadata, error) {
 	pruneIds := []object.ObjMetadata{}
 	invObj := cic.invToUnstructuredFunc(localInv)
-	clusterInv, err := cic.getClusterInventoryInfo(invObj)
+	clusterInv, err := cic.GetClusterInventoryInfo(localInv)
 	if err != nil {
 		return pruneIds, err
 	}
@@ -164,7 +166,7 @@ func (cic *ClusterInventoryClient) Replace(localInv InventoryInfo, objs []object
 		klog.V(4).Infof("applied objects same as cluster inventory: do nothing")
 		return nil
 	}
-	clusterInv, err := cic.getClusterInventoryInfo(cic.invToUnstructuredFunc(localInv))
+	clusterInv, err := cic.GetClusterInventoryInfo(localInv)
 	if err != nil {
 		return err
 	}
@@ -202,8 +204,7 @@ func (cic *ClusterInventoryClient) DeleteInventoryObj(localInv InventoryInfo) er
 // an error if one occurred.
 func (cic *ClusterInventoryClient) GetClusterObjs(localInv InventoryInfo) ([]object.ObjMetadata, error) {
 	var objs []object.ObjMetadata
-	invObj := cic.invToUnstructuredFunc(localInv)
-	clusterInv, err := cic.getClusterInventoryInfo(invObj)
+	clusterInv, err := cic.GetClusterInventoryInfo(localInv)
 	if err != nil {
 		return objs, err
 	}
@@ -224,7 +225,8 @@ func (cic *ClusterInventoryClient) GetClusterObjs(localInv InventoryInfo) ([]obj
 //
 // TODO(seans3): Remove the special case code to merge multiple cluster inventory
 // objects once we've determined that this case is no longer possible.
-func (cic *ClusterInventoryClient) getClusterInventoryInfo(localInv *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+func (cic *ClusterInventoryClient) GetClusterInventoryInfo(inv InventoryInfo) (*unstructured.Unstructured, error) {
+	localInv := cic.invToUnstructuredFunc(inv)
 	if localInv == nil {
 		return nil, fmt.Errorf("retrieving cluster inventory object with nil local inventory")
 	}

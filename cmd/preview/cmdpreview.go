@@ -12,11 +12,11 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/i18n"
+	"sigs.k8s.io/cli-utils/cmd/flagutils"
 	"sigs.k8s.io/cli-utils/cmd/printers"
 	"sigs.k8s.io/cli-utils/pkg/apply"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/common"
-	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/manifestreader"
 	"sigs.k8s.io/cli-utils/pkg/provider"
 )
@@ -53,6 +53,9 @@ func GetPreviewRunner(provider provider.Provider, loader manifestreader.Manifest
 	cmd.Flags().BoolVar(&previewDestroy, "destroy", previewDestroy, "If true, preview of destroy operations will be displayed.")
 	cmd.Flags().StringVar(&r.output, "output", printers.DefaultPrinter(),
 		fmt.Sprintf("Output format, must be one of %s", strings.Join(printers.SupportedPrinters(), ",")))
+	cmd.Flags().StringVar(&r.inventoryPolicy, "inventory-policy", "strict",
+		"It determines the behavior when the resources don't belong to current inventory. Available options "+
+			"\"strict\" and \"adopt\".")
 
 	r.Command = cmd
 	return r
@@ -76,6 +79,7 @@ type PreviewRunner struct {
 
 	serverSideOptions common.ServerSideOptions
 	output            string
+	inventoryPolicy   string
 }
 
 // RunE is the function run from the cobra command.
@@ -89,6 +93,11 @@ func (r *PreviewRunner) RunE(cmd *cobra.Command, args []string) error {
 
 	if previewDestroy {
 		r.Destroyer.DryRunStrategy = drs
+	}
+
+	inventoryPolicy, err := flagutils.ConvertInventoryPolicy(r.inventoryPolicy)
+	if err != nil {
+		return err
 	}
 
 	reader, err := r.loader.ManifestReader(cmd.InOrStdin(), args)
@@ -128,14 +137,17 @@ func (r *PreviewRunner) RunE(cmd *cobra.Command, args []string) error {
 			NoPrune:           noPrune,
 			DryRunStrategy:    drs,
 			ServerSideOptions: r.serverSideOptions,
-			InventoryPolicy:   inventory.AdoptIfNoInventory,
+			InventoryPolicy:   inventoryPolicy,
 		})
 	} else {
 		err = r.Destroyer.Initialize()
 		if err != nil {
 			return err
 		}
-		ch = r.Destroyer.Run(inv)
+		option := &apply.DestroyerOption{
+			InventoryPolicy: inventoryPolicy,
+		}
+		ch = r.Destroyer.Run(inv, option)
 	}
 
 	// The printer will print updates from the channel. It will block
