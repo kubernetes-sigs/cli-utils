@@ -44,6 +44,8 @@ type InventoryClient interface {
 	ApplyInventoryNamespace(invNamespace *unstructured.Unstructured) error
 	// GetClusterInventoryInfo returns the cluster inventory object.
 	GetClusterInventoryInfo(inv InventoryInfo) (*unstructured.Unstructured, error)
+	// UpdateLabels updates the labels of the cluster inventory object if it exists.
+	UpdateLabels(InventoryInfo, map[string]string) error
 }
 
 // ClusterInventoryClient is a concrete implementation of the
@@ -268,6 +270,18 @@ func (cic *ClusterInventoryClient) GetClusterInventoryInfo(inv InventoryInfo) (*
 		}
 	}
 	return clusterInv, nil
+}
+
+func (cic *ClusterInventoryClient) UpdateLabels(inv InventoryInfo, labels map[string]string) error {
+	obj, err := cic.GetClusterInventoryInfo(inv)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+	obj.SetLabels(labels)
+	return cic.applyInventoryObj(obj)
 }
 
 // mergeClusterInventory merges the inventory of multiple inventory objects
