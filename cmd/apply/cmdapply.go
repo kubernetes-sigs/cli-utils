@@ -14,10 +14,10 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/i18n"
+	"sigs.k8s.io/cli-utils/cmd/flagutils"
 	"sigs.k8s.io/cli-utils/cmd/printers"
 	"sigs.k8s.io/cli-utils/pkg/apply"
 	"sigs.k8s.io/cli-utils/pkg/common"
-	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/manifestreader"
 	"sigs.k8s.io/cli-utils/pkg/provider"
 )
@@ -55,6 +55,9 @@ func GetApplyRunner(provider provider.Provider, loader manifestreader.ManifestLo
 		"Background", "Propagation policy for pruning")
 	cmd.Flags().DurationVar(&r.pruneTimeout, "prune-timeout", time.Duration(0),
 		"Timeout threshold for waiting for all pruned resources to be deleted")
+	cmd.Flags().StringVar(&r.inventoryPolicy, "inventory-policy", "strict",
+		"It determines the behavior when the resources don't belong to current inventory. Available options "+
+			"\"strict\" and \"adopt\".")
 
 	r.Command = cmd
 	return r
@@ -80,10 +83,15 @@ type ApplyRunner struct {
 	noPrune                bool
 	prunePropagationPolicy string
 	pruneTimeout           time.Duration
+	inventoryPolicy        string
 }
 
 func (r *ApplyRunner) RunE(cmd *cobra.Command, args []string) error {
 	prunePropPolicy, err := convertPropagationPolicy(r.prunePropagationPolicy)
+	if err != nil {
+		return err
+	}
+	inventoryPolicy, err := flagutils.ConvertInventoryPolicy(r.inventoryPolicy)
 	if err != nil {
 		return err
 	}
@@ -133,7 +141,7 @@ func (r *ApplyRunner) RunE(cmd *cobra.Command, args []string) error {
 		DryRunStrategy:         common.DryRunNone,
 		PrunePropagationPolicy: prunePropPolicy,
 		PruneTimeout:           r.pruneTimeout,
-		InventoryPolicy:        inventory.AdoptIfNoInventory,
+		InventoryPolicy:        inventoryPolicy,
 	})
 
 	// The printer will print updates from the channel. It will block

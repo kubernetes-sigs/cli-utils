@@ -66,7 +66,7 @@ func TestGetClusterInventoryInfo(t *testing.T) {
 			if tc.inv != nil {
 				inv = storeObjsInInventory(tc.inv, tc.localObjs)
 			}
-			clusterInv, err := invClient.getClusterInventoryInfo(inv)
+			clusterInv, err := invClient.GetClusterInventoryInfo(WrapInventoryInfoObj(inv))
 			if tc.isError {
 				if err == nil {
 					t.Fatalf("expected error but received none")

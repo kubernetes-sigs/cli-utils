@@ -39,6 +39,10 @@ type Destroyer struct {
 	DryRunStrategy common.DryRunStrategy
 }
 
+type DestroyerOption struct {
+	InventoryPolicy inventory.InventoryPolicy
+}
+
 // Initialize sets up the Destroyer for actually doing an destroy against
 // a cluster. This involves validating command line inputs and configuring
 // clients for communicating with the cluster.
@@ -59,7 +63,7 @@ func (d *Destroyer) Initialize() error {
 // Run performs the destroy step. Passes the inventory object. This
 // happens asynchronously on progress and any errors are reported
 // back on the event channel.
-func (d *Destroyer) Run(inv inventory.InventoryInfo) <-chan event.Event {
+func (d *Destroyer) Run(inv inventory.InventoryInfo, option *DestroyerOption) <-chan event.Event {
 	ch := make(chan event.Event)
 
 	go func() {
@@ -75,6 +79,7 @@ func (d *Destroyer) Run(inv inventory.InventoryInfo) <-chan event.Event {
 		err := d.PruneOptions.Prune(inv, nil, sets.NewString(), taskContext, prune.Options{
 			DryRunStrategy:    d.DryRunStrategy,
 			PropagationPolicy: metav1.DeletePropagationBackground,
+			InventoryPolicy:   option.InventoryPolicy,
 		})
 		if err != nil {
 			ch <- event.Event{
