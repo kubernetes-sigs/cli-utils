@@ -14,6 +14,8 @@ import (
 	"sigs.k8s.io/cli-utils/cmd/flagutils"
 	"sigs.k8s.io/cli-utils/cmd/printers"
 	"sigs.k8s.io/cli-utils/pkg/apply"
+	"sigs.k8s.io/cli-utils/pkg/common"
+	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/manifestreader"
 	"sigs.k8s.io/cli-utils/pkg/provider"
 )
@@ -52,11 +54,12 @@ func DestroyCommand(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *c
 
 // DestroyRunner encapsulates data necessary to run the destroy command.
 type DestroyRunner struct {
-	Command   *cobra.Command
-	ioStreams genericclioptions.IOStreams
-	Destroyer *apply.Destroyer
-	provider  provider.Provider
-	loader    manifestreader.ManifestLoader
+	Command    *cobra.Command
+	PreProcess func(info inventory.InventoryInfo, strategy common.DryRunStrategy) (inventory.InventoryPolicy, error)
+	ioStreams  genericclioptions.IOStreams
+	Destroyer  *apply.Destroyer
+	provider   provider.Provider
+	loader     manifestreader.ManifestLoader
 
 	output          string
 	inventoryPolicy string
@@ -80,6 +83,13 @@ func (r *DestroyRunner) RunE(cmd *cobra.Command, args []string) error {
 	inv, _, err := r.loader.InventoryInfo(objs)
 	if err != nil {
 		return err
+	}
+
+	if r.PreProcess != nil {
+		inventoryPolicy, err = r.PreProcess(inv, r.Destroyer.DryRunStrategy)
+		if err != nil {
+			return err
+		}
 	}
 
 	// Run the destroyer. It will return a channel where we can receive updates

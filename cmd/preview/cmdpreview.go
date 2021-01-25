@@ -12,11 +12,13 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/i18n"
+
 	"sigs.k8s.io/cli-utils/cmd/flagutils"
 	"sigs.k8s.io/cli-utils/cmd/printers"
 	"sigs.k8s.io/cli-utils/pkg/apply"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/common"
+	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/manifestreader"
 	"sigs.k8s.io/cli-utils/pkg/provider"
 )
@@ -70,12 +72,13 @@ func PreviewCommand(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *c
 
 // PreviewRunner encapsulates data necessary to run the preview command.
 type PreviewRunner struct {
-	Command   *cobra.Command
-	ioStreams genericclioptions.IOStreams
-	Applier   *apply.Applier
-	Destroyer *apply.Destroyer
-	provider  provider.Provider
-	loader    manifestreader.ManifestLoader
+	Command    *cobra.Command
+	PreProcess func(info inventory.InventoryInfo, strategy common.DryRunStrategy) (inventory.InventoryPolicy, error)
+	ioStreams  genericclioptions.IOStreams
+	Applier    *apply.Applier
+	Destroyer  *apply.Destroyer
+	provider   provider.Provider
+	loader     manifestreader.ManifestLoader
 
 	serverSideOptions common.ServerSideOptions
 	output            string
@@ -112,6 +115,13 @@ func (r *PreviewRunner) RunE(cmd *cobra.Command, args []string) error {
 	inv, objs, err := r.loader.InventoryInfo(objs)
 	if err != nil {
 		return err
+	}
+
+	if r.PreProcess != nil {
+		inventoryPolicy, err = r.PreProcess(inv, drs)
+		if err != nil {
+			return err
+		}
 	}
 
 	// if destroy flag is set in preview, transmit it to destroyer DryRunStrategy flag

@@ -18,6 +18,7 @@ import (
 	"sigs.k8s.io/cli-utils/cmd/printers"
 	"sigs.k8s.io/cli-utils/pkg/apply"
 	"sigs.k8s.io/cli-utils/pkg/common"
+	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/manifestreader"
 	"sigs.k8s.io/cli-utils/pkg/provider"
 )
@@ -70,11 +71,12 @@ func ApplyCommand(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cob
 }
 
 type ApplyRunner struct {
-	Command   *cobra.Command
-	ioStreams genericclioptions.IOStreams
-	Applier   *apply.Applier
-	provider  provider.Provider
-	loader    manifestreader.ManifestLoader
+	Command    *cobra.Command
+	PreProcess func(info inventory.InventoryInfo, strategy common.DryRunStrategy) (inventory.InventoryPolicy, error)
+	ioStreams  genericclioptions.IOStreams
+	Applier    *apply.Applier
+	provider   provider.Provider
+	loader     manifestreader.ManifestLoader
 
 	serverSideOptions      common.ServerSideOptions
 	output                 string
@@ -123,6 +125,13 @@ func (r *ApplyRunner) RunE(cmd *cobra.Command, args []string) error {
 	inv, objs, err := r.loader.InventoryInfo(objs)
 	if err != nil {
 		return err
+	}
+
+	if r.PreProcess != nil {
+		inventoryPolicy, err = r.PreProcess(inv, common.DryRunNone)
+		if err != nil {
+			return err
+		}
 	}
 
 	// Run the applier. It will return a channel where we can receive updates
