@@ -13,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/klog"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/info"
 	"sigs.k8s.io/cli-utils/pkg/apply/poller"
@@ -89,6 +90,7 @@ func (a *Applier) Initialize() error {
 // resources for the subsequent apply. Returns the sorted resources to
 // apply as well as the objects for the prune, or an error if one occurred.
 func (a *Applier) prepareObjects(localInv inventory.InventoryInfo, localObjs []*unstructured.Unstructured) (*ResourceObjects, error) {
+	klog.V(4).Infof("applier preparing %d objects", len(localObjs))
 	if localInv == nil {
 		return nil, fmt.Errorf("the local inventory can't be nil")
 	}
@@ -97,20 +99,22 @@ func (a *Applier) prepareObjects(localInv inventory.InventoryInfo, localObjs []*
 	}
 	// Ensures the namespace exists before applying the inventory object into it.
 	if invNamespace := inventoryNamespaceInSet(localInv, localObjs); invNamespace != nil {
+		klog.V(4).Infof("applier prepareObjects applying namespace %s", invNamespace.GetName())
 		if err := a.invClient.ApplyInventoryNamespace(invNamespace); err != nil {
 			return nil, err
 		}
 	}
 
+	klog.V(4).Infof("applier merging %d objects into inventory", len(localObjs))
 	currentObjs := object.UnstructuredsToObjMetas(localObjs)
 	// returns the objects (pruneIds) to prune after apply. The prune
 	// algorithm requires stopping if the merge is not successful. Otherwise,
 	// the stored objects in inventory could become inconsistent.
 	pruneIds, err := a.invClient.Merge(localInv, currentObjs)
-
 	if err != nil {
 		return nil, err
 	}
+	klog.V(4).Infof("after inventory merge; %d objects to prune", len(pruneIds))
 	// Sort order for applied resources.
 	sort.Sort(ordering.SortableUnstructureds(localObjs))
 
@@ -173,6 +177,7 @@ func (r *ResourceObjects) AllIds() []object.ObjMetadata {
 // cancellation or timeout will only affect how long we Wait for the
 // resources to become current.
 func (a *Applier) Run(ctx context.Context, invInfo inventory.InventoryInfo, objects []*unstructured.Unstructured, options Options) <-chan event.Event {
+	klog.V(4).Infof("apply run for %d objects", len(objects))
 	eventChannel := make(chan event.Event)
 	setDefaults(&options)
 	a.invClient.SetDryRunStrategy(options.DryRunStrategy) // client shared with prune, so sets dry-run for prune too.
@@ -195,6 +200,7 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.InventoryInfo, obje
 		}
 
 		// Fetch the queue (channel) of tasks that should be executed.
+		klog.V(4).Infoln("applier building task queue...")
 		taskQueue := (&solver.TaskQueueSolver{
 			PruneOptions: a.PruneOptions,
 			Factory:      a.provider.Factory(),
@@ -229,7 +235,9 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.InventoryInfo, obje
 		}
 
 		// Create a new TaskStatusRunner to execute the taskQueue.
+		klog.V(4).Infoln("applier building TaskStatusRunner...")
 		runner := taskrunner.NewTaskStatusRunner(resourceObjects.AllIds(), a.StatusPoller)
+		klog.V(4).Infoln("applier running TaskStatusRunner...")
 		err = runner.Run(ctx, taskQueue, eventChannel, taskrunner.Options{
 			PollInterval:     options.PollInterval,
 			UseCache:         true,
