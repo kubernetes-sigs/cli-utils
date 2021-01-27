@@ -7,6 +7,7 @@ import (
 	"sort"
 	"sync"
 
+	"k8s.io/klog"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	pe "sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
@@ -182,8 +183,17 @@ func (r *ResourceStateCollector) processEvent(ev event.Event) error {
 // update for a resource.
 func (r *ResourceStateCollector) processStatusEvent(e event.StatusEvent) {
 	if e.Type == event.StatusEventResourceUpdate {
+		klog.V(7).Infoln("processing status event")
 		resource := e.Resource
-		previous := r.resourceInfos[resource.Identifier]
+		if resource == nil {
+			klog.V(4).Infoln("status event missing Resource field; no processing")
+			return
+		}
+		previous, found := r.resourceInfos[resource.Identifier]
+		if !found {
+			klog.V(4).Infof("%s status event not found in ResourceInfos; no processing", resource.Identifier)
+			return
+		}
 		previous.resourceStatus = e.Resource
 	}
 }
@@ -192,8 +202,10 @@ func (r *ResourceStateCollector) processStatusEvent(e event.StatusEvent) {
 func (r *ResourceStateCollector) processApplyEvent(e event.ApplyEvent) {
 	if e.Type == event.ApplyEventResourceUpdate {
 		identifier := e.Identifier
+		klog.V(7).Infof("processing apply event for %s", identifier)
 		previous, found := r.resourceInfos[identifier]
 		if !found {
+			klog.V(4).Infof("%s apply event not found in ResourceInfos; no processing", identifier)
 			return
 		}
 		previous.ApplyOpResult = &e.Operation
@@ -204,8 +216,10 @@ func (r *ResourceStateCollector) processApplyEvent(e event.ApplyEvent) {
 func (r *ResourceStateCollector) processPruneEvent(e event.PruneEvent) {
 	if e.Type == event.PruneEventResourceUpdate {
 		identifier := e.Identifier
+		klog.V(7).Infof("processing prune event for %s", identifier)
 		previous, found := r.resourceInfos[identifier]
 		if !found {
+			klog.V(4).Infof("%s prune event not found in ResourceInfos; no processing", identifier)
 			return
 		}
 		previous.PruneOpResult = &e.Operation
