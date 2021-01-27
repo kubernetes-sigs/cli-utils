@@ -55,9 +55,9 @@ func GetPreviewRunner(provider provider.Provider, loader manifestreader.Manifest
 	cmd.Flags().BoolVar(&previewDestroy, "destroy", previewDestroy, "If true, preview of destroy operations will be displayed.")
 	cmd.Flags().StringVar(&r.output, "output", printers.DefaultPrinter(),
 		fmt.Sprintf("Output format, must be one of %s", strings.Join(printers.SupportedPrinters(), ",")))
-	cmd.Flags().StringVar(&r.inventoryPolicy, "inventory-policy", "strict",
+	cmd.Flags().StringVar(&r.inventoryPolicy, flagutils.InventoryPolicyFlag, flagutils.InventoryPolicyStrict,
 		"It determines the behavior when the resources don't belong to current inventory. Available options "+
-			"\"strict\" and \"adopt\".")
+			fmt.Sprintf("%q and %q.", flagutils.InventoryPolicyStrict, flagutils.InventoryPolicyAdopt))
 
 	r.Command = cmd
 	return r

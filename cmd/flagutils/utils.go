@@ -9,11 +9,17 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 )
 
+const (
+	InventoryPolicyFlag   = "inventory-policy"
+	InventoryPolicyStrict = "strict"
+	InventoryPolicyAdopt  = "adopt"
+)
+
 func ConvertInventoryPolicy(policy string) (inventory.InventoryPolicy, error) {
 	switch policy {
-	case "strict":
+	case InventoryPolicyStrict:
 		return inventory.InventoryPolicyMustMatch, nil
-	case "adopt":
+	case InventoryPolicyAdopt:
 		return inventory.AdoptIfNoInventory, nil
 	default:
 		return inventory.InventoryPolicyMustMatch, fmt.Errorf(
