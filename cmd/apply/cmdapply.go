@@ -56,9 +56,9 @@ func GetApplyRunner(provider provider.Provider, loader manifestreader.ManifestLo
 		"Background", "Propagation policy for pruning")
 	cmd.Flags().DurationVar(&r.pruneTimeout, "prune-timeout", time.Duration(0),
 		"Timeout threshold for waiting for all pruned resources to be deleted")
-	cmd.Flags().StringVar(&r.inventoryPolicy, "inventory-policy", "strict",
+	cmd.Flags().StringVar(&r.inventoryPolicy, flagutils.InventoryPolicyFlag, flagutils.InventoryPolicyStrict,
 		"It determines the behavior when the resources don't belong to current inventory. Available options "+
-			"\"strict\" and \"adopt\".")
+			fmt.Sprintf("%q and %q.", flagutils.InventoryPolicyStrict, flagutils.InventoryPolicyAdopt))
 
 	r.Command = cmd
 	return r
