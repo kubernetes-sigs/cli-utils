@@ -15,6 +15,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/klog"
 	"k8s.io/kubectl/pkg/cmd/apply"
 	"k8s.io/kubectl/pkg/cmd/delete"
 	"k8s.io/kubectl/pkg/cmd/util"
@@ -73,6 +74,7 @@ var getClusterObj = getClusterObject
 func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 	go func() {
 		objects := a.Objects
+		klog.V(4).Infof("apply task starting; attempting to apply %d objects", len(objects))
 
 		// If this is a dry run, we need to handle situations where
 		// we have a CRD and a CR in the same resource set, but the CRD
@@ -102,6 +104,7 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 		// for that here. It could happen if this is dry-run and we removed
 		// all resources in the previous step.
 		if len(objects) == 0 {
+			klog.V(4).Infoln("no objects to apply after dry-run filtering--returning")
 			a.sendTaskResult(taskContext)
 			return
 		}
@@ -111,11 +114,15 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 		ao, dynamic, err := applyOptionsFactoryFunc(taskContext.EventChannel(),
 			a.ServerSideOptions, a.DryRunStrategy, a.Factory)
 		if err != nil {
+			if klog.V(4) {
+				klog.Errorf("error creating ApplyOptions (%s)--returning", err)
+			}
 			sendBatchApplyEvents(taskContext, objects, err)
 			a.sendTaskResult(taskContext)
 			return
 		}
 
+		klog.V(4).Infof("attempting to apply %d remaining objects", len(objects))
 		var infos []*resource.Info
 		for _, obj := range objects {
 			// Set the client and mapping fields on the provided
@@ -123,6 +130,10 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 			info, err := a.InfoHelper.BuildInfo(obj)
 			id := object.UnstructuredToObjMeta(obj)
 			if err != nil {
+				if klog.V(4) {
+					klog.Errorf("unable to convert obj to info for %s/%s (%s)--continue",
+						obj.GetNamespace(), obj.GetName(), err)
+				}
 				taskContext.EventChannel() <- createApplyEvent(
 					id, event.Failed, applyerror.NewUnknownTypeError(err))
 				taskContext.CaptureResourceFailure(id)
@@ -132,6 +143,10 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 			clusterObj, err := getClusterObj(dynamic, info)
 			if err != nil {
 				if !apierrors.IsNotFound(err) {
+					if klog.V(4) {
+						klog.Errorf("error retrieving %s/%s from cluster--continue",
+							info.Namespace, info.Name)
+					}
 					taskContext.EventChannel() <- createApplyEvent(
 						id,
 						event.Unchanged,
@@ -143,6 +158,8 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 			infos = append(infos, info)
 			canApply, err := inventory.CanApply(a.InvInfo, clusterObj, a.InventoryPolicy)
 			if !canApply {
+				klog.V(5).Infof("can not apply %s/%s--continue",
+					clusterObj.GetNamespace(), clusterObj.GetName())
 				taskContext.EventChannel() <- createApplyEvent(
 					id,
 					event.Unchanged,
@@ -153,8 +170,12 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 			// add the inventory annotation to the resource being applied.
 			inventory.AddInventoryIDAnnotation(obj, a.InvInfo)
 			ao.SetObjects([]*resource.Info{info})
+			klog.V(5).Infof("applying %s/%s...", info.Namespace, info.Name)
 			err = ao.Run()
 			if err != nil {
+				if klog.V(4) {
+					klog.Errorf("error applying (%s/%s) %s", info.Namespace, info.Name, err)
+				}
 				taskContext.EventChannel() <- createApplyEvent(
 					id, event.Failed, applyerror.NewApplyRunError(err))
 				taskContext.CaptureResourceFailure(id)
@@ -173,9 +194,12 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 				if err != nil {
 					continue
 				}
+				// Only add a resource if it successfully applied.
 				uid := acc.GetUID()
-				gen := acc.GetGeneration()
-				taskContext.ResourceApplied(id, uid, gen)
+				if string(uid) != "" {
+					gen := acc.GetGeneration()
+					taskContext.ResourceApplied(id, uid, gen)
+				}
 			}
 		}
 		a.sendTaskResult(taskContext)

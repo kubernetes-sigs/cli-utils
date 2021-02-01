@@ -440,6 +440,7 @@ var deployment = toUnstructured(map[string]interface{}{
 	"metadata": map[string]interface{}{
 		"name":      "deploy",
 		"namespace": "default",
+		"uid":       "uid-deployment",
 	},
 })
 

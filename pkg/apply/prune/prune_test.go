@@ -174,60 +174,62 @@ func TestPrune(t *testing.T) {
 	tests := map[string]struct {
 		// pastObjs/currentObjs do NOT contain the inventory object.
 		// Inventory object is generated from these past/current objects.
-		pastObjs       []*unstructured.Unstructured
-		currentObjs    []*unstructured.Unstructured
-		prunedObjs     []*unstructured.Unstructured
-		pruneEventObjs []*unstructured.Unstructured
-		isError        bool
+		pastObjs    []*unstructured.Unstructured
+		currentObjs []*unstructured.Unstructured
+		prunedObjs  []*unstructured.Unstructured
+		// finalClusterObjs are the objects in cluster at the end of prune,
+		// and the objects which should be stored in the inventory object.
+		finalClusterObjs []*unstructured.Unstructured
+		pruneEventObjs   []*unstructured.Unstructured
 	}{
 		"Past and current objects are empty; no pruned objects": {
-			pastObjs:       []*unstructured.Unstructured{},
-			currentObjs:    []*unstructured.Unstructured{},
-			prunedObjs:     []*unstructured.Unstructured{},
-			pruneEventObjs: []*unstructured.Unstructured{},
-			isError:        false,
+			pastObjs:         []*unstructured.Unstructured{},
+			currentObjs:      []*unstructured.Unstructured{},
+			prunedObjs:       []*unstructured.Unstructured{},
+			finalClusterObjs: []*unstructured.Unstructured{},
+			pruneEventObjs:   []*unstructured.Unstructured{},
 		},
 		"Past and current objects are the same; no pruned objects": {
-			pastObjs:       []*unstructured.Unstructured{namespace, pdb},
-			currentObjs:    []*unstructured.Unstructured{pdb, namespace},
-			prunedObjs:     []*unstructured.Unstructured{},
-			pruneEventObjs: []*unstructured.Unstructured{},
-			isError:        false,
+			pastObjs:         []*unstructured.Unstructured{namespace, pdb},
+			currentObjs:      []*unstructured.Unstructured{pdb, namespace},
+			prunedObjs:       []*unstructured.Unstructured{},
+			finalClusterObjs: []*unstructured.Unstructured{namespace, pdb},
+			pruneEventObjs:   []*unstructured.Unstructured{},
 		},
 		"No past objects; no pruned objects": {
-			pastObjs:       []*unstructured.Unstructured{},
-			currentObjs:    []*unstructured.Unstructured{pdb, namespace},
-			pruneEventObjs: []*unstructured.Unstructured{},
-			prunedObjs:     []*unstructured.Unstructured{},
-			isError:        false,
+			pastObjs:         []*unstructured.Unstructured{},
+			currentObjs:      []*unstructured.Unstructured{pdb, namespace},
+			pruneEventObjs:   []*unstructured.Unstructured{},
+			finalClusterObjs: []*unstructured.Unstructured{pdb, namespace},
+			prunedObjs:       []*unstructured.Unstructured{},
 		},
 		"No current objects; all previous objects pruned in correct order": {
-			pastObjs:       []*unstructured.Unstructured{namespace, pdb, role},
-			currentObjs:    []*unstructured.Unstructured{},
-			prunedObjs:     []*unstructured.Unstructured{pdb, role, namespace},
-			pruneEventObjs: []*unstructured.Unstructured{pdb, role, namespace},
-			isError:        false,
+			pastObjs:         []*unstructured.Unstructured{pdb, role, pod},
+			currentObjs:      []*unstructured.Unstructured{},
+			prunedObjs:       []*unstructured.Unstructured{pod, pdb, role},
+			finalClusterObjs: []*unstructured.Unstructured{},
+			pruneEventObjs:   []*unstructured.Unstructured{pod, pdb, role},
 		},
 		"Omitted object is pruned": {
-			pastObjs:       []*unstructured.Unstructured{namespace, pdb},
-			currentObjs:    []*unstructured.Unstructured{pdb, role},
-			prunedObjs:     []*unstructured.Unstructured{namespace},
-			pruneEventObjs: []*unstructured.Unstructured{namespace},
-			isError:        false,
+			pastObjs:         []*unstructured.Unstructured{pdb, role},
+			currentObjs:      []*unstructured.Unstructured{pdb},
+			prunedObjs:       []*unstructured.Unstructured{role},
+			finalClusterObjs: []*unstructured.Unstructured{pdb},
+			pruneEventObjs:   []*unstructured.Unstructured{role},
 		},
 		"Prevent delete lifecycle annotation stops pruning": {
-			pastObjs:       []*unstructured.Unstructured{preventDelete, pdb},
-			currentObjs:    []*unstructured.Unstructured{pdb, role},
-			prunedObjs:     []*unstructured.Unstructured{},
-			pruneEventObjs: []*unstructured.Unstructured{preventDelete},
-			isError:        false,
+			pastObjs:         []*unstructured.Unstructured{preventDelete, pdb},
+			currentObjs:      []*unstructured.Unstructured{pdb, role},
+			prunedObjs:       []*unstructured.Unstructured{},
+			finalClusterObjs: []*unstructured.Unstructured{preventDelete, pdb, role},
+			pruneEventObjs:   []*unstructured.Unstructured{preventDelete},
 		},
 		"Namespace not pruned if objects are still in it": {
-			pastObjs:       []*unstructured.Unstructured{namespace, pdb, pod},
-			currentObjs:    []*unstructured.Unstructured{pod},
-			prunedObjs:     []*unstructured.Unstructured{pdb},
-			pruneEventObjs: []*unstructured.Unstructured{pdb, namespace},
-			isError:        false,
+			pastObjs:         []*unstructured.Unstructured{namespace, pdb, pod},
+			currentObjs:      []*unstructured.Unstructured{pod},
+			prunedObjs:       []*unstructured.Unstructured{pdb},
+			finalClusterObjs: []*unstructured.Unstructured{namespace, pod},
+			pruneEventObjs:   []*unstructured.Unstructured{pdb, namespace},
 		},
 	}
 	for name, tc := range tests {
@@ -235,14 +237,18 @@ func TestPrune(t *testing.T) {
 			drs := common.Strategies[i]
 			t.Run(name, func(t *testing.T) {
 				po := NewPruneOptions()
-				// Set up the previously applied objects.
+				// Set up the union of previously applied objects and the
+				// currently applied objects as the current inventory items.
 				clusterObjs := object.UnstructuredsToObjMetas(tc.pastObjs)
-				po.InvClient = inventory.NewFakeInventoryClient(clusterObjs)
-				// Set up the currently applied objects.
-				currentInventory := createInventoryInfo(tc.currentObjs...)
+				currentObjs := object.UnstructuredsToObjMetas(tc.currentObjs)
+				fakeInvClient := inventory.NewFakeInventoryClient(object.Union(clusterObjs, currentObjs))
+				po.InvClient = fakeInvClient
+				// Set up the current inventory with union of objects.
+				unionObjs := unionObjects(tc.pastObjs, tc.currentObjs)
+				currentInventory := createInventoryInfo(unionObjs...)
 				// Set up the fake dynamic client to recognize all objects, and the RESTMapper.
 				objs := []runtime.Object{}
-				for _, obj := range tc.pastObjs {
+				for _, obj := range unionObjs {
 					objs = append(objs, obj)
 				}
 				po.client = fake.NewSimpleDynamicClient(scheme.Scheme, objs...)
@@ -259,33 +265,55 @@ func TestPrune(t *testing.T) {
 						DryRunStrategy: drs,
 					})
 				}()
-				if !tc.isError {
-					if err != nil {
-						t.Fatalf("Unexpected error during Prune(): %#v", err)
-					}
 
-					var actualPruneEvents []event.Event
-					for e := range eventChannel {
-						actualPruneEvents = append(actualPruneEvents, e)
-					}
-					if want, got := len(tc.pruneEventObjs), len(actualPruneEvents); want != got {
-						t.Errorf("Expected (%d) prune events, got (%d)", want, got)
-					}
+				if err != nil {
+					t.Fatalf("Unexpected error during Prune(): %#v", err)
+				}
 
-					for i, obj := range tc.pruneEventObjs {
-						e := actualPruneEvents[i]
-						expKind := obj.GetObjectKind().GroupVersionKind().Kind
-						actKind := e.PruneEvent.Identifier.GroupKind.Kind
-						if expKind != actKind {
-							t.Errorf("Expected kind %s, got %s", expKind, actKind)
-						}
+				// Test that the correct inventory objects are stored at the end of the prune.
+				actualObjs := fakeInvClient.Objs
+				expectedObjs := object.UnstructuredsToObjMetas(tc.finalClusterObjs)
+				if !object.SetEquals(expectedObjs, actualObjs) {
+					t.Errorf("expected inventory objs (%s), got (%s)", expectedObjs, actualObjs)
+				}
+
+				var actualPruneEvents []event.Event
+				for e := range eventChannel {
+					actualPruneEvents = append(actualPruneEvents, e)
+				}
+				if want, got := len(tc.pruneEventObjs), len(actualPruneEvents); want != got {
+					t.Errorf("Expected (%d) prune events, got (%d)", want, got)
+				}
+
+				for i, obj := range tc.pruneEventObjs {
+					e := actualPruneEvents[i]
+					expKind := obj.GetObjectKind().GroupVersionKind().Kind
+					actKind := e.PruneEvent.Identifier.GroupKind.Kind
+					if expKind != actKind {
+						t.Errorf("Expected kind %s, got %s", expKind, actKind)
 					}
-				} else if err == nil {
-					t.Fatalf("Expected error during Prune() but received none")
 				}
 			})
 		}
 	}
+}
+
+// unionObjects returns the union of sliceA and sliceB as a slice of unstructured objects.
+func unionObjects(sliceA []*unstructured.Unstructured, sliceB []*unstructured.Unstructured) []*unstructured.Unstructured {
+	m := map[string]*unstructured.Unstructured{}
+	for _, a := range sliceA {
+		metadata := object.UnstructuredToObjMeta(a)
+		m[metadata.String()] = a
+	}
+	for _, b := range sliceB {
+		metadata := object.UnstructuredToObjMeta(b)
+		m[metadata.String()] = b
+	}
+	union := []*unstructured.Unstructured{}
+	for _, u := range m {
+		union = append(union, u)
+	}
+	return union
 }
 
 // populateObjectIds returns a pointer to a set of strings containing
