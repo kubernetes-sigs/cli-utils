@@ -56,36 +56,6 @@ func TestCreateObjMetadata(t *testing.T) {
 			expected:  "",
 			isError:   true,
 		},
-		"Underscore is invalid name character": {
-			namespace: "test-namespace",
-			name:      "test_name", // Invalid "_" character
-			gk: schema.GroupKind{
-				Group: "apps",
-				Kind:  "ReplicaSet",
-			},
-			expected: "",
-			isError:  true,
-		},
-		"Name not starting with alphanumeric character is error": {
-			namespace: "test-namespace",
-			name:      "-test",
-			gk: schema.GroupKind{
-				Group: "apps",
-				Kind:  "ReplicaSet",
-			},
-			expected: "",
-			isError:  true,
-		},
-		"Name not ending with alphanumeric character is error": {
-			namespace: "test-namespace",
-			name:      "test-",
-			gk: schema.GroupKind{
-				Group: "apps",
-				Kind:  "ReplicaSet",
-			},
-			expected: "",
-			isError:  true,
-		},
 		"Colon is allowed in the name for RBAC resources": {
 			namespace: "test-namespace",
 			name:      "system::kube-scheduler",
@@ -95,16 +65,6 @@ func TestCreateObjMetadata(t *testing.T) {
 			},
 			expected: "test-namespace_system____kube-scheduler_rbac.authorization.k8s.io_Role",
 			isError:  false,
-		},
-		"Colon is not allowed in the name for non-RBAC resources": {
-			namespace: "test-namespace",
-			name:      "system::kube-scheduler",
-			gk: schema.GroupKind{
-				Group: "",
-				Kind:  "Pod",
-			},
-			expected: "",
-			isError:  true,
 		},
 	}
 

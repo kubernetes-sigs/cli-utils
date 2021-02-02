@@ -28,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/cli-runtime/pkg/resource"
 )
 
@@ -72,11 +71,6 @@ func CreateObjMetadata(namespace string, name string, gk schema.GroupKind) (ObjM
 	if name == "" {
 		return ObjMetadata{}, fmt.Errorf("empty name for object")
 	}
-	// Manually validate name, since by the time k8s reports the error
-	// the invalid name has already been encoded into the inventory object.
-	if !validateNameChars(name, gk) {
-		return ObjMetadata{}, fmt.Errorf("invalid characters in object name: %s", name)
-	}
 	if gk.Empty() {
 		return ObjMetadata{}, fmt.Errorf("empty GroupKind for object")
 	}
@@ -85,27 +79,6 @@ func CreateObjMetadata(namespace string, name string, gk schema.GroupKind) (ObjM
 		Name:      name,
 		GroupKind: gk,
 	}, nil
-}
-
-// validateNameChars returns false if the passed name is not a valid
-// resource name; true otherwise. For almost all resources, the following
-// characters are allowed:
-//
-//   Most resource types require a name that can be used as a DNS label name
-//   as defined in RFC 1123. This means the name must:
-//
-//   * contain no more than 253 characters
-//   * contain only lowercase alphanumeric characters, '-'
-//   * start with an alphanumeric character
-//   * end with an alphanumeric character
-//
-// For RBAC resources we also allow the colon character.
-func validateNameChars(name string, gk schema.GroupKind) bool {
-	if _, exists := RBACGroupKind[gk]; exists {
-		name = strings.ReplaceAll(name, ":", "")
-	}
-	errs := validation.IsDNS1123Subdomain(name)
-	return len(errs) == 0
 }
 
 // ParseObjMetadata takes a string, splits it into its four fields,
@@ -143,6 +116,10 @@ func ParseObjMetadata(s string) (ObjMetadata, error) {
 	// Finally, second field name. Name may contain colon transcoded as double underscore.
 	name := s[:index]
 	name = strings.ReplaceAll(name, colonTranscoded, ":")
+	// Check that there are no extra fields by search for fieldSeparator.
+	if strings.Contains(name, fieldSeparator) {
+		return ObjMetadata{}, fmt.Errorf("too many fields within: %s", s)
+	}
 	// Create the ObjMetadata object from the four parsed fields.
 	gk := schema.GroupKind{
 		Group: strings.TrimSpace(group),
