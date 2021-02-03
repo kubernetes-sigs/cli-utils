@@ -104,6 +104,12 @@ func (a *Applier) prepareObjects(localInv inventory.InventoryInfo, localObjs []*
 			return nil, err
 		}
 	}
+	// Retrieve previous inventory objects. Must happen before inventory client merge.
+	prevInv, err := a.invClient.GetClusterObjs(localInv)
+	if err != nil {
+		return nil, err
+	}
+	klog.V(4).Infof("%d previous inventory objects in cluster", len(prevInv))
 
 	klog.V(4).Infof("applier merging %d objects into inventory", len(localObjs))
 	currentObjs := object.UnstructuredsToObjMetas(localObjs)
@@ -122,6 +128,7 @@ func (a *Applier) prepareObjects(localInv inventory.InventoryInfo, localObjs []*
 		LocalInv:  localInv,
 		Resources: localObjs,
 		PruneIds:  pruneIds,
+		PrevInv:   prevInv,
 	}, nil
 }
 
@@ -132,6 +139,7 @@ type ResourceObjects struct {
 	LocalInv  inventory.InventoryInfo
 	Resources []*unstructured.Unstructured
 	PruneIds  []object.ObjMetadata
+	PrevInv   []object.ObjMetadata
 }
 
 // ObjsForApply returns the unstructured representation for all the resources
@@ -160,6 +168,13 @@ func (r *ResourceObjects) IdsForApply() []object.ObjMetadata {
 // be pruned.
 func (r *ResourceObjects) IdsForPrune() []object.ObjMetadata {
 	return r.PruneIds
+}
+
+// IdsForPrevInv returns the Ids for the previous inventory. These
+// Ids reference the objects managed by the inventory object which
+// are already in the cluster.
+func (r *ResourceObjects) IdsForPrevInv() []object.ObjMetadata {
+	return r.PrevInv
 }
 
 // AllIds returns the Ids for all resources that are relevant. This
