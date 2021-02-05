@@ -194,29 +194,9 @@ func (po *PruneOptions) Prune(localInv inventory.InventoryInfo,
 		}
 		taskContext.EventChannel() <- createPruneEvent(pruneObj, obj, event.Pruned)
 	}
-	// Calculate final inventory items, ensuring only successfully applied
-	// objects are in the inventory along with prune failures.
-	finalInventory := []object.ObjMetadata{}
-	for _, localObj := range localIds {
-		obj, err := po.getObject(localObj)
-		if err != nil {
-			if klog.V(4) {
-				klog.Errorf("error retrieving object for inventory determination: %s", err)
-			}
-			continue
-		}
-		uid := string(obj.GetUID())
-		if currentUIDs.Has(uid) {
-			klog.V(5).Infof("adding final inventory object %s/%s", localObj.Namespace, localObj.Name)
-			finalInventory = append(finalInventory, localObj)
-		} else {
-			klog.V(5).Infof("uid not found (%s); not adding final inventory obj %s/%s",
-				uid, localObj.Namespace, localObj.Name)
-		}
-	}
-	klog.V(4).Infof("final inventory %d successfully applied objects", len(finalInventory))
-	finalInventory = append(finalInventory, pruneFailures...)
-	klog.V(4).Infof("final inventory %d objects after appending prune failures", len(finalInventory))
+	// Final inventory equals applied objects and prune failures.
+	appliedResources := taskContext.AppliedResources()
+	finalInventory := append(appliedResources, pruneFailures...)
 	return po.InvClient.Replace(localInv, finalInventory)
 }
 

@@ -258,6 +258,11 @@ func TestPrune(t *testing.T) {
 				// the events that can be put on it.
 				eventChannel := make(chan event.Event, len(tc.pastObjs)+1) // Add one for inventory object
 				taskContext := taskrunner.NewTaskContext(eventChannel)
+				for _, u := range tc.currentObjs {
+					o := object.UnstructuredToObjMeta(u)
+					uid := u.GetUID()
+					taskContext.ResourceApplied(o, uid, 0)
+				}
 				err := func() error {
 					defer close(eventChannel)
 					// Run the prune and validate.

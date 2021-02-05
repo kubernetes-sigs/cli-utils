@@ -4,6 +4,8 @@
 package taskrunner
 
 import (
+	"strings"
+
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
@@ -60,12 +62,25 @@ func (tc *TaskContext) ResourceUID(id object.ObjMetadata) (types.UID, bool) {
 	return ai.uid, true
 }
 
+// AppliedResources returns all the objects (as ObjMetadata) that
+// were added as applied resources to the TaskContext.
+func (tc *TaskContext) AppliedResources() []object.ObjMetadata {
+	all := make([]object.ObjMetadata, 0, len(tc.appliedResources))
+	for r := range tc.appliedResources {
+		all = append(all, r)
+	}
+	return all
+}
+
 // AllResourceUIDs returns a set with the UIDs of all the resources in the
 // context.
 func (tc *TaskContext) AllResourceUIDs() sets.String {
 	uids := sets.NewString()
 	for _, ai := range tc.appliedResources {
-		uids.Insert(string(ai.uid))
+		uid := strings.TrimSpace(string(ai.uid))
+		if uid != "" {
+			uids.Insert(uid)
+		}
 	}
 	return uids
 }

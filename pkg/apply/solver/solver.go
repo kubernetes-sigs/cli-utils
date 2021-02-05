@@ -56,6 +56,7 @@ type resourceObjects interface {
 	Inventory() inventory.InventoryInfo
 	IdsForApply() []object.ObjMetadata
 	IdsForPrune() []object.ObjMetadata
+	IdsForPrevInv() []object.ObjMetadata
 }
 
 // BuildTaskQueue takes a set of resources in the form of info objects
@@ -65,12 +66,19 @@ func (t *TaskQueueSolver) BuildTaskQueue(ro resourceObjects,
 	o Options) chan taskrunner.Task {
 	var tasks []taskrunner.Task
 	remainingInfos := ro.ObjsForApply()
+	// Convert slice of previous inventory objects into a map.
+	prevInvSlice := ro.IdsForPrevInv()
+	prevInventory := make(map[object.ObjMetadata]bool, len(prevInvSlice))
+	for _, prevInvObj := range prevInvSlice {
+		prevInventory[prevInvObj] = true
+	}
 
 	crdSplitRes, hasCRDs := splitAfterCRDs(remainingInfos)
 	if hasCRDs {
 		tasks = append(tasks, &task.ApplyTask{
 			Objects:           append(crdSplitRes.before, crdSplitRes.crds...),
 			CRDs:              crdSplitRes.crds,
+			PrevInventory:     prevInventory,
 			ServerSideOptions: o.ServerSideOptions,
 			DryRunStrategy:    o.DryRunStrategy,
 			InfoHelper:        t.InfoHelper,
@@ -96,6 +104,7 @@ func (t *TaskQueueSolver) BuildTaskQueue(ro resourceObjects,
 		&task.ApplyTask{
 			Objects:           remainingInfos,
 			CRDs:              crdSplitRes.crds,
+			PrevInventory:     prevInventory,
 			ServerSideOptions: o.ServerSideOptions,
 			DryRunStrategy:    o.DryRunStrategy,
 			InfoHelper:        t.InfoHelper,

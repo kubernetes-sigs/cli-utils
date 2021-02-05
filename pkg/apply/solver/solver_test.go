@@ -309,10 +309,11 @@ func getType(task taskrunner.Task) reflect.Type {
 }
 
 type fakeResourceObjects struct {
-	objsForApply []*unstructured.Unstructured
-	inventory    inventory.InventoryInfo
-	idsForApply  []object.ObjMetadata
-	idsForPrune  []object.ObjMetadata
+	objsForApply  []*unstructured.Unstructured
+	inventory     inventory.InventoryInfo
+	idsForApply   []object.ObjMetadata
+	idsForPrune   []object.ObjMetadata
+	idsForPrevInv []object.ObjMetadata
 }
 
 func (f *fakeResourceObjects) ObjsForApply() []*unstructured.Unstructured {
@@ -329,6 +330,10 @@ func (f *fakeResourceObjects) IdsForApply() []object.ObjMetadata {
 
 func (f *fakeResourceObjects) IdsForPrune() []object.ObjMetadata {
 	return f.idsForPrune
+}
+
+func (f *fakeResourceObjects) IdsForPrevInv() []object.ObjMetadata {
+	return f.idsForPrevInv
 }
 
 func ignoreErrInfoToObjMeta(info *unstructured.Unstructured) object.ObjMetadata {
