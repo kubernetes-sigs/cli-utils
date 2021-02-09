@@ -30,6 +30,6 @@ require (
 	k8s.io/kubectl v0.18.10
 	k8s.io/utils v0.0.0-20200324210504-a9aa75ae1b89
 	sigs.k8s.io/controller-runtime v0.6.0
-	sigs.k8s.io/kustomize/kyaml v0.10.7
+	sigs.k8s.io/kustomize/kyaml v0.10.9
 	sigs.k8s.io/yaml v1.2.0
 )
