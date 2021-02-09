@@ -9,14 +9,12 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"path"
 	"reflect"
 	"regexp"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,70 +39,103 @@ import (
 
 var (
 	codec     = scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
-	resources = map[string]resourceInfo{
-		"inventoryObject": {
-			manifest: `
-  kind: ConfigMap
-  apiVersion: v1
-  metadata:
-    labels:
-      cli-utils.sigs.k8s.io/inventory-id: test
-    name: foo
-    namespace: default
+	resources = map[string]string{
+		"deployment": `
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: foo
+  namespace: default
+  uid: dep-uid
+  generation: 1
+spec:
+  replicas: 1
 `,
-		},
-		"deployment": {
-			manifest: `
-  kind: Deployment
-  apiVersion: apps/v1
-  metadata:
-    name: foo
-    namespace: default
-  spec:
-    replicas: 1
+		"secret": `
+kind: Secret
+apiVersion: v1
+metadata:
+  name: secret
+  namespace: default
+  uid: secret-uid
+  generation: 1
+type: Opaque
+spec:
+  foo: bar
 `,
-			basePath:    "/namespaces/%s/deployments",
-			factoryFunc: func() runtime.Object { return &appsv1.Deployment{} },
-		},
 	}
 )
 
-var deploymentUnmatched = &unstructured.Unstructured{
-	Object: map[string]interface{}{
-		"apiVersion": "apps/v1",
-		"kind":       "Deployment",
-		"metadata": map[string]interface{}{
-			"name":      "foo",
-			"namespace": "default",
-			"annotations": map[string]interface{}{
-				"config.k8s.io/owning-inventory": "unmatched",
-			},
-		},
-	},
+func Unstructured(t *testing.T, manifest string, mutators ...mutator) *unstructured.Unstructured {
+	u := &unstructured.Unstructured{}
+	err := runtime.DecodeInto(codec, []byte(manifest), u)
+	if !assert.NoError(t, err) {
+		t.FailNow()
+	}
+	for _, m := range mutators {
+		m.Mutate(u)
+	}
+	return u
 }
 
-var deploymentMatched = &unstructured.Unstructured{
-	Object: map[string]interface{}{
-		"apiVersion": "apps/v1",
-		"kind":       "Deployment",
-		"metadata": map[string]interface{}{
-			"name":      "foo",
-			"namespace": "default",
-			"annotations": map[string]interface{}{
-				"config.k8s.io/owning-inventory": "test",
-			},
-		},
-	},
+type mutator interface {
+	Mutate(u *unstructured.Unstructured)
 }
 
-// resourceStatus contains information about a specific resource, such
-// as the manifest yaml and the URL path for this resource in the
-// client. It also contains a factory function for creating a new
-// resource of the given type.
+func addOwningInv(t *testing.T, inv string) mutator {
+	return owningInvMutator{
+		t:   t,
+		inv: inv,
+	}
+}
+
+type owningInvMutator struct {
+	t   *testing.T
+	inv string
+}
+
+func (a owningInvMutator) Mutate(u *unstructured.Unstructured) {
+	annos, found, err := unstructured.NestedStringMap(u.Object, "metadata", "annotations")
+	if !assert.NoError(a.t, err) {
+		a.t.FailNow()
+	}
+	if !found {
+		annos = make(map[string]string)
+	}
+	annos["config.k8s.io/owning-inventory"] = a.inv
+	err = unstructured.SetNestedStringMap(u.Object, annos, "metadata", "annotations")
+	if !assert.NoError(a.t, err) {
+		a.t.FailNow()
+	}
+}
+
 type resourceInfo struct {
-	manifest    string
-	basePath    string
-	factoryFunc func() runtime.Object
+	resource *unstructured.Unstructured
+	exists   bool
+}
+
+type inventoryInfo struct {
+	name      string
+	namespace string
+	id        string
+	list      []object.ObjMetadata
+}
+
+func (i inventoryInfo) toWrapped() inventory.InventoryInfo {
+	inv := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "v1",
+			"kind":       "ConfigMap",
+			"metadata": map[string]interface{}{
+				"name":      i.name,
+				"namespace": i.namespace,
+				"labels": map[string]interface{}{
+					common.InventoryLabel: i.id,
+				},
+			},
+		},
+	}
+	return inventory.WrapInventoryInfoObj(inv)
 }
 
 type expectedEvent struct {
@@ -122,30 +153,30 @@ type expectedEvent struct {
 func TestApplier(t *testing.T) {
 	testCases := map[string]struct {
 		namespace          string
-		resources          []resourceInfo
+		resources          []*unstructured.Unstructured
+		invInfo            inventoryInfo
+		clusterObjs        []*unstructured.Unstructured
 		handlers           []handler
 		reconcileTimeout   time.Duration
 		prune              bool
+		inventoryPolicy    inventory.InventoryPolicy
 		statusEvents       []pollevent.Event
 		expectedEventTypes []expectedEvent
-		clusterObj         *unstructured.Unstructured
 	}{
-		"apply without status or prune": {
+		"initial apply without status or prune": {
 			namespace: "default",
-			resources: []resourceInfo{
-				resources["deployment"],
-				resources["inventoryObject"],
+			resources: []*unstructured.Unstructured{
+				Unstructured(t, resources["deployment"]),
 			},
-			handlers: []handler{
-				&nsHandler{},
-				&inventoryObjectHandler{},
-				&genericHandler{
-					resourceInfo: resources["deployment"],
-					namespace:    "default",
-				},
+			invInfo: inventoryInfo{
+				name:      "abc-123",
+				namespace: "default",
+				id:        "test",
 			},
+			clusterObjs:      []*unstructured.Unstructured{},
 			reconcileTimeout: time.Duration(0),
 			prune:            false,
+			inventoryPolicy:  inventory.InventoryPolicyMustMatch,
 			expectedEventTypes: []expectedEvent{
 				{
 					eventType: event.InitType,
@@ -160,36 +191,228 @@ func TestApplier(t *testing.T) {
 				},
 			},
 		},
-		"first apply with inventory object": {
+		"first apply multiple resources with status and prune": {
 			namespace: "default",
-			resources: []resourceInfo{
-				resources["deployment"],
-				resources["inventoryObject"],
+			resources: []*unstructured.Unstructured{
+				Unstructured(t, resources["deployment"]),
+				Unstructured(t, resources["secret"]),
 			},
-			handlers: []handler{
-				&nsHandler{},
-				&inventoryObjectHandler{},
-				&genericHandler{
-					resourceInfo: resources["deployment"],
-					namespace:    "default",
-				},
+			invInfo: inventoryInfo{
+				name:      "inv-123",
+				namespace: "default",
+				id:        "test",
 			},
+			clusterObjs:      []*unstructured.Unstructured{},
 			reconcileTimeout: time.Minute,
+			prune:            true,
+			inventoryPolicy:  inventory.InventoryPolicyMustMatch,
 			statusEvents: []pollevent.Event{
 				{
 					EventType: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
-						Identifier: object.ObjMetadata{
-							Name:      "foo-dcf2c498",
-							Namespace: "default",
-							GroupKind: schema.GroupKind{
-								Group: "",
-								Kind:  "ConfigMap",
-							},
-						},
-						Status: status.CurrentStatus,
+						Identifier: toIdentifier(t, resources["deployment"]),
+						Status:     status.InProgressStatus,
+						Resource:   Unstructured(t, resources["deployment"]),
 					},
 				},
+				{
+					EventType: pollevent.ResourceUpdateEvent,
+					Resource: &pollevent.ResourceStatus{
+						Identifier: toIdentifier(t, resources["deployment"]),
+						Status:     status.CurrentStatus,
+						Resource:   Unstructured(t, resources["deployment"]),
+					},
+				},
+				{
+					EventType: pollevent.ResourceUpdateEvent,
+					Resource: &pollevent.ResourceStatus{
+						Identifier: toIdentifier(t, resources["secret"]),
+						Status:     status.CurrentStatus,
+						Resource:   Unstructured(t, resources["secret"]),
+					},
+				},
+			},
+			expectedEventTypes: []expectedEvent{
+				{
+					eventType: event.InitType,
+				},
+				{
+					eventType:      event.ApplyType,
+					applyEventType: event.ApplyEventResourceUpdate,
+				},
+				{
+					eventType:      event.ApplyType,
+					applyEventType: event.ApplyEventResourceUpdate,
+				},
+				{
+					eventType:      event.ApplyType,
+					applyEventType: event.ApplyEventCompleted,
+				},
+				{
+					eventType:       event.StatusType,
+					statusEventType: event.StatusEventResourceUpdate,
+				},
+				{
+					eventType:       event.StatusType,
+					statusEventType: event.StatusEventResourceUpdate,
+				},
+				{
+					eventType:       event.StatusType,
+					statusEventType: event.StatusEventResourceUpdate,
+				},
+				{
+					eventType:       event.StatusType,
+					statusEventType: event.StatusEventCompleted,
+				},
+				{
+					eventType:      event.PruneType,
+					pruneEventType: event.PruneEventCompleted,
+				},
+			},
+		},
+		"apply multiple existing resources with status and prune": {
+			namespace: "default",
+			resources: []*unstructured.Unstructured{
+				Unstructured(t, resources["deployment"]),
+				Unstructured(t, resources["secret"]),
+			},
+			invInfo: inventoryInfo{
+				name:      "inv-123",
+				namespace: "default",
+				id:        "test",
+				list: []object.ObjMetadata{
+					object.UnstructuredToObjMeta(
+						Unstructured(t, resources["deployment"]),
+					),
+				},
+			},
+			clusterObjs: []*unstructured.Unstructured{
+				Unstructured(t, resources["deployment"]),
+			},
+			reconcileTimeout: time.Minute,
+			prune:            true,
+			inventoryPolicy:  inventory.AdoptIfNoInventory,
+			statusEvents: []pollevent.Event{
+				{
+					EventType: pollevent.ResourceUpdateEvent,
+					Resource: &pollevent.ResourceStatus{
+						Identifier: toIdentifier(t, resources["deployment"]),
+						Status:     status.CurrentStatus,
+						Resource:   Unstructured(t, resources["deployment"]),
+					},
+				},
+				{
+					EventType: pollevent.ResourceUpdateEvent,
+					Resource: &pollevent.ResourceStatus{
+						Identifier: toIdentifier(t, resources["secret"]),
+						Status:     status.CurrentStatus,
+						Resource:   Unstructured(t, resources["secret"]),
+					},
+				},
+			},
+			expectedEventTypes: []expectedEvent{
+				{
+					eventType: event.InitType,
+				},
+				{
+					eventType:      event.ApplyType,
+					applyEventType: event.ApplyEventResourceUpdate,
+				},
+				{
+					eventType:      event.ApplyType,
+					applyEventType: event.ApplyEventResourceUpdate,
+				},
+				{
+					eventType:      event.ApplyType,
+					applyEventType: event.ApplyEventCompleted,
+				},
+				{
+					eventType:       event.StatusType,
+					statusEventType: event.StatusEventResourceUpdate,
+				},
+				{
+					eventType:       event.StatusType,
+					statusEventType: event.StatusEventResourceUpdate,
+				},
+				{
+					eventType:       event.StatusType,
+					statusEventType: event.StatusEventCompleted,
+				},
+				{
+					eventType:      event.PruneType,
+					pruneEventType: event.PruneEventCompleted,
+				},
+			},
+		},
+		"apply no resources and prune all existing": {
+			namespace: "default",
+			resources: []*unstructured.Unstructured{},
+			invInfo: inventoryInfo{
+				name:      "inv-123",
+				namespace: "default",
+				id:        "test",
+				list: []object.ObjMetadata{
+					object.UnstructuredToObjMeta(
+						Unstructured(t, resources["deployment"]),
+					),
+					object.UnstructuredToObjMeta(
+						Unstructured(t, resources["secret"]),
+					),
+				},
+			},
+			clusterObjs: []*unstructured.Unstructured{
+				Unstructured(t, resources["deployment"], addOwningInv(t, "test")),
+				Unstructured(t, resources["secret"], addOwningInv(t, "test")),
+			},
+			reconcileTimeout: time.Minute,
+			prune:            true,
+			inventoryPolicy:  inventory.InventoryPolicyMustMatch,
+			statusEvents:     []pollevent.Event{},
+			expectedEventTypes: []expectedEvent{
+				{
+					eventType: event.InitType,
+				},
+				{
+					eventType:      event.ApplyType,
+					applyEventType: event.ApplyEventCompleted,
+				},
+				{
+					eventType:       event.StatusType,
+					statusEventType: event.StatusEventCompleted,
+				},
+				{
+					eventType:      event.PruneType,
+					pruneEventType: event.PruneEventResourceUpdate,
+					pruneEventOp:   event.Pruned,
+				},
+				{
+					eventType:      event.PruneType,
+					pruneEventType: event.PruneEventResourceUpdate,
+					pruneEventOp:   event.Pruned,
+				},
+				{
+					eventType:      event.PruneType,
+					pruneEventType: event.PruneEventCompleted,
+				},
+			},
+		},
+		"apply resource with existing object belonging to different inventory": {
+			namespace: "default",
+			resources: []*unstructured.Unstructured{
+				Unstructured(t, resources["deployment"]),
+			},
+			invInfo: inventoryInfo{
+				name:      "abc-123",
+				namespace: "default",
+				id:        "test",
+			},
+			clusterObjs: []*unstructured.Unstructured{
+				Unstructured(t, resources["deployment"], addOwningInv(t, "unmatched")),
+			},
+			reconcileTimeout: time.Minute,
+			prune:            true,
+			inventoryPolicy:  inventory.InventoryPolicyMustMatch,
+			statusEvents: []pollevent.Event{
 				{
 					EventType: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
@@ -212,67 +435,6 @@ func TestApplier(t *testing.T) {
 				{
 					eventType:      event.ApplyType,
 					applyEventType: event.ApplyEventResourceUpdate,
-				},
-				{
-					eventType:      event.ApplyType,
-					applyEventType: event.ApplyEventCompleted,
-				},
-				{
-					eventType:       event.StatusType,
-					statusEventType: event.StatusEventResourceUpdate,
-				},
-				{
-					eventType:       event.StatusType,
-					statusEventType: event.StatusEventResourceUpdate,
-				},
-				{
-					eventType:       event.StatusType,
-					statusEventType: event.StatusEventResourceUpdate,
-				},
-				{
-					eventType:       event.StatusType,
-					statusEventType: event.StatusEventCompleted,
-				},
-			},
-		},
-		"apply with inventory object and cluster object": {
-			namespace: "default",
-			resources: []resourceInfo{
-				resources["deployment"],
-				resources["inventoryObject"],
-			},
-			handlers: []handler{
-				&nsHandler{},
-				&inventoryObjectHandler{},
-				&genericHandler{
-					resourceInfo: resources["deployment"],
-					namespace:    "default",
-				},
-			},
-			reconcileTimeout: time.Minute,
-			statusEvents: []pollevent.Event{
-				{
-					EventType: pollevent.ResourceUpdateEvent,
-					Resource: &pollevent.ResourceStatus{
-						Identifier: object.ObjMetadata{
-							Name:      "foo-dcf2c498",
-							Namespace: "default",
-							GroupKind: schema.GroupKind{
-								Group: "",
-								Kind:  "ConfigMap",
-							},
-						},
-						Status: status.CurrentStatus,
-					},
-				},
-			},
-			expectedEventTypes: []expectedEvent{
-				{
-					eventType: event.InitType,
-				},
-				{
-					eventType:      event.ApplyType,
-					applyEventType: event.ApplyEventResourceUpdate,
 					applyErrorType: inventory.NewInventoryOverlapError(fmt.Errorf("")),
 				},
 				{
@@ -285,25 +447,37 @@ func TestApplier(t *testing.T) {
 				},
 				{
 					eventType:       event.StatusType,
+					statusEventType: event.StatusEventResourceUpdate,
+				},
+				{
+					eventType:       event.StatusType,
 					statusEventType: event.StatusEventCompleted,
 				},
-			},
-			prune:      false,
-			clusterObj: deploymentUnmatched,
-		},
-		"prune with inventory object annotation unmatched": {
-			namespace: "default",
-			resources: []resourceInfo{
-				resources["inventoryObject"],
-			},
-			handlers: []handler{
-				&nsHandler{},
-				&inventoryObjectHandler{},
-				&genericHandler{
-					namespace: "default",
+				{
+					eventType:      event.PruneType,
+					pruneEventType: event.PruneEventCompleted,
 				},
 			},
+		},
+		"resources belonging to a different inventory should not be pruned": {
+			namespace: "default",
+			resources: []*unstructured.Unstructured{},
+			invInfo: inventoryInfo{
+				name:      "abc-123",
+				namespace: "default",
+				id:        "test",
+				list: []object.ObjMetadata{
+					object.UnstructuredToObjMeta(
+						Unstructured(t, resources["deployment"]),
+					),
+				},
+			},
+			clusterObjs: []*unstructured.Unstructured{
+				Unstructured(t, resources["deployment"], addOwningInv(t, "unmatched")),
+			},
 			reconcileTimeout: 0,
+			prune:            true,
+			inventoryPolicy:  inventory.InventoryPolicyMustMatch,
 			expectedEventTypes: []expectedEvent{
 				{
 					eventType: event.InitType,
@@ -322,23 +496,26 @@ func TestApplier(t *testing.T) {
 					pruneEventType: event.PruneEventCompleted,
 				},
 			},
-			clusterObj: deploymentUnmatched,
-			prune:      true,
 		},
 		"prune with inventory object annotation matched": {
 			namespace: "default",
-			resources: []resourceInfo{
-				resources["inventoryObject"],
-			},
-			handlers: []handler{
-				&nsHandler{},
-				&inventoryObjectHandler{},
-				&genericHandler{
-					resourceInfo: resources["deployment"],
-					namespace:    "default",
+			resources: []*unstructured.Unstructured{},
+			invInfo: inventoryInfo{
+				name:      "abc-123",
+				namespace: "default",
+				id:        "test",
+				list: []object.ObjMetadata{
+					object.UnstructuredToObjMeta(
+						Unstructured(t, resources["deployment"]),
+					),
 				},
 			},
+			clusterObjs: []*unstructured.Unstructured{
+				Unstructured(t, resources["deployment"], addOwningInv(t, "test")),
+			},
 			reconcileTimeout: 0,
+			prune:            true,
+			inventoryPolicy:  inventory.InventoryPolicyMustMatch,
 			expectedEventTypes: []expectedEvent{
 				{
 					eventType: event.InitType,
@@ -357,23 +534,54 @@ func TestApplier(t *testing.T) {
 					pruneEventType: event.PruneEventCompleted,
 				},
 			},
-			clusterObj: deploymentMatched,
-			prune:      true,
 		},
 	}
 
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
-			inv, infos, err := createObjs(tc.resources)
-			assert.NoError(t, err)
-
 			tf := cmdtesting.NewTestFactory().WithNamespace(tc.namespace)
 			defer tf.Cleanup()
 
-			tf.UnstructuredClient = newFakeRESTClient(t, tc.handlers)
-			if tc.clusterObj != nil {
-				tf.FakeDynamicClient = fakeDynamicClient(tc.clusterObj)
+			mapper, err := tf.ToRESTMapper()
+			if !assert.NoError(t, err) {
+				t.FailNow()
 			}
+
+			objMap := make(map[object.ObjMetadata]resourceInfo)
+			for _, r := range tc.resources {
+				objMeta := object.UnstructuredToObjMeta(r)
+				objMap[objMeta] = resourceInfo{
+					resource: r,
+					exists:   false,
+				}
+			}
+			for _, r := range tc.clusterObjs {
+				objMeta := object.UnstructuredToObjMeta(r)
+				objMap[objMeta] = resourceInfo{
+					resource: r,
+					exists:   true,
+				}
+			}
+			var objs []resourceInfo
+			for _, obj := range objMap {
+				objs = append(objs, obj)
+			}
+
+			handlers := append([]handler{
+				&nsHandler{},
+				&inventoryObjectHandler{
+					inventoryName:      tc.invInfo.name,
+					inventoryNamespace: tc.invInfo.namespace,
+					inventoryID:        tc.invInfo.id,
+					inventoryList:      tc.invInfo.list,
+				},
+			}, &genericHandler{
+				resources: objs,
+				mapper:    mapper,
+			})
+
+			tf.UnstructuredClient = newFakeRESTClient(t, handlers)
+			tf.FakeDynamicClient = fakeDynamicClient(t, mapper, objs...)
 
 			cf := provider.NewProvider(tf)
 			applier := NewApplier(cf)
@@ -385,17 +593,10 @@ func TestApplier(t *testing.T) {
 			if !assert.NoError(t, err) {
 				return
 			}
-
-			objmeta := []object.ObjMetadata{}
-			if tc.clusterObj != nil {
-				objmeta = append(objmeta, object.UnstructuredToObjMeta(tc.clusterObj))
-			}
-			invClient := inventory.NewFakeInventoryClient(objmeta)
-			applier.invClient = invClient
-			err = applier.PruneOptions.Initialize(cf.Factory(), invClient)
-			if !assert.NoError(t, err) {
-				return
-			}
+			// TODO(mortent): This is not great, but at least this keeps the
+			// ugliness in the test code until we can find a way to wire it
+			// up so to avoid it.
+			applier.invClient.(*inventory.ClusterInventoryClient).InfoHelper = applier.infoHelper
 
 			poller := &fakePoller{
 				events: tc.statusEvents,
@@ -404,10 +605,11 @@ func TestApplier(t *testing.T) {
 			applier.StatusPoller = poller
 
 			ctx := context.Background()
-			eventChannel := applier.Run(ctx, inv, infos, Options{
+			eventChannel := applier.Run(ctx, tc.invInfo.toWrapped(), tc.resources, Options{
 				ReconcileTimeout: tc.reconcileTimeout,
 				EmitStatusEvents: true,
 				NoPrune:          !tc.prune,
+				InventoryPolicy:  tc.inventoryPolicy,
 			})
 
 			var events []event.Event
@@ -418,11 +620,15 @@ func TestApplier(t *testing.T) {
 				events = append(events, e)
 			}
 
-			assert.Equal(t, len(tc.expectedEventTypes), len(events))
+			if !assert.Equal(t, len(tc.expectedEventTypes), len(events)) {
+				t.FailNow()
+			}
 
 			for i, e := range events {
 				expected := tc.expectedEventTypes[i]
-				assert.Equal(t, expected.eventType.String(), e.Type.String())
+				if !assert.Equal(t, expected.eventType.String(), e.Type.String()) {
+					t.FailNow()
+				}
 
 				switch expected.eventType {
 				case event.InitType:
@@ -698,12 +904,8 @@ func newFakeRESTClient(t *testing.T, handlers []handler) *fake.RESTClient {
 	}
 }
 
-func toIdentifier(t *testing.T, resourceInfo resourceInfo) object.ObjMetadata {
-	obj := resourceInfo.factoryFunc()
-	err := runtime.DecodeInto(codec, []byte(resourceInfo.manifest), obj)
-	if err != nil {
-		t.Fatal(err)
-	}
+func toIdentifier(t *testing.T, manifest string) object.ObjMetadata {
+	obj := Unstructured(t, manifest)
 
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
@@ -714,20 +916,6 @@ func toIdentifier(t *testing.T, resourceInfo resourceInfo) object.ObjMetadata {
 		Name:      accessor.GetName(),
 		Namespace: "default",
 	}
-}
-
-func createObjs(resources []resourceInfo) (inventory.InventoryInfo, []*unstructured.Unstructured, error) {
-	var objs []*unstructured.Unstructured
-	for _, ri := range resources {
-		u := &unstructured.Unstructured{}
-		err := runtime.DecodeInto(codec, []byte(ri.manifest), u)
-		if err != nil {
-			return nil, nil, err
-		}
-		objs = append(objs, u)
-	}
-	inv, objs, err := inventory.SplitUnstructureds(objs)
-	return inventory.WrapInventoryInfoObj(inv), objs, err
 }
 
 // The handler interface allows different testcases to provide
@@ -742,33 +930,42 @@ type handler interface {
 // be fetched and updated. It will simply return the given resource
 // when asked for and accept patch requests.
 type genericHandler struct {
-	resourceInfo resourceInfo
-	namespace    string
+	resources []resourceInfo
+	mapper    meta.RESTMapper
 }
 
 func (g *genericHandler) handle(t *testing.T, req *http.Request) (*http.Response, bool, error) {
-	obj := g.resourceInfo.factoryFunc()
-	err := runtime.DecodeInto(codec, []byte(g.resourceInfo.manifest), obj)
-	if err != nil {
-		return nil, false, err
-	}
+	for _, r := range g.resources {
+		gvk := r.resource.GroupVersionKind()
+		mapping, err := g.mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+		if err != nil {
+			return nil, false, err
+		}
+		var allPath string
+		if mapping.Scope == meta.RESTScopeNamespace {
+			allPath = fmt.Sprintf("/namespaces/%s/%s", r.resource.GetNamespace(), mapping.Resource.Resource)
+		} else {
+			allPath = fmt.Sprintf("/%s", mapping.Resource.Resource)
+		}
+		singlePath := allPath + "/" + r.resource.GetName()
 
-	accessor, err := meta.Accessor(obj)
-	if err != nil {
-		return nil, false, err
-	}
+		if req.URL.Path == singlePath && req.Method == http.MethodGet {
+			if r.exists {
+				bodyRC := ioutil.NopCloser(bytes.NewReader(toJSONBytes(t, r.resource)))
+				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: bodyRC}, true, nil
+			}
+			return &http.Response{StatusCode: http.StatusNotFound, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.StringBody("")}, true, nil
+		}
 
-	basePath := fmt.Sprintf(g.resourceInfo.basePath, g.namespace)
-	resourcePath := path.Join(basePath, accessor.GetName())
+		if req.URL.Path == singlePath && req.Method == http.MethodPatch {
+			bodyRC := ioutil.NopCloser(bytes.NewReader(toJSONBytes(t, r.resource)))
+			return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: bodyRC}, true, nil
+		}
 
-	if req.URL.Path == resourcePath && req.Method == http.MethodGet {
-		bodyRC := ioutil.NopCloser(bytes.NewReader(toJSONBytes(t, obj)))
-		return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: bodyRC}, true, nil
-	}
-
-	if req.URL.Path == resourcePath && req.Method == http.MethodPatch {
-		bodyRC := ioutil.NopCloser(bytes.NewReader(toJSONBytes(t, obj)))
-		return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: bodyRC}, true, nil
+		if req.URL.Path == allPath && req.Method == http.MethodPost {
+			bodyRC := ioutil.NopCloser(bytes.NewReader(toJSONBytes(t, r.resource)))
+			return &http.Response{StatusCode: http.StatusCreated, Header: cmdtesting.DefaultHeader(), Body: bodyRC}, true, nil
+		}
 	}
 	return nil, false, nil
 }
@@ -776,17 +973,21 @@ func (g *genericHandler) handle(t *testing.T, req *http.Request) (*http.Response
 // inventoryObjectHandler knows how to handle requests on the inventory objects.
 // It knows how to handle creation, list and get requests for inventory objects.
 type inventoryObjectHandler struct {
-	inventoryObj *v1.ConfigMap
+	inventoryName      string
+	inventoryNamespace string
+	inventoryID        string
+	inventoryList      []object.ObjMetadata
+	inventoryObj       *v1.ConfigMap
 }
 
 var (
 	cmPathRegex     = regexp.MustCompile(`^/namespaces/([^/]+)/configmaps$`)
-	invObjNameRegex = regexp.MustCompile(`^[a-zA-Z]+-[a-z0-9]+$`)
 	invObjPathRegex = regexp.MustCompile(`^/namespaces/([^/]+)/configmaps/[a-zA-Z]+-[a-z0-9]+$`)
 )
 
 func (i *inventoryObjectHandler) handle(t *testing.T, req *http.Request) (*http.Response, bool, error) {
-	if req.Method == "POST" && cmPathRegex.Match([]byte(req.URL.Path)) {
+	if (req.Method == "POST" && cmPathRegex.Match([]byte(req.URL.Path))) ||
+		(req.Method == "PUT" && invObjPathRegex.Match([]byte(req.URL.Path))) {
 		b, err := ioutil.ReadAll(req.Body)
 		if err != nil {
 			return nil, false, err
@@ -796,10 +997,26 @@ func (i *inventoryObjectHandler) handle(t *testing.T, req *http.Request) (*http.
 		if err != nil {
 			return nil, false, err
 		}
-		if invObjNameRegex.Match([]byte(cm.Name)) {
+		if cm.Name == i.inventoryName && cm.Namespace == i.inventoryNamespace {
 			i.inventoryObj = &cm
+			var inventoryList []object.ObjMetadata
+			for s := range cm.Data {
+				objMeta, err := object.ParseObjMetadata(s)
+				if err != nil {
+					return nil, false, err
+				}
+				inventoryList = append(inventoryList, objMeta)
+			}
+			i.inventoryList = inventoryList
+
 			bodyRC := ioutil.NopCloser(bytes.NewReader(b))
-			return &http.Response{StatusCode: http.StatusCreated, Header: cmdtesting.DefaultHeader(), Body: bodyRC}, true, nil
+			var statusCode int
+			if req.Method == "POST" {
+				statusCode = http.StatusCreated
+			} else {
+				statusCode = http.StatusOK
+			}
+			return &http.Response{StatusCode: statusCode, Header: cmdtesting.DefaultHeader(), Body: bodyRC}, true, nil
 		}
 		return nil, false, nil
 	}
@@ -812,21 +1029,43 @@ func (i *inventoryObjectHandler) handle(t *testing.T, req *http.Request) (*http.
 			},
 			Items: []v1.ConfigMap{},
 		}
-		if i.inventoryObj != nil {
-			cmList.Items = append(cmList.Items, *i.inventoryObj)
+		if len(i.inventoryList) > 0 {
+			cmList.Items = append(cmList.Items, i.currentInvObj())
 		}
 		bodyRC := ioutil.NopCloser(bytes.NewReader(toJSONBytes(t, &cmList)))
 		return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: bodyRC}, true, nil
 	}
 
 	if req.Method == http.MethodGet && invObjPathRegex.Match([]byte(req.URL.Path)) {
-		if i.inventoryObj == nil {
+		if len(i.inventoryList) == 0 {
 			return &http.Response{StatusCode: http.StatusNotFound, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.StringBody("")}, true, nil
 		}
-		bodyRC := ioutil.NopCloser(bytes.NewReader(toJSONBytes(t, i.inventoryObj)))
+		invObj := i.currentInvObj()
+		bodyRC := ioutil.NopCloser(bytes.NewReader(toJSONBytes(t, &invObj)))
 		return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: bodyRC}, true, nil
 	}
 	return nil, false, nil
+}
+
+func (i *inventoryObjectHandler) currentInvObj() v1.ConfigMap {
+	inv := make(map[string]string)
+	for _, objMeta := range i.inventoryList {
+		inv[objMeta.String()] = ""
+	}
+	return v1.ConfigMap{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: v1.SchemeGroupVersion.String(),
+			Kind:       "ConfigMap",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      i.inventoryName,
+			Namespace: i.inventoryNamespace,
+			Labels: map[string]string{
+				common.InventoryLabel: i.inventoryID,
+			},
+		},
+		Data: inv,
+	}
 }
 
 // nsHandler can handle requests for a namespace. It will behave as if
@@ -945,15 +1184,26 @@ func objSetsEqual(setA []*unstructured.Unstructured, setB []*unstructured.Unstru
 }
 
 // fakeDynamicClient returns a fake dynamic client.
-func fakeDynamicClient(obj *unstructured.Unstructured) *dynamicfake.FakeDynamicClient {
+func fakeDynamicClient(t *testing.T, mapper meta.RESTMapper, objs ...resourceInfo) *dynamicfake.FakeDynamicClient {
 	fakeClient := dynamicfake.NewSimpleDynamicClient(runtime.NewScheme())
 
-	fakeClient.PrependReactor("get", "deployments", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
-		return true, obj, nil
-	})
-	fakeClient.PrependReactor("delete", "deployments", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
-		return true, nil, nil
-	})
-
+	for i := range objs {
+		obj := objs[i]
+		gvk := obj.resource.GroupVersionKind()
+		mapping, err := mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+		if !assert.NoError(t, err) {
+			t.FailNow()
+		}
+		r := mapping.Resource.Resource
+		fakeClient.PrependReactor("get", r, func(clienttesting.Action) (bool, runtime.Object, error) {
+			if obj.exists {
+				return true, obj.resource, nil
+			}
+			return false, nil, nil
+		})
+		fakeClient.PrependReactor("delete", r, func(clienttesting.Action) (bool, runtime.Object, error) {
+			return true, nil, nil
+		})
+	}
 	return fakeClient
 }

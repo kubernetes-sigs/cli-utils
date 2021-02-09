@@ -58,7 +58,7 @@ type ClusterInventoryClient struct {
 	dryRunStrategy        common.DryRunStrategy
 	InventoryFactoryFunc  InventoryFactoryFunc
 	invToUnstructuredFunc InventoryToUnstructuredFunc
-	infoHelper            info.InfoHelper
+	InfoHelper            info.InfoHelper
 }
 
 var _ InventoryClient = &ClusterInventoryClient{}
@@ -86,7 +86,7 @@ func NewInventoryClient(factory cmdutil.Factory,
 		dryRunStrategy:        common.DryRunNone,
 		InventoryFactoryFunc:  invFunc,
 		invToUnstructuredFunc: invToUnstructuredFunc,
-		infoHelper:            info.NewInfoHelper(factory),
+		InfoHelper:            info.NewInfoHelper(factory),
 	}
 	return &clusterInventoryClient, nil
 }
@@ -460,7 +460,7 @@ func (cic *ClusterInventoryClient) ApplyInventoryNamespace(obj *unstructured.Uns
 }
 
 func (cic *ClusterInventoryClient) toInfo(obj *unstructured.Unstructured) (*resource.Info, error) {
-	return cic.infoHelper.BuildInfo(obj)
+	return cic.InfoHelper.BuildInfo(obj)
 }
 
 // helperFromInfo returns the resource.Helper to talk to the APIServer based
