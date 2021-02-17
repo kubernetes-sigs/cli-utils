@@ -18,6 +18,7 @@ import (
 	"k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
 	"sigs.k8s.io/cli-utils/pkg/apply"
+	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/provider"
 	"sigs.k8s.io/cli-utils/pkg/util/factory"
@@ -108,6 +109,10 @@ var _ = Describe("Applier", func() {
 
 				It("Apply continues on error", func() {
 					continueOnErrorTest(c, invConfig, inventoryName, namespace.GetName())
+				})
+
+				It("Server-Side Apply", func() {
+					serversideApplyTest(c, invConfig, inventoryName, namespace.GetName())
 				})
 			})
 
@@ -205,7 +210,7 @@ func defaultInvSizeVerifyFunc(c client.Client, name, namespace string, count int
 
 func defaultInvCountVerifyFunc(c client.Client, namespace string, count int) {
 	var cmList v1.ConfigMapList
-	err := c.List(context.TODO(), &cmList, client.InNamespace(namespace))
+	err := c.List(context.TODO(), &cmList, client.InNamespace(namespace), client.HasLabels{common.InventoryLabel})
 	Expect(err).NotTo(HaveOccurred())
 	Expect(len(cmList.Items)).To(Equal(count))
 }

@@ -6,6 +6,7 @@ package task
 import (
 	"context"
 	"io/ioutil"
+	"strings"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -184,6 +185,12 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 			ao.SetObjects([]*resource.Info{info})
 			klog.V(5).Infof("applying %s/%s...", info.Namespace, info.Name)
 			err = ao.Run()
+			if err != nil && a.ServerSideOptions.ServerSideApply && isAPIService(obj) && isStreamError(err) {
+				// Server-side Apply doesn't work with APIService before k8s 1.21
+				// https://github.com/kubernetes/kubernetes/issues/89264
+				// Thus APIService is handled specially using client-side apply.
+				err = clientSideApply(info, taskContext.EventChannel(), a.DryRunStrategy, a.Factory)
+			}
 			if err != nil {
 				if klog.V(4) {
 					klog.Errorf("error applying (%s/%s) %s", info.Namespace, info.Name, err)
@@ -387,4 +394,24 @@ func sendBatchApplyEvents(taskContext *taskrunner.TaskContext, objects []*unstru
 			id, event.Failed, applyerror.NewInitializeApplyOptionError(err))
 		taskContext.CaptureResourceFailure(id)
 	}
+}
+
+func isAPIService(obj *unstructured.Unstructured) bool {
+	gk := obj.GroupVersionKind().GroupKind()
+	return gk.Group == "apiregistration.k8s.io" && gk.Kind == "APIService"
+}
+
+// isStreamError checks if the error is a StreamError. Since kubectl wraps the actual StreamError,
+// we can't check the error type.
+func isStreamError(err error) bool {
+	return strings.Contains(err.Error(), "stream error: stream ID ")
+}
+
+func clientSideApply(info *resource.Info, eventChannel chan event.Event, strategy common.DryRunStrategy, factory util.Factory) error {
+	ao, _, err := applyOptionsFactoryFunc(eventChannel, common.ServerSideOptions{ServerSideApply: false}, strategy, factory)
+	if err != nil {
+		return err
+	}
+	ao.SetObjects([]*resource.Info{info})
+	return ao.Run()
 }

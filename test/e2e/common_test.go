@@ -128,6 +128,30 @@ func deploymentManifest(namespace string) *unstructured.Unstructured {
 	}
 }
 
+func apiserviceManifest() *unstructured.Unstructured {
+	apiservice := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "apiregistration.k8s.io/v1",
+			"kind":       "APIService",
+			"metadata": map[string]interface{}{
+				"name": "v1beta1.custom.metrics.k8s.io",
+			},
+			"spec": map[string]interface{}{
+				"insecureSkipTLSVerify": true,
+				"group":                 "custom.metrics.k8s.io",
+				"groupPriorityMinimum":  100,
+				"versionPriority":       100,
+				"service": map[string]interface{}{
+					"name":      "custom-metrics-stackdriver-adapter",
+					"namespace": "custome-metrics",
+				},
+				"version": "v1beta1",
+			},
+		},
+	}
+	return apiservice
+}
+
 func manifestToUnstructured(manifest []byte) *unstructured.Unstructured {
 	u := make(map[string]interface{})
 	err := yaml.Unmarshal(manifest, &u)
