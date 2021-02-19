@@ -49,13 +49,18 @@ func (jf *formatter) FormatApplyEvent(ae event.ApplyEvent, as *list.ApplyStats, 
 		}
 	case event.ApplyEventResourceUpdate:
 		gk := ae.Identifier.GroupKind
-		return jf.printEvent("apply", "resourceApplied", map[string]interface{}{
+		eventInfo := map[string]interface{}{
 			"group":     gk.Group,
 			"kind":      gk.Kind,
 			"namespace": ae.Identifier.Namespace,
 			"name":      ae.Identifier.Name,
 			"operation": ae.Operation.String(),
-		})
+		}
+		if ae.Error != nil {
+			eventInfo["error"] = ae.Error.Error()
+		}
+
+		return jf.printEvent("apply", "resourceApplied", eventInfo)
 	}
 	return nil
 }

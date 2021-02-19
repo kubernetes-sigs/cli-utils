@@ -46,8 +46,13 @@ func (ef *formatter) FormatApplyEvent(ae event.ApplyEvent, as *list.ApplyStats, 
 	case event.ApplyEventResourceUpdate:
 		gk := ae.Identifier.GroupKind
 		name := ae.Identifier.Name
-		ef.print("%s %s", resourceIDToString(gk, name),
-			strings.ToLower(ae.Operation.String()))
+		if ae.Error != nil {
+			ef.print("%s failed: %s", resourceIDToString(gk, name),
+				ae.Error.Error())
+		} else {
+			ef.print("%s %s", resourceIDToString(gk, name),
+				strings.ToLower(ae.Operation.String()))
+		}
 	}
 	return nil
 }
@@ -68,12 +73,13 @@ func (ef *formatter) FormatPruneEvent(pe event.PruneEvent, ps *list.PruneStats) 
 		gk := pe.Identifier.GroupKind
 		switch pe.Operation {
 		case event.Pruned:
-			ef.print("%s %s", resourceIDToString(gk, pe.Identifier.Name), "pruned")
+			ef.print("%s pruned", resourceIDToString(gk, pe.Identifier.Name))
 		case event.PruneSkipped:
-			ef.print("%s %s", resourceIDToString(gk, pe.Identifier.Name), "prune skipped")
+			ef.print("%s prune skipped", resourceIDToString(gk, pe.Identifier.Name))
 		}
 	case event.PruneEventFailed:
-		ef.print("%s %s", resourceIDToString(pe.Identifier.GroupKind, pe.Identifier.Name), "prune failed")
+		ef.print("%s prune failed: %s", resourceIDToString(pe.Identifier.GroupKind, pe.Identifier.Name),
+			pe.Error.Error())
 	}
 	return nil
 }
@@ -88,12 +94,13 @@ func (ef *formatter) FormatDeleteEvent(de event.DeleteEvent, ds *list.DeleteStat
 		name := getName(obj)
 		switch de.Operation {
 		case event.Deleted:
-			ef.print("%s %s", resourceIDToString(gvk.GroupKind(), name), "deleted")
+			ef.print("%s deleted", resourceIDToString(gvk.GroupKind(), name))
 		case event.DeleteSkipped:
-			ef.print("%s %s", resourceIDToString(gvk.GroupKind(), name), "delete skipped")
+			ef.print("%s delete skipped", resourceIDToString(gvk.GroupKind(), name))
 		}
 	case event.DeleteEventFailed:
-		ef.print("%s %s", resourceIDToString(de.Identifier.GroupKind, de.Identifier.Name), "deletion failed")
+		ef.print("%s deletion failed: %s", resourceIDToString(de.Identifier.GroupKind, de.Identifier.Name),
+			de.Error.Error())
 	}
 	return nil
 }

@@ -178,5 +178,9 @@ func (b *BaseListPrinter) Print(ch <-chan event.Event, previewStrategy common.Dr
 			}
 		}
 	}
+	failedSum := applyStats.Failed + pruneStats.Failed + deleteStats.Failed
+	if failedSum > 0 {
+		return fmt.Errorf("%d resources failed", failedSum)
+	}
 	return nil
 }
