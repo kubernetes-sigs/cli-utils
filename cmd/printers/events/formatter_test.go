@@ -55,6 +55,16 @@ func TestFormatter_FormatApplyEvent(t *testing.T) {
 			},
 			expected: "cronjob.batch/my-cron configured (preview-server)",
 		},
+		"apply event with error should display the error": {
+			previewStrategy: common.DryRunServer,
+			event: event.ApplyEvent{
+				Operation:  event.Failed,
+				Type:       event.ApplyEventResourceUpdate,
+				Identifier: createIdentifier("apps", "Deployment", "", "my-dep"),
+				Error:      fmt.Errorf("this is a test error"),
+			},
+			expected: "deployment.apps/my-dep failed: this is a test error (preview-server)",
+		},
 		"completed event": {
 			previewStrategy: common.DryRunNone,
 			event: event.ApplyEvent{
@@ -164,6 +174,15 @@ func TestFormatter_FormatPruneEvent(t *testing.T) {
 			},
 			expected: "deployment.apps/my-dep prune skipped (preview)",
 		},
+		"resource with prune error": {
+			previewStrategy: common.DryRunNone,
+			event: event.PruneEvent{
+				Type:       event.PruneEventFailed,
+				Identifier: createIdentifier("apps", "Deployment", "", "my-dep"),
+				Error:      fmt.Errorf("this is a test"),
+			},
+			expected: "deployment.apps/my-dep prune failed: this is a test",
+		},
 		"prune event with completed status": {
 			previewStrategy: common.DryRunNone,
 			event: event.PruneEvent{
@@ -214,6 +233,16 @@ func TestFormatter_FormatDeleteEvent(t *testing.T) {
 				Object:    createObject("apps", "Deployment", "", "my-dep"),
 			},
 			expected: "deployment.apps/my-dep delete skipped (preview)",
+		},
+		"resource with delete error": {
+			previewStrategy: common.DryRunServer,
+			event: event.DeleteEvent{
+				Type:       event.DeleteEventFailed,
+				Object:     createObject("apps", "Deployment", "", "my-dep"),
+				Identifier: createIdentifier("apps", "Deployment", "", "my-dep"),
+				Error:      fmt.Errorf("this is a test"),
+			},
+			expected: "deployment.apps/my-dep deletion failed: this is a test (preview-server)",
 		},
 		"delete event with completed status": {
 			previewStrategy: common.DryRunNone,

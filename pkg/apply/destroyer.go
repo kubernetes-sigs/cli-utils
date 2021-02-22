@@ -131,26 +131,29 @@ func runPruneEventTransformer(eventChannel chan event.Event) (chan event.Event, 
 	go func() {
 		defer close(completedChannel)
 		for msg := range tempEventChannel {
-			if msg.PruneEvent.Type == event.PruneEventFailed {
+			// If it is not a Prune event, no need to make any transformation.
+			if msg.Type != event.PruneType {
+				eventChannel <- msg
+			} else {
+				var deleteEventType event.DeleteEventType
+				switch msg.PruneEvent.Type {
+				case event.PruneEventFailed:
+					deleteEventType = event.DeleteEventFailed
+				case event.PruneEventCompleted:
+					deleteEventType = event.DeleteEventCompleted
+				case event.PruneEventResourceUpdate:
+					deleteEventType = event.DeleteEventResourceUpdate
+				}
 				eventChannel <- event.Event{
 					Type: event.DeleteType,
 					DeleteEvent: event.DeleteEvent{
-						Type:       event.DeleteEventFailed,
+						Type:       deleteEventType,
 						Operation:  transformPruneOperation(msg.PruneEvent.Operation),
 						Object:     msg.PruneEvent.Object,
 						Identifier: msg.PruneEvent.Identifier,
+						Error:      msg.PruneEvent.Error,
 					},
 				}
-				continue
-			}
-			eventChannel <- event.Event{
-				Type: event.DeleteType,
-				DeleteEvent: event.DeleteEvent{
-					Type:       event.DeleteEventResourceUpdate,
-					Operation:  transformPruneOperation(msg.PruneEvent.Operation),
-					Object:     msg.PruneEvent.Object,
-					Identifier: msg.PruneEvent.Identifier,
-				},
 			}
 		}
 	}()
