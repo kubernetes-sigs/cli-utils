@@ -21,4 +21,7 @@ type InventoryInfo interface {
 	// The Provider contained in the applier should know
 	// if the Id is necessary and how to use it for pruning objects.
 	ID() string
+
+	// Match returns true if id matches with current inventory info.
+	Match(id string) bool
 }
