@@ -1,6 +1,6 @@
 module sigs.k8s.io/cli-utils
 
-go 1.13
+go 1.16
 
 require (
 	cloud.google.com/go v0.46.3 // indirect
@@ -30,6 +30,6 @@ require (
 	k8s.io/kubectl v0.18.10
 	k8s.io/utils v0.0.0-20200324210504-a9aa75ae1b89
 	sigs.k8s.io/controller-runtime v0.6.0
-	sigs.k8s.io/kustomize/kyaml v0.10.13
+	sigs.k8s.io/kustomize/kyaml v0.10.14
 	sigs.k8s.io/yaml v1.2.0
 )

@@ -70,7 +70,7 @@ $(MYGOBIN)/ginkgo:
 	go get github.com/onsi/ginkgo/ginkgo@v1.14.2
 
 $(MYGOBIN)/mdrip:
-	go install github.com/monopole/mdrip
+	go install github.com/monopole/mdrip@v1.0.2
 
 .PHONY:
 test-examples-e2e-kapply: $(MYGOBIN)/mdrip $(MYGOBIN)/kind
