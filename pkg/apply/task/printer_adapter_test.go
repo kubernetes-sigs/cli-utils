@@ -7,13 +7,16 @@ import (
 	"bytes"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"sigs.k8s.io/cli-utils/pkg/apply/duration"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 )
 
 func TestKubectlPrinterAdapter(t *testing.T) {
+	duration.SetStartTime(time.Now())
 	ch := make(chan event.Event)
 	buffer := bytes.Buffer{}
 	operation := "serverside-applied"
@@ -51,4 +54,8 @@ func TestKubectlPrinterAdapter(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, event.ServersideApplied, msg.ApplyEvent.Operation)
 	assert.Equal(t, deployment, msg.ApplyEvent.Object)
+	assert.NotNil(t, msg.ApplyEvent.Duration)
+	if *msg.ApplyEvent.Duration == 0*time.Second {
+		t.Errorf("duration should be greater than 0")
+	}
 }

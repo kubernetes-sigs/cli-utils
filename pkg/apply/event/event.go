@@ -4,6 +4,8 @@
 package event
 
 import (
+	"time"
+
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	pollevent "sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/object"
@@ -99,6 +101,7 @@ type ApplyEvent struct {
 	Operation  ApplyEventOperation
 	Object     *unstructured.Unstructured
 	Identifier object.ObjMetadata
+	Duration   *time.Duration
 	Error      error
 }
 
@@ -137,6 +140,7 @@ type PruneEvent struct {
 	Operation  PruneEventOperation
 	Object     *unstructured.Unstructured
 	Identifier object.ObjMetadata
+	Duration   *time.Duration
 	Error      error
 }
 
@@ -162,5 +166,6 @@ type DeleteEvent struct {
 	Operation  DeleteEventOperation
 	Object     *unstructured.Unstructured
 	Identifier object.ObjMetadata
+	Duration   *time.Duration
 	Error      error
 }

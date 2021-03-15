@@ -151,6 +151,7 @@ func runPruneEventTransformer(eventChannel chan event.Event) (chan event.Event, 
 						Operation:  transformPruneOperation(msg.PruneEvent.Operation),
 						Object:     msg.PruneEvent.Object,
 						Identifier: msg.PruneEvent.Identifier,
+						Duration:   msg.PruneEvent.Duration,
 						Error:      msg.PruneEvent.Error,
 					},
 				}

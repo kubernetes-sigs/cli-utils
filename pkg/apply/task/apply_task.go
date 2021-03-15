@@ -7,6 +7,7 @@ import (
 	"context"
 	"io/ioutil"
 	"strings"
+	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -21,6 +22,7 @@ import (
 	cmddelete "k8s.io/kubectl/pkg/cmd/delete"
 	"k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/slice"
+	"sigs.k8s.io/cli-utils/pkg/apply/duration"
 	applyerror "sigs.k8s.io/cli-utils/pkg/apply/error"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/info"
@@ -98,7 +100,7 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 			// Created event since the type didn't already exist in the
 			// cluster.
 			for _, obj := range objsWithCRD {
-				taskContext.EventChannel() <- createApplyEvent(object.UnstructuredToObjMeta(obj), event.Created, nil)
+				taskContext.EventChannel() <- createApplyEvent(object.UnstructuredToObjMeta(obj), event.Created, nil, nil)
 			}
 			// Update the resource set to no longer include the CRs.
 			klog.V(4).Infof("after dry-run filtering custom resources, %d objects left", len(objs))
@@ -141,7 +143,7 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 						obj.GetNamespace(), obj.GetName(), err)
 				}
 				taskContext.EventChannel() <- createApplyEvent(
-					id, event.Failed, applyerror.NewUnknownTypeError(err))
+					id, event.Failed, applyerror.NewUnknownTypeError(err), nil)
 				taskContext.CaptureResourceFailure(id)
 				continue
 			}
@@ -161,7 +163,7 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 						invInfos[id] = info
 						op = event.Unchanged
 					}
-					taskContext.EventChannel() <- createApplyEvent(id, op, err)
+					taskContext.EventChannel() <- createApplyEvent(id, op, err, nil)
 					taskContext.CaptureResourceFailure(id)
 					continue
 				}
@@ -176,7 +178,7 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 				taskContext.EventChannel() <- createApplyEvent(
 					id,
 					event.Unchanged,
-					err)
+					err, nil)
 				taskContext.CaptureResourceFailure(id)
 				continue
 			}
@@ -184,6 +186,7 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 			inventory.AddInventoryIDAnnotation(obj, a.InvInfo)
 			ao.SetObjects([]*resource.Info{info})
 			klog.V(5).Infof("applying %s/%s...", info.Namespace, info.Name)
+			duration.SetStartTime(time.Now())
 			err = ao.Run()
 			if err != nil && a.ServerSideOptions.ServerSideApply && isAPIService(obj) && isStreamError(err) {
 				// Server-side Apply doesn't work with APIService before k8s 1.21
@@ -203,7 +206,7 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 					delete(invInfos, id)
 				}
 				taskContext.EventChannel() <- createApplyEvent(
-					id, event.Failed, applyerror.NewApplyRunError(err))
+					id, event.Failed, applyerror.NewApplyRunError(err), duration.GetDuration(time.Now()))
 				taskContext.CaptureResourceFailure(id)
 			}
 		}
@@ -373,7 +376,7 @@ func buildCRDsInfo(crds []*unstructured.Unstructured) *crdsInfo {
 func (a *ApplyTask) ClearTimeout() {}
 
 // createApplyEvent is a helper function to package an apply event for a single resource.
-func createApplyEvent(id object.ObjMetadata, operation event.ApplyEventOperation, err error) event.Event {
+func createApplyEvent(id object.ObjMetadata, operation event.ApplyEventOperation, err error, d *time.Duration) event.Event {
 	return event.Event{
 		Type: event.ApplyType,
 		ApplyEvent: event.ApplyEvent{
@@ -381,6 +384,7 @@ func createApplyEvent(id object.ObjMetadata, operation event.ApplyEventOperation
 			Operation:  operation,
 			Identifier: id,
 			Error:      err,
+			Duration:   d,
 		},
 	}
 }
@@ -391,7 +395,7 @@ func sendBatchApplyEvents(taskContext *taskrunner.TaskContext, objects []*unstru
 	for _, obj := range objects {
 		id := object.UnstructuredToObjMeta(obj)
 		taskContext.EventChannel() <- createApplyEvent(
-			id, event.Failed, applyerror.NewInitializeApplyOptionError(err))
+			id, event.Failed, applyerror.NewInitializeApplyOptionError(err), nil)
 		taskContext.CaptureResourceFailure(id)
 	}
 }

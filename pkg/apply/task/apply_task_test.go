@@ -9,7 +9,7 @@ import (
 	"sync"
 	"testing"
 
-	"gotest.tools/assert"
+	"github.com/stretchr/testify/assert"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -654,6 +654,7 @@ func TestApplyTaskWithError(t *testing.T) {
 			for i, e := range events {
 				assert.Equal(t, tc.expectedEvents[i].Type, e.Type)
 				assert.Equal(t, tc.expectedEvents[i].ApplyEvent.Error.Error(), e.ApplyEvent.Error.Error())
+				assert.NotNil(t, e.ApplyEvent.Duration)
 			}
 		})
 	}

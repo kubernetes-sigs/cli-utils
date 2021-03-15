@@ -6,10 +6,12 @@ package task
 import (
 	"fmt"
 	"io"
+	"time"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/printers"
+	"sigs.k8s.io/cli-utils/pkg/apply/duration"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
@@ -40,6 +42,7 @@ func (r *resourcePrinterImpl) PrintObj(obj runtime.Object, _ io.Writer) error {
 			Operation:  r.applyOperation,
 			Object:     obj.(*unstructured.Unstructured),
 			Identifier: object.RuntimeToObjMeta(obj),
+			Duration:   duration.GetDuration(time.Now()),
 		},
 	}
 	return nil
