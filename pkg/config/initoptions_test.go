@@ -129,7 +129,7 @@ func TestComplete(t *testing.T) {
 				"d_test.yaml": readFileD,
 			},
 			isError:           false,
-			expectedNamespace: "namespaceB",
+			expectedNamespace: "foo",
 		},
 		"If all resources have the LocalConfig annotation use the default namespace": {
 			args: []string{},
@@ -147,7 +147,7 @@ func TestComplete(t *testing.T) {
 				"f_test.yaml": readFileF,
 			},
 			isError:           false,
-			expectedNamespace: "namespaceA",
+			expectedNamespace: "foo",
 		},
 	}
 	for name, tc := range tests {
