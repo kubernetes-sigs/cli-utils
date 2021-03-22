@@ -130,7 +130,7 @@ func (po *PruneOptions) Prune(localInv inventory.InventoryInfo,
 		obj, err := po.getObject(pruneObj)
 		if err != nil {
 			// Object not found in cluster, so no need to delete it; skip to next object.
-			if apierrors.IsNotFound(err) {
+			if apierrors.IsNotFound(err) || meta.IsNoMatchError(err) {
 				klog.V(5).Infof("%s/%s not found in cluster--skipping",
 					pruneObj.Namespace, pruneObj.Name)
 				continue
