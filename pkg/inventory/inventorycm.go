@@ -70,6 +70,11 @@ func (icm *InventoryConfigMap) ID() string {
 	return strings.TrimSpace(inventoryLabel)
 }
 
+func (icm *InventoryConfigMap) Match(id string) bool {
+	invID := icm.ID()
+	return invID == id
+}
+
 func (icm *InventoryConfigMap) UnstructuredInventory() *unstructured.Unstructured {
 	return icm.inv
 }

@@ -83,7 +83,7 @@ func inventoryIDMatch(inv InventoryInfo, obj *unstructured.Unstructured) invento
 	if !found {
 		return Empty
 	}
-	if value == inv.ID() {
+	if inv.Match(value) {
 		return Match
 	}
 	return NoMatch

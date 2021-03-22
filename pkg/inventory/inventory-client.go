@@ -46,6 +46,8 @@ type InventoryClient interface {
 	GetClusterInventoryInfo(inv InventoryInfo) (*unstructured.Unstructured, error)
 	// UpdateLabels updates the labels of the cluster inventory object if it exists.
 	UpdateLabels(InventoryInfo, map[string]string) error
+    // ApplyInventoryObj applies an inventory object to the cluster.
+	ApplyInventoryObj(obj *unstructured.Unstructured) error
 }
 
 // ClusterInventoryClient is a concrete implementation of the
@@ -143,7 +145,7 @@ func (cic *ClusterInventoryClient) Merge(localInv InventoryInfo, objs []object.O
 				return pruneIds, err
 			}
 			klog.V(4).Infof("update cluster inventory: %s/%s", clusterInv.GetNamespace(), clusterInv.GetName())
-			if err := cic.applyInventoryObj(clusterInv); err != nil {
+			if err := cic.ApplyInventoryObj(clusterInv); err != nil {
 				return pruneIds, err
 			}
 		}
@@ -178,7 +180,7 @@ func (cic *ClusterInventoryClient) Replace(localInv InventoryInfo, objs []object
 	}
 	klog.V(4).Infof("replace cluster inventory: %s/%s", clusterInv.GetNamespace(), clusterInv.GetName())
 	klog.V(4).Infof("replace cluster inventory %d objects", len(objs))
-	if err := cic.applyInventoryObj(clusterInv); err != nil {
+	if err := cic.ApplyInventoryObj(clusterInv); err != nil {
 		return err
 	}
 	return nil
@@ -187,7 +189,7 @@ func (cic *ClusterInventoryClient) Replace(localInv InventoryInfo, objs []object
 // replaceInventory stores the passed objects into the passed inventory object.
 func (cic *ClusterInventoryClient) replaceInventory(inv *unstructured.Unstructured, objs []object.ObjMetadata) (*unstructured.Unstructured, error) {
 	wrappedInv := cic.InventoryFactoryFunc(inv)
-	if err := wrappedInv.Store(objs); err != nil {
+	if err := wrappedInv.Store(objs); err!= nil {
 		return nil, err
 	}
 	clusterInv, err := wrappedInv.GetObject()
@@ -281,7 +283,7 @@ func (cic *ClusterInventoryClient) UpdateLabels(inv InventoryInfo, labels map[st
 		return err
 	}
 	obj.SetLabels(labels)
-	return cic.applyInventoryObj(obj)
+	return cic.ApplyInventoryObj(obj)
 }
 
 // mergeClusterInventory merges the inventory of multiple inventory objects
@@ -329,7 +331,7 @@ func (cic *ClusterInventoryClient) mergeClusterInventory(invObjs []*unstructured
 	// IMPORTANT: This must happen BEFORE deleting the other
 	// inventory objects, in order to ensure we always have
 	// access to the union of the inventory.
-	if err := cic.applyInventoryObj(retainInfo); err != nil {
+	if err := cic.ApplyInventoryObj(retainInfo); err != nil {
 		return nil, err
 	}
 	// Finally, delete the other inventory objects.
@@ -342,8 +344,8 @@ func (cic *ClusterInventoryClient) mergeClusterInventory(invObjs []*unstructured
 	return retainInfo, nil
 }
 
-// applyInventoryObj applies the passed inventory object to the APIServer.
-func (cic *ClusterInventoryClient) applyInventoryObj(obj *unstructured.Unstructured) error {
+// ApplyInventoryObj applies the passed inventory object to the APIServer.
+func (cic *ClusterInventoryClient) ApplyInventoryObj(obj *unstructured.Unstructured) error {
 	if cic.dryRunStrategy.ClientOrServerDryRun() {
 		klog.V(4).Infof("dry-run apply inventory object: not applied")
 		return nil
@@ -360,7 +362,12 @@ func (cic *ClusterInventoryClient) applyInventoryObj(obj *unstructured.Unstructu
 	var overwrite = true
 	replacedObj, err := helper.Replace(invInfo.Namespace, invInfo.Name, overwrite, invInfo.Object)
 	if err != nil {
-		return err
+		if apierrors.IsNotFound(err) {
+			replacedObj, err = helper.Create(invInfo.Namespace, false, invInfo.Object)
+		}
+		if err != nil {
+			return err
+		}
 	}
 	var ignoreError = true
 	return invInfo.Refresh(replacedObj, ignoreError)
