@@ -138,6 +138,20 @@ var role = &unstructured.Unstructured{
 	},
 }
 
+var unknownCR = &unstructured.Unstructured{
+	Object: map[string]interface{}{
+		"apiVersion": "cli-utils.test/v1",
+		"kind":       "Unknown",
+		"metadata": map[string]interface{}{
+			"name":      "test",
+			"namespace": "default",
+			"annotations": map[string]interface{}{
+				"config.k8s.io/owning-inventory": testInventoryLabel,
+			},
+		},
+	},
+}
+
 // Returns a inventory object with the inventory set from
 // the passed "children".
 func createInventoryInfo(children ...*unstructured.Unstructured) inventory.InventoryInfo {
@@ -230,6 +244,13 @@ func TestPrune(t *testing.T) {
 			prunedObjs:       []*unstructured.Unstructured{pdb},
 			finalClusterObjs: []*unstructured.Unstructured{namespace, pod},
 			pruneEventObjs:   []*unstructured.Unstructured{pdb, namespace},
+		},
+		"unknown type doesn't emit prune failed event": {
+			pastObjs:         []*unstructured.Unstructured{unknownCR},
+			currentObjs:      []*unstructured.Unstructured{},
+			prunedObjs:       []*unstructured.Unstructured{unknownCR},
+			finalClusterObjs: []*unstructured.Unstructured{},
+			pruneEventObjs:   []*unstructured.Unstructured{},
 		},
 	}
 	for name, tc := range tests {
