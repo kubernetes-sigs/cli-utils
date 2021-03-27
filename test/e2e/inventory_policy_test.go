@@ -17,6 +17,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/object"
+	"sigs.k8s.io/cli-utils/pkg/testutil"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -54,20 +55,12 @@ func inventoryPolicyMustMatchTest(c client.Client, invConfig InventoryConfig, na
 	}
 
 	By("Verify the events")
-	err := verifyEvents([]expEvent{
+	err := testutil.VerifyEvents([]testutil.ExpEvent{
 		{
-			eventType: event.ApplyType,
-			applyEvent: &expApplyEvent{
-				applyEventType: event.ApplyEventResourceUpdate,
-				operation:      event.Unchanged,
-				identifier:     object.UnstructuredToObjMeta(deploymentManifest(namespaceName)),
-				error:          inventory.NewInventoryOverlapError(fmt.Errorf("test")),
-			},
-		},
-		{
-			eventType: event.ApplyType,
-			applyEvent: &expApplyEvent{
-				applyEventType: event.ApplyEventCompleted,
+			EventType: event.ApplyType,
+			ApplyEvent: &testutil.ExpApplyEvent{
+				Identifier: object.UnstructuredToObjMeta(deploymentManifest(namespaceName)),
+				Error:      inventory.NewInventoryOverlapError(fmt.Errorf("test")),
 			},
 		},
 	}, events)
@@ -111,20 +104,13 @@ func inventoryPolicyAdoptIfNoInventoryTest(c client.Client, invConfig InventoryC
 	}
 
 	By("Verify the events")
-	err = verifyEvents([]expEvent{
+	err = testutil.VerifyEvents([]testutil.ExpEvent{
 		{
-			eventType: event.ApplyType,
-			applyEvent: &expApplyEvent{
-				applyEventType: event.ApplyEventResourceUpdate,
-				operation:      event.Configured,
-				identifier:     object.UnstructuredToObjMeta(deploymentManifest(namespaceName)),
-				error:          nil,
-			},
-		},
-		{
-			eventType: event.ApplyType,
-			applyEvent: &expApplyEvent{
-				applyEventType: event.ApplyEventCompleted,
+			EventType: event.ApplyType,
+			ApplyEvent: &testutil.ExpApplyEvent{
+				Operation:  event.Configured,
+				Identifier: object.UnstructuredToObjMeta(deploymentManifest(namespaceName)),
+				Error:      nil,
 			},
 		},
 	}, events)
@@ -178,20 +164,13 @@ func inventoryPolicyAdoptAllTest(c client.Client, invConfig InventoryConfig, nam
 	}
 
 	By("Verify the events")
-	err := verifyEvents([]expEvent{
+	err := testutil.VerifyEvents([]testutil.ExpEvent{
 		{
-			eventType: event.ApplyType,
-			applyEvent: &expApplyEvent{
-				applyEventType: event.ApplyEventResourceUpdate,
-				operation:      event.Configured,
-				identifier:     object.UnstructuredToObjMeta(deploymentManifest(namespaceName)),
-				error:          nil,
-			},
-		},
-		{
-			eventType: event.ApplyType,
-			applyEvent: &expApplyEvent{
-				applyEventType: event.ApplyEventCompleted,
+			EventType: event.ApplyType,
+			ApplyEvent: &testutil.ExpApplyEvent{
+				Operation:  event.Configured,
+				Identifier: object.UnstructuredToObjMeta(deploymentManifest(namespaceName)),
+				Error:      nil,
 			},
 		},
 	}, events)

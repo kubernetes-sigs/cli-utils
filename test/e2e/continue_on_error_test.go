@@ -15,6 +15,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/object"
+	"sigs.k8s.io/cli-utils/pkg/testutil"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -36,33 +37,22 @@ func continueOnErrorTest(_ client.Client, invConfig InventoryConfig, inventoryNa
 		Expect(e.Type).NotTo(Equal(event.ErrorType))
 		applierEvents = append(applierEvents, e)
 	}
-	err := verifyEvents([]expEvent{
+	err := testutil.VerifyEvents([]testutil.ExpEvent{
 		{
-			eventType: event.InitType,
+			EventType: event.InitType,
 		},
 		{
-			eventType: event.ApplyType,
-			applyEvent: &expApplyEvent{
-				applyEventType: event.ApplyEventResourceUpdate,
-				operation:      event.Failed,
-				identifier:     object.UnstructuredToObjMeta(manifestToUnstructured(invalidCrd)),
-				error:          fmt.Errorf("failed to apply"),
+			EventType: event.ApplyType,
+			ApplyEvent: &testutil.ExpApplyEvent{
+				Identifier: object.UnstructuredToObjMeta(manifestToUnstructured(invalidCrd)),
+				Error:      fmt.Errorf("failed to apply"),
 			},
 		},
 		{
-			eventType: event.ApplyType,
-			applyEvent: &expApplyEvent{
-				applyEventType: event.ApplyEventResourceUpdate,
-				operation:      event.Created,
+			EventType: event.ApplyType,
+			ApplyEvent: &testutil.ExpApplyEvent{
+				Operation: event.Created,
 			},
-		},
-		{
-			// complete
-			eventType: event.ApplyType,
-		},
-		{
-			// complete
-			eventType: event.PruneType,
 		},
 	}, applierEvents)
 	Expect(err).ToNot(HaveOccurred())
@@ -71,13 +61,12 @@ func continueOnErrorTest(_ client.Client, invConfig InventoryConfig, inventoryNa
 	destroyer := invConfig.DestroyerFactoryFunc()
 	option := &apply.DestroyerOption{InventoryPolicy: inventory.AdoptIfNoInventory}
 	destroyerEvents := runCollectNoErr(destroyer.Run(inv, option))
-	err = verifyEvents([]expEvent{
+	err = testutil.VerifyEvents([]testutil.ExpEvent{
 		{
-			eventType: event.DeleteType,
-			deleteEvent: &expDeleteEvent{
-				deleteEventType: event.DeleteEventResourceUpdate,
-				operation:       event.Deleted,
-				error:           nil,
+			EventType: event.DeleteType,
+			DeleteEvent: &testutil.ExpDeleteEvent{
+				Operation: event.Deleted,
+				Error:     nil,
 			},
 		},
 	}, destroyerEvents)

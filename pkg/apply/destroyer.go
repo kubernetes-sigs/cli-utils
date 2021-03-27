@@ -110,9 +110,11 @@ func (d *Destroyer) Run(inv inventory.InventoryInfo, option *DestroyerOption) <-
 		// events and shut down before we continue.
 		<-completedChannel
 		ch <- event.Event{
-			Type: event.DeleteType,
-			DeleteEvent: event.DeleteEvent{
-				Type: event.DeleteEventCompleted,
+			Type: event.ActionGroupType,
+			ActionGroupEvent: event.ActionGroupEvent{
+				GroupName: "destroyer",
+				Type:      event.Finished,
+				Action:    event.DeleteAction,
 			},
 		}
 	}()
@@ -135,19 +137,9 @@ func runPruneEventTransformer(eventChannel chan event.Event) (chan event.Event, 
 			if msg.Type != event.PruneType {
 				eventChannel <- msg
 			} else {
-				var deleteEventType event.DeleteEventType
-				switch msg.PruneEvent.Type {
-				case event.PruneEventFailed:
-					deleteEventType = event.DeleteEventFailed
-				case event.PruneEventCompleted:
-					deleteEventType = event.DeleteEventCompleted
-				case event.PruneEventResourceUpdate:
-					deleteEventType = event.DeleteEventResourceUpdate
-				}
 				eventChannel <- event.Event{
 					Type: event.DeleteType,
 					DeleteEvent: event.DeleteEvent{
-						Type:       deleteEventType,
 						Operation:  transformPruneOperation(msg.PruneEvent.Operation),
 						Object:     msg.PruneEvent.Object,
 						Identifier: msg.PruneEvent.Identifier,
@@ -161,12 +153,16 @@ func runPruneEventTransformer(eventChannel chan event.Event) (chan event.Event, 
 }
 
 func transformPruneOperation(pruneOp event.PruneEventOperation) event.DeleteEventOperation {
+	var deleteOp event.DeleteEventOperation
 	switch pruneOp {
 	case event.PruneSkipped:
-		return event.DeleteSkipped
+		deleteOp = event.DeleteSkipped
 	case event.Pruned:
-		return event.Deleted
+		deleteOp = event.Deleted
+	case event.PruneUnspecified:
+		deleteOp = event.DeleteUnspecified
 	default:
 		panic(fmt.Errorf("unknown prune operation %s", pruneOp.String()))
 	}
+	return deleteOp
 }

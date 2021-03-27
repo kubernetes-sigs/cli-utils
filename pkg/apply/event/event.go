@@ -16,6 +16,7 @@ type Type int
 const (
 	InitType Type = iota
 	ErrorType
+	ActionGroupType
 	ApplyType
 	StatusType
 	PruneType
@@ -37,6 +38,11 @@ type Event struct {
 	// ErrorEvent contains information about any errors encountered.
 	ErrorEvent ErrorEvent
 
+	// ActionGroupEvent contains information about the progression of tasks
+	// to apply, prune, and destroy resources, and tasks that involves waiting
+	// for a set of resources to reach a specific state.
+	ActionGroupEvent ActionGroupEvent
+
 	// ApplyEvent contains information about progress pertaining to
 	// applying a resource to the cluster.
 	ApplyEvent ApplyEvent
@@ -55,7 +61,7 @@ type Event struct {
 }
 
 type InitEvent struct {
-	ResourceGroups []ResourceGroup
+	ActionGroups []ActionGroup
 }
 
 //go:generate stringer -type=ResourceAction
@@ -64,9 +70,12 @@ type ResourceAction int
 const (
 	ApplyAction ResourceAction = iota
 	PruneAction
+	DeleteAction
+	WaitAction
 )
 
-type ResourceGroup struct {
+type ActionGroup struct {
+	Name        string
 	Action      ResourceAction
 	Identifiers []object.ObjMetadata
 }
@@ -75,92 +84,73 @@ type ErrorEvent struct {
 	Err error
 }
 
-//go:generate stringer -type=ApplyEventType
-type ApplyEventType int
+//go:generate stringer -type=ActionGroupEventType
+type ActionGroupEventType int
 
 const (
-	ApplyEventResourceUpdate ApplyEventType = iota
-	ApplyEventCompleted
+	Started ActionGroupEventType = iota
+	Finished
 )
+
+type ActionGroupEvent struct {
+	GroupName string
+	Action    ResourceAction
+	Type      ActionGroupEventType
+}
 
 //go:generate stringer -type=ApplyEventOperation
 type ApplyEventOperation int
 
 const (
-	ServersideApplied ApplyEventOperation = iota
+	ApplyUnspecified ApplyEventOperation = iota
+	ServersideApplied
 	Created
 	Unchanged
 	Configured
-	Failed
 )
 
 type ApplyEvent struct {
-	Type       ApplyEventType
-	Operation  ApplyEventOperation
-	Object     *unstructured.Unstructured
 	Identifier object.ObjMetadata
+	Operation  ApplyEventOperation
+	Resource   *unstructured.Unstructured
 	Error      error
 }
 
-//go:generate stringer -type=StatusEventType
-type StatusEventType int
-
-const (
-	StatusEventResourceUpdate StatusEventType = iota
-	StatusEventCompleted
-)
-
 type StatusEvent struct {
-	Type     StatusEventType
-	Resource *pollevent.ResourceStatus
+	Identifier       object.ObjMetadata
+	PollResourceInfo *pollevent.ResourceStatus
+	Resource         *unstructured.Unstructured
+	Error            error
 }
-
-//go:generate stringer -type=PruneEventType
-type PruneEventType int
-
-const (
-	PruneEventResourceUpdate PruneEventType = iota
-	PruneEventCompleted
-	PruneEventFailed
-)
 
 //go:generate stringer -type=PruneEventOperation
 type PruneEventOperation int
 
 const (
-	Pruned PruneEventOperation = iota
+	PruneUnspecified PruneEventOperation = iota
+	Pruned
 	PruneSkipped
 )
 
 type PruneEvent struct {
-	Type       PruneEventType
+	Identifier object.ObjMetadata
 	Operation  PruneEventOperation
 	Object     *unstructured.Unstructured
-	Identifier object.ObjMetadata
 	Error      error
 }
-
-//go:generate stringer -type=DeleteEventType
-type DeleteEventType int
-
-const (
-	DeleteEventResourceUpdate DeleteEventType = iota
-	DeleteEventCompleted
-	DeleteEventFailed
-)
 
 //go:generate stringer -type=DeleteEventOperation
 type DeleteEventOperation int
 
 const (
-	Deleted DeleteEventOperation = iota
+	DeleteUnspecified DeleteEventOperation = iota
+	Deleted
 	DeleteSkipped
 )
 
 type DeleteEvent struct {
-	Type       DeleteEventType
+	Identifier object.ObjMetadata
 	Operation  DeleteEventOperation
 	Object     *unstructured.Unstructured
-	Identifier object.ObjMetadata
 	Error      error
 }

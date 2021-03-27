@@ -50,5 +50,5 @@ func TestKubectlPrinterAdapter(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.Equal(t, event.ServersideApplied, msg.ApplyEvent.Operation)
-	assert.Equal(t, deployment, msg.ApplyEvent.Object)
+	assert.Equal(t, deployment, msg.ApplyEvent.Resource)
 }

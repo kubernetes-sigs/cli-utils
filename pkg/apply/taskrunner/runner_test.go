@@ -16,6 +16,7 @@ import (
 	pollevent "sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
 	"sigs.k8s.io/cli-utils/pkg/object"
+	"sigs.k8s.io/cli-utils/pkg/testutil"
 )
 
 var (
@@ -50,15 +51,15 @@ func TestBaseRunner(t *testing.T) {
 		"wait task runs until condition is met": {
 			identifiers: []object.ObjMetadata{depID, cmID},
 			tasks: []Task{
-				&busyTask{
+				&fakeApplyTask{
 					resultEvent: event.Event{
 						Type: event.ApplyType,
 					},
 					duration: 3 * time.Second,
 				},
-				NewWaitTask([]object.ObjMetadata{depID, cmID}, AllCurrent,
-					1*time.Minute),
-				&busyTask{
+				NewWaitTask("wait", []object.ObjMetadata{depID, cmID}, AllCurrent,
+					1*time.Minute, testutil.NewFakeRESTMapper()),
+				&fakeApplyTask{
 					resultEvent: event.Event{
 						Type: event.PruneType,
 					},
@@ -83,17 +84,23 @@ func TestBaseRunner(t *testing.T) {
 				},
 			},
 			expectedEventTypes: []event.Type{
+				event.ActionGroupType,
 				event.ApplyType,
+				event.ActionGroupType,
+				event.ActionGroupType,
 				event.StatusType,
 				event.StatusType,
+				event.ActionGroupType,
+				event.ActionGroupType,
 				event.PruneType,
+				event.ActionGroupType,
 			},
 		},
 		"wait task times out eventually": {
 			identifiers: []object.ObjMetadata{depID, cmID},
 			tasks: []Task{
-				NewWaitTask([]object.ObjMetadata{depID, cmID}, AllCurrent,
-					2*time.Second),
+				NewWaitTask("wait", []object.ObjMetadata{depID, cmID}, AllCurrent,
+					2*time.Second, testutil.NewFakeRESTMapper()),
 			},
 			statusEventsDelay: time.Second,
 			statusEvents: []pollevent.Event{
@@ -119,25 +126,25 @@ func TestBaseRunner(t *testing.T) {
 		"tasks run in order": {
 			identifiers: []object.ObjMetadata{},
 			tasks: []Task{
-				&busyTask{
+				&fakeApplyTask{
 					resultEvent: event.Event{
 						Type: event.ApplyType,
 					},
 					duration: 1 * time.Second,
 				},
-				&busyTask{
+				&fakeApplyTask{
 					resultEvent: event.Event{
 						Type: event.PruneType,
 					},
 					duration: 1 * time.Second,
 				},
-				&busyTask{
+				&fakeApplyTask{
 					resultEvent: event.Event{
 						Type: event.ApplyType,
 					},
 					duration: 1 * time.Second,
 				},
-				&busyTask{
+				&fakeApplyTask{
 					resultEvent: event.Event{
 						Type: event.PruneType,
 					},
@@ -147,10 +154,18 @@ func TestBaseRunner(t *testing.T) {
 			statusEventsDelay: 1 * time.Second,
 			statusEvents:      []pollevent.Event{},
 			expectedEventTypes: []event.Type{
+				event.ActionGroupType,
 				event.ApplyType,
+				event.ActionGroupType,
+				event.ActionGroupType,
 				event.PruneType,
+				event.ActionGroupType,
+				event.ActionGroupType,
 				event.ApplyType,
+				event.ActionGroupType,
+				event.ActionGroupType,
 				event.PruneType,
+				event.ActionGroupType,
 			},
 		},
 	}
@@ -235,13 +250,13 @@ func TestBaseRunnerCancellation(t *testing.T) {
 		"cancellation while custom task is running": {
 			identifiers: []object.ObjMetadata{depID},
 			tasks: []Task{
-				&busyTask{
+				&fakeApplyTask{
 					resultEvent: event.Event{
 						Type: event.ApplyType,
 					},
 					duration: 4 * time.Second,
 				},
-				&busyTask{
+				&fakeApplyTask{
 					resultEvent: event.Event{
 						Type: event.PruneType,
 					},
@@ -250,34 +265,40 @@ func TestBaseRunnerCancellation(t *testing.T) {
 			},
 			contextTimeout: 2 * time.Second,
 			expectedEventTypes: []event.Type{
+				event.ActionGroupType,
 				event.ApplyType,
+				event.ActionGroupType,
 			},
 		},
 		"cancellation while wait task is running": {
 			identifiers: []object.ObjMetadata{depID},
 			tasks: []Task{
-				NewWaitTask([]object.ObjMetadata{depID}, AllCurrent, 20*time.Second),
-				&busyTask{
+				NewWaitTask("wait", []object.ObjMetadata{depID}, AllCurrent,
+					20*time.Second, testutil.NewFakeRESTMapper()),
+				&fakeApplyTask{
 					resultEvent: event.Event{
 						Type: event.PruneType,
 					},
 					duration: 2 * time.Second,
 				},
 			},
-			contextTimeout:     2 * time.Second,
-			expectedEventTypes: []event.Type{},
+			contextTimeout: 2 * time.Second,
+			expectedEventTypes: []event.Type{
+				event.ActionGroupType,
+				event.ActionGroupType,
+			},
 		},
 		"error while custom task is running": {
 			identifiers: []object.ObjMetadata{depID},
 			tasks: []Task{
-				&busyTask{
+				&fakeApplyTask{
 					resultEvent: event.Event{
 						Type: event.ApplyType,
 					},
 					duration: 2 * time.Second,
 					err:      testError,
 				},
-				&busyTask{
+				&fakeApplyTask{
 					resultEvent: event.Event{
 						Type: event.PruneType,
 					},
@@ -287,14 +308,17 @@ func TestBaseRunnerCancellation(t *testing.T) {
 			contextTimeout: 30 * time.Second,
 			expectedError:  testError,
 			expectedEventTypes: []event.Type{
+				event.ActionGroupType,
 				event.ApplyType,
+				event.ActionGroupType,
 			},
 		},
 		"error from status poller while wait task is running": {
 			identifiers: []object.ObjMetadata{depID},
 			tasks: []Task{
-				NewWaitTask([]object.ObjMetadata{depID}, AllCurrent, 20*time.Second),
-				&busyTask{
+				NewWaitTask("wait", []object.ObjMetadata{depID}, AllCurrent,
+					20*time.Second, testutil.NewFakeRESTMapper()),
+				&fakeApplyTask{
 					resultEvent: event.Event{
 						Type: event.PruneType,
 					},
@@ -308,9 +332,12 @@ func TestBaseRunnerCancellation(t *testing.T) {
 					Error:     testError,
 				},
 			},
-			contextTimeout:     30 * time.Second,
-			expectedError:      testError,
-			expectedEventTypes: []event.Type{},
+			contextTimeout: 30 * time.Second,
+			expectedError:  testError,
+			expectedEventTypes: []event.Type{
+				event.ActionGroupType,
+				event.ActionGroupType,
+			},
 		},
 	}
 
@@ -379,20 +406,33 @@ func TestBaseRunnerCancellation(t *testing.T) {
 	}
 }
 
-type busyTask struct {
+type fakeApplyTask struct {
+	name        string
 	resultEvent event.Event
 	duration    time.Duration
 	err         error
 }
 
-func (b *busyTask) Start(taskContext *TaskContext) {
+func (f *fakeApplyTask) Name() string {
+	return f.name
+}
+
+func (f *fakeApplyTask) Action() event.ResourceAction {
+	return event.ApplyAction
+}
+
+func (f *fakeApplyTask) Identifiers() []object.ObjMetadata {
+	return []object.ObjMetadata{}
+}
+
+func (f *fakeApplyTask) Start(taskContext *TaskContext) {
 	go func() {
-		<-time.NewTimer(b.duration).C
-		taskContext.EventChannel() <- b.resultEvent
+		<-time.NewTimer(f.duration).C
+		taskContext.EventChannel() <- f.resultEvent
 		taskContext.TaskChannel() <- TaskResult{
-			Err: b.err,
+			Err: f.err,
 		}
 	}()
 }
 
-func (b *busyTask) ClearTimeout() {}
+func (f *fakeApplyTask) ClearTimeout() {}

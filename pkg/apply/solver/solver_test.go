@@ -38,8 +38,10 @@ func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 			objs:    []*unstructured.Unstructured{},
 			options: Options{},
 			expectedTasks: []taskrunner.Task{
-				&task.ApplyTask{},
-				&task.SendEventTask{},
+				&task.ApplyTask{
+					TaskName: "apply-0",
+					Objects:  []*unstructured.Unstructured{},
+				},
 			},
 		},
 		"single resource": {
@@ -49,11 +51,11 @@ func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 			options: Options{},
 			expectedTasks: []taskrunner.Task{
 				&task.ApplyTask{
+					TaskName: "apply-0",
 					Objects: []*unstructured.Unstructured{
 						depInfo,
 					},
 				},
-				&task.SendEventTask{},
 			},
 		},
 		"multiple resources with wait": {
@@ -66,19 +68,20 @@ func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 			},
 			expectedTasks: []taskrunner.Task{
 				&task.ApplyTask{
+					TaskName: "apply-0",
 					Objects: []*unstructured.Unstructured{
 						depInfo,
 						customInfo,
 					},
 				},
-				&task.SendEventTask{},
 				taskrunner.NewWaitTask(
+					"wait-0",
 					[]object.ObjMetadata{
 						ignoreErrInfoToObjMeta(depInfo),
 						ignoreErrInfoToObjMeta(customInfo),
 					},
-					taskrunner.AllCurrent, 1*time.Second),
-				&task.SendEventTask{},
+					taskrunner.AllCurrent, 1*time.Second,
+					testutil.NewFakeRESTMapper()),
 			},
 		},
 		"multiple resources with wait and prune": {
@@ -92,21 +95,23 @@ func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 			},
 			expectedTasks: []taskrunner.Task{
 				&task.ApplyTask{
+					TaskName: "apply-0",
 					Objects: []*unstructured.Unstructured{
 						depInfo,
 						customInfo,
 					},
 				},
-				&task.SendEventTask{},
 				taskrunner.NewWaitTask(
+					"wait-0",
 					[]object.ObjMetadata{
 						ignoreErrInfoToObjMeta(depInfo),
 						ignoreErrInfoToObjMeta(customInfo),
 					},
-					taskrunner.AllCurrent, 1*time.Second),
-				&task.SendEventTask{},
-				&task.PruneTask{},
-				&task.SendEventTask{},
+					taskrunner.AllCurrent, 1*time.Second,
+					testutil.NewFakeRESTMapper()),
+				&task.PruneTask{
+					TaskName: "prune-0",
+				},
 			},
 		},
 		"multiple resources with wait, prune and dryrun": {
@@ -121,14 +126,15 @@ func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 			},
 			expectedTasks: []taskrunner.Task{
 				&task.ApplyTask{
+					TaskName: "apply-0",
 					Objects: []*unstructured.Unstructured{
 						depInfo,
 						customInfo,
 					},
 				},
-				&task.SendEventTask{},
-				&task.PruneTask{},
-				&task.SendEventTask{},
+				&task.PruneTask{
+					TaskName: "prune-0",
+				},
 			},
 		},
 		"multiple resources with wait, prune and server-dryrun": {
@@ -143,14 +149,15 @@ func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 			},
 			expectedTasks: []taskrunner.Task{
 				&task.ApplyTask{
+					TaskName: "apply-0",
 					Objects: []*unstructured.Unstructured{
 						depInfo,
 						customInfo,
 					},
 				},
-				&task.SendEventTask{},
-				&task.PruneTask{},
-				&task.SendEventTask{},
+				&task.PruneTask{
+					TaskName: "prune-0",
+				},
 			},
 		},
 		"multiple resources including CRD": {
@@ -163,29 +170,31 @@ func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 			},
 			expectedTasks: []taskrunner.Task{
 				&task.ApplyTask{
+					TaskName: "apply-0",
 					Objects: []*unstructured.Unstructured{
 						crdInfo,
 					},
 				},
 				taskrunner.NewWaitTask(
+					"wait-0",
 					[]object.ObjMetadata{
 						ignoreErrInfoToObjMeta(crdInfo),
 					},
-					taskrunner.AllCurrent, 1*time.Second),
-				&task.ResetRESTMapperTask{},
+					taskrunner.AllCurrent, 1*time.Second,
+					testutil.NewFakeRESTMapper()),
 				&task.ApplyTask{
+					TaskName: "apply-1",
 					Objects: []*unstructured.Unstructured{
 						depInfo,
 					},
 				},
-				&task.SendEventTask{},
 				taskrunner.NewWaitTask(
+					"wait-1",
 					[]object.ObjMetadata{
-						ignoreErrInfoToObjMeta(crdInfo),
 						ignoreErrInfoToObjMeta(depInfo),
 					},
-					taskrunner.AllCurrent, 1*time.Second),
-				&task.SendEventTask{},
+					taskrunner.AllCurrent, 1*time.Second,
+					testutil.NewFakeRESTMapper()),
 			},
 		},
 		"no wait with CRDs if it is a dryrun": {
@@ -199,16 +208,17 @@ func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 			},
 			expectedTasks: []taskrunner.Task{
 				&task.ApplyTask{
+					TaskName: "apply-0",
 					Objects: []*unstructured.Unstructured{
 						crdInfo,
 					},
 				},
 				&task.ApplyTask{
+					TaskName: "apply-1",
 					Objects: []*unstructured.Unstructured{
 						depInfo,
 					},
 				},
-				&task.SendEventTask{},
 			},
 		},
 	}
@@ -227,12 +237,11 @@ func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 				idsForPrune:  nil,
 			}, tc.options)
 
-			tasks := queueToSlice(tq)
-
-			assert.Equal(t, len(tc.expectedTasks), len(tasks))
+			assert.Equal(t, len(tc.expectedTasks), len(tq.tasks))
 			for i, expTask := range tc.expectedTasks {
-				actualTask := tasks[i]
+				actualTask := tq.tasks[i]
 				assert.Equal(t, getType(expTask), getType(actualTask))
+				assert.Equal(t, expTask.Name(), actualTask.Name())
 
 				switch expTsk := expTask.(type) {
 				case *task.ApplyTask:
@@ -244,9 +253,9 @@ func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 					}
 				case *taskrunner.WaitTask:
 					actWaitTask := toWaitTask(t, actualTask)
-					assert.Equal(t, len(expTsk.Identifiers), len(actWaitTask.Identifiers))
-					for j, id := range expTsk.Identifiers {
-						actID := actWaitTask.Identifiers[j]
+					assert.Equal(t, len(expTsk.Ids), len(actWaitTask.Ids))
+					for j, id := range expTsk.Ids {
+						actID := actWaitTask.Ids[j]
 						assert.Equal(t, id, actID)
 					}
 				}
@@ -289,18 +298,6 @@ func createInfo(apiVersion, kind, name, namespace string) *resource.Info {
 				},
 			},
 		},
-	}
-}
-
-func queueToSlice(tq chan taskrunner.Task) []taskrunner.Task {
-	var tasks []taskrunner.Task
-	for {
-		select {
-		case t := <-tq:
-			tasks = append(tasks, t)
-		default:
-			return tasks
-		}
 	}
 }
 

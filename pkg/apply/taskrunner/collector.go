@@ -62,7 +62,7 @@ func getGeneration(r *event.ResourceStatus) int64 {
 }
 
 // conditionMet tests whether the provided Condition holds true for
-// all resources given by the list of Identifiers.
+// all resources given by the list of Ids.
 func (a *resourceStatusCollector) conditionMet(rwd []resourceWaitData, c Condition) bool {
 	switch c {
 	case AllCurrent:
@@ -75,7 +75,7 @@ func (a *resourceStatusCollector) conditionMet(rwd []resourceWaitData, c Conditi
 }
 
 // allMatchStatus checks whether all resources given by the
-// Identifiers parameter has the provided status.
+// Ids parameter has the provided status.
 func (a *resourceStatusCollector) allMatchStatus(rwd []resourceWaitData, s status.Status) bool {
 	for _, wd := range rwd {
 		ri, found := a.resourceMap[wd.identifier]
@@ -90,7 +90,7 @@ func (a *resourceStatusCollector) allMatchStatus(rwd []resourceWaitData, s statu
 }
 
 // noneMatchStatus checks whether none of the resources given
-// by the Identifiers parameters has the provided status.
+// by the Ids parameters has the provided status.
 func (a *resourceStatusCollector) noneMatchStatus(rwd []resourceWaitData, s status.Status) bool {
 	for _, wd := range rwd {
 		ri, found := a.resourceMap[wd.identifier]

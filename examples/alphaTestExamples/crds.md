@@ -124,8 +124,6 @@ Use the `kapply` binary in `MYGOBIN` to apply both the CRD and the CR.
 ```
 kapply apply $BASE --reconcile-timeout=1m > $OUTPUT/status
 
-expectedOutputLine "customresourcedefinition.apiextensions.k8s.io/foos.custom.io is Current: CRD is established"
-
 expectedOutputLine "foo.custom.io/example-foo is Current: Resource is current"
 
 kubectl get crd --no-headers | awk '{print $1}' > $OUTPUT/status
