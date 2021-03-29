@@ -3,6 +3,13 @@
 
 package inventory
 
+type InventoryStrategy string
+
+const (
+	NameStrategy  InventoryStrategy = "name"
+	LabelStrategy InventoryStrategy = "label"
+)
+
 // InventoryInfo provides the minimal information for the applier
 // to create, look up and update an inventory.
 // The inventory object can be any type, the Provider in the applier
@@ -21,4 +28,6 @@ type InventoryInfo interface {
 	// The Provider contained in the applier should know
 	// if the Id is necessary and how to use it for pruning objects.
 	ID() string
+
+	Strategy() InventoryStrategy
 }

@@ -32,10 +32,11 @@ type inventoryFactoryFunc func(name, namespace, id string) *unstructured.Unstruc
 type invWrapperFunc func(*unstructured.Unstructured) inventory.InventoryInfo
 type applierFactoryFunc func() *apply.Applier
 type destroyerFactoryFunc func() *apply.Destroyer
-type invSizeVerifyFunc func(c client.Client, name, namespace string, count int)
+type invSizeVerifyFunc func(c client.Client, name, namespace, id string, count int)
 type invCountVerifyFunc func(c client.Client, namespace string, count int)
 
 type InventoryConfig struct {
+	InventoryStrategy    inventory.InventoryStrategy
 	InventoryFactoryFunc inventoryFactoryFunc
 	InvWrapperFunc       invWrapperFunc
 	ApplierFactoryFunc   applierFactoryFunc
@@ -46,6 +47,7 @@ type InventoryConfig struct {
 
 var inventoryConfigs = map[string]InventoryConfig{
 	"ConfigMap (default)": {
+		InventoryStrategy:    inventory.LabelStrategy,
 		InventoryFactoryFunc: cmInventoryManifest,
 		InvWrapperFunc:       inventory.WrapInventoryInfoObj,
 		ApplierFactoryFunc:   newDefaultInvApplier,
@@ -54,6 +56,7 @@ var inventoryConfigs = map[string]InventoryConfig{
 		InvCountVerifyFunc:   defaultInvCountVerifyFunc,
 	},
 	"Custom Type": {
+		InventoryStrategy:    inventory.NameStrategy,
 		InventoryFactoryFunc: customInventoryManifest,
 		InvWrapperFunc:       customprovider.WrapInventoryInfoObj,
 		ApplierFactoryFunc:   newCustomInvApplier,
@@ -196,12 +199,15 @@ func newDefaultInvProvider() provider.Provider {
 	return provider.NewProvider(newFactory())
 }
 
-func defaultInvSizeVerifyFunc(c client.Client, name, namespace string, count int) {
-	var cm v1.ConfigMap
-	err := c.Get(context.TODO(), types.NamespacedName{
-		Name:      name,
-		Namespace: namespace,
-	}, &cm)
+func defaultInvSizeVerifyFunc(c client.Client, name, namespace, id string, count int) {
+	var cmList v1.ConfigMapList
+	err := c.List(context.TODO(), &cmList,
+		client.MatchingLabels(map[string]string{common.InventoryLabel: id}),
+		client.InNamespace(namespace))
+	Expect(err).ToNot(HaveOccurred())
+
+	Expect(len(cmList.Items)).To(Equal(1))
+	cm := cmList.Items[0]
 	Expect(err).ToNot(HaveOccurred())
 
 	data := cm.Data
@@ -241,8 +247,8 @@ func newFactory() util.Factory {
 	return util.NewFactory(matchVersionKubeConfigFlags)
 }
 
-func customInvSizeVerifyFunc(c client.Client, name, namespace string, count int) {
-	var u unstructured.Unstructured
+func customInvSizeVerifyFunc(c client.Client, name, namespace, _ string, count int) {
+	var u unstructured.UnstructuredList
 	u.SetGroupVersionKind(customprovider.InventoryGVK)
 	err := c.Get(context.TODO(), types.NamespacedName{
 		Name:      name,

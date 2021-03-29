@@ -70,6 +70,10 @@ func (icm *InventoryConfigMap) ID() string {
 	return strings.TrimSpace(inventoryLabel)
 }
 
+func (icm *InventoryConfigMap) Strategy() InventoryStrategy {
+	return LabelStrategy
+}
+
 func (icm *InventoryConfigMap) UnstructuredInventory() *unstructured.Unstructured {
 	return icm.inv
 }

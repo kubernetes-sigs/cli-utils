@@ -141,7 +141,7 @@ func inventoryPolicyAdoptIfNoInventoryTest(c client.Client, invConfig InventoryC
 	Expect(d.ObjectMeta.Annotations["config.k8s.io/owning-inventory"]).To(Equal(invName))
 
 	invConfig.InvCountVerifyFunc(c, namespaceName, 1)
-	invConfig.InvSizeVerifyFunc(c, invName, namespaceName, 1)
+	invConfig.InvSizeVerifyFunc(c, invName, namespaceName, invName, 1)
 }
 
 func inventoryPolicyAdoptAllTest(c client.Client, invConfig InventoryConfig, namespaceName string) {
