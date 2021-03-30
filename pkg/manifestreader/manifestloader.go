@@ -59,8 +59,14 @@ func (f *manifestLoader) ManifestReader(reader io.Reader, args []string) (Manife
 		EnforceNamespace: enforceNamespace,
 	}
 
+	return mReader(args, reader, readerOptions), nil
+}
+
+// mReader returns the ManifestReader based in the input args
+func mReader(args []string, reader io.Reader, readerOptions ReaderOptions) ManifestReader {
 	var mReader ManifestReader
-	if len(args) == 0 {
+	// Read from stdin if "-" is specified, similar to kubectl
+	if args[0] == "-" {
 		mReader = &StreamManifestReader{
 			ReaderName:    "stdin",
 			Reader:        reader,
@@ -72,5 +78,5 @@ func (f *manifestLoader) ManifestReader(reader io.Reader, args []string) (Manife
 			ReaderOptions: readerOptions,
 		}
 	}
-	return mReader, nil
+	return mReader
 }

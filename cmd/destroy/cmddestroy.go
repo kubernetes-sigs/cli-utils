@@ -66,6 +66,10 @@ type DestroyRunner struct {
 }
 
 func (r *DestroyRunner) RunE(cmd *cobra.Command, args []string) error {
+	if len(args) == 0 {
+		// default to the current working directory if no args are provided
+		args = append(args, ".")
+	}
 	inventoryPolicy, err := flagutils.ConvertInventoryPolicy(r.inventoryPolicy)
 	if err != nil {
 		return err

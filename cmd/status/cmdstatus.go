@@ -72,6 +72,10 @@ type StatusRunner struct {
 // poller to compute status for each of the resources. One of the printer
 // implementations takes care of printing the output.
 func (r *StatusRunner) runE(cmd *cobra.Command, args []string) error {
+	if len(args) == 0 {
+		// default to the current working directory if no args are provided
+		args = append(args, ".")
+	}
 	_, err := common.DemandOneDirectory(args)
 	if err != nil {
 		return err

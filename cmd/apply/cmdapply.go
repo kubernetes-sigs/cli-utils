@@ -89,6 +89,10 @@ type ApplyRunner struct {
 }
 
 func (r *ApplyRunner) RunE(cmd *cobra.Command, args []string) error {
+	if len(args) == 0 {
+		// default to the current working directory if no args are provided
+		args = append(args, ".")
+	}
 	prunePropPolicy, err := convertPropagationPolicy(r.prunePropagationPolicy)
 	if err != nil {
 		return err

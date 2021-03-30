@@ -87,6 +87,10 @@ type PreviewRunner struct {
 
 // RunE is the function run from the cobra command.
 func (r *PreviewRunner) RunE(cmd *cobra.Command, args []string) error {
+	if len(args) == 0 {
+		// default to the current working directory if no args are provided
+		args = append(args, ".")
+	}
 	var ch <-chan event.Event
 
 	drs := common.DryRunClient
