@@ -46,6 +46,8 @@ type InventoryClient interface {
 	GetClusterInventoryInfo(inv InventoryInfo) (*unstructured.Unstructured, error)
 	// UpdateLabels updates the labels of the cluster inventory object if it exists.
 	UpdateLabels(InventoryInfo, map[string]string) error
+	// GetInventoryObjs looks up the inventory objects from the cluster.
+	GetClusterInventoryObjs(inv InventoryInfo) ([]*unstructured.Unstructured, error)
 }
 
 // ClusterInventoryClient is a concrete implementation of the
@@ -251,20 +253,7 @@ func (cic *ClusterInventoryClient) GetClusterObjs(localInv InventoryInfo) ([]obj
 // TODO(seans3): Remove the special case code to merge multiple cluster inventory
 // objects once we've determined that this case is no longer possible.
 func (cic *ClusterInventoryClient) GetClusterInventoryInfo(inv InventoryInfo) (*unstructured.Unstructured, error) {
-	if inv == nil {
-		return nil, fmt.Errorf("inventoryInfo must be specified")
-	}
-
-	var clusterInvObjects []*unstructured.Unstructured
-	var err error
-	switch inv.Strategy() {
-	case NameStrategy:
-		clusterInvObjects, err = cic.getClusterInventoryObjsByName(inv)
-	case LabelStrategy:
-		clusterInvObjects, err = cic.getClusterInventoryObjsByLabel(inv)
-	default:
-		panic(fmt.Errorf("unknown inventory strategy: %s", inv.Strategy()))
-	}
+	clusterInvObjects, err := cic.GetClusterInventoryObjs(inv)
 	if err != nil {
 		return nil, err
 	}
@@ -357,6 +346,24 @@ func (cic *ClusterInventoryClient) UpdateLabels(inv InventoryInfo, labels map[st
 	}
 	obj.SetLabels(labels)
 	return cic.applyInventoryObj(obj)
+}
+
+func (cic *ClusterInventoryClient) GetClusterInventoryObjs(inv InventoryInfo) ([]*unstructured.Unstructured, error) {
+	if inv == nil {
+		return nil, fmt.Errorf("inventoryInfo must be specified")
+	}
+
+	var clusterInvObjects []*unstructured.Unstructured
+	var err error
+	switch inv.Strategy() {
+	case NameStrategy:
+		clusterInvObjects, err = cic.getClusterInventoryObjsByName(inv)
+	case LabelStrategy:
+		clusterInvObjects, err = cic.getClusterInventoryObjsByLabel(inv)
+	default:
+		panic(fmt.Errorf("unknown inventory strategy: %s", inv.Strategy()))
+	}
+	return clusterInvObjects, err
 }
 
 // mergeClusterInventory merges the inventory of multiple inventory objects

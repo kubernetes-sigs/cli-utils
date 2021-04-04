@@ -97,6 +97,29 @@ func (a *Applier) prepareObjects(localInv inventory.InventoryInfo, localObjs []*
 	if err := inventory.ValidateNoInventory(localObjs); err != nil {
 		return nil, err
 	}
+
+	// If the inventory uses the Name strategy and an inventory ID is provided,
+	// verify that the existing inventory object (if there is one) has an ID
+	// label that matches.
+	if localInv.Strategy() == inventory.NameStrategy && localInv.ID() != "" {
+		invObjs, err := a.invClient.GetClusterInventoryObjs(localInv)
+		if err != nil {
+			return nil, err
+		}
+
+		if len(invObjs) > 1 {
+			panic(fmt.Errorf("found %d inv objects with Name strategy", len(invObjs)))
+		}
+
+		if len(invObjs) == 1 {
+			invObj := invObjs[0]
+			val := invObj.GetLabels()[common.InventoryLabel]
+			if val != localInv.ID() {
+				return nil, fmt.Errorf("inventory-id of inventory object in cluster doesn't match provided id %q", localInv.ID())
+			}
+		}
+	}
+
 	// Ensures the namespace exists before applying the inventory object into it.
 	if invNamespace := inventoryNamespaceInSet(localInv, localObjs); invNamespace != nil {
 		klog.V(4).Infof("applier prepareObjects applying namespace %s", invNamespace.GetName())

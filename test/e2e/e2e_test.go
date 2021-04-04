@@ -45,8 +45,13 @@ type InventoryConfig struct {
 	InvCountVerifyFunc   invCountVerifyFunc
 }
 
+const (
+	ConfigMapTypeInvConfig = "ConfigMap"
+	CustomTypeInvConfig    = "Custom"
+)
+
 var inventoryConfigs = map[string]InventoryConfig{
-	"ConfigMap (default)": {
+	ConfigMapTypeInvConfig: {
 		InventoryStrategy:    inventory.LabelStrategy,
 		InventoryFactoryFunc: cmInventoryManifest,
 		InvWrapperFunc:       inventory.WrapInventoryInfoObj,
@@ -55,7 +60,7 @@ var inventoryConfigs = map[string]InventoryConfig{
 		InvSizeVerifyFunc:    defaultInvSizeVerifyFunc,
 		InvCountVerifyFunc:   defaultInvCountVerifyFunc,
 	},
-	"Custom Type": {
+	CustomTypeInvConfig: {
 		InventoryStrategy:    inventory.NameStrategy,
 		InventoryFactoryFunc: customInventoryManifest,
 		InvWrapperFunc:       customprovider.WrapInventoryInfoObj,
@@ -144,6 +149,24 @@ var _ = Describe("Applier", func() {
 			})
 		})
 	}
+
+	Context("InventoryStrategy: Name", func() {
+		var namespace *v1.Namespace
+		var inventoryName string
+
+		BeforeEach(func() {
+			inventoryName = randomString("test-inv-")
+			namespace = createRandomNamespace(c)
+		})
+
+		AfterEach(func() {
+			deleteNamespace(c, namespace)
+		})
+
+		It("Apply with existing inventory", func() {
+			applyWithExistingInvTest(c, inventoryConfigs[CustomTypeInvConfig], inventoryName, namespace.GetName())
+		})
+	})
 })
 
 func createInventoryCRD(c client.Client) {
