@@ -46,6 +46,8 @@ type InventoryClient interface {
 	GetClusterInventoryInfo(inv InventoryInfo) (*unstructured.Unstructured, error)
 	// UpdateLabels updates the labels of the cluster inventory object if it exists.
 	UpdateLabels(InventoryInfo, map[string]string) error
+	// GetInventoryObjs looks up the inventory objects from the cluster.
+	GetClusterInventoryObjs(inv InventoryInfo) ([]*unstructured.Unstructured, error)
 }
 
 // ClusterInventoryClient is a concrete implementation of the
@@ -199,7 +201,30 @@ func (cic *ClusterInventoryClient) replaceInventory(inv *unstructured.Unstructur
 
 // DeleteInventoryObj deletes the inventory object from the cluster.
 func (cic *ClusterInventoryClient) DeleteInventoryObj(localInv InventoryInfo) error {
-	return cic.deleteInventoryObj(cic.invToUnstructuredFunc(localInv))
+	if localInv == nil {
+		return fmt.Errorf("retrieving cluster inventory object with nil local inventory")
+	}
+	switch localInv.Strategy() {
+	case NameStrategy:
+		return cic.deleteInventoryObjByName(cic.invToUnstructuredFunc(localInv))
+	case LabelStrategy:
+		return cic.deleteInventoryObjsByLabel(localInv)
+	default:
+		panic(fmt.Errorf("unknown inventory strategy: %s", localInv.Strategy()))
+	}
+}
+
+func (cic *ClusterInventoryClient) deleteInventoryObjsByLabel(inv InventoryInfo) error {
+	clusterInvObjs, err := cic.getClusterInventoryObjsByLabel(inv)
+	if err != nil {
+		return err
+	}
+	for _, invObj := range clusterInvObjs {
+		if err := cic.deleteInventoryObjByName(invObj); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // GetClusterObjs returns the objects stored in the cluster inventory object, or
@@ -228,6 +253,24 @@ func (cic *ClusterInventoryClient) GetClusterObjs(localInv InventoryInfo) ([]obj
 // TODO(seans3): Remove the special case code to merge multiple cluster inventory
 // objects once we've determined that this case is no longer possible.
 func (cic *ClusterInventoryClient) GetClusterInventoryInfo(inv InventoryInfo) (*unstructured.Unstructured, error) {
+	clusterInvObjects, err := cic.GetClusterInventoryObjs(inv)
+	if err != nil {
+		return nil, err
+	}
+
+	var clusterInv *unstructured.Unstructured
+	if len(clusterInvObjects) == 1 {
+		clusterInv = clusterInvObjects[0]
+	} else if len(clusterInvObjects) > 1 {
+		clusterInv, err = cic.mergeClusterInventory(clusterInvObjects)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return clusterInv, nil
+}
+
+func (cic *ClusterInventoryClient) getClusterInventoryObjsByLabel(inv InventoryInfo) ([]*unstructured.Unstructured, error) {
 	localInv := cic.invToUnstructuredFunc(inv)
 	if localInv == nil {
 		return nil, fmt.Errorf("retrieving cluster inventory object with nil local inventory")
@@ -260,16 +303,37 @@ func (cic *ClusterInventoryClient) GetClusterInventoryInfo(inv InventoryInfo) (*
 	if err != nil {
 		return nil, err
 	}
-	var clusterInv *unstructured.Unstructured
-	if len(retrievedInventoryInfos) == 1 {
-		clusterInv = object.InfoToUnstructured(retrievedInventoryInfos[0])
-	} else if len(retrievedInventoryInfos) > 1 {
-		clusterInv, err = cic.mergeClusterInventory(object.InfosToUnstructureds(retrievedInventoryInfos))
-		if err != nil {
-			return nil, err
-		}
+	return object.InfosToUnstructureds(retrievedInventoryInfos), nil
+}
+
+func (cic *ClusterInventoryClient) getClusterInventoryObjsByName(inv InventoryInfo) ([]*unstructured.Unstructured, error) {
+	localInv := cic.invToUnstructuredFunc(inv)
+	if localInv == nil {
+		return nil, fmt.Errorf("retrieving cluster inventory object with nil local inventory")
 	}
-	return clusterInv, nil
+
+	invInfo, err := cic.toInfo(localInv)
+	if err != nil {
+		return nil, err
+	}
+
+	helper, err := cic.helperFromInfo(invInfo)
+	if err != nil {
+		return nil, err
+	}
+
+	res, err := helper.Get(inv.Namespace(), inv.Name())
+	if err != nil && !apierrors.IsNotFound(err) {
+		return nil, err
+	}
+	if apierrors.IsNotFound(err) {
+		return []*unstructured.Unstructured{}, nil
+	}
+	clusterInv, ok := res.(*unstructured.Unstructured)
+	if !ok {
+		return nil, fmt.Errorf("retrieved cluster inventory object is not of type *Unstructured")
+	}
+	return []*unstructured.Unstructured{clusterInv}, nil
 }
 
 func (cic *ClusterInventoryClient) UpdateLabels(inv InventoryInfo, labels map[string]string) error {
@@ -282,6 +346,24 @@ func (cic *ClusterInventoryClient) UpdateLabels(inv InventoryInfo, labels map[st
 	}
 	obj.SetLabels(labels)
 	return cic.applyInventoryObj(obj)
+}
+
+func (cic *ClusterInventoryClient) GetClusterInventoryObjs(inv InventoryInfo) ([]*unstructured.Unstructured, error) {
+	if inv == nil {
+		return nil, fmt.Errorf("inventoryInfo must be specified")
+	}
+
+	var clusterInvObjects []*unstructured.Unstructured
+	var err error
+	switch inv.Strategy() {
+	case NameStrategy:
+		clusterInvObjects, err = cic.getClusterInventoryObjsByName(inv)
+	case LabelStrategy:
+		clusterInvObjects, err = cic.getClusterInventoryObjsByLabel(inv)
+	default:
+		panic(fmt.Errorf("unknown inventory strategy: %s", inv.Strategy()))
+	}
+	return clusterInvObjects, err
 }
 
 // mergeClusterInventory merges the inventory of multiple inventory objects
@@ -335,7 +417,7 @@ func (cic *ClusterInventoryClient) mergeClusterInventory(invObjs []*unstructured
 	// Finally, delete the other inventory objects.
 	for i := 1; i < len(invObjs); i++ {
 		merge := invObjs[i]
-		if err := cic.deleteInventoryObj(merge); err != nil {
+		if err := cic.deleteInventoryObjByName(merge); err != nil {
 			return nil, err
 		}
 	}
@@ -399,9 +481,9 @@ func (cic *ClusterInventoryClient) createInventoryObj(obj *unstructured.Unstruct
 	return invInfo.Refresh(createdObj, ignoreError)
 }
 
-// deleteInventoryObj deletes the passed inventory object from the APIServer, or
+// deleteInventoryObjByName deletes the passed inventory object from the APIServer, or
 // an error if one occurs.
-func (cic *ClusterInventoryClient) deleteInventoryObj(obj *unstructured.Unstructured) error {
+func (cic *ClusterInventoryClient) deleteInventoryObjByName(obj *unstructured.Unstructured) error {
 	if cic.dryRunStrategy.ClientOrServerDryRun() {
 		klog.V(4).Infof("dry-run delete inventory object: not deleted")
 		return nil

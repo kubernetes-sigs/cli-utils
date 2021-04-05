@@ -5,6 +5,7 @@ package e2e
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -19,14 +20,15 @@ import (
 func applyAndDestroyTest(c client.Client, invConfig InventoryConfig, inventoryName, namespaceName string) {
 	By("Apply resources")
 	applier := invConfig.ApplierFactoryFunc()
+	inventoryID := fmt.Sprintf("%s-%s", inventoryName, namespaceName)
 
-	inv := invConfig.InvWrapperFunc(invConfig.InventoryFactoryFunc(inventoryName, namespaceName, "test"))
+	applyInv := createInventoryInfo(invConfig, inventoryName, namespaceName, inventoryID)
 
 	resources := []*unstructured.Unstructured{
 		deploymentManifest(namespaceName),
 	}
 
-	applyCh := applier.Run(context.TODO(), inv, resources, apply.Options{
+	applyCh := applier.Run(context.TODO(), applyInv, resources, apply.Options{
 		ReconcileTimeout: 2 * time.Minute,
 		EmitStatusEvents: true,
 	})
@@ -53,13 +55,14 @@ func applyAndDestroyTest(c client.Client, invConfig InventoryConfig, inventoryNa
 	Expect(err).ToNot(HaveOccurred())
 
 	By("Verify inventory")
-	invConfig.InvSizeVerifyFunc(c, inventoryName, namespaceName, 1)
+	invConfig.InvSizeVerifyFunc(c, inventoryName, namespaceName, inventoryID, 1)
 
 	By("Destroy resources")
 	destroyer := invConfig.DestroyerFactoryFunc()
 
+	destroyInv := createInventoryInfo(invConfig, inventoryName, namespaceName, inventoryID)
 	option := &apply.DestroyerOption{InventoryPolicy: inventory.AdoptIfNoInventory}
-	destroyerEvents := runCollectNoErr(destroyer.Run(inv, option))
+	destroyerEvents := runCollectNoErr(destroyer.Run(destroyInv, option))
 	err = verifyEvents([]expEvent{
 		{
 			eventType: event.DeleteType,
@@ -69,4 +72,15 @@ func applyAndDestroyTest(c client.Client, invConfig InventoryConfig, inventoryNa
 		},
 	}, destroyerEvents)
 	Expect(err).ToNot(HaveOccurred())
+}
+
+func createInventoryInfo(invConfig InventoryConfig, inventoryName, namespaceName, inventoryID string) inventory.InventoryInfo {
+	switch invConfig.InventoryStrategy {
+	case inventory.NameStrategy:
+		return invConfig.InvWrapperFunc(invConfig.InventoryFactoryFunc(inventoryName, namespaceName, randomString("inventory-")))
+	case inventory.LabelStrategy:
+		return invConfig.InvWrapperFunc(invConfig.InventoryFactoryFunc(randomString("inventory-"), namespaceName, inventoryID))
+	default:
+		panic(fmt.Errorf("unknown inventory strategy %q", invConfig.InventoryStrategy))
+	}
 }

@@ -27,6 +27,16 @@ func randomString(prefix string) string {
 	return fmt.Sprintf("%s%s", prefix, randomSuffix)
 }
 
+func run(ch <-chan event.Event) error {
+	var err error
+	for e := range ch {
+		if e.Type == event.ErrorType {
+			err = e.ErrorEvent.Err
+		}
+	}
+	return err
+}
+
 func runWithNoErr(ch <-chan event.Event) {
 	runCollectNoErr(ch)
 }

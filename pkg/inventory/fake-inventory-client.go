@@ -89,3 +89,7 @@ func (fic *FakeInventoryClient) GetClusterInventoryInfo(inv InventoryInfo) (*uns
 func (fic *FakeInventoryClient) UpdateLabels(inv InventoryInfo, labels map[string]string) error {
 	return nil
 }
+
+func (fic *FakeInventoryClient) GetClusterInventoryObjs(inv InventoryInfo) ([]*unstructured.Unstructured, error) {
+	return []*unstructured.Unstructured{}, nil
+}

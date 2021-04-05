@@ -470,7 +470,7 @@ func TestDeleteInventoryObj(t *testing.T) {
 				if inv != nil {
 					inv = storeObjsInInventory(tc.inv, tc.localObjs)
 				}
-				err := invClient.deleteInventoryObj(inv)
+				err := invClient.deleteInventoryObjByName(inv)
 				if err != nil {
 					t.Fatalf("unexpected error received: %s", err)
 				}

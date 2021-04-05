@@ -25,6 +25,10 @@ func (i *fakeInventoryInfo) ID() string {
 	return i.id
 }
 
+func (i *fakeInventoryInfo) Strategy() InventoryStrategy {
+	return NameStrategy
+}
+
 func testObjectWithAnnotation(key, val string) *unstructured.Unstructured {
 	obj := &unstructured.Unstructured{
 		Object: map[string]interface{}{

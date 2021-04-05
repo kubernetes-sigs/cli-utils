@@ -127,6 +127,10 @@ func (i InventoryCustomType) Name() string {
 	return i.inv.GetName()
 }
 
+func (i InventoryCustomType) Strategy() inventory.InventoryStrategy {
+	return inventory.NameStrategy
+}
+
 func (i InventoryCustomType) ID() string {
 	labels := i.inv.GetLabels()
 	id, found := labels[common.InventoryLabel]

@@ -921,6 +921,10 @@ func (fi *fakeInventoryInfo) ID() string {
 	return "id"
 }
 
+func (fi *fakeInventoryInfo) Strategy() inventory.InventoryStrategy {
+	return inventory.NameStrategy
+}
+
 func addOwningInventory(obj *unstructured.Unstructured, id string) *unstructured.Unstructured {
 	if obj == nil {
 		return nil
