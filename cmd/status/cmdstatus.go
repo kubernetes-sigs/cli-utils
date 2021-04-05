@@ -12,6 +12,7 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"sigs.k8s.io/cli-utils/cmd/flagutils"
 	"sigs.k8s.io/cli-utils/cmd/status/printers"
 	"sigs.k8s.io/cli-utils/pkg/apply/poller"
 	"sigs.k8s.io/cli-utils/pkg/common"
@@ -77,7 +78,7 @@ func (r *StatusRunner) runE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	reader, err := r.loader.ManifestReader(cmd.InOrStdin(), args)
+	reader, err := r.loader.ManifestReader(cmd.InOrStdin(), flagutils.PathFromArgs(args))
 	if err != nil {
 		return err
 	}

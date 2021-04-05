@@ -103,7 +103,7 @@ func (r *PreviewRunner) RunE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	reader, err := r.loader.ManifestReader(cmd.InOrStdin(), args)
+	reader, err := r.loader.ManifestReader(cmd.InOrStdin(), flagutils.PathFromArgs(args))
 	if err != nil {
 		return err
 	}

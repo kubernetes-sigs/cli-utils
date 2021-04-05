@@ -15,7 +15,7 @@ import (
 // and parsing the resources and inventory info.
 type ManifestLoader interface {
 	InventoryInfo([]*unstructured.Unstructured) (inventory.InventoryInfo, []*unstructured.Unstructured, error)
-	ManifestReader(reader io.Reader, args []string) (ManifestReader, error)
+	ManifestReader(reader io.Reader, path string) (ManifestReader, error)
 }
 
 // manifestLoader implements the ManifestLoader interface
@@ -37,7 +37,7 @@ func (f *manifestLoader) InventoryInfo(objs []*unstructured.Unstructured) (inven
 	return inventory.WrapInventoryInfoObj(invObj), objs, err
 }
 
-func (f *manifestLoader) ManifestReader(reader io.Reader, args []string) (ManifestReader, error) {
+func (f *manifestLoader) ManifestReader(reader io.Reader, path string) (ManifestReader, error) {
 	// Fetch the namespace from the configloader. The source of this
 	// either the namespace flag or the context. If the namespace is provided
 	// with the flag, enforceNamespace will be true. In this case, it is
@@ -59,8 +59,14 @@ func (f *manifestLoader) ManifestReader(reader io.Reader, args []string) (Manife
 		EnforceNamespace: enforceNamespace,
 	}
 
+	return mReader(path, reader, readerOptions), nil
+}
+
+// mReader returns the ManifestReader based in the input args
+func mReader(path string, reader io.Reader, readerOptions ReaderOptions) ManifestReader {
 	var mReader ManifestReader
-	if len(args) == 0 {
+	// Read from stdin if "-" is specified, similar to kubectl
+	if path == "-" {
 		mReader = &StreamManifestReader{
 			ReaderName:    "stdin",
 			Reader:        reader,
@@ -68,9 +74,9 @@ func (f *manifestLoader) ManifestReader(reader io.Reader, args []string) (Manife
 		}
 	} else {
 		mReader = &PathManifestReader{
-			Path:          args[0],
+			Path:          path,
 			ReaderOptions: readerOptions,
 		}
 	}
-	return mReader, nil
+	return mReader
 }
