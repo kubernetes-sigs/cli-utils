@@ -27,7 +27,7 @@ func NewFakeLoader(f util.Factory, objs []object.ObjMetadata) *fakeLoader {
 	}
 }
 
-func (f *fakeLoader) ManifestReader(reader io.Reader, _ []string) (ManifestReader, error) {
+func (f *fakeLoader) ManifestReader(reader io.Reader, _ string) (ManifestReader, error) {
 	mapper, err := f.factory.ToRESTMapper()
 	if err != nil {
 		return nil, err

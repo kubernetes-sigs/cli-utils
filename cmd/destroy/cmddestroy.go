@@ -72,7 +72,7 @@ func (r *DestroyRunner) RunE(cmd *cobra.Command, args []string) error {
 	}
 
 	// Retrieve the inventory object.
-	reader, err := r.loader.ManifestReader(cmd.InOrStdin(), args)
+	reader, err := r.loader.ManifestReader(cmd.InOrStdin(), flagutils.PathFromArgs(args))
 	if err != nil {
 		return err
 	}
