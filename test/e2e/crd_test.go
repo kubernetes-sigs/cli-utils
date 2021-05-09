@@ -67,13 +67,6 @@ func crdTest(_ client.Client, invConfig InventoryConfig, inventoryName, namespac
 				operation:      event.Created,
 			},
 		},
-		{
-			eventType: event.ApplyType,
-			applyEvent: &expApplyEvent{
-				applyEventType: event.ApplyEventResourceUpdate,
-				operation:      event.Created,
-			},
-		},
 	}, applierEvents)
 	Expect(err).ToNot(HaveOccurred())
 

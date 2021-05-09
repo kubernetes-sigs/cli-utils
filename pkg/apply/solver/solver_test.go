@@ -17,16 +17,34 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/object"
+	"sigs.k8s.io/cli-utils/pkg/object/graph"
 	"sigs.k8s.io/cli-utils/pkg/testutil"
+)
+
+const (
+	crdGroup      = "stable.example.com"
+	crdKind       = "CronTab"
+	crdKindPlural = "crontabs"
+	crdName       = crdKindPlural + "." + crdGroup
+	namespace     = "test-namespace"
 )
 
 var (
 	pruneOptions = &prune.PruneOptions{}
 
-	depInfo    = createInfo("apps/v1", "Deployment", "foo", "bar").Object.(*unstructured.Unstructured)
-	customInfo = createInfo("custom.io/v1", "Custom", "foo", "").Object.(*unstructured.Unstructured)
-	crdInfo    = createInfo("apiextensions.k8s.io/v1", "CustomResourceDefinition", "crd", "").Object.(*unstructured.Unstructured)
+	depInfo       = createInfo("apps/v1", "Deployment", "test-deployment", namespace).Object.(*unstructured.Unstructured)
+	namespaceInfo = createInfo("v1", "Namespace", namespace, "").Object.(*unstructured.Unstructured)
+	customInfo    = createInfo(crdGroup+"/v1", crdKind, "my-cron-object", "").Object.(*unstructured.Unstructured)
+	crInfo        = createInfo(crdGroup+"/v1", crdKind, "second-cron-object", "").Object.(*unstructured.Unstructured)
+	crdInfo       = createInfo("apiextensions.k8s.io/v1", "CustomResourceDefinition", crdName, "").Object.(*unstructured.Unstructured)
+	cmInfo        = createInfo("v1", "ConfigMap", "test-cm", namespace).Object.(*unstructured.Unstructured)
 )
+
+func createCRD(obj *unstructured.Unstructured) *unstructured.Unstructured {
+	_ = unstructured.SetNestedField(obj.Object, crdGroup, "spec", "group")
+	_ = unstructured.SetNestedField(obj.Object, crdKind, "spec", "names", "kind")
+	return obj
+}
 
 func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 	testCases := map[string]struct {
@@ -155,8 +173,8 @@ func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 		},
 		"multiple resources including CRD": {
 			objs: []*unstructured.Unstructured{
-				crdInfo,
-				depInfo,
+				createCRD(crdInfo),
+				customInfo,
 			},
 			options: Options{
 				ReconcileTimeout: time.Minute,
@@ -164,7 +182,7 @@ func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 			expectedTasks: []taskrunner.Task{
 				&task.ApplyTask{
 					Objects: []*unstructured.Unstructured{
-						crdInfo,
+						createCRD(crdInfo),
 					},
 				},
 				taskrunner.NewWaitTask(
@@ -175,14 +193,13 @@ func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 				&task.ResetRESTMapperTask{},
 				&task.ApplyTask{
 					Objects: []*unstructured.Unstructured{
-						depInfo,
+						customInfo,
 					},
 				},
 				&task.SendEventTask{},
 				taskrunner.NewWaitTask(
 					[]object.ObjMetadata{
-						ignoreErrInfoToObjMeta(crdInfo),
-						ignoreErrInfoToObjMeta(depInfo),
+						ignoreErrInfoToObjMeta(customInfo),
 					},
 					taskrunner.AllCurrent, 1*time.Second),
 				&task.SendEventTask{},
@@ -190,8 +207,8 @@ func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 		},
 		"no wait with CRDs if it is a dryrun": {
 			objs: []*unstructured.Unstructured{
-				crdInfo,
-				depInfo,
+				createCRD(crdInfo),
+				customInfo,
 			},
 			options: Options{
 				ReconcileTimeout: time.Minute,
@@ -200,12 +217,12 @@ func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 			expectedTasks: []taskrunner.Task{
 				&task.ApplyTask{
 					Objects: []*unstructured.Unstructured{
-						crdInfo,
+						createCRD(crdInfo),
 					},
 				},
 				&task.ApplyTask{
 					Objects: []*unstructured.Unstructured{
-						depInfo,
+						customInfo,
 					},
 				},
 				&task.SendEventTask{},
@@ -238,17 +255,175 @@ func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 				case *task.ApplyTask:
 					actApplyTask := toApplyTask(t, actualTask)
 					assert.Equal(t, len(expTsk.Objects), len(actApplyTask.Objects))
-					for j, obj := range expTsk.Objects {
-						actObj := actApplyTask.Objects[j]
-						assert.Equal(t, ignoreErrInfoToObjMeta(obj), ignoreErrInfoToObjMeta(actObj))
+					expectedObjs := object.UnstructuredsToObjMetas(expTsk.Objects)
+					actualObjs := object.UnstructuredsToObjMetas(actApplyTask.Objects)
+					if !object.SetEquals(expectedObjs, actualObjs) {
+						t.Errorf("expected apply objs (%s), got apply objs (%s)\n", expectedObjs, actualObjs)
 					}
 				case *taskrunner.WaitTask:
 					actWaitTask := toWaitTask(t, actualTask)
-					assert.Equal(t, len(expTsk.Identifiers), len(actWaitTask.Identifiers))
-					for j, id := range expTsk.Identifiers {
-						actID := actWaitTask.Identifiers[j]
-						assert.Equal(t, id, actID)
+					expectedObjs := expTsk.Identifiers
+					actualObjs := actWaitTask.Identifiers
+					assert.Equal(t, len(expectedObjs), len(actualObjs))
+					if !object.SetEquals(expectedObjs, actualObjs) {
+						t.Errorf("expected wait objs (%s), got wait objs (%s)\n", expectedObjs, actualObjs)
 					}
+				}
+			}
+		})
+	}
+}
+
+func TestAddNamespaceEdges(t *testing.T) {
+	testCases := map[string]struct {
+		objs     []*unstructured.Unstructured
+		expected []graph.Edge
+	}{
+		"no objects means no edges added to graph": {
+			objs:     []*unstructured.Unstructured{},
+			expected: []graph.Edge{},
+		},
+		"one object means no edges added to graph": {
+			objs:     []*unstructured.Unstructured{depInfo},
+			expected: []graph.Edge{},
+		},
+		"two unrelated objects means no edges added to graph": {
+			objs:     []*unstructured.Unstructured{depInfo, customInfo},
+			expected: []graph.Edge{},
+		},
+		"one namespace and one object NOT in namespace is zero edges": {
+			objs:     []*unstructured.Unstructured{customInfo, namespaceInfo},
+			expected: []graph.Edge{},
+		},
+		"one namespace and one object in namespace is one edge": {
+			objs: []*unstructured.Unstructured{depInfo, namespaceInfo},
+			expected: []graph.Edge{
+				{
+					From: ignoreErrInfoToObjMeta(depInfo),
+					To:   ignoreErrInfoToObjMeta(namespaceInfo),
+				},
+			},
+		},
+		"one namespace and one object in namespace and one not is one edge": {
+			objs: []*unstructured.Unstructured{depInfo, namespaceInfo, customInfo},
+			expected: []graph.Edge{
+				{
+					From: ignoreErrInfoToObjMeta(depInfo),
+					To:   ignoreErrInfoToObjMeta(namespaceInfo),
+				},
+			},
+		},
+		"one namespace and two object in namespace is two edges": {
+			objs: []*unstructured.Unstructured{depInfo, namespaceInfo, cmInfo},
+			expected: []graph.Edge{
+				{
+					From: ignoreErrInfoToObjMeta(depInfo),
+					To:   ignoreErrInfoToObjMeta(namespaceInfo),
+				},
+				{
+					From: ignoreErrInfoToObjMeta(cmInfo),
+					To:   ignoreErrInfoToObjMeta(namespaceInfo),
+				},
+			},
+		},
+	}
+
+	for tn, tc := range testCases {
+		t.Run(tn, func(t *testing.T) {
+			g := graph.New()
+			addNamespaceEdges(g, tc.objs)
+			actual := g.GetEdges()
+			if len(tc.expected) != len(actual) {
+				t.Errorf("expected num edges %d, got %d\n", len(tc.expected), len(actual))
+			}
+			for _, expectedEdge := range tc.expected {
+				found := false
+				for _, actualEdge := range actual {
+					if expectedEdge == actualEdge {
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Errorf("expected edge (%s) not found\n", expectedEdge)
+				}
+			}
+		})
+	}
+}
+
+func TestAddCRDEdges(t *testing.T) {
+	testCases := map[string]struct {
+		objs     []*unstructured.Unstructured
+		expected []graph.Edge
+	}{
+		"no objects means no edges added to graph": {
+			objs:     []*unstructured.Unstructured{},
+			expected: []graph.Edge{},
+		},
+		"one object means no edges added to graph": {
+			objs:     []*unstructured.Unstructured{depInfo},
+			expected: []graph.Edge{},
+		},
+		"two unrelated objects means no edges added to graph": {
+			objs:     []*unstructured.Unstructured{depInfo, customInfo},
+			expected: []graph.Edge{},
+		},
+		"one CRD and one object NOT custom resource is zero edges": {
+			objs:     []*unstructured.Unstructured{crdInfo, depInfo},
+			expected: []graph.Edge{},
+		},
+		"one CRD and one custom resource is one edge": {
+			objs: []*unstructured.Unstructured{crdInfo, customInfo},
+			expected: []graph.Edge{
+				{
+					From: ignoreErrInfoToObjMeta(customInfo),
+					To:   ignoreErrInfoToObjMeta(crdInfo),
+				},
+			},
+		},
+		"one CRD and one custom resource and one not is one edge": {
+			objs: []*unstructured.Unstructured{crdInfo, customInfo, cmInfo},
+			expected: []graph.Edge{
+				{
+					From: ignoreErrInfoToObjMeta(customInfo),
+					To:   ignoreErrInfoToObjMeta(crdInfo),
+				},
+			},
+		},
+		"one CRD and two custom resources is two edges": {
+			objs: []*unstructured.Unstructured{crdInfo, customInfo, crInfo},
+			expected: []graph.Edge{
+				{
+					From: ignoreErrInfoToObjMeta(customInfo),
+					To:   ignoreErrInfoToObjMeta(crdInfo),
+				},
+				{
+					From: ignoreErrInfoToObjMeta(crInfo),
+					To:   ignoreErrInfoToObjMeta(crdInfo),
+				},
+			},
+		},
+	}
+
+	for tn, tc := range testCases {
+		t.Run(tn, func(t *testing.T) {
+			g := graph.New()
+			addCRDEdges(g, tc.objs)
+			actual := g.GetEdges()
+			if len(tc.expected) != len(actual) {
+				t.Errorf("expected num edges %d, got %d\n", len(tc.expected), len(actual))
+			}
+			for _, expectedEdge := range tc.expected {
+				found := false
+				for _, actualEdge := range actual {
+					if expectedEdge == actualEdge {
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Errorf("expected edge (%s) not found\n", expectedEdge)
 				}
 			}
 		})

@@ -24,11 +24,13 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	extensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/resource"
+	"k8s.io/klog"
 )
 
 const (
@@ -50,8 +52,12 @@ var RBACGroupKind = map[schema.GroupKind]bool{
 	{Group: rbacv1.GroupName, Kind: "ClusterRoleBinding"}: true,
 }
 
-// CoreV1Namespace is Namespace GVK.
-var CoreV1Namespace = corev1.SchemeGroupVersion.WithKind("Namespace")
+var (
+	CoreV1Namespace = corev1.SchemeGroupVersion.WithKind("Namespace")
+	CoreNamespace   = CoreV1Namespace.GroupKind()
+	ExtensionsV1CRD = extensionsv1.SchemeGroupVersion.WithKind("CustomResourceDefinition")
+	ExtensionsCRD   = ExtensionsV1CRD.GroupKind()
+)
 
 // ObjMetadata organizes and stores the indentifying information
 // for an object. This struct (as a string) is stored in a
@@ -293,4 +299,76 @@ func SetEquals(setA []ObjMetadata, setB []ObjMetadata) bool {
 		}
 	}
 	return true
+}
+
+const (
+	DependsOnAnnotation       = "config.k8s.io/depends-on"
+	NumFieldsClusterScoped    = 3
+	NumFieldsNamespacedScoped = 5
+	AnnotationSeparator       = ","
+	FieldSeparator            = "/"
+	NamespacesField           = "namespaces"
+)
+
+// DependsOnObjs returns the slice of object references (ObjMetadata)
+// that the passed unstructured object depends on based on an
+// annotation within the passed unstructured object.
+func DependsOnObjs(u *unstructured.Unstructured) []ObjMetadata {
+	objs := []ObjMetadata{}
+	if u == nil {
+		return objs
+	}
+	annots := u.GetAnnotations()
+	objsEncoded, found := annots[DependsOnAnnotation]
+	if found {
+		klog.V(5).Infof("depends-on annotation found: %s\n", objsEncoded)
+	} else {
+		return objs
+	}
+	objs, err := AnnotationToObjMetas(objsEncoded)
+	if err != nil {
+		klog.V(5).Infof("error parsing depends-on annotation: %s\n", err)
+		return objs
+	}
+	return objs
+}
+
+// annotationToObjMeta parses the passed annotation as an
+// object reference. The fields are separated by '/', and the
+// string can have either three fields (cluster-scoped object)
+// or five fields (namespace-scoped object). Examples are:
+//   Cluster-Scoped: <group>/<kind>/<name> (3 fields)
+//   Namespaced: <group>/namespaces/<namespace>/<kind>/<name> (5 fields)
+// For the "core" group, the string is empty.
+// Return the parsed ObjMetadata object or an error if unable
+// to parse the obj ref annotation string.
+func AnnotationToObjMetas(o string) ([]ObjMetadata, error) {
+	objs := []ObjMetadata{}
+	for _, objStr := range strings.Split(o, AnnotationSeparator) {
+		var group, kind, namespace, name string
+		objStr := strings.TrimSpace(objStr)
+		fields := strings.Split(objStr, FieldSeparator)
+		if len(fields) != NumFieldsClusterScoped &&
+			len(fields) != NumFieldsNamespacedScoped {
+			return objs, fmt.Errorf("unable to parse depends on annotation into ObjMetadata: %s", o)
+		}
+		group = fields[0]
+		if len(fields) == 3 {
+			kind = fields[1]
+			name = fields[2]
+		} else {
+			if fields[1] != NamespacesField {
+				return objs, fmt.Errorf("depends on annotation missing 'namespaces' field: %s", o)
+			}
+			namespace = fields[2]
+			kind = fields[3]
+			name = fields[4]
+		}
+		obj, err := CreateObjMetadata(namespace, name, schema.GroupKind{Group: group, Kind: kind})
+		if err != nil {
+			return objs, err
+		}
+		objs = append(objs, obj)
+	}
+	return objs, nil
 }
