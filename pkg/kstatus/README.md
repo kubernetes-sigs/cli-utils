@@ -134,5 +134,5 @@ when something isn't working as expected.
 ### Depend on kyaml instead of k8s libraries
 The sigs.k8s.io/kustomize/kstatus/status package currently depends on k8s libraries. This can be 
 challenging if someone wants to vendor the library within their own project. We want to replace
-the dependencies on k8s libraries with kyaml for the status package. The wait package needs to 
+the dependencies on k8s libraries with kyaml for the status package. The `polling` package needs to 
 talk to a k8s cluster, so this package will continue to rely on the k8s libraries.
