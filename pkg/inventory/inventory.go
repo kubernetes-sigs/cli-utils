@@ -14,7 +14,6 @@ package inventory
 import (
 	"fmt"
 	"strings"
-	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -174,8 +173,7 @@ func fixLegacyInventoryName(obj *unstructured.Unstructured) error {
 	name := accessor.GetName()
 	if obj.GetName() == legacyInvName || name == legacyInvName {
 		klog.V(4).Infof("renaming legacy inventory name")
-		seed := time.Now().UTC().UnixNano()
-		randomSuffix := common.RandomStr(seed)
+		randomSuffix := common.RandomStr()
 		return addSuffixToName(obj, randomSuffix)
 	}
 	return nil

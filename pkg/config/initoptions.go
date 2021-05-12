@@ -221,7 +221,7 @@ func fileExists(path string) bool {
 func (i *InitOptions) fillInValues() string {
 	now := time.Now()
 	nowStr := now.Format("2006-01-02 15:04:05 MST")
-	randomSuffix := common.RandomStr(now.UTC().UnixNano())
+	randomSuffix := common.RandomStr()
 	manifestStr := i.Template
 	klog.V(4).Infof("namespace/inventory-id: %s/%s", i.Namespace, i.InventoryID)
 	manifestStr = strings.ReplaceAll(manifestStr, "<DATETIME>", nowStr)

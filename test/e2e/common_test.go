@@ -6,7 +6,6 @@ package e2e
 import (
 	"fmt"
 	"strings"
-	"time"
 
 	. "github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
@@ -22,8 +21,7 @@ import (
 )
 
 func randomString(prefix string) string {
-	seed := time.Now().UTC().UnixNano()
-	randomSuffix := common.RandomStr(seed)
+	randomSuffix := common.RandomStr()
 	return fmt.Sprintf("%s%s", prefix, randomSuffix)
 }
 
