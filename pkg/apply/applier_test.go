@@ -412,22 +412,7 @@ func TestApplier(t *testing.T) {
 			reconcileTimeout: time.Minute,
 			prune:            true,
 			inventoryPolicy:  inventory.InventoryPolicyMustMatch,
-			statusEvents: []pollevent.Event{
-				{
-					EventType: pollevent.ResourceUpdateEvent,
-					Resource: &pollevent.ResourceStatus{
-						Identifier: toIdentifier(t, resources["deployment"]),
-						Status:     status.InProgressStatus,
-					},
-				},
-				{
-					EventType: pollevent.ResourceUpdateEvent,
-					Resource: &pollevent.ResourceStatus{
-						Identifier: toIdentifier(t, resources["deployment"]),
-						Status:     status.CurrentStatus,
-					},
-				},
-			},
+			statusEvents:     []pollevent.Event{},
 			expectedEventTypes: []expectedEvent{
 				{
 					eventType: event.InitType,
@@ -440,14 +425,6 @@ func TestApplier(t *testing.T) {
 				{
 					eventType:      event.ApplyType,
 					applyEventType: event.ApplyEventCompleted,
-				},
-				{
-					eventType:       event.StatusType,
-					statusEventType: event.StatusEventResourceUpdate,
-				},
-				{
-					eventType:       event.StatusType,
-					statusEventType: event.StatusEventResourceUpdate,
 				},
 				{
 					eventType:       event.StatusType,
