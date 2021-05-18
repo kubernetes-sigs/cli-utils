@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -25,6 +26,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/klog"
 	"k8s.io/kubectl/pkg/cmd/util"
+	"sigs.k8s.io/cli-utils/pkg/apply/duration"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
 	"sigs.k8s.io/cli-utils/pkg/common"
@@ -140,7 +142,7 @@ func (po *PruneOptions) Prune(localInv inventory.InventoryInfo,
 					pruneObj.Namespace, pruneObj.Name, err)
 			}
 			pruneFailures = append(pruneFailures, pruneObj)
-			taskContext.EventChannel() <- createPruneFailedEvent(pruneObj, err)
+			taskContext.EventChannel() <- createPruneFailedEvent(pruneObj, err, nil)
 			taskContext.CaptureResourceFailure(pruneObj)
 			continue
 		}
@@ -153,7 +155,7 @@ func (po *PruneOptions) Prune(localInv inventory.InventoryInfo,
 		// Handle lifecycle directive preventing deletion.
 		if !canPrune(localInv, obj, o.InventoryPolicy, uid) {
 			klog.V(4).Infof("skip prune for lifecycle directive %s/%s", pruneObj.Namespace, pruneObj.Name)
-			taskContext.EventChannel() <- createPruneEvent(pruneObj, obj, event.PruneSkipped)
+			taskContext.EventChannel() <- createPruneEvent(pruneObj, obj, event.PruneSkipped, nil)
 			pruneFailures = append(pruneFailures, pruneObj)
 			continue
 		}
@@ -163,7 +165,7 @@ func (po *PruneOptions) Prune(localInv inventory.InventoryInfo,
 			if pruneObj.GroupKind == object.CoreV1Namespace.GroupKind() &&
 				localNamespaces.Has(pruneObj.Name) {
 				klog.V(4).Infof("skip pruning namespace: %s", pruneObj.Name)
-				taskContext.EventChannel() <- createPruneEvent(pruneObj, obj, event.PruneSkipped)
+				taskContext.EventChannel() <- createPruneEvent(pruneObj, obj, event.PruneSkipped, nil)
 				pruneFailures = append(pruneFailures, pruneObj)
 				taskContext.CaptureResourceFailure(pruneObj)
 				continue
@@ -176,23 +178,24 @@ func (po *PruneOptions) Prune(localInv inventory.InventoryInfo,
 				if klog.V(4) {
 					klog.Errorf("prune failed for %s/%s (%s)", pruneObj.Namespace, pruneObj.Name, err)
 				}
-				taskContext.EventChannel() <- createPruneFailedEvent(pruneObj, err)
+				taskContext.EventChannel() <- createPruneFailedEvent(pruneObj, err, nil)
 				pruneFailures = append(pruneFailures, pruneObj)
 				taskContext.CaptureResourceFailure(pruneObj)
 				continue
 			}
+			duration.SetStartTime(time.Now())
 			err = namespacedClient.Delete(context.TODO(), pruneObj.Name, metav1.DeleteOptions{})
 			if err != nil {
 				if klog.V(4) {
 					klog.Errorf("prune failed for %s/%s (%s)", pruneObj.Namespace, pruneObj.Name, err)
 				}
-				taskContext.EventChannel() <- createPruneFailedEvent(pruneObj, err)
+				taskContext.EventChannel() <- createPruneFailedEvent(pruneObj, err, duration.GetDuration(time.Now()))
 				pruneFailures = append(pruneFailures, pruneObj)
 				taskContext.CaptureResourceFailure(pruneObj)
 				continue
 			}
 		}
-		taskContext.EventChannel() <- createPruneEvent(pruneObj, obj, event.Pruned)
+		taskContext.EventChannel() <- createPruneEvent(pruneObj, obj, event.Pruned, duration.GetDuration(time.Now()))
 	}
 	// Final inventory equals applied objects and prune failures.
 	appliedResources := taskContext.AppliedResources()
@@ -246,7 +249,7 @@ func preventDeleteAnnotation(annotations map[string]string) bool {
 }
 
 // createPruneEvent is a helper function to package a prune event.
-func createPruneEvent(id object.ObjMetadata, obj *unstructured.Unstructured, op event.PruneEventOperation) event.Event {
+func createPruneEvent(id object.ObjMetadata, obj *unstructured.Unstructured, op event.PruneEventOperation, d *time.Duration) event.Event {
 	return event.Event{
 		Type: event.PruneType,
 		PruneEvent: event.PruneEvent{
@@ -254,18 +257,20 @@ func createPruneEvent(id object.ObjMetadata, obj *unstructured.Unstructured, op 
 			Operation:  op,
 			Object:     obj,
 			Identifier: id,
+			Duration:   d,
 		},
 	}
 }
 
 // createPruneEvent is a helper function to package a prune event for a failure.
-func createPruneFailedEvent(objMeta object.ObjMetadata, err error) event.Event {
+func createPruneFailedEvent(objMeta object.ObjMetadata, err error, d *time.Duration) event.Event {
 	return event.Event{
 		Type: event.PruneType,
 		PruneEvent: event.PruneEvent{
 			Type:       event.PruneEventFailed,
 			Identifier: objMeta,
 			Error:      err,
+			Duration:   d,
 		},
 	}
 }
