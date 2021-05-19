@@ -86,7 +86,7 @@ func (r *DestroyRunner) RunE(cmd *cobra.Command, args []string) error {
 	}
 
 	if r.PreProcess != nil {
-		inventoryPolicy, err = r.PreProcess(inv, r.Destroyer.DryRunStrategy)
+		inventoryPolicy, err = r.PreProcess(inv, common.DryRunNone)
 		if err != nil {
 			return err
 		}
@@ -106,5 +106,5 @@ func (r *DestroyRunner) RunE(cmd *cobra.Command, args []string) error {
 	// The printer will print updates from the channel. It will block
 	// until the channel is closed.
 	printer := printers.GetPrinter(r.output, r.ioStreams)
-	return printer.Print(ch, r.Destroyer.DryRunStrategy)
+	return printer.Print(ch, common.DryRunNone)
 }
