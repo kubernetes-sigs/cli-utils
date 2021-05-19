@@ -6,7 +6,6 @@ package list
 import (
 	"fmt"
 
-	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/object"
@@ -21,12 +20,10 @@ type Formatter interface {
 	FormatActionGroupEvent(age event.ActionGroupEvent, ags []event.ActionGroup, as *ApplyStats, ps *PruneStats, ds *DeleteStats, c Collector) error
 }
 
-type FormatterFactory func(ioStreams genericclioptions.IOStreams,
-	previewStrategy common.DryRunStrategy) Formatter
+type FormatterFactory func(previewStrategy common.DryRunStrategy) Formatter
 
 type BaseListPrinter struct {
 	FormatterFactory FormatterFactory
-	IOStreams        genericclioptions.IOStreams
 }
 
 type ApplyStats struct {
@@ -127,7 +124,7 @@ func (b *BaseListPrinter) Print(ch <-chan event.Event, previewStrategy common.Dr
 		latestStatus: make(map[object.ObjMetadata]event.StatusEvent),
 	}
 	printStatus := false
-	formatter := b.FormatterFactory(b.IOStreams, previewStrategy)
+	formatter := b.FormatterFactory(previewStrategy)
 	for e := range ch {
 		switch e.Type {
 		case event.InitType:
