@@ -16,7 +16,7 @@ import (
 // CachingRESTClientGetter caches the RESTMapper so every call to
 // ToRESTMapper will get a reference to the same mapper.
 type CachingRESTClientGetter struct {
-	once     sync.Once
+	mx       sync.Mutex
 	Delegate genericclioptions.RESTClientGetter
 
 	mapper meta.RESTMapper
@@ -31,10 +31,13 @@ func (c *CachingRESTClientGetter) ToDiscoveryClient() (discovery.CachedDiscovery
 }
 
 func (c *CachingRESTClientGetter) ToRESTMapper() (meta.RESTMapper, error) {
+	c.mx.Lock()
+	defer c.mx.Unlock()
+	if c.mapper != nil {
+		return c.mapper, nil
+	}
 	var err error
-	c.once.Do(func() {
-		c.mapper, err = c.Delegate.ToRESTMapper()
-	})
+	c.mapper, err = c.Delegate.ToRESTMapper()
 	return c.mapper, err
 }
 
