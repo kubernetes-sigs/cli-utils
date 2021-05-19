@@ -14,6 +14,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/apply"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
+	"sigs.k8s.io/cli-utils/pkg/testutil"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -38,18 +39,12 @@ func applyAndDestroyTest(c client.Client, invConfig InventoryConfig, inventoryNa
 		Expect(e.Type).NotTo(Equal(event.ErrorType))
 		applierEvents = append(applierEvents, e)
 	}
-	err := verifyEvents([]expEvent{
+	err := testutil.VerifyEvents([]testutil.ExpEvent{
 		{
-			eventType: event.InitType,
+			EventType: event.InitType,
 		},
 		{
-			eventType: event.ApplyType,
-		},
-		{
-			eventType: event.ApplyType,
-		},
-		{
-			eventType: event.PruneType,
+			EventType: event.ApplyType,
 		},
 	}, applierEvents)
 	Expect(err).ToNot(HaveOccurred())
@@ -63,12 +58,9 @@ func applyAndDestroyTest(c client.Client, invConfig InventoryConfig, inventoryNa
 	destroyInv := createInventoryInfo(invConfig, inventoryName, namespaceName, inventoryID)
 	option := &apply.DestroyerOption{InventoryPolicy: inventory.AdoptIfNoInventory}
 	destroyerEvents := runCollectNoErr(destroyer.Run(destroyInv, option))
-	err = verifyEvents([]expEvent{
+	err = testutil.VerifyEvents([]testutil.ExpEvent{
 		{
-			eventType: event.DeleteType,
-		},
-		{
-			eventType: event.DeleteType,
+			EventType: event.DeleteType,
 		},
 	}, destroyerEvents)
 	Expect(err).ToNot(HaveOccurred())

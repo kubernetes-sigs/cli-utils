@@ -4,8 +4,15 @@
 package taskrunner
 
 import (
+	"fmt"
+	"reflect"
 	"time"
 
+	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/client-go/restmapper"
+	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
@@ -13,23 +20,28 @@ import (
 // Task is the interface that must be implemented by
 // all tasks that will be executed by the taskrunner.
 type Task interface {
+	Name() string
+	Action() event.ResourceAction
+	Identifiers() []object.ObjMetadata
 	Start(taskContext *TaskContext)
 	ClearTimeout()
 }
 
 // NewWaitTask creates a new wait task where we will wait until
 // the resources specifies by ids all meet the specified condition.
-func NewWaitTask(ids []object.ObjMetadata, cond Condition, timeout time.Duration) *WaitTask {
+func NewWaitTask(name string, ids []object.ObjMetadata, cond Condition, timeout time.Duration, mapper meta.RESTMapper) *WaitTask {
 	// Create the token channel and only add one item.
 	tokenChannel := make(chan struct{}, 1)
 	tokenChannel <- struct{}{}
 
 	return &WaitTask{
-		Identifiers: ids,
-		Condition:   cond,
-		Timeout:     timeout,
+		name:      name,
+		Ids:       ids,
+		Condition: cond,
+		Timeout:   timeout,
 
-		token: tokenChannel,
+		mapper: mapper,
+		token:  tokenChannel,
 	}
 }
 
@@ -41,13 +53,17 @@ func NewWaitTask(ids []object.ObjMetadata, cond Condition, timeout time.Duration
 // is handled in a special way to the taskrunner and is a part of the core
 // package.
 type WaitTask struct {
-	// Identifiers is the list of resources that we are waiting for.
-	Identifiers []object.ObjMetadata
+	// name allows providing a name for the task.
+	name string
+	// Ids is the list of resources that we are waiting for.
+	Ids []object.ObjMetadata
 	// Condition defines the status we want all resources to reach
 	Condition Condition
 	// Timeout defines how long we are willing to wait for the condition
 	// to be met.
 	Timeout time.Duration
+
+	mapper meta.RESTMapper
 
 	// cancelFunc is a function that will cancel the timeout timer
 	// on the task.
@@ -60,6 +76,18 @@ type WaitTask struct {
 	// taskChannel, even if the condition is met and the task times out
 	// at the same time.
 	token chan struct{}
+}
+
+func (w *WaitTask) Name() string {
+	return w.name
+}
+
+func (w *WaitTask) Action() event.ResourceAction {
+	return event.WaitAction
+}
+
+func (w *WaitTask) Identifiers() []object.ObjMetadata {
+	return w.Ids
 }
 
 // Start kicks off the task. For the wait task, this just means
@@ -84,7 +112,7 @@ func (w *WaitTask) setTimer(taskContext *TaskContext) {
 		case <-w.token:
 			taskContext.TaskChannel() <- TaskResult{
 				Err: &TimeoutError{
-					Identifiers: w.Identifiers,
+					Identifiers: w.Ids,
 					Timeout:     w.Timeout,
 					Condition:   w.Condition,
 				},
@@ -111,7 +139,7 @@ func (w *WaitTask) checkCondition(taskContext *TaskContext, coll *resourceStatus
 // was applied.
 func (w *WaitTask) computeResourceWaitData(taskContext *TaskContext) []resourceWaitData {
 	var rwd []resourceWaitData
-	for _, id := range w.Identifiers {
+	for _, id := range w.Ids {
 		if taskContext.ResourceFailed(id) {
 			continue
 		}
@@ -137,11 +165,27 @@ func (w *WaitTask) startAndComplete(taskContext *TaskContext) {
 // for the task has been met, or something has failed so the task
 // need to be stopped.
 func (w *WaitTask) complete(taskContext *TaskContext) {
+	var err error
+	for _, obj := range w.Ids {
+		if (obj.GroupKind.Group == v1.SchemeGroupVersion.Group ||
+			obj.GroupKind.Group == v1beta1.SchemeGroupVersion.Group) &&
+			obj.GroupKind.Kind == "CustomResourceDefinition" {
+			ddRESTMapper, err := extractDeferredDiscoveryRESTMapper(w.mapper)
+			if err == nil {
+				ddRESTMapper.Reset()
+				// We only need to reset once.
+				break
+			}
+			continue
+		}
+	}
 	select {
 	// Only do something if we can get the token.
 	case <-w.token:
 		go func() {
-			taskContext.TaskChannel() <- TaskResult{}
+			taskContext.TaskChannel() <- TaskResult{
+				Err: err,
+			}
 		}()
 	default:
 		return
@@ -184,4 +228,21 @@ func (c Condition) Meets(s status.Status) bool {
 	default:
 		return false
 	}
+}
+
+// extractDeferredDiscoveryRESTMapper unwraps the provided RESTMapper
+// interface to get access to the underlying DeferredDiscoveryRESTMapper
+// that can be reset.
+func extractDeferredDiscoveryRESTMapper(mapper meta.RESTMapper) (*restmapper.DeferredDiscoveryRESTMapper,
+	error) {
+	val := reflect.ValueOf(mapper)
+	if val.Type().Kind() != reflect.Struct {
+		return nil, fmt.Errorf("unexpected RESTMapper type: %s", val.Type().String())
+	}
+	fv := val.FieldByName("RESTMapper")
+	ddRESTMapper, ok := fv.Interface().(*restmapper.DeferredDiscoveryRESTMapper)
+	if !ok {
+		return nil, fmt.Errorf("unexpected RESTMapper type")
+	}
+	return ddRESTMapper, nil
 }

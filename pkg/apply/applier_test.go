@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"reflect"
 	"regexp"
 	"testing"
 	"time"
@@ -35,6 +34,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/provider"
+	"sigs.k8s.io/cli-utils/pkg/testutil"
 )
 
 var (
@@ -138,30 +138,18 @@ func (i inventoryInfo) toWrapped() inventory.InventoryInfo {
 	return inventory.WrapInventoryInfoObj(inv)
 }
 
-type expectedEvent struct {
-	eventType event.Type
-
-	applyEventType  event.ApplyEventType
-	statusEventType event.StatusEventType
-	pruneEventType  event.PruneEventType
-	deleteEventType event.DeleteEventType
-
-	applyErrorType error
-	pruneEventOp   event.PruneEventOperation
-}
-
 func TestApplier(t *testing.T) {
 	testCases := map[string]struct {
-		namespace          string
-		resources          []*unstructured.Unstructured
-		invInfo            inventoryInfo
-		clusterObjs        []*unstructured.Unstructured
-		handlers           []handler
-		reconcileTimeout   time.Duration
-		prune              bool
-		inventoryPolicy    inventory.InventoryPolicy
-		statusEvents       []pollevent.Event
-		expectedEventTypes []expectedEvent
+		namespace        string
+		resources        []*unstructured.Unstructured
+		invInfo          inventoryInfo
+		clusterObjs      []*unstructured.Unstructured
+		handlers         []handler
+		reconcileTimeout time.Duration
+		prune            bool
+		inventoryPolicy  inventory.InventoryPolicy
+		statusEvents     []pollevent.Event
+		expectedEvents   []testutil.ExpEvent
 	}{
 		"initial apply without status or prune": {
 			namespace: "default",
@@ -177,17 +165,18 @@ func TestApplier(t *testing.T) {
 			reconcileTimeout: time.Duration(0),
 			prune:            false,
 			inventoryPolicy:  inventory.InventoryPolicyMustMatch,
-			expectedEventTypes: []expectedEvent{
+			expectedEvents: []testutil.ExpEvent{
 				{
-					eventType: event.InitType,
+					EventType: event.InitType,
 				},
 				{
-					eventType:      event.ApplyType,
-					applyEventType: event.ApplyEventResourceUpdate,
+					EventType: event.ActionGroupType,
 				},
 				{
-					eventType:      event.ApplyType,
-					applyEventType: event.ApplyEventCompleted,
+					EventType: event.ApplyType,
+				},
+				{
+					EventType: event.ActionGroupType,
 				},
 			},
 		},
@@ -232,41 +221,42 @@ func TestApplier(t *testing.T) {
 					},
 				},
 			},
-			expectedEventTypes: []expectedEvent{
+			expectedEvents: []testutil.ExpEvent{
 				{
-					eventType: event.InitType,
+					EventType: event.InitType,
 				},
 				{
-					eventType:      event.ApplyType,
-					applyEventType: event.ApplyEventResourceUpdate,
+					EventType: event.ActionGroupType,
 				},
 				{
-					eventType:      event.ApplyType,
-					applyEventType: event.ApplyEventResourceUpdate,
+					EventType: event.ApplyType,
 				},
 				{
-					eventType:      event.ApplyType,
-					applyEventType: event.ApplyEventCompleted,
+					EventType: event.ApplyType,
 				},
 				{
-					eventType:       event.StatusType,
-					statusEventType: event.StatusEventResourceUpdate,
+					EventType: event.ActionGroupType,
 				},
 				{
-					eventType:       event.StatusType,
-					statusEventType: event.StatusEventResourceUpdate,
+					EventType: event.ActionGroupType,
 				},
 				{
-					eventType:       event.StatusType,
-					statusEventType: event.StatusEventResourceUpdate,
+					EventType: event.StatusType,
 				},
 				{
-					eventType:       event.StatusType,
-					statusEventType: event.StatusEventCompleted,
+					EventType: event.StatusType,
 				},
 				{
-					eventType:      event.PruneType,
-					pruneEventType: event.PruneEventCompleted,
+					EventType: event.StatusType,
+				},
+				{
+					EventType: event.ActionGroupType,
+				},
+				{
+					EventType: event.ActionGroupType,
+				},
+				{
+					EventType: event.ActionGroupType,
 				},
 			},
 		},
@@ -310,37 +300,39 @@ func TestApplier(t *testing.T) {
 					},
 				},
 			},
-			expectedEventTypes: []expectedEvent{
+			expectedEvents: []testutil.ExpEvent{
 				{
-					eventType: event.InitType,
+					EventType: event.InitType,
 				},
 				{
-					eventType:      event.ApplyType,
-					applyEventType: event.ApplyEventResourceUpdate,
+					EventType: event.ActionGroupType,
 				},
 				{
-					eventType:      event.ApplyType,
-					applyEventType: event.ApplyEventResourceUpdate,
+					EventType: event.ApplyType,
 				},
 				{
-					eventType:      event.ApplyType,
-					applyEventType: event.ApplyEventCompleted,
+					EventType: event.ApplyType,
 				},
 				{
-					eventType:       event.StatusType,
-					statusEventType: event.StatusEventResourceUpdate,
+					EventType: event.ActionGroupType,
 				},
 				{
-					eventType:       event.StatusType,
-					statusEventType: event.StatusEventResourceUpdate,
+					EventType: event.ActionGroupType,
 				},
 				{
-					eventType:       event.StatusType,
-					statusEventType: event.StatusEventCompleted,
+					EventType: event.StatusType,
 				},
 				{
-					eventType:      event.PruneType,
-					pruneEventType: event.PruneEventCompleted,
+					EventType: event.StatusType,
+				},
+				{
+					EventType: event.ActionGroupType,
+				},
+				{
+					EventType: event.ActionGroupType,
+				},
+				{
+					EventType: event.ActionGroupType,
 				},
 			},
 		},
@@ -368,31 +360,39 @@ func TestApplier(t *testing.T) {
 			prune:            true,
 			inventoryPolicy:  inventory.InventoryPolicyMustMatch,
 			statusEvents:     []pollevent.Event{},
-			expectedEventTypes: []expectedEvent{
+			expectedEvents: []testutil.ExpEvent{
 				{
-					eventType: event.InitType,
+					EventType: event.InitType,
 				},
 				{
-					eventType:      event.ApplyType,
-					applyEventType: event.ApplyEventCompleted,
+					EventType: event.ActionGroupType,
 				},
 				{
-					eventType:       event.StatusType,
-					statusEventType: event.StatusEventCompleted,
+					EventType: event.ActionGroupType,
 				},
 				{
-					eventType:      event.PruneType,
-					pruneEventType: event.PruneEventResourceUpdate,
-					pruneEventOp:   event.Pruned,
+					EventType: event.ActionGroupType,
 				},
 				{
-					eventType:      event.PruneType,
-					pruneEventType: event.PruneEventResourceUpdate,
-					pruneEventOp:   event.Pruned,
+					EventType: event.ActionGroupType,
 				},
 				{
-					eventType:      event.PruneType,
-					pruneEventType: event.PruneEventCompleted,
+					EventType: event.ActionGroupType,
+				},
+				{
+					EventType: event.PruneType,
+					PruneEvent: &testutil.ExpPruneEvent{
+						Operation: event.Pruned,
+					},
+				},
+				{
+					EventType: event.PruneType,
+					PruneEvent: &testutil.ExpPruneEvent{
+						Operation: event.Pruned,
+					},
+				},
+				{
+					EventType: event.ActionGroupType,
 				},
 			},
 		},
@@ -412,27 +412,49 @@ func TestApplier(t *testing.T) {
 			reconcileTimeout: time.Minute,
 			prune:            true,
 			inventoryPolicy:  inventory.InventoryPolicyMustMatch,
-			statusEvents:     []pollevent.Event{},
-			expectedEventTypes: []expectedEvent{
+			statusEvents: []pollevent.Event{
 				{
-					eventType: event.InitType,
+					EventType: pollevent.ResourceUpdateEvent,
+					Resource: &pollevent.ResourceStatus{
+						Identifier: toIdentifier(t, resources["deployment"]),
+						Status:     status.InProgressStatus,
+					},
 				},
 				{
-					eventType:      event.ApplyType,
-					applyEventType: event.ApplyEventResourceUpdate,
-					applyErrorType: inventory.NewInventoryOverlapError(fmt.Errorf("")),
+					EventType: pollevent.ResourceUpdateEvent,
+					Resource: &pollevent.ResourceStatus{
+						Identifier: toIdentifier(t, resources["deployment"]),
+						Status:     status.CurrentStatus,
+					},
+				},
+			},
+			expectedEvents: []testutil.ExpEvent{
+				{
+					EventType: event.InitType,
 				},
 				{
-					eventType:      event.ApplyType,
-					applyEventType: event.ApplyEventCompleted,
+					EventType: event.ActionGroupType,
 				},
 				{
-					eventType:       event.StatusType,
-					statusEventType: event.StatusEventCompleted,
+					EventType: event.ApplyType,
+					ApplyEvent: &testutil.ExpApplyEvent{
+						Error: inventory.NewInventoryOverlapError(fmt.Errorf("")),
+					},
 				},
 				{
-					eventType:      event.PruneType,
-					pruneEventType: event.PruneEventCompleted,
+					EventType: event.ActionGroupType,
+				},
+				{
+					EventType: event.ActionGroupType,
+				},
+				{
+					EventType: event.ActionGroupType,
+				},
+				{
+					EventType: event.ActionGroupType,
+				},
+				{
+					EventType: event.ActionGroupType,
 				},
 			},
 		},
@@ -455,22 +477,27 @@ func TestApplier(t *testing.T) {
 			reconcileTimeout: 0,
 			prune:            true,
 			inventoryPolicy:  inventory.InventoryPolicyMustMatch,
-			expectedEventTypes: []expectedEvent{
+			expectedEvents: []testutil.ExpEvent{
 				{
-					eventType: event.InitType,
+					EventType: event.InitType,
 				},
 				{
-					eventType:      event.ApplyType,
-					applyEventType: event.ApplyEventCompleted,
+					EventType: event.ActionGroupType,
 				},
 				{
-					eventType:      event.PruneType,
-					pruneEventType: event.PruneEventResourceUpdate,
-					pruneEventOp:   event.PruneSkipped,
+					EventType: event.ActionGroupType,
 				},
 				{
-					eventType:      event.PruneType,
-					pruneEventType: event.PruneEventCompleted,
+					EventType: event.ActionGroupType,
+				},
+				{
+					EventType: event.PruneType,
+					PruneEvent: &testutil.ExpPruneEvent{
+						Operation: event.PruneSkipped,
+					},
+				},
+				{
+					EventType: event.ActionGroupType,
 				},
 			},
 		},
@@ -493,22 +520,27 @@ func TestApplier(t *testing.T) {
 			reconcileTimeout: 0,
 			prune:            true,
 			inventoryPolicy:  inventory.InventoryPolicyMustMatch,
-			expectedEventTypes: []expectedEvent{
+			expectedEvents: []testutil.ExpEvent{
 				{
-					eventType: event.InitType,
+					EventType: event.InitType,
 				},
 				{
-					eventType:      event.ApplyType,
-					applyEventType: event.ApplyEventCompleted,
+					EventType: event.ActionGroupType,
 				},
 				{
-					eventType:      event.PruneType,
-					pruneEventType: event.PruneEventResourceUpdate,
-					pruneEventOp:   event.Pruned,
+					EventType: event.ActionGroupType,
 				},
 				{
-					eventType:      event.PruneType,
-					pruneEventType: event.PruneEventCompleted,
+					EventType: event.ActionGroupType,
+				},
+				{
+					EventType: event.PruneType,
+					PruneEvent: &testutil.ExpPruneEvent{
+						Operation: event.Pruned,
+					},
+				},
+				{
+					EventType: event.ActionGroupType,
 				},
 			},
 		},
@@ -590,39 +622,29 @@ func TestApplier(t *testing.T) {
 			})
 
 			var events []event.Event
-			for e := range eventChannel {
-				if e.Type == event.ApplyType && e.ApplyEvent.Type == event.ApplyEventCompleted {
-					close(poller.start)
-				}
-				events = append(events, e)
-			}
+			timer := time.NewTimer(30 * time.Second)
 
-			if !assert.Equal(t, len(tc.expectedEventTypes), len(events)) {
-				t.FailNow()
-			}
-
-			for i, e := range events {
-				expected := tc.expectedEventTypes[i]
-				if !assert.Equal(t, expected.eventType.String(), e.Type.String()) {
-					t.FailNow()
-				}
-
-				switch expected.eventType {
-				case event.InitType:
-				case event.ApplyType:
-					assert.Equal(t, expected.applyEventType.String(), e.ApplyEvent.Type.String())
-					assert.Equal(t, reflect.TypeOf(expected.applyErrorType), reflect.TypeOf(e.ApplyEvent.Error))
-				case event.StatusType:
-					assert.Equal(t, expected.statusEventType.String(), e.StatusEvent.Type.String())
-				case event.PruneType:
-					assert.Equal(t, expected.pruneEventType.String(), e.PruneEvent.Type.String())
-					assert.Equal(t, expected.pruneEventOp.String(), e.PruneEvent.Operation.String())
-				case event.DeleteType:
-					assert.Equal(t, expected.deleteEventType.String(), e.DeleteEvent.Type.String())
-				default:
-					assert.Fail(t, "unexpected event type %s", expected.eventType.String())
+		loop:
+			for {
+				select {
+				case e, ok := <-eventChannel:
+					if !ok {
+						break loop
+					}
+					if e.Type == event.ActionGroupType &&
+						e.ActionGroupEvent.Action == event.ApplyAction &&
+						e.ActionGroupEvent.Type == event.Finished {
+						close(poller.start)
+					}
+					events = append(events, e)
+				case <-timer.C:
+					t.Errorf("timeout")
+					break loop
 				}
 			}
+
+			err = testutil.VerifyEvents(tc.expectedEvents, events)
+			assert.NoError(t, err)
 		})
 	}
 }

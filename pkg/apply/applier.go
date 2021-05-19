@@ -259,16 +259,7 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.InventoryInfo, obje
 		eventChannel <- event.Event{
 			Type: event.InitType,
 			InitEvent: event.InitEvent{
-				ResourceGroups: []event.ResourceGroup{
-					{
-						Action:      event.ApplyAction,
-						Identifiers: resourceObjects.IdsForApply(),
-					},
-					{
-						Action:      event.PruneAction,
-						Identifiers: resourceObjects.IdsForPrune(),
-					},
-				},
+				ActionGroups: taskQueue.ToActionGroups(),
 			},
 		}
 
@@ -276,7 +267,7 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.InventoryInfo, obje
 		klog.V(4).Infoln("applier building TaskStatusRunner...")
 		runner := taskrunner.NewTaskStatusRunner(resourceObjects.AllIds(), a.StatusPoller)
 		klog.V(4).Infoln("applier running TaskStatusRunner...")
-		err = runner.Run(ctx, taskQueue, eventChannel, taskrunner.Options{
+		err = runner.Run(ctx, taskQueue.ToChannel(), eventChannel, taskrunner.Options{
 			PollInterval:     options.PollInterval,
 			UseCache:         true,
 			EmitStatusEvents: options.EmitStatusEvents,

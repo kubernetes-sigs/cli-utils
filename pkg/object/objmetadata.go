@@ -62,6 +62,19 @@ type ObjMetadata struct {
 	GroupKind schema.GroupKind
 }
 
+// ObjMetas is a slice of ObjMetadata.
+type ObjMetas []ObjMetadata
+
+// Contains checks if the provided ObjMetadata exists in the ObjMetas slice.
+func (oms ObjMetas) Contains(id ObjMetadata) bool {
+	for _, om := range oms {
+		if om == id {
+			return true
+		}
+	}
+	return false
+}
+
 // CreateObjMetadata returns a pointer to an ObjMetadata struct filled
 // with the passed values. This function normalizes and validates the
 // passed fields and returns an error for bad parameters.

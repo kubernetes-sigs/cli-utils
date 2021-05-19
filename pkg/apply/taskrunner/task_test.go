@@ -10,10 +10,12 @@ import (
 
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/object"
+	"sigs.k8s.io/cli-utils/pkg/testutil"
 )
 
 func TestWaitTask_TimeoutTriggered(t *testing.T) {
-	task := NewWaitTask([]object.ObjMetadata{}, AllCurrent, 2*time.Second)
+	task := NewWaitTask("wait", []object.ObjMetadata{}, AllCurrent,
+		2*time.Second, testutil.NewFakeRESTMapper())
 
 	eventChannel := make(chan event.Event)
 	taskContext := NewTaskContext(eventChannel)
@@ -35,7 +37,8 @@ func TestWaitTask_TimeoutTriggered(t *testing.T) {
 }
 
 func TestWaitTask_TimeoutCancelled(t *testing.T) {
-	task := NewWaitTask([]object.ObjMetadata{}, AllCurrent, 2*time.Second)
+	task := NewWaitTask("wait", []object.ObjMetadata{}, AllCurrent,
+		2*time.Second, testutil.NewFakeRESTMapper())
 
 	eventChannel := make(chan event.Event)
 	taskContext := NewTaskContext(eventChannel)
@@ -54,7 +57,8 @@ func TestWaitTask_TimeoutCancelled(t *testing.T) {
 }
 
 func TestWaitTask_SingleTaskResult(t *testing.T) {
-	task := NewWaitTask([]object.ObjMetadata{}, AllCurrent, 2*time.Second)
+	task := NewWaitTask("wait", []object.ObjMetadata{}, AllCurrent,
+		2*time.Second, testutil.NewFakeRESTMapper())
 
 	eventChannel := make(chan event.Event)
 	taskContext := NewTaskContext(eventChannel)

@@ -159,7 +159,7 @@ func (b *baseRunner) run(ctx context.Context, taskQueue chan Task,
 			// If the statusChannel has closed or we are preparing
 			// to abort the task processing, we just ignore all
 			// statusEvents.
-			// TODO(mortent): Check if a losed statusChannel might
+			// TODO(mortent): Check if a closed statusChannel might
 			// create a busy loop here.
 			if !ok || abort {
 				continue
@@ -183,8 +183,10 @@ func (b *baseRunner) run(ctx context.Context, taskQueue chan Task,
 				eventChannel <- event.Event{
 					Type: event.StatusType,
 					StatusEvent: event.StatusEvent{
-						Type:     event.StatusEventResourceUpdate,
-						Resource: statusEvent.Resource,
+						Identifier:       statusEvent.Resource.Identifier,
+						PollResourceInfo: statusEvent.Resource,
+						Resource:         statusEvent.Resource.Resource,
+						Error:            statusEvent.Error,
 					},
 				}
 			}
@@ -208,6 +210,14 @@ func (b *baseRunner) run(ctx context.Context, taskQueue chan Task,
 		// If everything is ok, we fetch and start the next task.
 		case msg := <-taskContext.TaskChannel():
 			currentTask.ClearTimeout()
+			taskContext.EventChannel() <- event.Event{
+				Type: event.ActionGroupType,
+				ActionGroupEvent: event.ActionGroupEvent{
+					GroupName: currentTask.Name(),
+					Action:    currentTask.Action(),
+					Type:      event.Finished,
+				},
+			}
 			if msg.Err != nil {
 				b.amendTimeoutError(msg.Err)
 				return msg.Err
@@ -275,6 +285,15 @@ func (b *baseRunner) nextTask(taskQueue chan Task,
 	default:
 		// Only happens when the channel is empty.
 		return nil, true
+	}
+
+	taskContext.EventChannel() <- event.Event{
+		Type: event.ActionGroupType,
+		ActionGroupEvent: event.ActionGroupEvent{
+			GroupName: tsk.Name(),
+			Action:    tsk.Action(),
+			Type:      event.Started,
+		},
 	}
 
 	switch st := tsk.(type) {

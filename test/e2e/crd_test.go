@@ -16,6 +16,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
 	"sigs.k8s.io/cli-utils/pkg/object"
+	"sigs.k8s.io/cli-utils/pkg/testutil"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -41,37 +42,33 @@ func crdTest(_ client.Client, invConfig InventoryConfig, inventoryName, namespac
 		Expect(e.Type).NotTo(Equal(event.ErrorType))
 		applierEvents = append(applierEvents, e)
 	}
-	err := verifyEvents([]expEvent{
+	err := testutil.VerifyEvents([]testutil.ExpEvent{
 		{
-			eventType: event.ApplyType,
-			applyEvent: &expApplyEvent{
-				applyEventType: event.ApplyEventResourceUpdate,
-				operation:      event.Created,
-				identifier:     object.UnstructuredToObjMeta(manifestToUnstructured(crd)),
-				error:          nil,
+			EventType: event.ApplyType,
+			ApplyEvent: &testutil.ExpApplyEvent{
+				Operation:  event.Created,
+				Identifier: object.UnstructuredToObjMeta(manifestToUnstructured(crd)),
+				Error:      nil,
 			},
 		},
 		{
-			eventType: event.StatusType,
-			statusEvent: &expStatusEvent{
-				statusEventType: event.StatusEventResourceUpdate,
-				identifier:      object.UnstructuredToObjMeta(manifestToUnstructured(crd)),
-				status:          status.CurrentStatus,
-				error:           nil,
+			EventType: event.StatusType,
+			StatusEvent: &testutil.ExpStatusEvent{
+				Identifier: object.UnstructuredToObjMeta(manifestToUnstructured(crd)),
+				Status:     status.CurrentStatus,
+				Error:      nil,
 			},
 		},
 		{
-			eventType: event.ApplyType,
-			applyEvent: &expApplyEvent{
-				applyEventType: event.ApplyEventResourceUpdate,
-				operation:      event.Created,
+			EventType: event.ApplyType,
+			ApplyEvent: &testutil.ExpApplyEvent{
+				Operation: event.Created,
 			},
 		},
 		{
-			eventType: event.ApplyType,
-			applyEvent: &expApplyEvent{
-				applyEventType: event.ApplyEventResourceUpdate,
-				operation:      event.Created,
+			EventType: event.ApplyType,
+			ApplyEvent: &testutil.ExpApplyEvent{
+				Operation: event.Created,
 			},
 		},
 	}, applierEvents)
@@ -81,30 +78,27 @@ func crdTest(_ client.Client, invConfig InventoryConfig, inventoryName, namespac
 	destroyer := invConfig.DestroyerFactoryFunc()
 	option := &apply.DestroyerOption{InventoryPolicy: inventory.AdoptIfNoInventory}
 	destroyerEvents := runCollectNoErr(destroyer.Run(inv, option))
-	err = verifyEvents([]expEvent{
+	err = testutil.VerifyEvents([]testutil.ExpEvent{
 		{
-			eventType: event.DeleteType,
-			deleteEvent: &expDeleteEvent{
-				deleteEventType: event.DeleteEventResourceUpdate,
-				operation:       event.Deleted,
-				error:           nil,
+			EventType: event.DeleteType,
+			DeleteEvent: &testutil.ExpDeleteEvent{
+				Operation: event.Deleted,
+				Error:     nil,
 			},
 		},
 		{
-			eventType: event.DeleteType,
-			deleteEvent: &expDeleteEvent{
-				deleteEventType: event.DeleteEventResourceUpdate,
-				operation:       event.Deleted,
-				error:           nil,
+			EventType: event.DeleteType,
+			DeleteEvent: &testutil.ExpDeleteEvent{
+				Operation: event.Deleted,
+				Error:     nil,
 			},
 		},
 		{
-			eventType: event.DeleteType,
-			deleteEvent: &expDeleteEvent{
-				deleteEventType: event.DeleteEventResourceUpdate,
-				operation:       event.Deleted,
-				identifier:      object.UnstructuredToObjMeta(manifestToUnstructured(crd)),
-				error:           nil,
+			EventType: event.DeleteType,
+			DeleteEvent: &testutil.ExpDeleteEvent{
+				Operation:  event.Deleted,
+				Identifier: object.UnstructuredToObjMeta(manifestToUnstructured(crd)),
+				Error:      nil,
 			},
 		},
 	}, destroyerEvents)

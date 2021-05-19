@@ -46,6 +46,8 @@ type applyOptions interface {
 // ApplyTask applies the given Objects to the cluster
 // by using the ApplyOptions.
 type ApplyTask struct {
+	TaskName string
+
 	Factory    util.Factory
 	InfoHelper info.InfoHelper
 	Mapper     meta.RESTMapper
@@ -65,6 +67,18 @@ var applyOptionsFactoryFunc = newApplyOptions
 
 // getClusterObj gets the cluster object. Used for allow unit testing.
 var getClusterObj = getClusterObject
+
+func (a *ApplyTask) Name() string {
+	return a.TaskName
+}
+
+func (a *ApplyTask) Action() event.ResourceAction {
+	return event.ApplyAction
+}
+
+func (a *ApplyTask) Identifiers() []object.ObjMetadata {
+	return object.UnstructuredsToObjMetas(a.Objects)
+}
 
 // Start creates a new goroutine that will invoke
 // the Run function on the ApplyOptions to update
@@ -140,8 +154,8 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 					klog.Errorf("unable to convert obj to info for %s/%s (%s)--continue",
 						obj.GetNamespace(), obj.GetName(), err)
 				}
-				taskContext.EventChannel() <- createApplyEvent(
-					id, event.Failed, applyerror.NewUnknownTypeError(err))
+				taskContext.EventChannel() <- createApplyFailedEvent(id,
+					applyerror.NewUnknownTypeError(err))
 				taskContext.CaptureResourceFailure(id)
 				continue
 			}
@@ -153,15 +167,13 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 						klog.Errorf("error (%s) retrieving %s/%s from cluster--continue",
 							err, info.Namespace, info.Name)
 					}
-					op := event.Failed
 					if a.objInCluster(id) {
 						// Object in cluster stays in the inventory.
 						klog.V(4).Infof("%s/%s apply retrieval failure, but in cluster--keep in inventory",
 							info.Namespace, info.Name)
 						invInfos[id] = info
-						op = event.Unchanged
 					}
-					taskContext.EventChannel() <- createApplyEvent(id, op, err)
+					taskContext.EventChannel() <- createApplyFailedEvent(id, err)
 					taskContext.CaptureResourceFailure(id)
 					continue
 				}
@@ -173,10 +185,12 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 			if !canApply {
 				klog.V(5).Infof("can not apply %s/%s--continue",
 					clusterObj.GetNamespace(), clusterObj.GetName())
-				taskContext.EventChannel() <- createApplyEvent(
-					id,
-					event.Unchanged,
-					err)
+				if err != nil {
+					taskContext.EventChannel() <- createApplyFailedEvent(id, err)
+				} else {
+					taskContext.EventChannel() <- createApplyEvent(id,
+						event.Unchanged, clusterObj)
+				}
 				taskContext.CaptureResourceFailure(id)
 				continue
 			}
@@ -202,8 +216,8 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 						info.Namespace, info.Name)
 					delete(invInfos, id)
 				}
-				taskContext.EventChannel() <- createApplyEvent(
-					id, event.Failed, applyerror.NewApplyRunError(err))
+				taskContext.EventChannel() <- createApplyFailedEvent(id,
+					applyerror.NewApplyRunError(err))
 				taskContext.CaptureResourceFailure(id)
 			}
 		}
@@ -373,12 +387,21 @@ func buildCRDsInfo(crds []*unstructured.Unstructured) *crdsInfo {
 func (a *ApplyTask) ClearTimeout() {}
 
 // createApplyEvent is a helper function to package an apply event for a single resource.
-func createApplyEvent(id object.ObjMetadata, operation event.ApplyEventOperation, err error) event.Event {
+func createApplyEvent(id object.ObjMetadata, operation event.ApplyEventOperation, resource *unstructured.Unstructured) event.Event {
 	return event.Event{
 		Type: event.ApplyType,
 		ApplyEvent: event.ApplyEvent{
-			Type:       event.ApplyEventResourceUpdate,
+			Identifier: id,
 			Operation:  operation,
+			Resource:   resource,
+		},
+	}
+}
+
+func createApplyFailedEvent(id object.ObjMetadata, err error) event.Event {
+	return event.Event{
+		Type: event.ApplyType,
+		ApplyEvent: event.ApplyEvent{
 			Identifier: id,
 			Error:      err,
 		},
@@ -390,8 +413,8 @@ func createApplyEvent(id object.ObjMetadata, operation event.ApplyEventOperation
 func sendBatchApplyEvents(taskContext *taskrunner.TaskContext, objects []*unstructured.Unstructured, err error) {
 	for _, obj := range objects {
 		id := object.UnstructuredToObjMeta(obj)
-		taskContext.EventChannel() <- createApplyEvent(
-			id, event.Failed, applyerror.NewInitializeApplyOptionError(err))
+		taskContext.EventChannel() <- createApplyFailedEvent(id,
+			applyerror.NewInitializeApplyOptionError(err))
 		taskContext.CaptureResourceFailure(id)
 	}
 }

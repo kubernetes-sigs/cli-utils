@@ -15,6 +15,7 @@
 package solver
 
 import (
+	"fmt"
 	"time"
 
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -41,6 +42,31 @@ type TaskQueueSolver struct {
 	Mapper       meta.RESTMapper
 }
 
+type TaskQueue struct {
+	tasks []taskrunner.Task
+}
+
+func (tq *TaskQueue) ToChannel() chan taskrunner.Task {
+	taskQueue := make(chan taskrunner.Task, len(tq.tasks))
+	for _, t := range tq.tasks {
+		taskQueue <- t
+	}
+	return taskQueue
+}
+
+func (tq *TaskQueue) ToActionGroups() []event.ActionGroup {
+	var ags []event.ActionGroup
+
+	for _, t := range tq.tasks {
+		ags = append(ags, event.ActionGroup{
+			Name:        t.Name(),
+			Action:      t.Action(),
+			Identifiers: t.Identifiers(),
+		})
+	}
+	return ags
+}
+
 type Options struct {
 	ServerSideOptions      common.ServerSideOptions
 	ReconcileTimeout       time.Duration
@@ -63,7 +89,11 @@ type resourceObjects interface {
 // and constructs the task queue. The options parameter allows
 // customization of how the task queue are built.
 func (t *TaskQueueSolver) BuildTaskQueue(ro resourceObjects,
-	o Options) chan taskrunner.Task {
+	o Options) *TaskQueue {
+	var applyCounter int
+	var pruneCounter int
+	var waitCounter int
+
 	var tasks []taskrunner.Task
 	remainingInfos := ro.ObjsForApply()
 	// Convert slice of previous inventory objects into a map.
@@ -76,6 +106,7 @@ func (t *TaskQueueSolver) BuildTaskQueue(ro resourceObjects,
 	crdSplitRes, hasCRDs := splitAfterCRDs(remainingInfos)
 	if hasCRDs {
 		tasks = append(tasks, &task.ApplyTask{
+			TaskName:          fmt.Sprintf("apply-%d", applyCounter),
 			Objects:           append(crdSplitRes.before, crdSplitRes.crds...),
 			CRDs:              crdSplitRes.crds,
 			PrevInventory:     prevInventory,
@@ -87,21 +118,24 @@ func (t *TaskQueueSolver) BuildTaskQueue(ro resourceObjects,
 			InventoryPolicy:   o.InventoryPolicy,
 			InvInfo:           ro.Inventory(),
 		})
+		applyCounter += 1
 		if !o.DryRunStrategy.ClientOrServerDryRun() {
 			objs := object.UnstructuredsToObjMetas(crdSplitRes.crds)
 			tasks = append(tasks, taskrunner.NewWaitTask(
+				fmt.Sprintf("wait-%d", waitCounter),
 				objs,
 				taskrunner.AllCurrent,
-				1*time.Minute),
-				&task.ResetRESTMapperTask{
-					Mapper: t.Mapper,
-				})
+				1*time.Minute,
+				t.Mapper),
+			)
+			waitCounter += 1
 		}
 		remainingInfos = crdSplitRes.after
 	}
 
 	tasks = append(tasks,
 		&task.ApplyTask{
+			TaskName:          fmt.Sprintf("apply-%d", applyCounter),
 			Objects:           remainingInfos,
 			CRDs:              crdSplitRes.crds,
 			PrevInventory:     prevInventory,
@@ -113,36 +147,24 @@ func (t *TaskQueueSolver) BuildTaskQueue(ro resourceObjects,
 			InventoryPolicy:   o.InventoryPolicy,
 			InvInfo:           ro.Inventory(),
 		},
-		&task.SendEventTask{
-			Event: event.Event{
-				Type: event.ApplyType,
-				ApplyEvent: event.ApplyEvent{
-					Type: event.ApplyEventCompleted,
-				},
-			},
-		},
 	)
 
 	if !o.DryRunStrategy.ClientOrServerDryRun() && o.ReconcileTimeout != time.Duration(0) {
 		tasks = append(tasks,
 			taskrunner.NewWaitTask(
-				ro.IdsForApply(),
+				fmt.Sprintf("wait-%d", waitCounter),
+				object.UnstructuredsToObjMetas(remainingInfos),
 				taskrunner.AllCurrent,
-				o.ReconcileTimeout),
-			&task.SendEventTask{
-				Event: event.Event{
-					Type: event.StatusType,
-					StatusEvent: event.StatusEvent{
-						Type: event.StatusEventCompleted,
-					},
-				},
-			},
+				o.ReconcileTimeout,
+				t.Mapper),
 		)
+		waitCounter += 1
 	}
 
 	if o.Prune {
 		tasks = append(tasks,
 			&task.PruneTask{
+				TaskName:          fmt.Sprintf("prune-%d", pruneCounter),
 				Objects:           ro.ObjsForApply(),
 				InventoryObject:   ro.Inventory(),
 				PruneOptions:      t.PruneOptions,
@@ -150,43 +172,23 @@ func (t *TaskQueueSolver) BuildTaskQueue(ro resourceObjects,
 				DryRunStrategy:    o.DryRunStrategy,
 				InventoryPolicy:   o.InventoryPolicy,
 			},
-			&task.SendEventTask{
-				Event: event.Event{
-					Type: event.PruneType,
-					PruneEvent: event.PruneEvent{
-						Type: event.PruneEventCompleted,
-					},
-				},
-			},
 		)
 
 		if !o.DryRunStrategy.ClientOrServerDryRun() && o.PruneTimeout != time.Duration(0) {
 			tasks = append(tasks,
 				taskrunner.NewWaitTask(
+					fmt.Sprintf("wait-%d", waitCounter),
 					ro.IdsForPrune(),
 					taskrunner.AllNotFound,
-					o.PruneTimeout),
-				&task.SendEventTask{
-					Event: event.Event{
-						Type: event.StatusType,
-						StatusEvent: event.StatusEvent{
-							Type: event.StatusEventCompleted,
-						},
-					},
-				},
+					o.PruneTimeout,
+					t.Mapper),
 			)
 		}
 	}
 
-	return tasksToQueue(tasks)
-}
-
-func tasksToQueue(tasks []taskrunner.Task) chan taskrunner.Task {
-	taskQueue := make(chan taskrunner.Task, len(tasks))
-	for _, t := range tasks {
-		taskQueue <- t
+	return &TaskQueue{
+		tasks: tasks,
 	}
-	return taskQueue
 }
 
 type crdSplitResult struct {

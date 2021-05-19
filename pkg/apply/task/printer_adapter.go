@@ -36,10 +36,9 @@ func (r *resourcePrinterImpl) PrintObj(obj runtime.Object, _ io.Writer) error {
 	r.ch <- event.Event{
 		Type: event.ApplyType,
 		ApplyEvent: event.ApplyEvent{
-			Type:       event.ApplyEventResourceUpdate,
-			Operation:  r.applyOperation,
-			Object:     obj.(*unstructured.Unstructured),
 			Identifier: object.RuntimeToObjMeta(obj),
+			Operation:  r.applyOperation,
+			Resource:   obj.(*unstructured.Unstructured),
 		},
 	}
 	return nil

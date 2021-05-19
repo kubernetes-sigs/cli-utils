@@ -13,11 +13,12 @@ import (
 )
 
 type Formatter interface {
-	FormatApplyEvent(ae event.ApplyEvent, as *ApplyStats, c Collector) error
-	FormatStatusEvent(se event.StatusEvent, sc Collector) error
-	FormatPruneEvent(pe event.PruneEvent, ps *PruneStats) error
-	FormatDeleteEvent(de event.DeleteEvent, ds *DeleteStats) error
+	FormatApplyEvent(ae event.ApplyEvent) error
+	FormatStatusEvent(se event.StatusEvent) error
+	FormatPruneEvent(pe event.PruneEvent) error
+	FormatDeleteEvent(de event.DeleteEvent) error
 	FormatErrorEvent(ee event.ErrorEvent) error
+	FormatActionGroupEvent(age event.ActionGroupEvent, ags []event.ActionGroup, as *ApplyStats, ps *PruneStats, ds *DeleteStats, c Collector) error
 }
 
 type FormatterFactory func(ioStreams genericclioptions.IOStreams,
@@ -38,6 +39,7 @@ type ApplyStats struct {
 
 func (a *ApplyStats) inc(op event.ApplyEventOperation) {
 	switch op {
+	case event.ApplyUnspecified:
 	case event.ServersideApplied:
 		a.ServersideApplied++
 	case event.Created:
@@ -46,11 +48,13 @@ func (a *ApplyStats) inc(op event.ApplyEventOperation) {
 		a.Unchanged++
 	case event.Configured:
 		a.Configured++
-	case event.Failed:
-		a.Failed++
 	default:
 		panic(fmt.Errorf("unknown apply operation %s", op.String()))
 	}
+}
+
+func (a *ApplyStats) incFailed() {
+	a.Failed++
 }
 
 func (a *ApplyStats) Sum() int {
@@ -113,68 +117,88 @@ func (sc *StatusCollector) LatestStatus() map[object.ObjMetadata]event.StatusEve
 // format on StdOut. As we support other printer implementations
 // this should probably be an interface.
 // This function will block until the channel is closed.
+//nolint:gocyclo
 func (b *BaseListPrinter) Print(ch <-chan event.Event, previewStrategy common.DryRunStrategy) error {
+	var actionGroups []event.ActionGroup
 	applyStats := &ApplyStats{}
+	pruneStats := &PruneStats{}
+	deleteStats := &DeleteStats{}
 	statusCollector := &StatusCollector{
 		latestStatus: make(map[object.ObjMetadata]event.StatusEvent),
 	}
 	printStatus := false
-	pruneStats := &PruneStats{}
-	deleteStats := &DeleteStats{}
 	formatter := b.FormatterFactory(b.IOStreams, previewStrategy)
 	for e := range ch {
 		switch e.Type {
+		case event.InitType:
+			actionGroups = e.InitEvent.ActionGroups
 		case event.ErrorType:
 			_ = formatter.FormatErrorEvent(e.ErrorEvent)
 			return e.ErrorEvent.Err
 		case event.ApplyType:
-			if e.ApplyEvent.Type == event.ApplyEventResourceUpdate {
-				applyStats.inc(e.ApplyEvent.Operation)
+			applyStats.inc(e.ApplyEvent.Operation)
+			if e.ApplyEvent.Error != nil {
+				applyStats.incFailed()
 			}
-			if e.ApplyEvent.Type == event.ApplyEventCompleted {
-				printStatus = true
-			}
-			if err := formatter.FormatApplyEvent(e.ApplyEvent, applyStats, statusCollector); err != nil {
+			if err := formatter.FormatApplyEvent(e.ApplyEvent); err != nil {
 				return err
 			}
 		case event.StatusType:
-			if se := e.StatusEvent; se.Type == event.StatusEventResourceUpdate {
-				statusCollector.updateStatus(e.StatusEvent.Resource.Identifier, e.StatusEvent)
-				if printStatus {
-					if err := formatter.FormatStatusEvent(e.StatusEvent, statusCollector); err != nil {
-						return err
-					}
+			statusCollector.updateStatus(e.StatusEvent.Identifier, e.StatusEvent)
+			if printStatus {
+				if err := formatter.FormatStatusEvent(e.StatusEvent); err != nil {
+					return err
 				}
 			}
 		case event.PruneType:
-			if e.PruneEvent.Type == event.PruneEventResourceUpdate {
-				switch e.PruneEvent.Operation {
-				case event.Pruned:
-					pruneStats.incPruned()
-				case event.PruneSkipped:
-					pruneStats.incSkipped()
-				}
+			switch e.PruneEvent.Operation {
+			case event.Pruned:
+				pruneStats.incPruned()
+			case event.PruneSkipped:
+				pruneStats.incSkipped()
 			}
-			if e.PruneEvent.Type == event.PruneEventFailed {
+			if e.PruneEvent.Error != nil {
 				pruneStats.incFailed()
 			}
-			if err := formatter.FormatPruneEvent(e.PruneEvent, pruneStats); err != nil {
+			if err := formatter.FormatPruneEvent(e.PruneEvent); err != nil {
 				return err
 			}
 		case event.DeleteType:
-			if e.DeleteEvent.Type == event.DeleteEventResourceUpdate {
-				switch e.DeleteEvent.Operation {
-				case event.Deleted:
-					deleteStats.incDeleted()
-				case event.DeleteSkipped:
-					deleteStats.incSkipped()
-				}
+			switch e.DeleteEvent.Operation {
+			case event.Deleted:
+				deleteStats.incDeleted()
+			case event.DeleteSkipped:
+				deleteStats.incSkipped()
 			}
-			if e.DeleteEvent.Type == event.DeleteEventFailed {
+			if e.DeleteEvent.Error != nil {
 				deleteStats.incFailed()
 			}
-			if err := formatter.FormatDeleteEvent(e.DeleteEvent, deleteStats); err != nil {
+			if err := formatter.FormatDeleteEvent(e.DeleteEvent); err != nil {
 				return err
+			}
+		case event.ActionGroupType:
+			if err := formatter.FormatActionGroupEvent(e.ActionGroupEvent, actionGroups, applyStats,
+				pruneStats, deleteStats, statusCollector); err != nil {
+				return err
+			}
+
+			switch e.ActionGroupEvent.Action {
+			case event.ApplyAction:
+				if e.ActionGroupEvent.Type == event.Started {
+					applyStats = &ApplyStats{}
+				}
+			case event.PruneAction:
+				if e.ActionGroupEvent.Type == event.Started {
+					pruneStats = &PruneStats{}
+				}
+			case event.DeleteAction:
+				if e.ActionGroupEvent.Type == event.Started {
+					deleteStats = &DeleteStats{}
+				}
+			case event.WaitAction:
+				if e.ActionGroupEvent.Type == event.Started {
+					printStatus = true
+				}
 			}
 		}
 	}
@@ -183,4 +207,13 @@ func (b *BaseListPrinter) Print(ch <-chan event.Event, previewStrategy common.Dr
 		return fmt.Errorf("%d resources failed", failedSum)
 	}
 	return nil
+}
+
+func ActionGroupByName(name string, ags []event.ActionGroup) (event.ActionGroup, bool) {
+	for _, ag := range ags {
+		if ag.Name == name {
+			return ag, true
+		}
+	}
+	return event.ActionGroup{}, false
 }

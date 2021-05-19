@@ -6,22 +6,38 @@ package task
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/prune"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
+	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
 // PruneTask prunes objects from the cluster
 // by using the PruneOptions. The provided Objects is the
 // set of resources that have just been applied.
 type PruneTask struct {
+	TaskName string
+
 	PruneOptions      *prune.PruneOptions
 	InventoryObject   inventory.InventoryInfo
 	Objects           []*unstructured.Unstructured
 	DryRunStrategy    common.DryRunStrategy
 	PropagationPolicy metav1.DeletionPropagation
 	InventoryPolicy   inventory.InventoryPolicy
+}
+
+func (p *PruneTask) Name() string {
+	return p.TaskName
+}
+
+func (p *PruneTask) Action() event.ResourceAction {
+	return event.PruneAction
+}
+
+func (p *PruneTask) Identifiers() []object.ObjMetadata {
+	return object.UnstructuredsToObjMetas(p.Objects)
 }
 
 // Start creates a new goroutine that will invoke

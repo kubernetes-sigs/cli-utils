@@ -250,7 +250,6 @@ func createPruneEvent(id object.ObjMetadata, obj *unstructured.Unstructured, op 
 	return event.Event{
 		Type: event.PruneType,
 		PruneEvent: event.PruneEvent{
-			Type:       event.PruneEventResourceUpdate,
 			Operation:  op,
 			Object:     obj,
 			Identifier: id,
@@ -263,7 +262,6 @@ func createPruneFailedEvent(objMeta object.ObjMetadata, err error) event.Event {
 	return event.Event{
 		Type: event.PruneType,
 		PruneEvent: event.PruneEvent{
-			Type:       event.PruneEventFailed,
 			Identifier: objMeta,
 			Error:      err,
 		},
