@@ -168,7 +168,7 @@ func (o *ObjMetadata) String() string {
 // BuildObjectMetadata returns object metadata (ObjMetadata) for the
 // passed objects (infos).
 func InfosToObjMetas(infos []*resource.Info) ([]ObjMetadata, error) {
-	objMetas := []ObjMetadata{}
+	objMetas := make([]ObjMetadata, 0, len(infos))
 	for _, info := range infos {
 		objMeta, err := InfoToObjMeta(info)
 		if err != nil {
@@ -191,7 +191,7 @@ func InfoToObjMeta(info *resource.Info) (ObjMetadata, error) {
 }
 
 func UnstructuredsToObjMetas(objs []*unstructured.Unstructured) []ObjMetadata {
-	var objMetas []ObjMetadata
+	objMetas := make([]ObjMetadata, 0, len(objs))
 	for _, obj := range objs {
 		objMetas = append(objMetas, ObjMetadata{
 			Name:      obj.GetName(),
@@ -219,10 +219,10 @@ func RuntimeToObjMeta(obj runtime.Object) ObjMetadata {
 	}
 }
 
-// CalcHash returns a hash of the sorted strings from
+// Hash returns a hash of the sorted strings from
 // the object metadata, or an error if one occurred.
 func Hash(objs []ObjMetadata) (string, error) {
-	objStrs := []string{}
+	objStrs := make([]string, 0, len(objs))
 	for _, obj := range objs {
 		objStrs = append(objStrs, obj.String())
 	}
@@ -253,17 +253,17 @@ func calcHash(objs []string) (uint32, error) {
 // do not exist in "b" (A - B).
 func SetDiff(setA []ObjMetadata, setB []ObjMetadata) []ObjMetadata {
 	// Create a map of the elements of A
-	m := map[string]ObjMetadata{}
+	m := make(map[ObjMetadata]struct{}, len(setA))
 	for _, a := range setA {
-		m[a.String()] = a
+		m[a] = struct{}{}
 	}
 	// Remove from A each element of B
 	for _, b := range setB {
-		delete(m, b.String()) // OK to delete even if b not in m
+		delete(m, b) // OK to delete even if b not in m
 	}
 	// Create/return slice from the map of remaining items
-	diff := []ObjMetadata{}
-	for _, r := range m {
+	diff := make([]ObjMetadata, 0, len(m))
+	for r := range m {
 		diff = append(diff, r)
 	}
 	return diff
@@ -272,15 +272,15 @@ func SetDiff(setA []ObjMetadata, setB []ObjMetadata) []ObjMetadata {
 // Union returns the slice of objects that is the set of unique
 // items of the merging of set A and set B.
 func Union(setA []ObjMetadata, setB []ObjMetadata) []ObjMetadata {
-	m := map[string]ObjMetadata{}
+	m := make(map[ObjMetadata]struct{}, len(setA)+len(setB))
 	for _, a := range setA {
-		m[a.String()] = a
+		m[a] = struct{}{}
 	}
 	for _, b := range setB {
-		m[b.String()] = b
+		m[b] = struct{}{}
 	}
-	union := []ObjMetadata{}
-	for _, u := range m {
+	union := make([]ObjMetadata, 0, len(m))
+	for u := range m {
 		union = append(union, u)
 	}
 	return union
@@ -289,13 +289,13 @@ func Union(setA []ObjMetadata, setB []ObjMetadata) []ObjMetadata {
 // SetEquals returns true if the slice of objects in setA equals
 // the slice of objects in setB.
 func SetEquals(setA []ObjMetadata, setB []ObjMetadata) bool {
-	mapA := map[string]bool{}
+	mapA := make(map[ObjMetadata]struct{}, len(setA))
 	for _, a := range setA {
-		mapA[a.String()] = true
+		mapA[a] = struct{}{}
 	}
-	mapB := map[string]bool{}
+	mapB := make(map[ObjMetadata]struct{}, len(setB))
 	for _, b := range setB {
-		mapB[b.String()] = true
+		mapB[b] = struct{}{}
 	}
 	if len(mapA) != len(mapB) {
 		return false
