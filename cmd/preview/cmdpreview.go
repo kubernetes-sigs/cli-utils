@@ -94,10 +94,6 @@ func (r *PreviewRunner) RunE(cmd *cobra.Command, args []string) error {
 		drs = common.DryRunServer
 	}
 
-	if previewDestroy {
-		r.Destroyer.DryRunStrategy = drs
-	}
-
 	inventoryPolicy, err := flagutils.ConvertInventoryPolicy(r.inventoryPolicy)
 	if err != nil {
 		return err
@@ -126,7 +122,7 @@ func (r *PreviewRunner) RunE(cmd *cobra.Command, args []string) error {
 
 	// if destroy flag is set in preview, transmit it to destroyer DryRunStrategy flag
 	// and pivot execution to destroy with dry-run
-	if !r.Destroyer.DryRunStrategy.ClientOrServerDryRun() {
+	if !previewDestroy {
 		err = r.Applier.Initialize()
 		if err != nil {
 			return err
@@ -156,6 +152,7 @@ func (r *PreviewRunner) RunE(cmd *cobra.Command, args []string) error {
 		}
 		option := &apply.DestroyerOption{
 			InventoryPolicy: inventoryPolicy,
+			DryRunStrategy:  drs,
 		}
 		ch = r.Destroyer.Run(inv, option)
 	}

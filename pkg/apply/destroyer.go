@@ -33,14 +33,18 @@ func NewDestroyer(provider provider.Provider) *Destroyer {
 // Destroyer performs the step of grabbing all the previous inventory objects and
 // prune them. This also deletes all the previous inventory objects
 type Destroyer struct {
-	provider       provider.Provider
-	PruneOptions   *prune.PruneOptions
-	invClient      inventory.InventoryClient
-	DryRunStrategy common.DryRunStrategy
+	provider     provider.Provider
+	PruneOptions *prune.PruneOptions
+	invClient    inventory.InventoryClient
 }
 
 type DestroyerOption struct {
+	// InventoryPolicy defines the inventory policy of apply.
 	InventoryPolicy inventory.InventoryPolicy
+
+	// DryRunStrategy defines whether changes should actually be performed,
+	// or if it is just talk and no action.
+	DryRunStrategy common.DryRunStrategy
 }
 
 // Initialize sets up the Destroyer for actually doing an destroy against
@@ -68,7 +72,9 @@ func (d *Destroyer) Run(inv inventory.InventoryInfo, option *DestroyerOption) <-
 
 	go func() {
 		defer close(ch)
-		d.invClient.SetDryRunStrategy(d.DryRunStrategy)
+		// TODO: We should see if we can avoid having the dry-run strategy
+		// as a field on the inventory client.
+		d.invClient.SetDryRunStrategy(option.DryRunStrategy)
 
 		// Start the event transformer goroutine so we can transform
 		// the Prune events emitted from the Prune function to Delete
@@ -77,7 +83,7 @@ func (d *Destroyer) Run(inv inventory.InventoryInfo, option *DestroyerOption) <-
 		tempChannel, completedChannel := runPruneEventTransformer(ch)
 		taskContext := taskrunner.NewTaskContext(tempChannel)
 		err := d.PruneOptions.Prune(inv, nil, sets.NewString(), taskContext, prune.Options{
-			DryRunStrategy:    d.DryRunStrategy,
+			DryRunStrategy:    option.DryRunStrategy,
 			PropagationPolicy: metav1.DeletePropagationBackground,
 			InventoryPolicy:   option.InventoryPolicy,
 		})
