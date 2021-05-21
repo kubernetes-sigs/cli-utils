@@ -6,15 +6,29 @@ package manifestreader
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/cli-utils/pkg/apply/solver"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/kustomize/kyaml/kio/filters"
 	"sigs.k8s.io/kustomize/kyaml/kio/kioutil"
 	"sigs.k8s.io/kustomize/kyaml/yaml"
 )
+
+type UnknownTypesError struct {
+	GroupKinds []schema.GroupKind
+}
+
+func (e *UnknownTypesError) Error() string {
+	var gks []string
+	for _, gk := range e.GroupKinds {
+		gks = append(gks, gk.String())
+	}
+	return fmt.Sprintf("unknown resource types: %s", strings.Join(gks, ","))
+}
 
 // SetNamespaces verifies that every namespaced resource has the namespace
 // set, and if one does not, it will set the namespace to the provided
@@ -34,6 +48,7 @@ func SetNamespaces(mapper meta.RESTMapper, objs []*unstructured.Unstructured,
 		}
 	}
 
+	var unknownGKs []schema.GroupKind
 	for _, obj := range objs {
 		accessor, _ := meta.Accessor(obj)
 
@@ -91,14 +106,18 @@ func SetNamespaces(mapper meta.RESTMapper, objs []*unstructured.Unstructured,
 
 		switch scope {
 		case "":
-			return fmt.Errorf("can't find scope for resource %s %s", gk.String(), accessor.GetName())
+			unknownGKs = append(unknownGKs, gk)
 		case "Cluster":
 			continue
 		case "Namespaced":
 			accessor.SetNamespace(defaultNamespace)
 		}
 	}
-
+	if len(unknownGKs) > 0 {
+		return &UnknownTypesError{
+			GroupKinds: unknownGKs,
+		}
+	}
 	return nil
 }
 

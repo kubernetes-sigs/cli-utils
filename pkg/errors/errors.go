@@ -15,6 +15,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
+	"sigs.k8s.io/cli-utils/pkg/manifestreader"
 )
 
 const (
@@ -48,6 +49,14 @@ Timeout after {{printf "%.0f" .err.Timeout.Seconds}} seconds waiting for {{print
 
 {{- range .err.TimedOutResources}}
 {{printf "%s/%s %s %s" .Identifier.GroupKind.Kind .Identifier.Name .Status .Message }}
+{{- end}}
+`
+
+	errorMsgForType[reflect.TypeOf(manifestreader.UnknownTypesError{})] = `
+Unknown type(s) encountered. Every type must either be already installed in the cluster or the CRD must be among the applied manifests.
+
+{{- range .err.GroupKinds}}
+{{ printf "%s" . }}
 {{- end}}
 `
 
