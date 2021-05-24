@@ -129,6 +129,21 @@ func TestSetNamespaces(t *testing.T) {
 			enforceNamespace:   true,
 			expectedNamespaces: []string{"", "bar"},
 		},
+		"unknown types in CRs": {
+			objs: []*unstructured.Unstructured{
+				toUnstructured(schema.GroupVersionKind{
+					Group:   "custom.io",
+					Version: "v1",
+					Kind:    "Custom",
+				}, ""),
+				toUnstructured(schema.GroupVersionKind{
+					Group:   "custom.io",
+					Version: "v1",
+					Kind:    "AnotherCustom",
+				}, ""),
+			},
+			expectedErrText: "unknown resource types: Custom.custom.io,AnotherCustom.custom.io",
+		},
 	}
 
 	for tn, tc := range testCases {
