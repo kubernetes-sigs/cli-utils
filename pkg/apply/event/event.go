@@ -72,6 +72,7 @@ const (
 	PruneAction
 	DeleteAction
 	WaitAction
+	InventoryAction
 )
 
 type ActionGroup struct {

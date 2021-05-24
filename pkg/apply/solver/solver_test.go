@@ -38,10 +38,12 @@ func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 			objs:    []*unstructured.Unstructured{},
 			options: Options{},
 			expectedTasks: []taskrunner.Task{
+				&task.InvAddTask{TaskName: "inventory-add-0"},
 				&task.ApplyTask{
 					TaskName: "apply-0",
 					Objects:  []*unstructured.Unstructured{},
 				},
+				&task.InvSetTask{TaskName: "inventory-replace-0"},
 			},
 		},
 		"single resource": {
@@ -50,12 +52,14 @@ func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 			},
 			options: Options{},
 			expectedTasks: []taskrunner.Task{
+				&task.InvAddTask{TaskName: "inventory-add-0"},
 				&task.ApplyTask{
 					TaskName: "apply-0",
 					Objects: []*unstructured.Unstructured{
 						depInfo,
 					},
 				},
+				&task.InvSetTask{TaskName: "inventory-replace-0"},
 			},
 		},
 		"multiple resources with wait": {
@@ -67,6 +71,7 @@ func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 				ReconcileTimeout: time.Minute,
 			},
 			expectedTasks: []taskrunner.Task{
+				&task.InvAddTask{TaskName: "inventory-add-0"},
 				&task.ApplyTask{
 					TaskName: "apply-0",
 					Objects: []*unstructured.Unstructured{
@@ -82,6 +87,7 @@ func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 					},
 					taskrunner.AllCurrent, 1*time.Second,
 					testutil.NewFakeRESTMapper()),
+				&task.InvSetTask{TaskName: "inventory-replace-0"},
 			},
 		},
 		"multiple resources with wait and prune": {
@@ -94,6 +100,7 @@ func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 				Prune:            true,
 			},
 			expectedTasks: []taskrunner.Task{
+				&task.InvAddTask{TaskName: "inventory-add-0"},
 				&task.ApplyTask{
 					TaskName: "apply-0",
 					Objects: []*unstructured.Unstructured{
@@ -112,6 +119,7 @@ func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 				&task.PruneTask{
 					TaskName: "prune-0",
 				},
+				&task.InvSetTask{TaskName: "inventory-replace-0"},
 			},
 		},
 		"multiple resources with wait, prune and dryrun": {
@@ -125,6 +133,7 @@ func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 				DryRunStrategy:   common.DryRunClient,
 			},
 			expectedTasks: []taskrunner.Task{
+				&task.InvAddTask{TaskName: "inventory-add-0"},
 				&task.ApplyTask{
 					TaskName: "apply-0",
 					Objects: []*unstructured.Unstructured{
@@ -135,6 +144,7 @@ func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 				&task.PruneTask{
 					TaskName: "prune-0",
 				},
+				&task.InvSetTask{TaskName: "inventory-replace-0"},
 			},
 		},
 		"multiple resources with wait, prune and server-dryrun": {
@@ -148,6 +158,7 @@ func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 				DryRunStrategy:   common.DryRunServer,
 			},
 			expectedTasks: []taskrunner.Task{
+				&task.InvAddTask{TaskName: "inventory-add-0"},
 				&task.ApplyTask{
 					TaskName: "apply-0",
 					Objects: []*unstructured.Unstructured{
@@ -158,6 +169,7 @@ func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 				&task.PruneTask{
 					TaskName: "prune-0",
 				},
+				&task.InvSetTask{TaskName: "inventory-replace-0"},
 			},
 		},
 		"multiple resources including CRD": {
@@ -169,6 +181,7 @@ func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 				ReconcileTimeout: time.Minute,
 			},
 			expectedTasks: []taskrunner.Task{
+				&task.InvAddTask{TaskName: "inventory-add-0"},
 				&task.ApplyTask{
 					TaskName: "apply-0",
 					Objects: []*unstructured.Unstructured{
@@ -195,6 +208,7 @@ func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 					},
 					taskrunner.AllCurrent, 1*time.Second,
 					testutil.NewFakeRESTMapper()),
+				&task.InvSetTask{TaskName: "inventory-replace-0"},
 			},
 		},
 		"no wait with CRDs if it is a dryrun": {
@@ -207,6 +221,7 @@ func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 				DryRunStrategy:   common.DryRunClient,
 			},
 			expectedTasks: []taskrunner.Task{
+				&task.InvAddTask{TaskName: "inventory-add-0"},
 				&task.ApplyTask{
 					TaskName: "apply-0",
 					Objects: []*unstructured.Unstructured{
@@ -219,6 +234,7 @@ func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 						depInfo,
 					},
 				},
+				&task.InvSetTask{TaskName: "inventory-replace-0"},
 			},
 		},
 	}
