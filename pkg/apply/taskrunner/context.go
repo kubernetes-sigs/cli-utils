@@ -19,6 +19,7 @@ func NewTaskContext(eventChannel chan event.Event) *TaskContext {
 		eventChannel:     eventChannel,
 		appliedResources: make(map[object.ObjMetadata]applyInfo),
 		failedResources:  make(map[object.ObjMetadata]struct{}),
+		pruneFailures:    make(map[object.ObjMetadata]struct{}),
 	}
 }
 
@@ -31,8 +32,11 @@ type TaskContext struct {
 
 	appliedResources map[object.ObjMetadata]applyInfo
 
-	// failedResources records the IDs of resources that are failed during applying and pruning.
+	// failedResources records the IDs of resources that are failed during applying.
 	failedResources map[object.ObjMetadata]struct{}
+
+	// pruneFailures records the IDs of resources that are failed during pruning.
+	pruneFailures map[object.ObjMetadata]struct{}
 }
 
 func (tc *TaskContext) TaskChannel() chan TaskResult {
@@ -102,6 +106,18 @@ func (tc *TaskContext) ResourceFailed(id object.ObjMetadata) bool {
 
 func (tc *TaskContext) CaptureResourceFailure(id object.ObjMetadata) {
 	tc.failedResources[id] = struct{}{}
+}
+
+func (tc *TaskContext) CapturePruneFailure(id object.ObjMetadata) {
+	tc.pruneFailures[id] = struct{}{}
+}
+
+func (tc *TaskContext) PruneFailures() []object.ObjMetadata {
+	failures := make([]object.ObjMetadata, 0, len(tc.pruneFailures))
+	for f := range tc.pruneFailures {
+		failures = append(failures, f)
+	}
+	return failures
 }
 
 // applyInfo captures information about resources that have been

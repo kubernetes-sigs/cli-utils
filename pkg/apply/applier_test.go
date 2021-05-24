@@ -689,17 +689,6 @@ var obj2 = &unstructured.Unstructured{
 	},
 }
 
-var obj3 = &unstructured.Unstructured{
-	Object: map[string]interface{}{
-		"apiVersion": "apps/v1",
-		"kind":       "Deployment",
-		"metadata": map[string]interface{}{
-			"name":      "obj3",
-			"namespace": "different-namespace",
-		},
-	},
-}
-
 var clusterScopedObj = &unstructured.Unstructured{
 	Object: map[string]interface{}{
 		"apiVersion": "rbac.authorization.k8s.io/v1",
@@ -708,63 +697,6 @@ var clusterScopedObj = &unstructured.Unstructured{
 			"name": "cluster-scoped-1",
 		},
 	},
-}
-
-func createNamespace(ns string) *unstructured.Unstructured {
-	return &unstructured.Unstructured{
-		Object: map[string]interface{}{
-			"apiVersion": "v1",
-			"kind":       "Namespace",
-			"metadata": map[string]interface{}{
-				"name": ns,
-			},
-		},
-	}
-}
-
-func TestInventoryNamespaceInSet(t *testing.T) {
-	inventoryNamespace := createNamespace(namespace)
-
-	tests := map[string]struct {
-		inv       inventory.InventoryInfo
-		objects   []*unstructured.Unstructured
-		namespace *unstructured.Unstructured
-	}{
-		"Nil inventory object, no resources returns nil namespace": {
-			inv:       nil,
-			objects:   []*unstructured.Unstructured{},
-			namespace: nil,
-		},
-		"Inventory object, but no resources returns nil namespace": {
-			inv:       localInv,
-			objects:   []*unstructured.Unstructured{},
-			namespace: nil,
-		},
-		"Inventory object, resources with no namespace returns nil namespace": {
-			inv:       localInv,
-			objects:   []*unstructured.Unstructured{obj1, obj2},
-			namespace: nil,
-		},
-		"Inventory object, different namespace returns nil namespace": {
-			inv:       localInv,
-			objects:   []*unstructured.Unstructured{createNamespace("foo")},
-			namespace: nil,
-		},
-		"Inventory object, inventory namespace returns inventory namespace": {
-			inv:       localInv,
-			objects:   []*unstructured.Unstructured{obj1, inventoryNamespace, obj3},
-			namespace: inventoryNamespace,
-		},
-	}
-
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			actualNamespace := inventoryNamespaceInSet(tc.inv, tc.objects)
-			if tc.namespace != actualNamespace {
-				t.Fatalf("expected namespace (%v), got (%v)", tc.namespace, actualNamespace)
-			}
-		})
-	}
 }
 
 func TestReadAndPrepareObjects(t *testing.T) {

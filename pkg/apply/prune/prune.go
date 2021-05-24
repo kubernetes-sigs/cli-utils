@@ -123,8 +123,6 @@ func (po *PruneOptions) Prune(localInv inventory.InventoryInfo,
 	// Sort the resources in reverse order using the same rules as is
 	// used for apply.
 	sort.Sort(sort.Reverse(ordering.SortableMetas(pruneObjs)))
-	// Store prune failures to ensure they remain in the inventory.
-	pruneFailures := []object.ObjMetadata{}
 	for _, pruneObj := range pruneObjs {
 		klog.V(5).Infof("attempting prune: %s", pruneObj)
 		obj, err := po.getObject(pruneObj)
@@ -139,9 +137,8 @@ func (po *PruneOptions) Prune(localInv inventory.InventoryInfo,
 				klog.Errorf("prune obj (%s/%s) UID retrival error: %s",
 					pruneObj.Namespace, pruneObj.Name, err)
 			}
-			pruneFailures = append(pruneFailures, pruneObj)
 			taskContext.EventChannel() <- createPruneFailedEvent(pruneObj, err)
-			taskContext.CaptureResourceFailure(pruneObj)
+			taskContext.CapturePruneFailure(pruneObj)
 			continue
 		}
 		// Do not prune objects that are in set of currently applied objects.
@@ -154,7 +151,7 @@ func (po *PruneOptions) Prune(localInv inventory.InventoryInfo,
 		if !canPrune(localInv, obj, o.InventoryPolicy, uid) {
 			klog.V(4).Infof("skip prune for lifecycle directive %s/%s", pruneObj.Namespace, pruneObj.Name)
 			taskContext.EventChannel() <- createPruneEvent(pruneObj, obj, event.PruneSkipped)
-			pruneFailures = append(pruneFailures, pruneObj)
+			taskContext.CapturePruneFailure(pruneObj)
 			continue
 		}
 		// If regular pruning (not destroying), skip deleting namespace containing
@@ -164,8 +161,7 @@ func (po *PruneOptions) Prune(localInv inventory.InventoryInfo,
 				localNamespaces.Has(pruneObj.Name) {
 				klog.V(4).Infof("skip pruning namespace: %s", pruneObj.Name)
 				taskContext.EventChannel() <- createPruneEvent(pruneObj, obj, event.PruneSkipped)
-				pruneFailures = append(pruneFailures, pruneObj)
-				taskContext.CaptureResourceFailure(pruneObj)
+				taskContext.CapturePruneFailure(pruneObj)
 				continue
 			}
 		}
@@ -177,8 +173,7 @@ func (po *PruneOptions) Prune(localInv inventory.InventoryInfo,
 					klog.Errorf("prune failed for %s/%s (%s)", pruneObj.Namespace, pruneObj.Name, err)
 				}
 				taskContext.EventChannel() <- createPruneFailedEvent(pruneObj, err)
-				pruneFailures = append(pruneFailures, pruneObj)
-				taskContext.CaptureResourceFailure(pruneObj)
+				taskContext.CapturePruneFailure(pruneObj)
 				continue
 			}
 			err = namespacedClient.Delete(context.TODO(), pruneObj.Name, metav1.DeleteOptions{})
@@ -187,17 +182,13 @@ func (po *PruneOptions) Prune(localInv inventory.InventoryInfo,
 					klog.Errorf("prune failed for %s/%s (%s)", pruneObj.Namespace, pruneObj.Name, err)
 				}
 				taskContext.EventChannel() <- createPruneFailedEvent(pruneObj, err)
-				pruneFailures = append(pruneFailures, pruneObj)
-				taskContext.CaptureResourceFailure(pruneObj)
+				taskContext.CapturePruneFailure(pruneObj)
 				continue
 			}
 		}
 		taskContext.EventChannel() <- createPruneEvent(pruneObj, obj, event.Pruned)
 	}
-	// Final inventory equals applied objects and prune failures.
-	appliedResources := taskContext.AppliedResources()
-	finalInventory := append(appliedResources, pruneFailures...)
-	return po.InvClient.Replace(localInv, finalInventory)
+	return nil
 }
 
 func (po *PruneOptions) namespacedClient(obj object.ObjMetadata) (dynamic.ResourceInterface, error) {
