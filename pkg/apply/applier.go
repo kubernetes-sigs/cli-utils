@@ -224,7 +224,6 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.InventoryInfo, obje
 			Factory:      a.provider.Factory(),
 			InfoHelper:   a.infoHelper,
 			Mapper:       mapper,
-			InvClient:    a.invClient,
 		}).BuildTaskQueue(resourceObjects, solver.Options{
 			ServerSideOptions:      options.ServerSideOptions,
 			ReconcileTimeout:       options.ReconcileTimeout,
@@ -246,9 +245,9 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.InventoryInfo, obje
 
 		// Create a new TaskStatusRunner to execute the taskQueue.
 		klog.V(4).Infoln("applier building TaskStatusRunner...")
-		runner := taskrunner.NewTaskStatusRunner(resourceObjects.AllIds(), a.StatusPoller)
+		runner := taskrunner.NewTaskStatusRunner(a.invClient, resourceObjects.AllIds(), a.StatusPoller)
 		klog.V(4).Infoln("applier running TaskStatusRunner...")
-		err = runner.Run(ctx, taskQueue.ToChannel(), eventChannel, taskrunner.Options{
+		err = runner.Run(ctx, invInfo, resourceObjects.ObjsForApply(), taskQueue.ToChannel(), eventChannel, taskrunner.Options{
 			PollInterval:     options.PollInterval,
 			UseCache:         true,
 			EmitStatusEvents: options.EmitStatusEvents,

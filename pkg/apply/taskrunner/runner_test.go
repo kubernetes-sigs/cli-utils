@@ -204,7 +204,8 @@ func TestBaseRunner(t *testing.T) {
 				}
 			}()
 
-			err := runner.run(context.Background(), taskQueue, statusChannel,
+			taskContext := NewTaskContext(eventChannel)
+			err := runner.run(context.Background(), taskContext, taskQueue, statusChannel,
 				eventChannel, baseOptions{emitStatusEvents: true})
 			close(statusChannel)
 			close(eventChannel)
@@ -378,7 +379,8 @@ func TestBaseRunnerCancellation(t *testing.T) {
 
 			ctx, cancel := context.WithTimeout(context.Background(), tc.contextTimeout)
 			defer cancel()
-			err := runner.run(ctx, taskQueue, statusChannel, eventChannel,
+			taskContext := NewTaskContext(eventChannel)
+			err := runner.run(ctx, taskContext, taskQueue, statusChannel, eventChannel,
 				baseOptions{emitStatusEvents: false})
 			close(statusChannel)
 			close(eventChannel)

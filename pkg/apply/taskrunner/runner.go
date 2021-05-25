@@ -8,8 +8,12 @@ import (
 	"fmt"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/klog"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/poller"
+	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling"
 	pollevent "sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
@@ -17,12 +21,14 @@ import (
 )
 
 // NewTaskStatusRunner returns a new TaskStatusRunner.
-func NewTaskStatusRunner(identifiers []object.ObjMetadata, statusPoller poller.Poller) *taskStatusRunner {
+func NewTaskStatusRunner(invClient inventory.InventoryClient, identifiers []object.ObjMetadata,
+	statusPoller poller.Poller) *taskStatusRunner {
 	return &taskStatusRunner{
 		identifiers:  identifiers,
 		statusPoller: statusPoller,
 
 		baseRunner: newBaseRunner(newResourceStatusCollector(identifiers)),
+		invClient:  invClient,
 	}
 }
 
@@ -34,6 +40,7 @@ type taskStatusRunner struct {
 	statusPoller poller.Poller
 
 	baseRunner *baseRunner
+	invClient  inventory.InventoryClient
 }
 
 // Options defines properties that is passed along to
@@ -47,25 +54,66 @@ type Options struct {
 // Run starts the execution of the taskqueue. It will start the
 // statusPoller and then pass the statusChannel to the baseRunner
 // that does most of the work.
-func (tsr *taskStatusRunner) Run(ctx context.Context, taskQueue chan Task,
-	eventChannel chan event.Event, options Options) error {
+func (tsr *taskStatusRunner) Run(ctx context.Context,
+	invInfo inventory.InventoryInfo,
+	objects []*unstructured.Unstructured,
+	taskQueue chan Task,
+	eventChannel chan event.Event,
+	options Options) error {
 	statusCtx, cancelFunc := context.WithCancel(context.Background())
 	statusChannel := tsr.statusPoller.Poll(statusCtx, tsr.identifiers, polling.Options{
 		PollInterval: options.PollInterval,
 		UseCache:     options.UseCache,
 	})
 
+	// First, add/merge the inventory
+	if err := inventory.ValidateNoInventory(objects); err != nil {
+		cancelFunc()
+		return err
+	}
+	// Ensures the namespace exists before applying the inventory object into it.
+	if invNamespace := inventoryNamespaceInSet(invInfo, objects); invNamespace != nil {
+		klog.V(4).Infof("applying inventory namespace %s", invNamespace.GetName())
+		if err := tsr.invClient.ApplyInventoryNamespace(invNamespace); err != nil {
+			cancelFunc()
+			return err
+		}
+	}
+	klog.V(4).Infof("merging %d local objects into inventory", len(objects))
+	currentObjs := object.UnstructuredsToObjMetas(objects)
+	_, err := tsr.invClient.Merge(invInfo, currentObjs)
+	if err != nil {
+		cancelFunc()
+		return err
+	}
+
 	o := baseOptions{
 		emitStatusEvents: options.EmitStatusEvents,
 	}
-	err := tsr.baseRunner.run(ctx, taskQueue, statusChannel, eventChannel, o)
+	taskContext := NewTaskContext(eventChannel)
+	runErr := tsr.baseRunner.run(ctx, taskContext, taskQueue, statusChannel, eventChannel, o)
+
 	// cancel the statusPoller by cancelling the context.
 	cancelFunc()
 	// drain the statusChannel to make sure the lack of a consumer
 	// doesn't block the shutdown of the statusPoller.
 	for range statusChannel {
 	}
-	return err
+
+	// After running apply/prune, set final inventory references
+	// (regardless of error from run).
+	appliedObjs := taskContext.AppliedResources()
+	klog.V(4).Infof("set inventory %d applied objects", len(appliedObjs))
+	pruneFailures := taskContext.PruneFailures()
+	klog.V(4).Infof("set inventory %d prune failures", len(pruneFailures))
+	invObjs := object.Union(appliedObjs, pruneFailures)
+	klog.V(4).Infof("set inventory %d total objects", len(invObjs))
+	err = tsr.invClient.Replace(invInfo, invObjs)
+	if err != nil {
+		return err
+	}
+
+	return runErr
 }
 
 // NewTaskRunner returns a new taskRunner. It can process taskqueues
@@ -95,7 +143,8 @@ func (tr *taskRunner) Run(ctx context.Context, taskQueue chan Task,
 		// statusEvents to emit.
 		emitStatusEvents: false,
 	}
-	return tr.baseRunner.run(ctx, taskQueue, nilStatusChannel, eventChannel, o)
+	taskContext := NewTaskContext(eventChannel)
+	return tr.baseRunner.run(ctx, taskContext, taskQueue, nilStatusChannel, eventChannel, o)
 }
 
 // newBaseRunner returns a new baseRunner using the given collector.
@@ -122,13 +171,13 @@ type baseOptions struct {
 // run is the main function that implements the processing of
 // tasks in the taskqueue. It sets up a loop where a single goroutine
 // will process events from three different channels.
-func (b *baseRunner) run(ctx context.Context, taskQueue chan Task,
+func (b *baseRunner) run(ctx context.Context, taskContext *TaskContext, taskQueue chan Task,
 	statusChannel <-chan pollevent.Event, eventChannel chan event.Event,
 	o baseOptions) error {
 	// taskContext is passed into all tasks when they are started. It
 	// provides access to the eventChannel and the taskChannel, and
 	// also provides a way to pass data between tasks.
-	taskContext := NewTaskContext(eventChannel)
+	// taskContext := NewTaskContext(eventChannel)
 
 	// Find and start the first task in the queue.
 	currentTask, done := b.nextTask(taskQueue, taskContext)
@@ -356,4 +405,24 @@ func IsTimeoutError(err error) (*TimeoutError, bool) {
 		return e, true
 	}
 	return &TimeoutError{}, false
+}
+
+// inventoryNamespaceInSet returns the the namespace the passed inventory
+// object will be applied to, or nil if this namespace object does not exist
+// in the passed slice "infos" or the inventory object is cluster-scoped.
+func inventoryNamespaceInSet(inv inventory.InventoryInfo, objs []*unstructured.Unstructured) *unstructured.Unstructured {
+	if inv == nil {
+		return nil
+	}
+	invNamespace := inv.Namespace()
+
+	for _, obj := range objs {
+		acc, _ := meta.Accessor(obj)
+		gvk := obj.GetObjectKind().GroupVersionKind()
+		if gvk == object.CoreV1Namespace && acc.GetName() == invNamespace {
+			inventory.AddInventoryIDAnnotation(obj, inv)
+			return obj
+		}
+	}
+	return nil
 }

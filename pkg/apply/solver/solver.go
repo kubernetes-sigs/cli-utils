@@ -40,7 +40,6 @@ type TaskQueueSolver struct {
 	InfoHelper   info.InfoHelper
 	Factory      util.Factory
 	Mapper       meta.RESTMapper
-	InvClient    inventory.InventoryClient
 }
 
 type TaskQueue struct {
@@ -103,13 +102,6 @@ func (t *TaskQueueSolver) BuildTaskQueue(ro resourceObjects,
 	for _, prevInvObj := range prevInvSlice {
 		prevInventory[prevInvObj] = true
 	}
-
-	// First task merge local applied objects to inventory.
-	tasks = append(tasks, &task.InvAddTask{
-		InvClient: t.InvClient,
-		InvInfo:   ro.Inventory(),
-		Objects:   ro.ObjsForApply(),
-	})
 
 	crdSplitRes, hasCRDs := splitAfterCRDs(remainingInfos)
 	if hasCRDs {
@@ -193,12 +185,6 @@ func (t *TaskQueueSolver) BuildTaskQueue(ro resourceObjects,
 			)
 		}
 	}
-
-	// Final task is to set inventory with objects in cluster.
-	tasks = append(tasks, &task.InvSetTask{
-		InvClient: t.InvClient,
-		InvInfo:   ro.Inventory(),
-	})
 
 	return &TaskQueue{
 		tasks: tasks,
