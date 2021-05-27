@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/go-errors/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/klog"
@@ -84,11 +83,7 @@ func (a *Applier) Initialize() error {
 	return nil
 }
 
-// prepareObjects merges the currently applied objects into the
-// set of stored objects in the cluster inventory. In the process, it
-// calculates the set of objects to be pruned (pruneIds), and orders the
-// resources for the subsequent apply. Returns the sorted resources to
-// apply as well as the objects for the prune, or an error if one occurred.
+// prepareObjects returns ResourceObjects or an error if one occurred.
 func (a *Applier) prepareObjects(localInv inventory.InventoryInfo, localObjs []*unstructured.Unstructured) (*ResourceObjects, error) {
 	klog.V(4).Infof("applier preparing %d objects", len(localObjs))
 	if localInv == nil {
@@ -120,30 +115,15 @@ func (a *Applier) prepareObjects(localInv inventory.InventoryInfo, localObjs []*
 		}
 	}
 
-	// Ensures the namespace exists before applying the inventory object into it.
-	if invNamespace := inventoryNamespaceInSet(localInv, localObjs); invNamespace != nil {
-		klog.V(4).Infof("applier prepareObjects applying namespace %s", invNamespace.GetName())
-		if err := a.invClient.ApplyInventoryNamespace(invNamespace); err != nil {
-			return nil, err
-		}
-	}
-	// Retrieve previous inventory objects. Must happen before inventory client merge.
+	// Retrieve previous inventory objects to calculate prune ids.
 	prevInv, err := a.invClient.GetClusterObjs(localInv)
 	if err != nil {
 		return nil, err
 	}
-	klog.V(4).Infof("%d previous inventory objects in cluster", len(prevInv))
+	locals := object.UnstructuredsToObjMetas(localObjs)
+	pruneIds := object.SetDiff(prevInv, locals)
+	klog.V(4).Infof("applier calculated %d prune objects", len(pruneIds))
 
-	klog.V(4).Infof("applier merging %d objects into inventory", len(localObjs))
-	currentObjs := object.UnstructuredsToObjMetas(localObjs)
-	// returns the objects (pruneIds) to prune after apply. The prune
-	// algorithm requires stopping if the merge is not successful. Otherwise,
-	// the stored objects in inventory could become inconsistent.
-	pruneIds, err := a.invClient.Merge(localInv, currentObjs)
-	if err != nil {
-		return nil, err
-	}
-	klog.V(4).Infof("after inventory merge; %d objects to prune", len(pruneIds))
 	// Sort order for applied resources.
 	sort.Sort(ordering.SortableUnstructureds(localObjs))
 
@@ -244,6 +224,7 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.InventoryInfo, obje
 			Factory:      a.provider.Factory(),
 			InfoHelper:   a.infoHelper,
 			Mapper:       mapper,
+			InvClient:    a.invClient,
 		}).BuildTaskQueue(resourceObjects, solver.Options{
 			ServerSideOptions:      options.ServerSideOptions,
 			ReconcileTimeout:       options.ReconcileTimeout,
@@ -336,24 +317,4 @@ func handleError(eventChannel chan event.Event, err error) {
 			Err: err,
 		},
 	}
-}
-
-// inventoryNamespaceInSet returns the the namespace the passed inventory
-// object will be applied to, or nil if this namespace object does not exist
-// in the passed slice "infos" or the inventory object is cluster-scoped.
-func inventoryNamespaceInSet(inv inventory.InventoryInfo, objs []*unstructured.Unstructured) *unstructured.Unstructured {
-	if inv == nil {
-		return nil
-	}
-	invNamespace := inv.Namespace()
-
-	for _, obj := range objs {
-		acc, _ := meta.Accessor(obj)
-		gvk := obj.GetObjectKind().GroupVersionKind()
-		if gvk == object.CoreV1Namespace && acc.GetName() == invNamespace {
-			inventory.AddInventoryIDAnnotation(obj, inv)
-			return obj
-		}
-	}
-	return nil
 }
