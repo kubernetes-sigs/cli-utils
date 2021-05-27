@@ -309,7 +309,7 @@ metadata:
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
 			node := tc.node
-			err := removeAnnotations(node, tc.removeAnnotations...)
+			err := RemoveAnnotations(node, tc.removeAnnotations...)
 			if !assert.NoError(t, err) {
 				t.FailNow()
 			}

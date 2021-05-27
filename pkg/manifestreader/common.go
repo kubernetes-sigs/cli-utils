@@ -137,8 +137,8 @@ func FilterLocalConfig(objs []*unstructured.Unstructured) []*unstructured.Unstru
 	return filteredObjs
 }
 
-// removeAnnotations removes the specified kioutil annotations from the resource.
-func removeAnnotations(n *yaml.RNode, annotations ...kioutil.AnnotationKey) error {
+// RemoveAnnotations removes the specified kioutil annotations from the resource.
+func RemoveAnnotations(n *yaml.RNode, annotations ...kioutil.AnnotationKey) error {
 	for _, a := range annotations {
 		err := n.PipeE(yaml.ClearAnnotation(a))
 		if err != nil {
@@ -148,9 +148,9 @@ func removeAnnotations(n *yaml.RNode, annotations ...kioutil.AnnotationKey) erro
 	return nil
 }
 
-// kyamlNodeToUnstructured take a resource represented as a kyaml RNode and
+// KyamlNodeToUnstructured take a resource represented as a kyaml RNode and
 // turns it into an Unstructured object.
-func kyamlNodeToUnstructured(n *yaml.RNode) (*unstructured.Unstructured, error) {
+func KyamlNodeToUnstructured(n *yaml.RNode) (*unstructured.Unstructured, error) {
 	b, err := n.MarshalJSON()
 	if err != nil {
 		return nil, err

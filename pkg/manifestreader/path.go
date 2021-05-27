@@ -32,11 +32,11 @@ func (p *PathManifestReader) Read() ([]*unstructured.Unstructured, error) {
 	}
 
 	for _, n := range nodes {
-		err = removeAnnotations(n, kioutil.IndexAnnotation)
+		err = RemoveAnnotations(n, kioutil.IndexAnnotation)
 		if err != nil {
 			return objs, err
 		}
-		u, err := kyamlNodeToUnstructured(n)
+		u, err := KyamlNodeToUnstructured(n)
 		if err != nil {
 			return objs, err
 		}
