@@ -65,13 +65,13 @@ function fetch_kb_tools {
 
 # Install metalinter
 function install_metalinter {
-   which gometalinter.v2 || go get -v -u gopkg.in/alecthomas/gometalinter.v2
+   which gometalinter.v2 || go install gopkg.in/alecthomas/gometalinter.v2
 }
 
 
 # # Install wire
 # function install_wire {
-#    which wire|| go get -v -u github.com/google/wire/cmd/wire
+#    which wire|| go install github.com/google/wire/cmd/wire
 # }
 
 # header_text "using tools"

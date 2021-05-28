@@ -271,7 +271,7 @@ func newFactory() util.Factory {
 }
 
 func customInvSizeVerifyFunc(c client.Client, name, namespace, _ string, count int) {
-	var u unstructured.UnstructuredList
+	var u unstructured.Unstructured
 	u.SetGroupVersionKind(customprovider.InventoryGVK)
 	err := c.Get(context.TODO(), types.NamespacedName{
 		Name:      name,

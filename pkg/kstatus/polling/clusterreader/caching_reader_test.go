@@ -15,7 +15,6 @@ import (
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/testutil"
@@ -202,12 +201,12 @@ type fakeReader struct {
 	err                 error
 }
 
-func (f *fakeReader) Get(_ context.Context, _ client.ObjectKey, _ runtime.Object) error {
+func (f *fakeReader) Get(_ context.Context, _ client.ObjectKey, _ client.Object) error {
 	return nil
 }
 
 //nolint:gocritic
-func (f *fakeReader) List(_ context.Context, list runtime.Object, opts ...client.ListOption) error {
+func (f *fakeReader) List(_ context.Context, list client.ObjectList, opts ...client.ListOption) error {
 	var namespace string
 	for _, opt := range opts {
 		switch opt := opt.(type) {

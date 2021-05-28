@@ -27,22 +27,22 @@ fmt:
 	go fmt ./...
 
 generate:
-	(which $(GOPATH)/bin/stringer || go get golang.org/x/tools/cmd/stringer)
+	(which $(GOPATH)/bin/stringer || go install golang.org/x/tools/cmd/stringer@a3eb095d6aeed806877423d9ef571b9a50ca8a2a) # latest as of 2021-05-27
 	go generate ./...
 
 license:
-	(which $(GOPATH)/bin/addlicense || go get github.com/google/addlicense)
+	(which $(GOPATH)/bin/addlicense || go install github.com/google/addlicense@6d92264d717064f28b32464f0f9693a5b4ef0239) # latest as of 2021-05-27
 	$(GOPATH)/bin/addlicense  -y 2020 -c "The Kubernetes Authors." -f LICENSE_TEMPLATE .
 
 verify-license:
-	(which $(GOPATH)/bin/addlicense || go get github.com/google/addlicense)
+	(which $(GOPATH)/bin/addlicense || go install github.com/google/addlicense@6d92264d717064f28b32464f0f9693a5b4ef0239) # latest as of 2021-05-27
 	$(GOPATH)/bin/addlicense  -check .
 
 tidy:
 	go mod tidy
 
 lint:
-	(which $(GOPATH)/bin/golangci-lint || go get github.com/golangci/golangci-lint/cmd/golangci-lint@v1.31.0)
+	(which $(GOPATH)/bin/golangci-lint || go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.40.1)
 	$(GOPATH)/bin/golangci-lint run ./...
 
 test:
@@ -67,7 +67,7 @@ build-with-race-detector:
 verify-kapply-e2e: test-examples-e2e-kapply
 
 $(MYGOBIN)/ginkgo:
-	go get github.com/onsi/ginkgo/ginkgo@v1.14.2
+	go install github.com/onsi/ginkgo/ginkgo@v1.16.2
 
 $(MYGOBIN)/mdrip:
 	go install github.com/monopole/mdrip@v1.0.2
@@ -84,7 +84,7 @@ test-examples-e2e-kapply: $(MYGOBIN)/mdrip $(MYGOBIN)/kind
 	)
 
 $(MYGOBIN)/kind:
-	go get sigs.k8s.io/kind@v0.9.0
+	go install sigs.k8s.io/kind@v0.11.0
 
 .PHONY: nuke
 nuke: clean

@@ -79,8 +79,8 @@ metadata:
     name: test-pod-label
 spec:
   containers:
-  - name: kubernetes-pause
-    image: k8s.gcr.io/pause:2.0
+    - name: kubernetes-pause
+      image: k8s.gcr.io/pause:2.0
 `)
 
 var podB = []byte(`
@@ -93,8 +93,8 @@ metadata:
     name: test-pod-label
 spec:
   containers:
-  - name: kubernetes-pause
-    image: k8s.gcr.io/pause:2.0
+    - name: kubernetes-pause
+      image: k8s.gcr.io/pause:2.0
 `)
 
 func buildMultiResourceConfig(configs ...[]byte) []byte {

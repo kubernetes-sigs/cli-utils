@@ -106,7 +106,7 @@ expectedOutputLine "1"
 # Capture the inventory object name for later testing
 invName=$(kubectl get cm --selector='cli-utils.sigs.k8s.io/inventory-id' --no-headers | awk '{print $1}')
 # There should be three config maps
-kubectl get cm --selector='!cli-utils.sigs.k8s.io/inventory-id' --no-headers | wc -l > $OUTPUT/status
+kubectl get cm --selector='name=test-config-map-label' --no-headers | wc -l > $OUTPUT/status
 expectedOutputLine "3"
 # ConfigMap cm-a had been created in the cluster
 kubectl get configmap/cm-a --no-headers | wc -l > $OUTPUT/status
@@ -161,7 +161,7 @@ expectedOutputLine "1"
 kubectl get configmap/${invName} --no-headers > $OUTPUT/status
 expectedOutputLine "${invName}"
 # There should be three config maps
-kubectl get cm --selector='!cli-utils.sigs.k8s.io/inventory-id' --no-headers | wc -l > $OUTPUT/status
+kubectl get cm --selector='name=test-config-map-label' --no-headers | wc -l > $OUTPUT/status
 expectedOutputLine "3"
 # ConfigMap cm-b had been created in the cluster
 kubectl get configmap/cm-b --no-headers | wc -l > $OUTPUT/status
