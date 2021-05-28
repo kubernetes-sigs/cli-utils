@@ -10,7 +10,6 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -276,7 +275,7 @@ func TestPrune(t *testing.T) {
 				err := func() error {
 					defer close(eventChannel)
 					// Run the prune and validate.
-					return po.Prune(currentInventory, tc.currentObjs, populateObjectIds(tc.currentObjs, t), taskContext, Options{
+					return po.Prune(currentInventory, tc.currentObjs, populateObjectIds(tc.currentObjs), taskContext, Options{
 						DryRunStrategy: drs,
 					})
 				}()
@@ -326,14 +325,10 @@ func unionObjects(sliceA []*unstructured.Unstructured, sliceB []*unstructured.Un
 
 // populateObjectIds returns a pointer to a set of strings containing
 // the UID's of the passed objects (infos).
-func populateObjectIds(objs []*unstructured.Unstructured, t *testing.T) sets.String {
+func populateObjectIds(objs []*unstructured.Unstructured) sets.String {
 	uids := sets.NewString()
 	for _, currObj := range objs {
-		metadata, err := meta.Accessor(currObj)
-		if err != nil {
-			t.Fatalf("Unexpected error retrieving object metadata: %#v", err)
-		}
-		uid := string(metadata.GetUID())
+		uid := string(currObj.GetUID())
 		uids.Insert(uid)
 	}
 	return uids
@@ -495,7 +490,7 @@ func TestPruneWithError(t *testing.T) {
 			err := func() error {
 				defer close(eventChannel)
 				// Run the prune and validate.
-				return po.Prune(currentInventory, tc.currentObjs, populateObjectIds(tc.currentObjs, t), taskContext, Options{
+				return po.Prune(currentInventory, tc.currentObjs, populateObjectIds(tc.currentObjs), taskContext, Options{
 					DryRunStrategy: drs,
 				})
 			}()

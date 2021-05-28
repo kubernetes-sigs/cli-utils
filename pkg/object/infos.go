@@ -4,7 +4,6 @@
 package object
 
 import (
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/cli-runtime/pkg/resource"
 	"sigs.k8s.io/kustomize/kyaml/kio/kioutil"
@@ -15,15 +14,14 @@ func InfoToUnstructured(info *resource.Info) *unstructured.Unstructured {
 }
 
 func UnstructuredToInfo(obj *unstructured.Unstructured) (*resource.Info, error) {
-	accessor, _ := meta.Accessor(obj)
-	annos := accessor.GetAnnotations()
+	annos := obj.GetAnnotations()
 
 	source := "unstructured"
 	path, ok := annos[kioutil.PathAnnotation]
 	if ok {
 		source = path
 		delete(annos, kioutil.PathAnnotation)
-		accessor.SetAnnotations(annos)
+		obj.SetAnnotations(annos)
 	}
 
 	return &resource.Info{

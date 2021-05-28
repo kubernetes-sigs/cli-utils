@@ -4,7 +4,6 @@
 package task
 
 import (
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/klog"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
@@ -71,9 +70,8 @@ func inventoryNamespaceInSet(inv inventory.InventoryInfo, objs []*unstructured.U
 	invNamespace := inv.Namespace()
 
 	for _, obj := range objs {
-		acc, _ := meta.Accessor(obj)
 		gvk := obj.GetObjectKind().GroupVersionKind()
-		if gvk == object.CoreV1Namespace && acc.GetName() == invNamespace {
+		if gvk == object.CoreV1Namespace && obj.GetName() == invNamespace {
 			inventory.AddInventoryIDAnnotation(obj, inv)
 			return obj
 		}

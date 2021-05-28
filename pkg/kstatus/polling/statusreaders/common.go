@@ -14,7 +14,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/engine"
@@ -102,7 +101,6 @@ type statusForGenResourcesFunc func(ctx context.Context, mapper meta.RESTMapper,
 // resources.
 func statusForGeneratedResources(ctx context.Context, mapper meta.RESTMapper, reader engine.ClusterReader, statusReader resourceTypeStatusReader,
 	object *unstructured.Unstructured, gk schema.GroupKind, selectorPath ...string) (event.ResourceStatuses, error) {
-	namespace := getNamespaceForNamespacedResource(object)
 	selector, err := toSelector(object, selectorPath...)
 	if err != nil {
 		return event.ResourceStatuses{}, err
@@ -114,7 +112,7 @@ func statusForGeneratedResources(ctx context.Context, mapper meta.RESTMapper, re
 		return event.ResourceStatuses{}, err
 	}
 	objectList.SetGroupVersionKind(gvk)
-	err = reader.ListNamespaceScoped(ctx, &objectList, namespace, selector)
+	err = reader.ListNamespaceScoped(ctx, &objectList, object.GetNamespace(), selector)
 	if err != nil {
 		return event.ResourceStatuses{}, err
 	}
@@ -181,14 +179,4 @@ func toIdentifier(u *unstructured.Unstructured) object.ObjMetadata {
 		Name:      u.GetName(),
 		Namespace: u.GetNamespace(),
 	}
-}
-
-// getNamespaceForNamespacedResource returns the namespace for the given object,
-// but includes logic for returning the default namespace if it is not set.
-func getNamespaceForNamespacedResource(object runtime.Object) string {
-	acc, err := meta.Accessor(object)
-	if err != nil {
-		panic(err)
-	}
-	return acc.GetNamespace()
 }

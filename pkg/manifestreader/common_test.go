@@ -9,7 +9,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
@@ -169,10 +168,7 @@ func TestSetNamespaces(t *testing.T) {
 			assert.NoError(t, err)
 
 			for i, obj := range tc.objs {
-				expectedNs := tc.expectedNamespaces[i]
-				assert.Equal(t, expectedNs, obj.GetNamespace())
-				accessor, _ := meta.Accessor(obj)
-				assert.Equal(t, expectedNs, accessor.GetNamespace())
+				assert.Equal(t, tc.expectedNamespaces[i], obj.GetNamespace())
 			}
 		})
 	}
