@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"k8s.io/apimachinery/pkg/api/meta"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	"sigs.k8s.io/kustomize/kyaml/kio/kioutil"
 )
@@ -80,8 +79,7 @@ func TestPathManifestReader_Read(t *testing.T) {
 
 			for i, obj := range objs {
 				assert.Equal(t, tc.namespaces[i], obj.GetNamespace())
-				accessor, _ := meta.Accessor(obj)
-				_, ok := accessor.GetAnnotations()[kioutil.PathAnnotation]
+				_, ok := obj.GetAnnotations()[kioutil.PathAnnotation]
 				assert.True(t, ok)
 			}
 		})

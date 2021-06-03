@@ -50,8 +50,6 @@ func SetNamespaces(mapper meta.RESTMapper, objs []*unstructured.Unstructured,
 
 	var unknownGKs []schema.GroupKind
 	for _, obj := range objs {
-		accessor, _ := meta.Accessor(obj)
-
 		// Exclude any inventory objects here since we don't want to change
 		// their namespace.
 		if inventory.IsInventoryObject(obj) {
@@ -60,7 +58,7 @@ func SetNamespaces(mapper meta.RESTMapper, objs []*unstructured.Unstructured,
 
 		// if the resource already has the namespace set, we don't
 		// need to do anything
-		if ns := accessor.GetNamespace(); ns != "" {
+		if ns := obj.GetNamespace(); ns != "" {
 			if enforceNamespace && ns != defaultNamespace {
 				return fmt.Errorf("the namespace from the provided object %q "+
 					"does not match the namespace %q. You must pass '--namespace=%s' to perform this operation",
@@ -83,7 +81,7 @@ func SetNamespaces(mapper meta.RESTMapper, objs []*unstructured.Unstructured,
 				// This means the resource does not have the namespace set,
 				// but it is a namespaced resource. So we set the namespace
 				// to the provided default value.
-				accessor.SetNamespace(defaultNamespace)
+				obj.SetNamespace(defaultNamespace)
 			}
 			continue
 		}
@@ -110,7 +108,7 @@ func SetNamespaces(mapper meta.RESTMapper, objs []*unstructured.Unstructured,
 		case "Cluster":
 			continue
 		case "Namespaced":
-			accessor.SetNamespace(defaultNamespace)
+			obj.SetNamespace(defaultNamespace)
 		}
 	}
 	if len(unknownGKs) > 0 {
@@ -126,11 +124,10 @@ func SetNamespaces(mapper meta.RESTMapper, objs []*unstructured.Unstructured,
 func FilterLocalConfig(objs []*unstructured.Unstructured) []*unstructured.Unstructured {
 	var filteredObjs []*unstructured.Unstructured
 	for _, obj := range objs {
-		acc, _ := meta.Accessor(obj)
 		// Ignoring the value of the LocalConfigAnnotation here. This is to be
 		// consistent with the behavior in the kyaml library:
 		// https://github.com/kubernetes-sigs/kustomize/blob/30b58e90a39485bc5724b2278651c5d26b815cb2/kyaml/kio/filters/local.go#L29
-		if _, found := acc.GetAnnotations()[filters.LocalConfigAnnotation]; !found {
+		if _, found := obj.GetAnnotations()[filters.LocalConfigAnnotation]; !found {
 			filteredObjs = append(filteredObjs, obj)
 		}
 	}

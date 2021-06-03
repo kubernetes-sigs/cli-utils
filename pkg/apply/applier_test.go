@@ -837,14 +837,9 @@ func newFakeRESTClient(t *testing.T, handlers []handler) *fake.RESTClient {
 
 func toIdentifier(t *testing.T, manifest string) object.ObjMetadata {
 	obj := Unstructured(t, manifest)
-
-	accessor, err := meta.Accessor(obj)
-	if err != nil {
-		t.Fatal(err)
-	}
 	return object.ObjMetadata{
 		GroupKind: obj.GetObjectKind().GroupVersionKind().GroupKind(),
-		Name:      accessor.GetName(),
+		Name:      obj.GetName(),
 		Namespace: "default",
 	}
 }

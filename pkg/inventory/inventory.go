@@ -15,7 +15,6 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/cli-utils/pkg/common"
@@ -73,16 +72,7 @@ func IsInventoryObject(obj *unstructured.Unstructured) bool {
 // for the passed inventory object. Returns error if the passed object is nil or
 // is not a inventory object.
 func retrieveInventoryLabel(obj *unstructured.Unstructured) (string, error) {
-	if obj == nil {
-		return "", fmt.Errorf("inventory info is nil")
-	}
-
-	accessor, err := meta.Accessor(obj)
-	if err != nil {
-		return "", err
-	}
-	labels := accessor.GetLabels()
-	inventoryLabel, exists := labels[common.InventoryLabel]
+	inventoryLabel, exists := obj.GetLabels()[common.InventoryLabel]
 	if !exists {
 		return "", fmt.Errorf("inventory label does not exist for inventory object: %s", common.InventoryLabel)
 	}
@@ -134,16 +124,12 @@ func SplitUnstructureds(objs []*unstructured.Unstructured) (*unstructured.Unstru
 // an error if name stored in the object differs from the name in
 // the Info struct.
 func addSuffixToName(obj *unstructured.Unstructured, suffix string) error {
-	if obj == nil {
-		return fmt.Errorf("nil unstructured.Unstructured")
-	}
 	suffix = strings.TrimSpace(suffix)
 	if len(suffix) == 0 {
 		return fmt.Errorf("passed empty suffix")
 	}
 
-	accessor, _ := meta.Accessor(obj)
-	name := accessor.GetName()
+	name := obj.GetName()
 	if name != obj.GetName() {
 		return fmt.Errorf("inventory object (%s) and resource.Info (%s) have different names", name, obj.GetName())
 	}
@@ -153,7 +139,7 @@ func addSuffixToName(obj *unstructured.Unstructured, suffix string) error {
 		return fmt.Errorf("name already has suffix: %s", name)
 	}
 	name += suffix
-	accessor.SetName(name)
+	obj.SetName(name)
 
 	return nil
 }
@@ -163,15 +149,7 @@ func addSuffixToName(obj *unstructured.Unstructured, suffix string) error {
 // This fixes a problem where inventory object names collide if
 // they are created in the same namespace.
 func fixLegacyInventoryName(obj *unstructured.Unstructured) error {
-	if obj == nil {
-		return fmt.Errorf("invalid inventory object is nil")
-	}
-	accessor, err := meta.Accessor(obj)
-	if err != nil {
-		return err
-	}
-	name := accessor.GetName()
-	if obj.GetName() == legacyInvName || name == legacyInvName {
+	if obj.GetName() == legacyInvName {
 		klog.V(4).Infof("renaming legacy inventory name")
 		randomSuffix := common.RandomStr()
 		return addSuffixToName(obj, randomSuffix)
