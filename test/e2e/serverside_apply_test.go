@@ -47,6 +47,7 @@ func serversideApplyTest(c client.Client, invConfig InventoryConfig, inventoryNa
 	}, &d)
 	Expect(err).NotTo(HaveOccurred())
 	_, found := d.ObjectMeta.Annotations[v1.LastAppliedConfigAnnotation]
+	// LastAppliedConfigAnnotation annotation is only set for client-side apply and we've server-side applied here.
 	Expect(found).To(BeFalse())
 	fields := d.GetManagedFields()
 	Expect(fields[0].Manager).To(Equal("test"))
@@ -65,6 +66,7 @@ func serversideApplyTest(c client.Client, invConfig InventoryConfig, inventoryNa
 	}, apiService)
 	Expect(err).NotTo(HaveOccurred())
 	_, found2 := apiService.GetAnnotations()[v1.LastAppliedConfigAnnotation]
+	// LastAppliedConfigAnnotation annotation is only set for client-side apply and we've server-side applied here.
 	Expect(found2).To(BeFalse())
 	fields2 := apiService.GetManagedFields()
 	Expect(fields2[0].Manager).To(Equal("test"))
