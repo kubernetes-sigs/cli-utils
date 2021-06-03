@@ -16,7 +16,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/cmd/apply"
 	cmddelete "k8s.io/kubectl/pkg/cmd/delete"
 	"k8s.io/kubectl/pkg/cmd/util"
@@ -133,7 +133,7 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 		ao, dynamic, err := applyOptionsFactoryFunc(taskContext.EventChannel(),
 			a.ServerSideOptions, a.DryRunStrategy, a.Factory)
 		if err != nil {
-			if klog.V(4) {
+			if klog.V(4).Enabled() {
 				klog.Errorf("error creating ApplyOptions (%s)--returning", err)
 			}
 			sendBatchApplyEvents(taskContext, objects, err)
@@ -150,7 +150,7 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 			info, err := a.InfoHelper.BuildInfo(obj)
 			id := object.UnstructuredToObjMeta(obj)
 			if err != nil {
-				if klog.V(4) {
+				if klog.V(4).Enabled() {
 					klog.Errorf("unable to convert obj to info for %s/%s (%s)--continue",
 						obj.GetNamespace(), obj.GetName(), err)
 				}
@@ -163,7 +163,7 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 			clusterObj, err := getClusterObj(dynamic, info)
 			if err != nil {
 				if !apierrors.IsNotFound(err) {
-					if klog.V(4) {
+					if klog.V(4).Enabled() {
 						klog.Errorf("error (%s) retrieving %s/%s from cluster--continue",
 							err, info.Namespace, info.Name)
 					}
@@ -206,7 +206,7 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 				err = clientSideApply(info, taskContext.EventChannel(), a.DryRunStrategy, a.Factory)
 			}
 			if err != nil {
-				if klog.V(4) {
+				if klog.V(4).Enabled() {
 					klog.Errorf("error applying (%s/%s) %s", info.Namespace, info.Name, err)
 				}
 				// If apply failed and the object is not in the cluster, remove

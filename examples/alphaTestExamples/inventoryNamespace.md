@@ -99,7 +99,7 @@ expectedOutputLine "1"
 invName=$(kubectl get cm -n test-namespace --selector='cli-utils.sigs.k8s.io/inventory-id' --no-headers | awk '{print $1}')
 
 # There should be one config map that is not the inventory object
-kubectl get cm -n test-namespace --selector='!cli-utils.sigs.k8s.io/inventory-id' --no-headers | wc -l > $OUTPUT/status
+kubectl get cm -n test-namespace --selector='name=test-config-map-label' --no-headers | wc -l > $OUTPUT/status
 expectedOutputLine "1"
 
 # ConfigMap cm-a had been created in the cluster

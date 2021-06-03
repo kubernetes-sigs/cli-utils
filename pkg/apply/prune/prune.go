@@ -23,7 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
@@ -133,7 +133,7 @@ func (po *PruneOptions) Prune(localInv inventory.InventoryInfo,
 					pruneObj.Namespace, pruneObj.Name)
 				continue
 			}
-			if klog.V(5) {
+			if klog.V(5).Enabled() {
 				klog.Errorf("prune obj (%s/%s) UID retrival error: %s",
 					pruneObj.Namespace, pruneObj.Name, err)
 			}
@@ -169,7 +169,7 @@ func (po *PruneOptions) Prune(localInv inventory.InventoryInfo,
 			klog.V(4).Infof("prune object delete: %s/%s", pruneObj.Namespace, pruneObj.Name)
 			namespacedClient, err := po.namespacedClient(pruneObj)
 			if err != nil {
-				if klog.V(4) {
+				if klog.V(4).Enabled() {
 					klog.Errorf("prune failed for %s/%s (%s)", pruneObj.Namespace, pruneObj.Name, err)
 				}
 				taskContext.EventChannel() <- createPruneFailedEvent(pruneObj, err)
@@ -178,7 +178,7 @@ func (po *PruneOptions) Prune(localInv inventory.InventoryInfo,
 			}
 			err = namespacedClient.Delete(context.TODO(), pruneObj.Name, metav1.DeleteOptions{})
 			if err != nil {
-				if klog.V(4) {
+				if klog.V(4).Enabled() {
 					klog.Errorf("prune failed for %s/%s (%s)", pruneObj.Namespace, pruneObj.Name, err)
 				}
 				taskContext.EventChannel() <- createPruneFailedEvent(pruneObj, err)

@@ -4,7 +4,7 @@
 package task
 
 import (
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
 	"sigs.k8s.io/cli-utils/pkg/inventory"

@@ -124,9 +124,9 @@ invName=$(kubectl get cm --selector='cli-utils.sigs.k8s.io/inventory-id' --no-he
 # There should be four config maps: one inventory in default, two in test-namespace, one in default namespace
 kubectl get cm --selector='cli-utils.sigs.k8s.io/inventory-id' --no-headers | wc -l > $OUTPUT/status
 expectedOutputLine "1"
-kubectl get cm -n test-namespace --selector='!cli-utils.sigs.k8s.io/inventory-id' --no-headers | wc -l > $OUTPUT/status
+kubectl get cm -n test-namespace --selector='name=test-config-map-label' --no-headers | wc -l > $OUTPUT/status
 expectedOutputLine "2"
-kubectl get cm --selector='!cli-utils.sigs.k8s.io/inventory-id' --no-headers | wc -l > $OUTPUT/status
+kubectl get cm --selector='name=test-config-map-label' --no-headers | wc -l > $OUTPUT/status
 expectedOutputLine "1"
 # ConfigMap cm-a had been created in the cluster
 kubectl get configmap/cm-a -n test-namespace --no-headers | wc -l > $OUTPUT/status

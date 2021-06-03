@@ -47,11 +47,11 @@ func serversideApplyTest(c client.Client, invConfig InventoryConfig, inventoryNa
 	}, &d)
 	Expect(err).NotTo(HaveOccurred())
 	_, found := d.ObjectMeta.Annotations[v1.LastAppliedConfigAnnotation]
-	Expect(found).To(Equal(false))
+	Expect(found).To(BeFalse())
 	fields := d.GetManagedFields()
 	Expect(fields[0].Manager).To(Equal("test"))
 
-	By("Verify APIService is client-side applied")
+	By("Verify APIService is server-side applied")
 	var apiService = &unstructured.Unstructured{}
 	apiService.SetGroupVersionKind(
 		schema.GroupVersionKind{
@@ -65,7 +65,7 @@ func serversideApplyTest(c client.Client, invConfig InventoryConfig, inventoryNa
 	}, apiService)
 	Expect(err).NotTo(HaveOccurred())
 	_, found2 := apiService.GetAnnotations()[v1.LastAppliedConfigAnnotation]
-	Expect(found2).To(Equal(true))
+	Expect(found2).To(BeFalse())
 	fields2 := apiService.GetManagedFields()
-	Expect(len(fields2)).To(Equal(0))
+	Expect(fields2[0].Manager).To(Equal("test"))
 }
