@@ -4,17 +4,21 @@
 package apply
 
 import (
-	"fmt"
+	"context"
+	"time"
 
 	"github.com/go-errors/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
+	"sigs.k8s.io/cli-utils/pkg/apply/poller"
 	"sigs.k8s.io/cli-utils/pkg/apply/prune"
+	"sigs.k8s.io/cli-utils/pkg/apply/solver"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/provider"
+	"sigs.k8s.io/cli-utils/pkg/util/factory"
 )
 
 // NewDestroyer returns a new destroyer. It will set up the ApplyOptions and
@@ -34,6 +38,7 @@ func NewDestroyer(provider provider.Provider) *Destroyer {
 // prune them. This also deletes all the previous inventory objects
 type Destroyer struct {
 	provider     provider.Provider
+	StatusPoller poller.Poller
 	PruneOptions *prune.PruneOptions
 	invClient    inventory.InventoryClient
 }
@@ -45,12 +50,26 @@ type DestroyerOption struct {
 	// DryRunStrategy defines whether changes should actually be performed,
 	// or if it is just talk and no action.
 	DryRunStrategy common.DryRunStrategy
+
+	// DeleteTimeout defines how long we should wait for resources
+	// to be fully deleted.
+	DeleteTimeout time.Duration
+
+	// DeletePropagationPolicy defines the deletion propagation policy
+	// that should be used. If this is not provided, the default is to
+	// use the Background policy.
+	DeletePropagationPolicy metav1.DeletionPropagation
 }
 
 // Initialize sets up the Destroyer for actually doing an destroy against
 // a cluster. This involves validating command line inputs and configuring
 // clients for communicating with the cluster.
 func (d *Destroyer) Initialize() error {
+	statusPoller, err := factory.NewStatusPoller(d.provider.Factory())
+	if err != nil {
+		return errors.WrapPrefix(err, "error creating status poller", 1)
+	}
+	d.StatusPoller = statusPoller
 	invClient, err := d.provider.InventoryClient()
 	if err != nil {
 		return errors.WrapPrefix(err, "error creating inventory client", 1)
@@ -68,107 +87,62 @@ func (d *Destroyer) Initialize() error {
 // happens asynchronously on progress and any errors are reported
 // back on the event channel.
 func (d *Destroyer) Run(inv inventory.InventoryInfo, option *DestroyerOption) <-chan event.Event {
-	ch := make(chan event.Event)
-
+	eventChannel := make(chan event.Event)
+	d.invClient.SetDryRunStrategy(option.DryRunStrategy)
 	go func() {
-		defer close(ch)
-		// TODO: We should see if we can avoid having the dry-run strategy
-		// as a field on the inventory client.
-		d.invClient.SetDryRunStrategy(option.DryRunStrategy)
-
-		// Start the event transformer goroutine so we can transform
-		// the Prune events emitted from the Prune function to Delete
-		// Events. That we use Prune to implement destroy is an
-		// implementation detail and the events should not be Prune events.
-		tempChannel, completedChannel := runPruneEventTransformer(ch)
-		taskContext := taskrunner.NewTaskContext(tempChannel)
-		err := d.PruneOptions.Prune(inv, nil, sets.NewString(), taskContext, prune.Options{
-			DryRunStrategy:    option.DryRunStrategy,
-			PropagationPolicy: metav1.DeletePropagationBackground,
-			InventoryPolicy:   option.InventoryPolicy,
-		})
+		defer close(eventChannel)
+		mapper, err := d.provider.Factory().ToRESTMapper()
 		if err != nil {
-			ch <- event.Event{
-				Type: event.ErrorType,
-				ErrorEvent: event.ErrorEvent{
-					Err: errors.WrapPrefix(err, "error pruning resources in cluster", 1),
-				},
-			}
+			handleError(eventChannel, err)
 			return
 		}
-
-		// Now delete the inventory object as well.
-		err = d.invClient.DeleteInventoryObj(inv)
+		// Retrieves the ids for the resources in the cluster from the inventory.
+		deleteIds, err := d.invClient.GetClusterObjs(inv)
 		if err != nil {
-			ch <- event.Event{
-				Type: event.ErrorType,
-				ErrorEvent: event.ErrorEvent{
-					Err: errors.WrapPrefix(err, "error deleting inventory object", 1),
-				},
-			}
+			handleError(eventChannel, err)
 			return
 		}
-
-		// Close the tempChannel to signal to the event transformer that
-		// it should terminate.
-		close(tempChannel)
-		// Wait for the event transformer to complete processing all
-		// events and shut down before we continue.
-		<-completedChannel
-		ch <- event.Event{
-			Type: event.ActionGroupType,
-			ActionGroupEvent: event.ActionGroupEvent{
-				GroupName: "destroyer",
-				Type:      event.Finished,
-				Action:    event.DeleteAction,
+		resourceObjs := &ResourceObjects{LocalInv: inv, PruneIds: deleteIds}
+		klog.V(4).Infoln("destroyer building task queue...")
+		taskBuilder := &solver.TaskQueueBuilder{
+			PruneOptions: d.PruneOptions,
+			Factory:      d.provider.Factory(),
+			Mapper:       mapper,
+			InvClient:    d.invClient,
+		}
+		opts := solver.Options{
+			Prune:                  true,
+			PruneTimeout:           option.DeleteTimeout,
+			DryRunStrategy:         option.DryRunStrategy,
+			PrunePropagationPolicy: option.DeletePropagationPolicy,
+			InventoryPolicy:        option.InventoryPolicy,
+		}
+		// Build the ordered set of tasks to execute.
+		taskQueue := taskBuilder.
+			AppendPruneWaitTasks(resourceObjs, opts).
+			AppendDeleteInvTask(resourceObjs).
+			Build()
+		// Send event to inform the caller about the resources that
+		// will be pruned.
+		eventChannel <- event.Event{
+			Type: event.InitType,
+			InitEvent: event.InitEvent{
+				ActionGroups: taskQueue.ToActionGroups(),
 			},
 		}
-	}()
-	return ch
-}
-
-// runPruneEventTransformer creates a channel for events and
-// starts a goroutine that will read from the channel until it
-// is closed. All events will be republished as Delete events
-// on the provided eventChannel. The function will also return
-// a channel that it will close once the goroutine is shutting
-// down.
-func runPruneEventTransformer(eventChannel chan event.Event) (chan event.Event, <-chan struct{}) {
-	completedChannel := make(chan struct{})
-	tempEventChannel := make(chan event.Event)
-	go func() {
-		defer close(completedChannel)
-		for msg := range tempEventChannel {
-			// If it is not a Prune event, no need to make any transformation.
-			if msg.Type != event.PruneType {
-				eventChannel <- msg
-			} else {
-				eventChannel <- event.Event{
-					Type: event.DeleteType,
-					DeleteEvent: event.DeleteEvent{
-						Operation:  transformPruneOperation(msg.PruneEvent.Operation),
-						Object:     msg.PruneEvent.Object,
-						Identifier: msg.PruneEvent.Identifier,
-						Error:      msg.PruneEvent.Error,
-					},
-				}
-			}
+		// Create a new TaskStatusRunner to execute the taskQueue.
+		klog.V(4).Infoln("destroyer building TaskStatusRunner...")
+		runner := taskrunner.NewTaskStatusRunner(resourceObjs.AllIds(), d.StatusPoller)
+		klog.V(4).Infoln("destroyer running TaskStatusRunner...")
+		// TODO(seans): Make the poll interval configurable like the applier.
+		err = runner.Run(context.Background(), taskQueue.ToChannel(), eventChannel, taskrunner.Options{
+			UseCache:         true,
+			PollInterval:     poller.DefaultPollInterval,
+			EmitStatusEvents: true,
+		})
+		if err != nil {
+			handleError(eventChannel, err)
 		}
 	}()
-	return tempEventChannel, completedChannel
-}
-
-func transformPruneOperation(pruneOp event.PruneEventOperation) event.DeleteEventOperation {
-	var deleteOp event.DeleteEventOperation
-	switch pruneOp {
-	case event.PruneSkipped:
-		deleteOp = event.DeleteSkipped
-	case event.Pruned:
-		deleteOp = event.Deleted
-	case event.PruneUnspecified:
-		deleteOp = event.DeleteUnspecified
-	default:
-		panic(fmt.Errorf("unknown prune operation %s", pruneOp.String()))
-	}
-	return deleteOp
+	return eventChannel
 }

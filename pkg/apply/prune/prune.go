@@ -137,7 +137,11 @@ func (po *PruneOptions) Prune(localInv inventory.InventoryInfo,
 				klog.Errorf("prune obj (%s/%s) UID retrival error: %s",
 					pruneObj.Namespace, pruneObj.Name, err)
 			}
-			taskContext.EventChannel() <- createPruneFailedEvent(pruneObj, err)
+			e := createPruneFailedEvent(pruneObj, err)
+			if po.Destroy {
+				e = createDeleteFailedEvent(pruneObj, err)
+			}
+			taskContext.EventChannel() <- e
 			taskContext.CapturePruneFailure(pruneObj)
 			continue
 		}
@@ -150,7 +154,12 @@ func (po *PruneOptions) Prune(localInv inventory.InventoryInfo,
 		// Handle lifecycle directive preventing deletion.
 		if !canPrune(localInv, obj, o.InventoryPolicy, uid) {
 			klog.V(4).Infof("skip prune for lifecycle directive %s/%s", pruneObj.Namespace, pruneObj.Name)
-			taskContext.EventChannel() <- createPruneEvent(pruneObj, obj, event.PruneSkipped)
+			// TODO(seans): Clean up this prune/delete event checking code.
+			e := createPruneEvent(pruneObj, obj, event.PruneSkipped)
+			if po.Destroy {
+				e = createDeleteEvent(pruneObj, obj, event.DeleteSkipped)
+			}
+			taskContext.EventChannel() <- e
 			taskContext.CapturePruneFailure(pruneObj)
 			continue
 		}
@@ -160,7 +169,11 @@ func (po *PruneOptions) Prune(localInv inventory.InventoryInfo,
 			if pruneObj.GroupKind == object.CoreV1Namespace.GroupKind() &&
 				localNamespaces.Has(pruneObj.Name) {
 				klog.V(4).Infof("skip pruning namespace: %s", pruneObj.Name)
-				taskContext.EventChannel() <- createPruneEvent(pruneObj, obj, event.PruneSkipped)
+				e := createPruneEvent(pruneObj, obj, event.PruneSkipped)
+				if po.Destroy {
+					e = createDeleteEvent(pruneObj, obj, event.DeleteSkipped)
+				}
+				taskContext.EventChannel() <- e
 				taskContext.CapturePruneFailure(pruneObj)
 				continue
 			}
@@ -172,7 +185,11 @@ func (po *PruneOptions) Prune(localInv inventory.InventoryInfo,
 				if klog.V(4).Enabled() {
 					klog.Errorf("prune failed for %s/%s (%s)", pruneObj.Namespace, pruneObj.Name, err)
 				}
-				taskContext.EventChannel() <- createPruneFailedEvent(pruneObj, err)
+				e := createPruneFailedEvent(pruneObj, err)
+				if po.Destroy {
+					e = createDeleteFailedEvent(pruneObj, err)
+				}
+				taskContext.EventChannel() <- e
 				taskContext.CapturePruneFailure(pruneObj)
 				continue
 			}
@@ -181,12 +198,20 @@ func (po *PruneOptions) Prune(localInv inventory.InventoryInfo,
 				if klog.V(4).Enabled() {
 					klog.Errorf("prune failed for %s/%s (%s)", pruneObj.Namespace, pruneObj.Name, err)
 				}
-				taskContext.EventChannel() <- createPruneFailedEvent(pruneObj, err)
+				e := createPruneFailedEvent(pruneObj, err)
+				if po.Destroy {
+					e = createDeleteFailedEvent(pruneObj, err)
+				}
+				taskContext.EventChannel() <- e
 				taskContext.CapturePruneFailure(pruneObj)
 				continue
 			}
 		}
-		taskContext.EventChannel() <- createPruneEvent(pruneObj, obj, event.Pruned)
+		e := createPruneEvent(pruneObj, obj, event.Pruned)
+		if po.Destroy {
+			e = createDeleteEvent(pruneObj, obj, event.Deleted)
+		}
+		taskContext.EventChannel() <- e
 	}
 	return nil
 }
@@ -248,11 +273,34 @@ func createPruneEvent(id object.ObjMetadata, obj *unstructured.Unstructured, op 
 	}
 }
 
-// createPruneEvent is a helper function to package a prune event for a failure.
+// createDeleteEvent is a helper function to package a delete event.
+func createDeleteEvent(id object.ObjMetadata, obj *unstructured.Unstructured, op event.DeleteEventOperation) event.Event {
+	return event.Event{
+		Type: event.DeleteType,
+		DeleteEvent: event.DeleteEvent{
+			Operation:  op,
+			Object:     obj,
+			Identifier: id,
+		},
+	}
+}
+
+// createPruneFailedEvent is a helper function to package a prune event for a failure.
 func createPruneFailedEvent(objMeta object.ObjMetadata, err error) event.Event {
 	return event.Event{
 		Type: event.PruneType,
 		PruneEvent: event.PruneEvent{
+			Identifier: objMeta,
+			Error:      err,
+		},
+	}
+}
+
+// createDeleteFailedEvent is a helper function to package a delete event for a failure.
+func createDeleteFailedEvent(objMeta object.ObjMetadata, err error) event.Event {
+	return event.Event{
+		Type: event.DeleteType,
+		DeleteEvent: event.DeleteEvent{
 			Identifier: objMeta,
 			Error:      err,
 		},

@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/info"
@@ -35,12 +36,22 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
-type TaskQueueSolver struct {
+const defaultWaitTimeout = 1 * time.Minute
+
+type TaskQueueBuilder struct {
 	PruneOptions *prune.PruneOptions
 	InfoHelper   info.InfoHelper
 	Factory      util.Factory
 	Mapper       meta.RESTMapper
 	InvClient    inventory.InventoryClient
+	// The accumulated tasks and counter variables to name tasks.
+	invAddCounter    int
+	invSetCounter    int
+	deleteInvCounter int
+	applyCounter     int
+	waitCounter      int
+	pruneCounter     int
+	tasks            []taskrunner.Task
 }
 
 type TaskQueue struct {
@@ -86,127 +97,148 @@ type resourceObjects interface {
 	IdsForPrevInv() []object.ObjMetadata
 }
 
-// BuildTaskQueue takes a set of resources in the form of info objects
-// and constructs the task queue. The options parameter allows
-// customization of how the task queue are built.
-func (t *TaskQueueSolver) BuildTaskQueue(ro resourceObjects,
-	o Options) *TaskQueue {
-	var invAddCounter int
-	var invReplaceCounter int
-	var applyCounter int
-	var pruneCounter int
-	var waitCounter int
+// Build returns the queue of tasks that have been created.
+func (t *TaskQueueBuilder) Build() *TaskQueue {
+	return &TaskQueue{
+		tasks: t.tasks,
+	}
+}
 
-	var tasks []taskrunner.Task
-	remainingInfos := ro.ObjsForApply()
+// AppendInvAddTask appends an inventory add task to the task queue.
+// Returns a pointer to the Builder to chain function calls.
+func (t *TaskQueueBuilder) AppendInvAddTask(ro resourceObjects) *TaskQueueBuilder {
+	klog.V(5).Infoln("adding inventory add task")
+	t.tasks = append(t.tasks, &task.InvAddTask{
+		TaskName:  fmt.Sprintf("inventory-add-%d", t.invAddCounter),
+		InvClient: t.InvClient,
+		InvInfo:   ro.Inventory(),
+		Objects:   ro.ObjsForApply(),
+	})
+	t.invAddCounter += 1
+	return t
+}
+
+// AppendInvAddTask appends an inventory set task to the task queue.
+// Returns a pointer to the Builder to chain function calls.
+func (t *TaskQueueBuilder) AppendInvSetTask(ro resourceObjects) *TaskQueueBuilder {
+	klog.V(5).Infoln("adding inventory set task")
+	t.tasks = append(t.tasks, &task.InvSetTask{
+		TaskName:  fmt.Sprintf("inventory-set-%d", t.invSetCounter),
+		InvClient: t.InvClient,
+		InvInfo:   ro.Inventory(),
+	})
+	t.invSetCounter += 1
+	return t
+}
+
+// AppendInvAddTask appends to the task queue a task to delete the inventory object.
+// Returns a pointer to the Builder to chain function calls.
+func (t *TaskQueueBuilder) AppendDeleteInvTask(ro resourceObjects) *TaskQueueBuilder {
+	klog.V(5).Infoln("adding delete inventory task")
+	t.tasks = append(t.tasks, &task.DeleteInvTask{
+		TaskName:  fmt.Sprintf("delete-inventory-%d", t.deleteInvCounter),
+		InvClient: t.InvClient,
+		InvInfo:   ro.Inventory(),
+	})
+	t.deleteInvCounter += 1
+	return t
+}
+
+// AppendInvAddTask appends a task to the task queue to apply the passed objects
+// to the cluster. Returns a pointer to the Builder to chain function calls.
+func (t *TaskQueueBuilder) AppendApplyTask(applyObjs []*unstructured.Unstructured,
+	crdSplitRes crdSplitResult, ro resourceObjects, o Options) *TaskQueueBuilder {
+	klog.V(5).Infoln("adding apply task")
 	// Convert slice of previous inventory objects into a map.
 	prevInvSlice := ro.IdsForPrevInv()
 	prevInventory := make(map[object.ObjMetadata]bool, len(prevInvSlice))
 	for _, prevInvObj := range prevInvSlice {
 		prevInventory[prevInvObj] = true
 	}
-
-	// First task merge local applied objects to inventory.
-	tasks = append(tasks, &task.InvAddTask{
-		TaskName:  fmt.Sprintf("inventory-add-%d", invAddCounter),
-		InvClient: t.InvClient,
-		InvInfo:   ro.Inventory(),
-		Objects:   ro.ObjsForApply(),
+	t.tasks = append(t.tasks, &task.ApplyTask{
+		TaskName:          fmt.Sprintf("apply-%d", t.applyCounter),
+		Objects:           applyObjs,
+		CRDs:              crdSplitRes.crds,
+		PrevInventory:     prevInventory,
+		ServerSideOptions: o.ServerSideOptions,
+		DryRunStrategy:    o.DryRunStrategy,
+		InfoHelper:        t.InfoHelper,
+		Factory:           t.Factory,
+		Mapper:            t.Mapper,
+		InventoryPolicy:   o.InventoryPolicy,
+		InvInfo:           ro.Inventory(),
 	})
+	t.applyCounter += 1
+	return t
+}
 
-	crdSplitRes, hasCRDs := splitAfterCRDs(remainingInfos)
-	if hasCRDs {
-		tasks = append(tasks, &task.ApplyTask{
-			TaskName:          fmt.Sprintf("apply-%d", applyCounter),
-			Objects:           append(crdSplitRes.before, crdSplitRes.crds...),
-			CRDs:              crdSplitRes.crds,
-			PrevInventory:     prevInventory,
-			ServerSideOptions: o.ServerSideOptions,
-			DryRunStrategy:    o.DryRunStrategy,
-			InfoHelper:        t.InfoHelper,
-			Factory:           t.Factory,
-			Mapper:            t.Mapper,
-			InventoryPolicy:   o.InventoryPolicy,
-			InvInfo:           ro.Inventory(),
-		})
-		applyCounter += 1
-		if !o.DryRunStrategy.ClientOrServerDryRun() {
-			objs := object.UnstructuredsToObjMetas(crdSplitRes.crds)
-			tasks = append(tasks, taskrunner.NewWaitTask(
-				fmt.Sprintf("wait-%d", waitCounter),
-				objs,
-				taskrunner.AllCurrent,
-				1*time.Minute,
-				t.Mapper),
-			)
-			waitCounter += 1
-		}
-		remainingInfos = crdSplitRes.after
-	}
+// AppendInvAddTask appends a task to wait on the passed objects to the task queue.
+// Returns a pointer to the Builder to chain function calls.
+func (t *TaskQueueBuilder) AppendWaitTask(waitIds []object.ObjMetadata) *TaskQueueBuilder {
+	klog.V(5).Infoln("adding wait task")
+	t.tasks = append(t.tasks, taskrunner.NewWaitTask(
+		fmt.Sprintf("wait-%d", t.waitCounter),
+		waitIds,
+		taskrunner.AllCurrent,
+		defaultWaitTimeout,
+		t.Mapper),
+	)
+	t.waitCounter += 1
+	return t
+}
 
-	tasks = append(tasks,
-		&task.ApplyTask{
-			TaskName:          fmt.Sprintf("apply-%d", applyCounter),
-			Objects:           remainingInfos,
-			CRDs:              crdSplitRes.crds,
-			PrevInventory:     prevInventory,
-			ServerSideOptions: o.ServerSideOptions,
+// AppendInvAddTask appends a task to delete objects from the cluster to the task queue.
+// Returns a pointer to the Builder to chain function calls.
+func (t *TaskQueueBuilder) AppendPruneTask(ro resourceObjects, o Options) *TaskQueueBuilder {
+	klog.V(5).Infoln("adding prune task")
+	t.tasks = append(t.tasks,
+		&task.PruneTask{
+			TaskName:          fmt.Sprintf("prune-%d", t.pruneCounter),
+			Objects:           ro.ObjsForApply(),
+			InventoryObject:   ro.Inventory(),
+			PruneOptions:      t.PruneOptions,
+			PropagationPolicy: o.PrunePropagationPolicy,
 			DryRunStrategy:    o.DryRunStrategy,
-			InfoHelper:        t.InfoHelper,
-			Factory:           t.Factory,
-			Mapper:            t.Mapper,
 			InventoryPolicy:   o.InventoryPolicy,
-			InvInfo:           ro.Inventory(),
 		},
 	)
+	t.pruneCounter += 1
+	return t
+}
 
-	if !o.DryRunStrategy.ClientOrServerDryRun() && o.ReconcileTimeout != time.Duration(0) {
-		tasks = append(tasks,
-			taskrunner.NewWaitTask(
-				fmt.Sprintf("wait-%d", waitCounter),
-				object.UnstructuredsToObjMetas(remainingInfos),
-				taskrunner.AllCurrent,
-				o.ReconcileTimeout,
-				t.Mapper),
-		)
-		waitCounter += 1
+// AppendApplyWaitTasks adds apply and wait tasks to the task queue,
+// depending on build variables (like dry-run) and resource types
+// (like CRD's). Returns a pointer to the Builder to chain function calls.
+func (t *TaskQueueBuilder) AppendApplyWaitTasks(ro resourceObjects, o Options) *TaskQueueBuilder {
+	applyObjs := ro.ObjsForApply()
+	crdSplitRes, hasCRDs := splitAfterCRDs(applyObjs)
+	if hasCRDs {
+		t.AppendApplyTask(append(crdSplitRes.before, crdSplitRes.crds...), crdSplitRes, ro, o)
+		if !o.DryRunStrategy.ClientOrServerDryRun() {
+			waitIds := object.UnstructuredsToObjMetas(crdSplitRes.crds)
+			t.AppendWaitTask(waitIds)
+		}
+		applyObjs = crdSplitRes.after
 	}
+	t.AppendApplyTask(applyObjs, crdSplitRes, ro, o)
+	if !o.DryRunStrategy.ClientOrServerDryRun() && o.ReconcileTimeout != time.Duration(0) {
+		waitIds := object.UnstructuredsToObjMetas(applyObjs)
+		t.AppendWaitTask(waitIds)
+	}
+	return t
+}
 
+// AppendPruneWaitTasks adds prune and wait tasks to the task queue
+// based on build variables (like dry-run). Returns a pointer to the
+// Builder to chain function calls.
+func (t *TaskQueueBuilder) AppendPruneWaitTasks(ro resourceObjects, o Options) *TaskQueueBuilder {
 	if o.Prune {
-		tasks = append(tasks,
-			&task.PruneTask{
-				TaskName:          fmt.Sprintf("prune-%d", pruneCounter),
-				Objects:           ro.ObjsForApply(),
-				InventoryObject:   ro.Inventory(),
-				PruneOptions:      t.PruneOptions,
-				PropagationPolicy: o.PrunePropagationPolicy,
-				DryRunStrategy:    o.DryRunStrategy,
-				InventoryPolicy:   o.InventoryPolicy,
-			},
-		)
-
+		t.AppendPruneTask(ro, o)
 		if !o.DryRunStrategy.ClientOrServerDryRun() && o.PruneTimeout != time.Duration(0) {
-			tasks = append(tasks,
-				taskrunner.NewWaitTask(
-					fmt.Sprintf("wait-%d", waitCounter),
-					ro.IdsForPrune(),
-					taskrunner.AllNotFound,
-					o.PruneTimeout,
-					t.Mapper),
-			)
+			t.AppendWaitTask(ro.IdsForPrune())
 		}
 	}
-
-	// Final task is to set inventory with objects in cluster.
-	tasks = append(tasks, &task.InvSetTask{
-		TaskName:  fmt.Sprintf("inventory-replace-%d", invReplaceCounter),
-		InvClient: t.InvClient,
-		InvInfo:   ro.Inventory(),
-	})
-
-	return &TaskQueue{
-		tasks: tasks,
-	}
+	return t
 }
 
 type crdSplitResult struct {
