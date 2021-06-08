@@ -58,61 +58,71 @@ func less(i, j object.ObjMetadata) bool {
 	}
 	// In case of tie, compare the namespace and name combination so that the output
 	// order is consistent irrespective of input order
-	return i.Namespace+i.Name < j.Namespace+j.Name
+	if i.Namespace != j.Namespace {
+		return i.Namespace < j.Namespace
+	}
+	return i.Name < j.Name
 }
 
-// An attempt to order things to help k8s, e.g.
-// a Service should come before things that refer to it.
-// Namespace should be first.
-// In some cases order just specified to provide determinism.
-var orderFirst = []string{
-	"Namespace",
-	"ResourceQuota",
-	"StorageClass",
-	"CustomResourceDefinition",
-	"MutatingWebhookConfiguration",
-	"ServiceAccount",
-	"PodSecurityPolicy",
-	"Role",
-	"ClusterRole",
-	"RoleBinding",
-	"ClusterRoleBinding",
-	"ConfigMap",
-	"Secret",
-	"Service",
-	"LimitRange",
-	"PriorityClass",
-	"Deployment",
-	"StatefulSet",
-	"CronJob",
-	"PodDisruptionBudget",
-}
+var kind2index = computeKind2index()
 
-var orderLast = []string{
-	"ValidatingWebhookConfiguration",
+func computeKind2index() map[string]int {
+	// An attempt to order things to help k8s, e.g.
+	// a Service should come before things that refer to it.
+	// Namespace should be first.
+	// In some cases order just specified to provide determinism.
+	orderFirst := []string{
+		"Namespace",
+		"ResourceQuota",
+		"StorageClass",
+		"CustomResourceDefinition",
+		"MutatingWebhookConfiguration",
+		"ServiceAccount",
+		"PodSecurityPolicy",
+		"Role",
+		"ClusterRole",
+		"RoleBinding",
+		"ClusterRoleBinding",
+		"ConfigMap",
+		"Secret",
+		"Service",
+		"LimitRange",
+		"PriorityClass",
+		"Deployment",
+		"StatefulSet",
+		"CronJob",
+		"PodDisruptionBudget",
+	}
+	orderLast := []string{
+		"ValidatingWebhookConfiguration",
+	}
+	kind2indexResult := make(map[string]int, len(orderFirst)+len(orderLast))
+	for i, n := range orderFirst {
+		kind2indexResult[n] = -len(orderFirst) + i
+	}
+	for i, n := range orderLast {
+		kind2indexResult[n] = 1 + i
+	}
+	return kind2indexResult
 }
 
 // getIndexByKind returns the index of the kind respecting the order
 func getIndexByKind(kind string) int {
-	m := map[string]int{}
-	for i, n := range orderFirst {
-		m[n] = -len(orderFirst) + i
-	}
-	for i, n := range orderLast {
-		m[n] = 1 + i
-	}
-	return m[kind]
+	return kind2index[kind]
 }
 
-func Equals(x schema.GroupKind, o schema.GroupKind) bool {
-	return x.Group == o.Group && x.Kind == o.Kind
+func Equals(i, j schema.GroupKind) bool {
+	return i.Group == j.Group && i.Kind == j.Kind
 }
 
-func IsLessThan(x schema.GroupKind, o schema.GroupKind) bool {
-	indexI := getIndexByKind(x.Kind)
-	indexJ := getIndexByKind(o.Kind)
+func IsLessThan(i, j schema.GroupKind) bool {
+	indexI := getIndexByKind(i.Kind)
+	indexJ := getIndexByKind(j.Kind)
 	if indexI != indexJ {
 		return indexI < indexJ
 	}
-	return x.String() < o.String()
+	if i.Group != j.Group {
+		return i.Group < j.Group
+	}
+	return i.Kind < j.Kind
 }
