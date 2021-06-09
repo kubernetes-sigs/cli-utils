@@ -25,7 +25,6 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/cmd/util"
-	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
@@ -122,6 +121,7 @@ func (po *PruneOptions) Prune(localInv inventory.InventoryInfo,
 	klog.V(4).Infof("prune: %d objects to prune (clusterInv - localIds)", len(pruneObjs))
 	// Sort the resources in reverse order using the same rules as is
 	// used for apply.
+	eventFactory := CreateEventFactory(po.Destroy)
 	sort.Sort(sort.Reverse(ordering.SortableMetas(pruneObjs)))
 	for _, pruneObj := range pruneObjs {
 		klog.V(5).Infof("attempting prune: %s", pruneObj)
@@ -137,11 +137,7 @@ func (po *PruneOptions) Prune(localInv inventory.InventoryInfo,
 				klog.Errorf("prune obj (%s/%s) UID retrival error: %s",
 					pruneObj.Namespace, pruneObj.Name, err)
 			}
-			e := createPruneFailedEvent(pruneObj, err)
-			if po.Destroy {
-				e = createDeleteFailedEvent(pruneObj, err)
-			}
-			taskContext.EventChannel() <- e
+			taskContext.EventChannel() <- eventFactory.CreateFailedEvent(pruneObj, err)
 			taskContext.CapturePruneFailure(pruneObj)
 			continue
 		}
@@ -154,12 +150,7 @@ func (po *PruneOptions) Prune(localInv inventory.InventoryInfo,
 		// Handle lifecycle directive preventing deletion.
 		if !canPrune(localInv, obj, o.InventoryPolicy, uid) {
 			klog.V(4).Infof("skip prune for lifecycle directive %s/%s", pruneObj.Namespace, pruneObj.Name)
-			// TODO(seans): Clean up this prune/delete event checking code.
-			e := createPruneEvent(pruneObj, obj, event.PruneSkipped)
-			if po.Destroy {
-				e = createDeleteEvent(pruneObj, obj, event.DeleteSkipped)
-			}
-			taskContext.EventChannel() <- e
+			taskContext.EventChannel() <- eventFactory.CreateSkippedEvent(obj)
 			taskContext.CapturePruneFailure(pruneObj)
 			continue
 		}
@@ -169,11 +160,7 @@ func (po *PruneOptions) Prune(localInv inventory.InventoryInfo,
 			if pruneObj.GroupKind == object.CoreV1Namespace.GroupKind() &&
 				localNamespaces.Has(pruneObj.Name) {
 				klog.V(4).Infof("skip pruning namespace: %s", pruneObj.Name)
-				e := createPruneEvent(pruneObj, obj, event.PruneSkipped)
-				if po.Destroy {
-					e = createDeleteEvent(pruneObj, obj, event.DeleteSkipped)
-				}
-				taskContext.EventChannel() <- e
+				taskContext.EventChannel() <- eventFactory.CreateSkippedEvent(obj)
 				taskContext.CapturePruneFailure(pruneObj)
 				continue
 			}
@@ -185,11 +172,7 @@ func (po *PruneOptions) Prune(localInv inventory.InventoryInfo,
 				if klog.V(4).Enabled() {
 					klog.Errorf("prune failed for %s/%s (%s)", pruneObj.Namespace, pruneObj.Name, err)
 				}
-				e := createPruneFailedEvent(pruneObj, err)
-				if po.Destroy {
-					e = createDeleteFailedEvent(pruneObj, err)
-				}
-				taskContext.EventChannel() <- e
+				taskContext.EventChannel() <- eventFactory.CreateFailedEvent(pruneObj, err)
 				taskContext.CapturePruneFailure(pruneObj)
 				continue
 			}
@@ -198,20 +181,12 @@ func (po *PruneOptions) Prune(localInv inventory.InventoryInfo,
 				if klog.V(4).Enabled() {
 					klog.Errorf("prune failed for %s/%s (%s)", pruneObj.Namespace, pruneObj.Name, err)
 				}
-				e := createPruneFailedEvent(pruneObj, err)
-				if po.Destroy {
-					e = createDeleteFailedEvent(pruneObj, err)
-				}
-				taskContext.EventChannel() <- e
+				taskContext.EventChannel() <- eventFactory.CreateFailedEvent(pruneObj, err)
 				taskContext.CapturePruneFailure(pruneObj)
 				continue
 			}
 		}
-		e := createPruneEvent(pruneObj, obj, event.Pruned)
-		if po.Destroy {
-			e = createDeleteEvent(pruneObj, obj, event.Deleted)
-		}
-		taskContext.EventChannel() <- e
+		taskContext.EventChannel() <- eventFactory.CreateSuccessEvent(obj)
 	}
 	return nil
 }
@@ -259,52 +234,6 @@ func preventDeleteAnnotation(annotations map[string]string) bool {
 		}
 	}
 	return false
-}
-
-// createPruneEvent is a helper function to package a prune event.
-func createPruneEvent(id object.ObjMetadata, obj *unstructured.Unstructured, op event.PruneEventOperation) event.Event {
-	return event.Event{
-		Type: event.PruneType,
-		PruneEvent: event.PruneEvent{
-			Operation:  op,
-			Object:     obj,
-			Identifier: id,
-		},
-	}
-}
-
-// createDeleteEvent is a helper function to package a delete event.
-func createDeleteEvent(id object.ObjMetadata, obj *unstructured.Unstructured, op event.DeleteEventOperation) event.Event {
-	return event.Event{
-		Type: event.DeleteType,
-		DeleteEvent: event.DeleteEvent{
-			Operation:  op,
-			Object:     obj,
-			Identifier: id,
-		},
-	}
-}
-
-// createPruneFailedEvent is a helper function to package a prune event for a failure.
-func createPruneFailedEvent(objMeta object.ObjMetadata, err error) event.Event {
-	return event.Event{
-		Type: event.PruneType,
-		PruneEvent: event.PruneEvent{
-			Identifier: objMeta,
-			Error:      err,
-		},
-	}
-}
-
-// createDeleteFailedEvent is a helper function to package a delete event for a failure.
-func createDeleteFailedEvent(objMeta object.ObjMetadata, err error) event.Event {
-	return event.Event{
-		Type: event.DeleteType,
-		DeleteEvent: event.DeleteEvent{
-			Identifier: objMeta,
-			Error:      err,
-		},
-	}
 }
 
 func canPrune(localInv inventory.InventoryInfo, obj *unstructured.Unstructured,
