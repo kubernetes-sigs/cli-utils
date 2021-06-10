@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-errors/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/poller"
@@ -17,6 +18,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
+	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/provider"
 	"sigs.k8s.io/cli-utils/pkg/util/factory"
 )
@@ -91,18 +93,19 @@ func (d *Destroyer) Run(inv inventory.InventoryInfo, option *DestroyerOption) <-
 	d.invClient.SetDryRunStrategy(option.DryRunStrategy)
 	go func() {
 		defer close(eventChannel)
+		// Retrieve the objects to be deleted from the cluster. Second parameter is empty
+		// because no local objects returns all inventory objects for deletion.
+		emptyLocalObjs := []*unstructured.Unstructured{}
+		deleteObjs, err := d.PruneOptions.GetPruneObjs(inv, emptyLocalObjs)
+		if err != nil {
+			handleError(eventChannel, err)
+			return
+		}
 		mapper, err := d.provider.Factory().ToRESTMapper()
 		if err != nil {
 			handleError(eventChannel, err)
 			return
 		}
-		// Retrieves the ids for the resources in the cluster from the inventory.
-		deleteIds, err := d.invClient.GetClusterObjs(inv)
-		if err != nil {
-			handleError(eventChannel, err)
-			return
-		}
-		resourceObjs := &ResourceObjects{LocalInv: inv, PruneIds: deleteIds}
 		klog.V(4).Infoln("destroyer building task queue...")
 		taskBuilder := &solver.TaskQueueBuilder{
 			PruneOptions: d.PruneOptions,
@@ -119,8 +122,8 @@ func (d *Destroyer) Run(inv inventory.InventoryInfo, option *DestroyerOption) <-
 		}
 		// Build the ordered set of tasks to execute.
 		taskQueue := taskBuilder.
-			AppendPruneWaitTasks(resourceObjs, opts).
-			AppendDeleteInvTask(resourceObjs).
+			AppendPruneWaitTasks(inv, deleteObjs, opts).
+			AppendDeleteInvTask(inv).
 			Build()
 		// Send event to inform the caller about the resources that
 		// will be pruned.
@@ -132,7 +135,8 @@ func (d *Destroyer) Run(inv inventory.InventoryInfo, option *DestroyerOption) <-
 		}
 		// Create a new TaskStatusRunner to execute the taskQueue.
 		klog.V(4).Infoln("destroyer building TaskStatusRunner...")
-		runner := taskrunner.NewTaskStatusRunner(resourceObjs.AllIds(), d.StatusPoller)
+		deleteIds := object.UnstructuredsToObjMetas(deleteObjs)
+		runner := taskrunner.NewTaskStatusRunner(deleteIds, d.StatusPoller)
 		klog.V(4).Infoln("destroyer running TaskStatusRunner...")
 		// TODO(seans): Make the poll interval configurable like the applier.
 		err = runner.Run(context.Background(), taskQueue.ToChannel(), eventChannel, taskrunner.Options{

@@ -15,9 +15,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
-	"strings"
 
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -36,11 +34,13 @@ import (
 // implement the prune functionality.
 type PruneOptions struct {
 	InvClient inventory.InventoryClient
-	client    dynamic.Interface
-	mapper    meta.RESTMapper
+	Client    dynamic.Interface
+	Mapper    meta.RESTMapper
 	// True if we are destroying, which deletes the inventory object
 	// as well (possibly) the inventory namespace.
 	Destroy bool
+	// TODO(seans): Replace this with Filter interface to generalize prune skipping.
+	LocalNamespaces sets.String
 }
 
 // NewPruneOptions returns a struct (PruneOptions) encapsulating the necessary
@@ -48,7 +48,8 @@ type PruneOptions struct {
 // gathering this information.
 func NewPruneOptions() *PruneOptions {
 	po := &PruneOptions{
-		Destroy: false,
+		Destroy:         false,
+		LocalNamespaces: sets.NewString(),
 	}
 	return po
 }
@@ -56,11 +57,11 @@ func NewPruneOptions() *PruneOptions {
 func (po *PruneOptions) Initialize(factory util.Factory, invClient inventory.InventoryClient) error {
 	var err error
 	// Client/Builder fields from the Factory.
-	po.client, err = factory.DynamicClient()
+	po.Client, err = factory.DynamicClient()
 	if err != nil {
 		return err
 	}
-	po.mapper, err = factory.ToRESTMapper()
+	po.Mapper, err = factory.ToRESTMapper()
 	if err != nil {
 		return err
 	}
@@ -81,22 +82,15 @@ type Options struct {
 	InventoryPolicy inventory.InventoryPolicy
 }
 
-// Prune deletes the set of resources which were previously applied
-// but omitted in the current apply. Calculates the set of objects
-// to prune by removing the currently applied objects from the union
-// set of the previously applied objects and currently applied objects
-// stored in the cluster inventory. As a final step, stores the current
-// inventory which is all the successfully applied objects and the
-// prune failures. Does not stop when encountering prune failures.
-// Returns an error for unrecoverable errors.
+// Prune deletes the set of passed pruneObjs.
 //
 // Parameters:
 //   localInv - locally read inventory object
-//   localObjs - locally read, currently applied (attempted) objects
+//   pruneObjs - objects to prune (delete)
 //   currentUIDs - UIDs for successfully applied objects
 //   taskContext - task for apply/prune
 func (po *PruneOptions) Prune(localInv inventory.InventoryInfo,
-	localObjs []*unstructured.Unstructured,
+	pruneObjs []*unstructured.Unstructured,
 	currentUIDs sets.String,
 	taskContext *taskrunner.TaskContext,
 	o Options) error {
@@ -104,102 +98,87 @@ func (po *PruneOptions) Prune(localInv inventory.InventoryInfo,
 	if localInv == nil {
 		return fmt.Errorf("the local inventory object can't be nil")
 	}
-	// Get the list of Object Meta from the local objects.
-	localIds := object.UnstructuredsToObjMetas(localObjs)
-	// Create the set of namespaces for currently (locally) applied objects, including
-	// the namespace the inventory object lives in (if it's not cluster-scoped). When
-	// pruning, check this set of namespaces to ensure these namespaces are not deleted.
-	localNamespaces := localNamespaces(localInv, localIds)
-	clusterInv, err := po.InvClient.GetClusterObjs(localInv)
-	if err != nil {
-		return err
-	}
-	klog.V(4).Infof("prune: %d objects attempted to apply", len(localIds))
-	klog.V(4).Infof("prune: %d objects successfully applied", len(currentUIDs))
-	klog.V(4).Infof("prune: %d union objects stored in cluster inventory", len(clusterInv))
-	pruneObjs := object.SetDiff(clusterInv, localIds)
-	klog.V(4).Infof("prune: %d objects to prune (clusterInv - localIds)", len(pruneObjs))
 	// Sort the resources in reverse order using the same rules as is
 	// used for apply.
 	eventFactory := CreateEventFactory(po.Destroy)
-	sort.Sort(sort.Reverse(ordering.SortableMetas(pruneObjs)))
 	for _, pruneObj := range pruneObjs {
-		klog.V(5).Infof("attempting prune: %s", pruneObj)
-		obj, err := po.getObject(pruneObj)
-		if err != nil {
-			// Object not found in cluster, so no need to delete it; skip to next object.
-			if apierrors.IsNotFound(err) || meta.IsNoMatchError(err) {
-				klog.V(5).Infof("%s/%s not found in cluster--skipping",
-					pruneObj.Namespace, pruneObj.Name)
-				continue
-			}
-			if klog.V(5).Enabled() {
-				klog.Errorf("prune obj (%s/%s) UID retrival error: %s",
-					pruneObj.Namespace, pruneObj.Name, err)
-			}
-			taskContext.EventChannel() <- eventFactory.CreateFailedEvent(pruneObj, err)
-			taskContext.CapturePruneFailure(pruneObj)
-			continue
-		}
+		pruneID := object.UnstructuredToObjMeta(pruneObj)
+		klog.V(5).Infof("attempting prune: %s", pruneID)
 		// Do not prune objects that are in set of currently applied objects.
-		uid := string(obj.GetUID())
+		uid := string(pruneObj.GetUID())
 		if currentUIDs.Has(uid) {
 			klog.V(5).Infof("prune object in current apply; do not prune: %s", uid)
 			continue
 		}
 		// Handle lifecycle directive preventing deletion.
-		if !canPrune(localInv, obj, o.InventoryPolicy, uid) {
-			klog.V(4).Infof("skip prune for lifecycle directive %s/%s", pruneObj.Namespace, pruneObj.Name)
-			taskContext.EventChannel() <- eventFactory.CreateSkippedEvent(obj)
-			taskContext.CapturePruneFailure(pruneObj)
+		if !canPrune(localInv, pruneObj, o.InventoryPolicy, uid) {
+			klog.V(4).Infof("skip prune for lifecycle directive %s", pruneID)
+			taskContext.EventChannel() <- eventFactory.CreateSkippedEvent(pruneObj)
+			taskContext.CapturePruneFailure(pruneID)
 			continue
 		}
 		// If regular pruning (not destroying), skip deleting namespace containing
 		// currently applied objects.
-		if !po.Destroy {
-			if pruneObj.GroupKind == object.CoreV1Namespace.GroupKind() &&
-				localNamespaces.Has(pruneObj.Name) {
-				klog.V(4).Infof("skip pruning namespace: %s", pruneObj.Name)
-				taskContext.EventChannel() <- eventFactory.CreateSkippedEvent(obj)
-				taskContext.CapturePruneFailure(pruneObj)
-				continue
-			}
+		if pruneID.GroupKind == object.CoreV1Namespace.GroupKind() &&
+			po.LocalNamespaces.Has(pruneID.Name) {
+			klog.V(4).Infof("skip pruning namespace: %s", pruneID.Name)
+			taskContext.EventChannel() <- eventFactory.CreateSkippedEvent(pruneObj)
+			taskContext.CapturePruneFailure(pruneID)
+			continue
 		}
 		if !o.DryRunStrategy.ClientOrServerDryRun() {
-			klog.V(4).Infof("prune object delete: %s/%s", pruneObj.Namespace, pruneObj.Name)
-			namespacedClient, err := po.namespacedClient(pruneObj)
+			klog.V(4).Infof("prune object delete: %s", pruneID)
+			namespacedClient, err := po.namespacedClient(pruneID)
 			if err != nil {
 				if klog.V(4).Enabled() {
-					klog.Errorf("prune failed for %s/%s (%s)", pruneObj.Namespace, pruneObj.Name, err)
+					klog.Errorf("prune failed for %s (%s)", pruneID, err)
 				}
-				taskContext.EventChannel() <- eventFactory.CreateFailedEvent(pruneObj, err)
-				taskContext.CapturePruneFailure(pruneObj)
+				taskContext.EventChannel() <- eventFactory.CreateFailedEvent(pruneID, err)
+				taskContext.CapturePruneFailure(pruneID)
 				continue
 			}
-			err = namespacedClient.Delete(context.TODO(), pruneObj.Name, metav1.DeleteOptions{})
+			err = namespacedClient.Delete(context.TODO(), pruneID.Name, metav1.DeleteOptions{})
 			if err != nil {
 				if klog.V(4).Enabled() {
-					klog.Errorf("prune failed for %s/%s (%s)", pruneObj.Namespace, pruneObj.Name, err)
+					klog.Errorf("prune failed for %s (%s)", pruneID, err)
 				}
-				taskContext.EventChannel() <- eventFactory.CreateFailedEvent(pruneObj, err)
-				taskContext.CapturePruneFailure(pruneObj)
+				taskContext.EventChannel() <- eventFactory.CreateFailedEvent(pruneID, err)
+				taskContext.CapturePruneFailure(pruneID)
 				continue
 			}
 		}
-		taskContext.EventChannel() <- eventFactory.CreateSuccessEvent(obj)
+		taskContext.EventChannel() <- eventFactory.CreateSuccessEvent(pruneObj)
 	}
 	return nil
 }
 
-func (po *PruneOptions) namespacedClient(obj object.ObjMetadata) (dynamic.ResourceInterface, error) {
-	mapping, err := po.mapper.RESTMapping(obj.GroupKind)
+// GetPruneObjs calculates the set of prune objects, and retrieves them
+// from the cluster. Set of prune objects equals the set of inventory
+// objects minus the set of currently applied objects. Returns an error
+// if one occurs.
+func (po *PruneOptions) GetPruneObjs(inv inventory.InventoryInfo,
+	localObjs []*unstructured.Unstructured) ([]*unstructured.Unstructured, error) {
+	localIds := object.UnstructuredsToObjMetas(localObjs)
+	prevInvIds, err := po.InvClient.GetClusterObjs(inv)
 	if err != nil {
 		return nil, err
 	}
-	return po.client.Resource(mapping.Resource).Namespace(obj.Namespace), nil
+	pruneIds := object.SetDiff(prevInvIds, localIds)
+	pruneObjs := []*unstructured.Unstructured{}
+	for _, pruneID := range pruneIds {
+		pruneObj, err := po.GetObject(pruneID)
+		if err != nil {
+			return nil, err
+		}
+		pruneObjs = append(pruneObjs, pruneObj)
+	}
+	sort.Sort(sort.Reverse(ordering.SortableUnstructureds(pruneObjs)))
+	return pruneObjs, nil
 }
 
-func (po *PruneOptions) getObject(obj object.ObjMetadata) (*unstructured.Unstructured, error) {
+// GetObject uses the passed object data to retrieve the object
+// from the cluster (or an error if one occurs).
+func (po *PruneOptions) GetObject(obj object.ObjMetadata) (*unstructured.Unstructured, error) {
 	namespacedClient, err := po.namespacedClient(obj)
 	if err != nil {
 		return nil, err
@@ -207,22 +186,12 @@ func (po *PruneOptions) getObject(obj object.ObjMetadata) (*unstructured.Unstruc
 	return namespacedClient.Get(context.TODO(), obj.Name, metav1.GetOptions{})
 }
 
-// localNamespaces returns a set of strings of all the namespaces
-// for the passed non cluster-scoped localObjs, plus the namespace
-// of the passed inventory object.
-func localNamespaces(localInv inventory.InventoryInfo, localObjs []object.ObjMetadata) sets.String {
-	namespaces := sets.NewString()
-	for _, obj := range localObjs {
-		namespace := strings.TrimSpace(strings.ToLower(obj.Namespace))
-		if namespace != "" {
-			namespaces.Insert(namespace)
-		}
+func (po *PruneOptions) namespacedClient(obj object.ObjMetadata) (dynamic.ResourceInterface, error) {
+	mapping, err := po.Mapper.RESTMapping(obj.GroupKind)
+	if err != nil {
+		return nil, err
 	}
-	invNamespace := strings.TrimSpace(strings.ToLower(localInv.Namespace()))
-	if invNamespace != "" {
-		namespaces.Insert(invNamespace)
-	}
-	return namespaces
+	return po.Client.Resource(mapping.Resource).Namespace(obj.Namespace), nil
 }
 
 // preventDeleteAnnotation returns true if the "onRemove:keep"

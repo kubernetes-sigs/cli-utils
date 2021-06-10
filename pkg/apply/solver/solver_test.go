@@ -28,6 +28,21 @@ var (
 	crdInfo    = createInfo("apiextensions.k8s.io/v1", "CustomResourceDefinition", "crd", "").Object.(*unstructured.Unstructured)
 )
 
+var inventoryObj = &unstructured.Unstructured{
+	Object: map[string]interface{}{
+		"apiVersion": "v1",
+		"kind":       "ConfigMap",
+		"metadata": map[string]interface{}{
+			"name":      "test-inventory-name",
+			"namespace": "test-inventory-namespace",
+			"labels": map[string]interface{}{
+				common.InventoryLabel: "test-inventory-label",
+			},
+		},
+	},
+}
+var localInv = inventory.WrapInventoryInfoObj(inventoryObj)
+
 func TestTaskQueueBuilder_BuildTaskQueue(t *testing.T) {
 	testCases := map[string]struct {
 		objs          []*unstructured.Unstructured
@@ -241,22 +256,19 @@ func TestTaskQueueBuilder_BuildTaskQueue(t *testing.T) {
 
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
+			applyIds := object.UnstructuredsToObjMetas(tc.objs)
+			fakeInvClient := inventory.NewFakeInventoryClient(applyIds)
 			tqb := TaskQueueBuilder{
 				PruneOptions: pruneOptions,
 				Mapper:       testutil.NewFakeRESTMapper(),
+				InvClient:    fakeInvClient,
 			}
-
-			objs := object.UnstructuredsToObjMetas(tc.objs)
-			ro := &fakeResourceObjects{
-				objsForApply: tc.objs,
-				idsForApply:  objs,
-				idsForPrune:  nil,
-			}
+			emptyPruneObjs := []*unstructured.Unstructured{}
 			tq := tqb.
-				AppendInvAddTask(ro).
-				AppendApplyWaitTasks(ro, tc.options).
-				AppendPruneWaitTasks(ro, tc.options).
-				AppendInvSetTask(ro).
+				AppendInvAddTask(localInv, tc.objs).
+				AppendApplyWaitTasks(localInv, tc.objs, tc.options).
+				AppendPruneWaitTasks(localInv, emptyPruneObjs, tc.options).
+				AppendInvSetTask(localInv).
 				Build()
 
 			assert.Equal(t, len(tc.expectedTasks), len(tq.tasks))
@@ -325,34 +337,6 @@ func createInfo(apiVersion, kind, name, namespace string) *resource.Info {
 
 func getType(task taskrunner.Task) reflect.Type {
 	return reflect.TypeOf(task)
-}
-
-type fakeResourceObjects struct {
-	objsForApply  []*unstructured.Unstructured
-	inventory     inventory.InventoryInfo
-	idsForApply   []object.ObjMetadata
-	idsForPrune   []object.ObjMetadata
-	idsForPrevInv []object.ObjMetadata
-}
-
-func (f *fakeResourceObjects) ObjsForApply() []*unstructured.Unstructured {
-	return f.objsForApply
-}
-
-func (f *fakeResourceObjects) Inventory() inventory.InventoryInfo {
-	return f.inventory
-}
-
-func (f *fakeResourceObjects) IdsForApply() []object.ObjMetadata {
-	return f.idsForApply
-}
-
-func (f *fakeResourceObjects) IdsForPrune() []object.ObjMetadata {
-	return f.idsForPrune
-}
-
-func (f *fakeResourceObjects) IdsForPrevInv() []object.ObjMetadata {
-	return f.idsForPrevInv
 }
 
 func ignoreErrInfoToObjMeta(info *unstructured.Unstructured) object.ObjMetadata {
