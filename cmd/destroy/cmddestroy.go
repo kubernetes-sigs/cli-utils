@@ -6,6 +6,7 @@ package destroy
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -40,6 +41,10 @@ func GetDestroyRunner(provider provider.Provider, loader manifestreader.Manifest
 	cmd.Flags().StringVar(&r.inventoryPolicy, flagutils.InventoryPolicyFlag, flagutils.InventoryPolicyStrict,
 		"It determines the behavior when the resources don't belong to current inventory. Available options "+
 			fmt.Sprintf("%q and %q.", flagutils.InventoryPolicyStrict, flagutils.InventoryPolicyAdopt))
+	cmd.Flags().DurationVar(&r.deleteTimeout, "delete-timeout", time.Duration(0),
+		"Timeout threshold for waiting for all deleted resources to complete deletion")
+	cmd.Flags().StringVar(&r.deletePropagationPolicy, "delete-propagation-policy",
+		"Background", "Propagation policy for deletion")
 
 	r.Command = cmd
 	return r
@@ -61,16 +66,21 @@ type DestroyRunner struct {
 	provider   provider.Provider
 	loader     manifestreader.ManifestLoader
 
-	output          string
-	inventoryPolicy string
+	output                  string
+	deleteTimeout           time.Duration
+	deletePropagationPolicy string
+	inventoryPolicy         string
 }
 
 func (r *DestroyRunner) RunE(cmd *cobra.Command, args []string) error {
+	deletePropPolicy, err := flagutils.ConvertPropagationPolicy(r.deletePropagationPolicy)
+	if err != nil {
+		return err
+	}
 	inventoryPolicy, err := flagutils.ConvertInventoryPolicy(r.inventoryPolicy)
 	if err != nil {
 		return err
 	}
-
 	// Retrieve the inventory object.
 	reader, err := r.loader.ManifestReader(cmd.InOrStdin(), flagutils.PathFromArgs(args))
 	if err != nil {
@@ -99,7 +109,9 @@ func (r *DestroyRunner) RunE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	option := &apply.DestroyerOption{
-		InventoryPolicy: inventoryPolicy,
+		DeleteTimeout:           r.deleteTimeout,
+		DeletePropagationPolicy: deletePropPolicy,
+		InventoryPolicy:         inventoryPolicy,
 	}
 	ch := r.Destroyer.Run(inv, option)
 

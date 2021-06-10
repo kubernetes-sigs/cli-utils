@@ -119,6 +119,9 @@ expectedOutputLine "configmap/firstmap deleted"
 
 expectedOutputLine "configmap/secondmap delete skipped"
 
+expectedOutputLine "1 resource(s) deleted, 1 skipped"
+expectedNotFound "resource(s) pruned"
+
 kubectl get cm --no-headers | awk '{print $1}' > $OUTPUT/status
 expectedOutputLine "secondmap"
 ```

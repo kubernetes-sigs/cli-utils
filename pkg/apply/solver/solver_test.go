@@ -28,7 +28,7 @@ var (
 	crdInfo    = createInfo("apiextensions.k8s.io/v1", "CustomResourceDefinition", "crd", "").Object.(*unstructured.Unstructured)
 )
 
-func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
+func TestTaskQueueBuilder_BuildTaskQueue(t *testing.T) {
 	testCases := map[string]struct {
 		objs          []*unstructured.Unstructured
 		options       Options
@@ -43,7 +43,7 @@ func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 					TaskName: "apply-0",
 					Objects:  []*unstructured.Unstructured{},
 				},
-				&task.InvSetTask{TaskName: "inventory-replace-0"},
+				&task.InvSetTask{TaskName: "inventory-set-0"},
 			},
 		},
 		"single resource": {
@@ -59,7 +59,7 @@ func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 						depInfo,
 					},
 				},
-				&task.InvSetTask{TaskName: "inventory-replace-0"},
+				&task.InvSetTask{TaskName: "inventory-set-0"},
 			},
 		},
 		"multiple resources with wait": {
@@ -87,7 +87,7 @@ func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 					},
 					taskrunner.AllCurrent, 1*time.Second,
 					testutil.NewFakeRESTMapper()),
-				&task.InvSetTask{TaskName: "inventory-replace-0"},
+				&task.InvSetTask{TaskName: "inventory-set-0"},
 			},
 		},
 		"multiple resources with wait and prune": {
@@ -119,7 +119,7 @@ func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 				&task.PruneTask{
 					TaskName: "prune-0",
 				},
-				&task.InvSetTask{TaskName: "inventory-replace-0"},
+				&task.InvSetTask{TaskName: "inventory-set-0"},
 			},
 		},
 		"multiple resources with wait, prune and dryrun": {
@@ -144,7 +144,7 @@ func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 				&task.PruneTask{
 					TaskName: "prune-0",
 				},
-				&task.InvSetTask{TaskName: "inventory-replace-0"},
+				&task.InvSetTask{TaskName: "inventory-set-0"},
 			},
 		},
 		"multiple resources with wait, prune and server-dryrun": {
@@ -169,7 +169,7 @@ func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 				&task.PruneTask{
 					TaskName: "prune-0",
 				},
-				&task.InvSetTask{TaskName: "inventory-replace-0"},
+				&task.InvSetTask{TaskName: "inventory-set-0"},
 			},
 		},
 		"multiple resources including CRD": {
@@ -208,7 +208,7 @@ func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 					},
 					taskrunner.AllCurrent, 1*time.Second,
 					testutil.NewFakeRESTMapper()),
-				&task.InvSetTask{TaskName: "inventory-replace-0"},
+				&task.InvSetTask{TaskName: "inventory-set-0"},
 			},
 		},
 		"no wait with CRDs if it is a dryrun": {
@@ -234,24 +234,30 @@ func TestTaskQueueSolver_BuildTaskQueue(t *testing.T) {
 						depInfo,
 					},
 				},
-				&task.InvSetTask{TaskName: "inventory-replace-0"},
+				&task.InvSetTask{TaskName: "inventory-set-0"},
 			},
 		},
 	}
 
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
-			tqs := TaskQueueSolver{
+			tqb := TaskQueueBuilder{
 				PruneOptions: pruneOptions,
 				Mapper:       testutil.NewFakeRESTMapper(),
 			}
 
 			objs := object.UnstructuredsToObjMetas(tc.objs)
-			tq := tqs.BuildTaskQueue(&fakeResourceObjects{
+			ro := &fakeResourceObjects{
 				objsForApply: tc.objs,
 				idsForApply:  objs,
 				idsForPrune:  nil,
-			}, tc.options)
+			}
+			tq := tqb.
+				AppendInvAddTask(ro).
+				AppendApplyWaitTasks(ro, tc.options).
+				AppendPruneWaitTasks(ro, tc.options).
+				AppendInvSetTask(ro).
+				Build()
 
 			assert.Equal(t, len(tc.expectedTasks), len(tq.tasks))
 			for i, expTask := range tc.expectedTasks {

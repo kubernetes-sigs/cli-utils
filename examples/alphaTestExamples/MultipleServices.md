@@ -114,6 +114,8 @@ expectedOutputLine "service/wordpress deleted"
 
 expectedOutputLine "deployment.apps/wordpress deleted"
 
+expectedOutputLine "2 resource(s) deleted, 0 skipped"
+
 # Verify that we still have the mysql resources in the cluster.
 kubectl get all --no-headers --selector=app=mysql | wc -l | xargs > $OUTPUT/status
 expectedOutputLine "4"

@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/i18n"
@@ -89,7 +88,7 @@ type ApplyRunner struct {
 }
 
 func (r *ApplyRunner) RunE(cmd *cobra.Command, args []string) error {
-	prunePropPolicy, err := convertPropagationPolicy(r.prunePropagationPolicy)
+	prunePropPolicy, err := flagutils.ConvertPropagationPolicy(r.prunePropagationPolicy)
 	if err != nil {
 		return err
 	}
@@ -157,20 +156,4 @@ func (r *ApplyRunner) RunE(cmd *cobra.Command, args []string) error {
 	// until the channel is closed.
 	printer := printers.GetPrinter(r.output, r.ioStreams)
 	return printer.Print(ch, common.DryRunNone)
-}
-
-// convertPropagationPolicy converts a propagationPolicy described as a
-// string to a DeletionPropagation type that is passed into the Applier.
-func convertPropagationPolicy(propagationPolicy string) (metav1.DeletionPropagation, error) {
-	switch propagationPolicy {
-	case string(metav1.DeletePropagationForeground):
-		return metav1.DeletePropagationForeground, nil
-	case string(metav1.DeletePropagationBackground):
-		return metav1.DeletePropagationBackground, nil
-	case string(metav1.DeletePropagationOrphan):
-		return metav1.DeletePropagationOrphan, nil
-	default:
-		return metav1.DeletePropagationBackground, fmt.Errorf(
-			"prune propagation policy must be one of Background, Foreground, Orphan")
-	}
 }

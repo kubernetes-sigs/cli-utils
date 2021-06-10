@@ -254,5 +254,8 @@ expectedOutputLine "configmap/the-map2 deleted"
 
 expectedOutputLine "service/the-service deleted"
 
+expectedOutputLine "3 resource(s) deleted, 0 skipped"
+expectedNotFound "resource(s) pruned"
+
 kind delete cluster;
 ```

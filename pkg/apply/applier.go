@@ -190,7 +190,7 @@ func (r *ResourceObjects) AllIds() []object.ObjMetadata {
 // on progress and any errors are reported back on the event channel.
 // Cancelling the operation or setting timeout on how long to Wait
 // for it complete can be done with the passed in context.
-// Note: There sn't currently any way to interrupt the operation
+// Note: There isn't currently any way to interrupt the operation
 // before all the given resources have been applied to the cluster. Any
 // cancellation or timeout will only affect how long we Wait for the
 // resources to become current.
@@ -201,31 +201,29 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.InventoryInfo, obje
 	a.invClient.SetDryRunStrategy(options.DryRunStrategy) // client shared with prune, so sets dry-run for prune too.
 	go func() {
 		defer close(eventChannel)
-
 		// This provides us with a slice of all the objects that will be
 		// applied to the cluster. This takes care of ordering resources
 		// and handling the inventory object.
-		resourceObjects, err := a.prepareObjects(invInfo, objects)
+		resourceObjs, err := a.prepareObjects(invInfo, objects)
 		if err != nil {
 			handleError(eventChannel, err)
 			return
 		}
-
 		mapper, err := a.provider.Factory().ToRESTMapper()
 		if err != nil {
 			handleError(eventChannel, err)
 			return
 		}
-
 		// Fetch the queue (channel) of tasks that should be executed.
 		klog.V(4).Infoln("applier building task queue...")
-		taskQueue := (&solver.TaskQueueSolver{
+		taskBuilder := &solver.TaskQueueBuilder{
 			PruneOptions: a.PruneOptions,
 			Factory:      a.provider.Factory(),
 			InfoHelper:   a.infoHelper,
 			Mapper:       mapper,
 			InvClient:    a.invClient,
-		}).BuildTaskQueue(resourceObjects, solver.Options{
+		}
+		opts := solver.Options{
 			ServerSideOptions:      options.ServerSideOptions,
 			ReconcileTimeout:       options.ReconcileTimeout,
 			Prune:                  !options.NoPrune,
@@ -233,8 +231,14 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.InventoryInfo, obje
 			PrunePropagationPolicy: options.PrunePropagationPolicy,
 			PruneTimeout:           options.PruneTimeout,
 			InventoryPolicy:        options.InventoryPolicy,
-		})
-
+		}
+		// Build the task queue by appending tasks in the proper order.
+		taskQueue := taskBuilder.
+			AppendInvAddTask(resourceObjs).
+			AppendApplyWaitTasks(resourceObjs, opts).
+			AppendPruneWaitTasks(resourceObjs, opts).
+			AppendInvSetTask(resourceObjs).
+			Build()
 		// Send event to inform the caller about the resources that
 		// will be applied/pruned.
 		eventChannel <- event.Event{
@@ -243,10 +247,9 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.InventoryInfo, obje
 				ActionGroups: taskQueue.ToActionGroups(),
 			},
 		}
-
 		// Create a new TaskStatusRunner to execute the taskQueue.
 		klog.V(4).Infoln("applier building TaskStatusRunner...")
-		runner := taskrunner.NewTaskStatusRunner(resourceObjects.AllIds(), a.StatusPoller)
+		runner := taskrunner.NewTaskStatusRunner(resourceObjs.AllIds(), a.StatusPoller)
 		klog.V(4).Infoln("applier running TaskStatusRunner...")
 		err = runner.Run(ctx, taskQueue.ToChannel(), eventChannel, taskrunner.Options{
 			PollInterval:     options.PollInterval,
@@ -303,7 +306,7 @@ type Options struct {
 // have not been provided.
 func setDefaults(o *Options) {
 	if o.PollInterval == time.Duration(0) {
-		o.PollInterval = 2 * time.Second
+		o.PollInterval = poller.DefaultPollInterval
 	}
 	if o.PrunePropagationPolicy == metav1.DeletionPropagation("") {
 		o.PrunePropagationPolicy = metav1.DeletePropagationBackground

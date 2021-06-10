@@ -33,7 +33,11 @@ func (p *PruneTask) Name() string {
 }
 
 func (p *PruneTask) Action() event.ResourceAction {
-	return event.PruneAction
+	action := event.PruneAction
+	if p.PruneOptions.Destroy {
+		action = event.DeleteAction
+	}
+	return action
 }
 
 func (p *PruneTask) Identifiers() []object.ObjMetadata {
