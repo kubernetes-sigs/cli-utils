@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
@@ -595,26 +596,19 @@ func TestApplier(t *testing.T) {
 			tf.FakeDynamicClient = fakeDynamicClient(t, mapper, objs...)
 
 			cf := provider.NewProvider(tf)
-			applier := NewApplier(cf)
+			poller := &fakePoller{
+				events: tc.statusEvents,
+				start:  make(chan struct{}),
+			}
+			applier, err := NewApplier(cf, poller)
+			require.NoError(t, err)
 			applier.infoHelper = &fakeInfoHelper{
 				factory: tf,
-			}
-
-			err = applier.Initialize()
-			if !assert.NoError(t, err) {
-				return
 			}
 			// TODO(mortent): This is not great, but at least this keeps the
 			// ugliness in the test code until we can find a way to wire it
 			// up so to avoid it.
 			applier.invClient.(*inventory.ClusterInventoryClient).InfoHelper = applier.infoHelper
-
-			poller := &fakePoller{
-				events: tc.statusEvents,
-				start:  make(chan struct{}),
-			}
-			applier.StatusPoller = poller
-
 			ctx := context.Background()
 			eventChannel := applier.Run(ctx, tc.invInfo.toWrapped(), tc.resources, Options{
 				ReconcileTimeout: tc.reconcileTimeout,
@@ -783,7 +777,7 @@ func TestReadAndPrepareObjects(t *testing.T) {
 				scheme.Scheme.PrioritizedVersionsAllGroups()...)
 			// Create applier with fake inventory client, and call prepareObjects
 			applier := &Applier{
-				PruneOptions: po,
+				pruneOptions: po,
 				invClient:    fakeInvClient,
 			}
 			applyObjs, pruneObjs, err := applier.prepareObjects(tc.inventory, tc.localObjs)

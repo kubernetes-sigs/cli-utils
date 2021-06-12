@@ -20,11 +20,11 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/manifestreader"
 	"sigs.k8s.io/cli-utils/pkg/provider"
+	"sigs.k8s.io/cli-utils/pkg/util/factory"
 )
 
 func GetApplyRunner(provider provider.Provider, loader manifestreader.ManifestLoader, ioStreams genericclioptions.IOStreams) *ApplyRunner {
 	r := &ApplyRunner{
-		Applier:   apply.NewApplier(provider),
 		ioStreams: ioStreams,
 		provider:  provider,
 		loader:    loader,
@@ -73,7 +73,6 @@ type ApplyRunner struct {
 	Command    *cobra.Command
 	PreProcess func(info inventory.InventoryInfo, strategy common.DryRunStrategy) (inventory.InventoryPolicy, error)
 	ioStreams  genericclioptions.IOStreams
-	Applier    *apply.Applier
 	provider   provider.Provider
 	loader     manifestreader.ManifestLoader
 
@@ -132,13 +131,19 @@ func (r *ApplyRunner) RunE(cmd *cobra.Command, args []string) error {
 			return err
 		}
 	}
+	f := r.provider.Factory()
+	statusPoller, err := factory.NewStatusPoller(f)
+	if err != nil {
+		return err
+	}
 
 	// Run the applier. It will return a channel where we can receive updates
 	// to keep track of progress and any issues.
-	if err := r.Applier.Initialize(); err != nil {
+	a, err := apply.NewApplier(r.provider, statusPoller)
+	if err != nil {
 		return err
 	}
-	ch := r.Applier.Run(context.Background(), inv, objs, apply.Options{
+	ch := a.Run(context.Background(), inv, objs, apply.Options{
 		ServerSideOptions: r.serverSideOptions,
 		PollInterval:      r.period,
 		ReconcileTimeout:  r.reconcileTimeout,
