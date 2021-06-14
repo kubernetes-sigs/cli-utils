@@ -51,6 +51,9 @@ type ExpDeleteEvent struct {
 }
 
 func VerifyEvents(expEvents []ExpEvent, events []event.Event) error {
+	if len(expEvents) == 0 && len(events) == 0 {
+		return nil
+	}
 	expEventIndex := 0
 	for i := range events {
 		e := events[i]

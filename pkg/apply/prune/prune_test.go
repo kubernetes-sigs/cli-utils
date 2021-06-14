@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -23,6 +24,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/object"
+	"sigs.k8s.io/cli-utils/pkg/testutil"
 )
 
 var testNamespace = "test-inventory-namespace"
@@ -179,23 +181,23 @@ func TestPrune(t *testing.T) {
 		options         Options
 		currentUIDs     sets.String
 		localNamespaces sets.String
-		expectedEvents  []event.Event
+		expectedEvents  []testutil.ExpEvent
 	}{
 		"No pruned objects; no prune/delete events": {
 			pruneObjs:       []*unstructured.Unstructured{},
 			options:         defaultOptions,
 			localNamespaces: sets.NewString(),
+			expectedEvents:  []testutil.ExpEvent{},
 		},
 		"One successfully pruned object": {
 			pruneObjs:       []*unstructured.Unstructured{pod},
 			options:         defaultOptions,
 			localNamespaces: sets.NewString(),
-			expectedEvents: []event.Event{
+			expectedEvents: []testutil.ExpEvent{
 				{
-					Type: event.PruneType,
-					PruneEvent: event.PruneEvent{
+					EventType: event.PruneType,
+					PruneEvent: &testutil.ExpPruneEvent{
 						Operation: event.Pruned,
-						Object:    pod,
 					},
 				},
 			},
@@ -204,26 +206,23 @@ func TestPrune(t *testing.T) {
 			pruneObjs:       []*unstructured.Unstructured{pod, pdb, namespace},
 			options:         defaultOptions,
 			localNamespaces: sets.NewString(),
-			expectedEvents: []event.Event{
+			expectedEvents: []testutil.ExpEvent{
 				{
-					Type: event.PruneType,
-					PruneEvent: event.PruneEvent{
+					EventType: event.PruneType,
+					PruneEvent: &testutil.ExpPruneEvent{
 						Operation: event.Pruned,
-						Object:    pod,
 					},
 				},
 				{
-					Type: event.PruneType,
-					PruneEvent: event.PruneEvent{
+					EventType: event.PruneType,
+					PruneEvent: &testutil.ExpPruneEvent{
 						Operation: event.Pruned,
-						Object:    pdb,
 					},
 				},
 				{
-					Type: event.PruneType,
-					PruneEvent: event.PruneEvent{
+					EventType: event.PruneType,
+					PruneEvent: &testutil.ExpPruneEvent{
 						Operation: event.Pruned,
-						Object:    namespace,
 					},
 				},
 			},
@@ -233,12 +232,11 @@ func TestPrune(t *testing.T) {
 			destroy:         true,
 			options:         defaultOptions,
 			localNamespaces: sets.NewString(),
-			expectedEvents: []event.Event{
+			expectedEvents: []testutil.ExpEvent{
 				{
-					Type: event.DeleteType,
-					DeleteEvent: event.DeleteEvent{
+					EventType: event.DeleteType,
+					DeleteEvent: &testutil.ExpDeleteEvent{
 						Operation: event.Deleted,
-						Object:    pod,
 					},
 				},
 			},
@@ -248,26 +246,23 @@ func TestPrune(t *testing.T) {
 			destroy:         true,
 			options:         defaultOptions,
 			localNamespaces: sets.NewString(),
-			expectedEvents: []event.Event{
+			expectedEvents: []testutil.ExpEvent{
 				{
-					Type: event.DeleteType,
-					DeleteEvent: event.DeleteEvent{
+					EventType: event.DeleteType,
+					DeleteEvent: &testutil.ExpDeleteEvent{
 						Operation: event.Deleted,
-						Object:    pod,
 					},
 				},
 				{
-					Type: event.DeleteType,
-					DeleteEvent: event.DeleteEvent{
+					EventType: event.DeleteType,
+					DeleteEvent: &testutil.ExpDeleteEvent{
 						Operation: event.Deleted,
-						Object:    pdb,
 					},
 				},
 				{
-					Type: event.DeleteType,
-					DeleteEvent: event.DeleteEvent{
+					EventType: event.DeleteType,
+					DeleteEvent: &testutil.ExpDeleteEvent{
 						Operation: event.Deleted,
-						Object:    namespace,
 					},
 				},
 			},
@@ -276,12 +271,11 @@ func TestPrune(t *testing.T) {
 			pruneObjs:       []*unstructured.Unstructured{pod},
 			options:         clientDryRunOptions,
 			localNamespaces: sets.NewString(),
-			expectedEvents: []event.Event{
+			expectedEvents: []testutil.ExpEvent{
 				{
-					Type: event.PruneType,
-					PruneEvent: event.PruneEvent{
+					EventType: event.PruneType,
+					PruneEvent: &testutil.ExpPruneEvent{
 						Operation: event.Pruned,
-						Object:    pod,
 					},
 				},
 			},
@@ -291,12 +285,11 @@ func TestPrune(t *testing.T) {
 			destroy:         true,
 			options:         serverDryRunOptions,
 			localNamespaces: sets.NewString(),
-			expectedEvents: []event.Event{
+			expectedEvents: []testutil.ExpEvent{
 				{
-					Type: event.DeleteType,
-					DeleteEvent: event.DeleteEvent{
+					EventType: event.DeleteType,
+					DeleteEvent: &testutil.ExpDeleteEvent{
 						Operation: event.Deleted,
-						Object:    pod,
 					},
 				},
 			},
@@ -306,18 +299,18 @@ func TestPrune(t *testing.T) {
 			options:         defaultOptions,
 			localNamespaces: sets.NewString(),
 			currentUIDs:     sets.NewString("uid1"),
+			expectedEvents:  []testutil.ExpEvent{},
 		},
 		"UID match for only one object means only one pruned": {
 			pruneObjs:       []*unstructured.Unstructured{pod, pdb},
 			options:         defaultOptions,
 			currentUIDs:     sets.NewString("uid1"),
 			localNamespaces: sets.NewString(),
-			expectedEvents: []event.Event{
+			expectedEvents: []testutil.ExpEvent{
 				{
-					Type: event.PruneType,
-					PruneEvent: event.PruneEvent{
+					EventType: event.PruneType,
+					PruneEvent: &testutil.ExpPruneEvent{
 						Operation: event.Pruned,
-						Object:    pdb,
 					},
 				},
 			},
@@ -326,12 +319,11 @@ func TestPrune(t *testing.T) {
 			pruneObjs:       []*unstructured.Unstructured{preventDelete},
 			options:         defaultOptions,
 			localNamespaces: sets.NewString(),
-			expectedEvents: []event.Event{
+			expectedEvents: []testutil.ExpEvent{
 				{
-					Type: event.PruneType,
-					PruneEvent: event.PruneEvent{
+					EventType: event.PruneType,
+					PruneEvent: &testutil.ExpPruneEvent{
 						Operation: event.PruneSkipped,
-						Object:    preventDelete,
 					},
 				},
 			},
@@ -341,12 +333,11 @@ func TestPrune(t *testing.T) {
 			destroy:         true,
 			options:         defaultOptions,
 			localNamespaces: sets.NewString(),
-			expectedEvents: []event.Event{
+			expectedEvents: []testutil.ExpEvent{
 				{
-					Type: event.DeleteType,
-					DeleteEvent: event.DeleteEvent{
+					EventType: event.DeleteType,
+					DeleteEvent: &testutil.ExpDeleteEvent{
 						Operation: event.DeleteSkipped,
-						Object:    preventDelete,
 					},
 				},
 			},
@@ -355,19 +346,17 @@ func TestPrune(t *testing.T) {
 			pruneObjs:       []*unstructured.Unstructured{preventDelete, pod},
 			options:         defaultOptions,
 			localNamespaces: sets.NewString(),
-			expectedEvents: []event.Event{
+			expectedEvents: []testutil.ExpEvent{
 				{
-					Type: event.PruneType,
-					PruneEvent: event.PruneEvent{
+					EventType: event.PruneType,
+					PruneEvent: &testutil.ExpPruneEvent{
 						Operation: event.PruneSkipped,
-						Object:    preventDelete,
 					},
 				},
 				{
-					Type: event.PruneType,
-					PruneEvent: event.PruneEvent{
+					EventType: event.PruneType,
+					PruneEvent: &testutil.ExpPruneEvent{
 						Operation: event.Pruned,
-						Object:    pod,
 					},
 				},
 			},
@@ -376,17 +365,17 @@ func TestPrune(t *testing.T) {
 			pruneObjs:       []*unstructured.Unstructured{namespace},
 			options:         defaultOptions,
 			localNamespaces: sets.NewString(namespace.GetName()),
-			expectedEvents: []event.Event{
+			expectedEvents: []testutil.ExpEvent{
 				{
-					Type: event.PruneType,
-					PruneEvent: event.PruneEvent{
+					EventType: event.PruneType,
+					PruneEvent: &testutil.ExpPruneEvent{
 						Operation: event.PruneSkipped,
-						Object:    namespace,
 					},
 				},
 			},
 		},
 	}
+
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			po := NewPruneOptions()
@@ -422,14 +411,8 @@ func TestPrune(t *testing.T) {
 				actualEvents = append(actualEvents, e)
 			}
 			// Validate the expected/actual events
-			if len(tc.expectedEvents) != len(actualEvents) {
-				t.Fatalf("expected %d prune events, got %d", len(tc.expectedEvents), len(actualEvents))
-			}
-			for _, expected := range tc.expectedEvents {
-				if !eventExists(actualEvents, expected) {
-					t.Errorf("expected event (%#v) not found in actual events", expected)
-				}
-			}
+			err = testutil.VerifyEvents(tc.expectedEvents, actualEvents)
+			assert.NoError(t, err)
 		})
 	}
 }
@@ -438,14 +421,14 @@ func TestPruneWithErrors(t *testing.T) {
 	tests := map[string]struct {
 		pruneObjs      []*unstructured.Unstructured
 		destroy        bool
-		expectedEvents []event.Event
+		expectedEvents []testutil.ExpEvent
 	}{
 		"Prune delete failure": {
 			pruneObjs: []*unstructured.Unstructured{pdbDeleteFailure},
-			expectedEvents: []event.Event{
+			expectedEvents: []testutil.ExpEvent{
 				{
-					Type: event.PruneType,
-					PruneEvent: event.PruneEvent{
+					EventType: event.PruneType,
+					PruneEvent: &testutil.ExpPruneEvent{
 						Identifier: object.UnstructuredToObjMeta(pdbDeleteFailure),
 						Error:      fmt.Errorf("expected delete error"),
 					},
@@ -455,10 +438,10 @@ func TestPruneWithErrors(t *testing.T) {
 		"Destroy delete failure": {
 			pruneObjs: []*unstructured.Unstructured{pdbDeleteFailure},
 			destroy:   true,
-			expectedEvents: []event.Event{
+			expectedEvents: []testutil.ExpEvent{
 				{
-					Type: event.DeleteType,
-					DeleteEvent: event.DeleteEvent{
+					EventType: event.DeleteType,
+					DeleteEvent: &testutil.ExpDeleteEvent{
 						Identifier: object.UnstructuredToObjMeta(pdbDeleteFailure),
 						Error:      fmt.Errorf("expected delete error"),
 					},
@@ -495,75 +478,10 @@ func TestPruneWithErrors(t *testing.T) {
 			for e := range eventChannel {
 				actualEvents = append(actualEvents, e)
 			}
-			// Validate the expected/actual error events
-			if len(tc.expectedEvents) != len(actualEvents) {
-				t.Fatalf("expected %d prune events, got %d", len(tc.expectedEvents), len(actualEvents))
-			}
-			for _, expected := range tc.expectedEvents {
-				if !errorEventExists(actualEvents, expected) {
-					t.Errorf("expected event: %v not found in actual events", expected)
-				}
-			}
+			err = testutil.VerifyEvents(tc.expectedEvents, actualEvents)
+			assert.NoError(t, err)
 		})
 	}
-}
-
-// eventExists returns true if the passed "expected" event exists in the
-// slice of "actualEvents".
-func eventExists(actualEvents []event.Event, expected event.Event) bool {
-	for _, actual := range actualEvents {
-		if expected.Type == actual.Type {
-			if expected.Type == event.PruneType {
-				expectedPruneEvent := expected.PruneEvent
-				actualPruneEvent := actual.PruneEvent
-				if expectedPruneEvent.Operation == actualPruneEvent.Operation &&
-					expectedPruneEvent.Object == actualPruneEvent.Object {
-					return true
-				}
-			}
-			if expected.Type == event.DeleteType {
-				expectedDeleteEvent := expected.DeleteEvent
-				actualDeleteEvent := actual.DeleteEvent
-				if expectedDeleteEvent.Operation == actualDeleteEvent.Operation &&
-					expectedDeleteEvent.Object == actualDeleteEvent.Object {
-					return true
-				}
-			}
-		}
-	}
-	return false
-}
-
-// errorEventExists returns true if the passed "expected" event exists in the
-// slice of "actualEvents".
-func errorEventExists(actualEvents []event.Event, expected event.Event) bool {
-	for _, actual := range actualEvents {
-		if expected.Type == actual.Type {
-			if expected.Type == event.PruneType {
-				expectedPruneEvent := expected.PruneEvent
-				actualPruneEvent := actual.PruneEvent
-				if expectedPruneEvent.Identifier == actualPruneEvent.Identifier {
-					expectedErr := expectedPruneEvent.Error
-					actualErr := actualPruneEvent.Error
-					if expectedErr.Error() == actualErr.Error() {
-						return true
-					}
-				}
-			}
-			if expected.Type == event.DeleteType {
-				expectedDeleteEvent := expected.DeleteEvent
-				actualDeleteEvent := actual.DeleteEvent
-				if expectedDeleteEvent.Identifier == actualDeleteEvent.Identifier {
-					expectedErr := expectedDeleteEvent.Error
-					actualErr := actualDeleteEvent.Error
-					if expectedErr.Error() == actualErr.Error() {
-						return true
-					}
-				}
-			}
-		}
-	}
-	return false
 }
 
 func TestGetPruneObjs(t *testing.T) {
