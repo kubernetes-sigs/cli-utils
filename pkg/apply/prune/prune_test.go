@@ -6,10 +6,10 @@ package prune
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -24,6 +24,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/object"
+	"sigs.k8s.io/cli-utils/pkg/testutil"
 )
 
 var testNamespace = "test-inventory-namespace"
@@ -92,21 +93,6 @@ var pdb = &unstructured.Unstructured{
 	},
 }
 
-var pdbGetFailure = &unstructured.Unstructured{
-	Object: map[string]interface{}{
-		"apiVersion": "policy/v1beta1",
-		"kind":       "PodDisruptionBudget",
-		"metadata": map[string]interface{}{
-			"name":      pdbName + "get-failure",
-			"namespace": testNamespace,
-			"uid":       "uid2",
-			"annotations": map[string]interface{}{
-				"config.k8s.io/owning-inventory": testInventoryLabel,
-			},
-		},
-	},
-}
-
 var pdbDeleteFailure = &unstructured.Unstructured{
 	Object: map[string]interface{}{
 		"apiVersion": "policy/v1beta1",
@@ -130,20 +116,6 @@ var role = &unstructured.Unstructured{
 			"name":      roleName,
 			"namespace": testNamespace,
 			"uid":       "uid3",
-			"annotations": map[string]interface{}{
-				"config.k8s.io/owning-inventory": testInventoryLabel,
-			},
-		},
-	},
-}
-
-var unknownCR = &unstructured.Unstructured{
-	Object: map[string]interface{}{
-		"apiVersion": "cli-utils.test/v1",
-		"kind":       "Unknown",
-		"metadata": map[string]interface{}{
-			"name":      "test",
-			"namespace": "default",
 			"annotations": map[string]interface{}{
 				"config.k8s.io/owning-inventory": testInventoryLabel,
 			},
@@ -183,155 +155,403 @@ var preventDelete = &unstructured.Unstructured{
 	},
 }
 
+// Options with different dry-run values.
+var (
+	defaultOptions = Options{
+		DryRunStrategy:    common.DryRunNone,
+		PropagationPolicy: metav1.DeletePropagationBackground,
+		InventoryPolicy:   inventory.InventoryPolicyMustMatch,
+	}
+	clientDryRunOptions = Options{
+		DryRunStrategy:    common.DryRunClient,
+		PropagationPolicy: metav1.DeletePropagationBackground,
+		InventoryPolicy:   inventory.InventoryPolicyMustMatch,
+	}
+	serverDryRunOptions = Options{
+		DryRunStrategy:    common.DryRunServer,
+		PropagationPolicy: metav1.DeletePropagationBackground,
+		InventoryPolicy:   inventory.InventoryPolicyMustMatch,
+	}
+)
+
 func TestPrune(t *testing.T) {
 	tests := map[string]struct {
-		// pastObjs/currentObjs do NOT contain the inventory object.
-		// Inventory object is generated from these past/current objects.
-		pastObjs       []*unstructured.Unstructured
-		currentObjs    []*unstructured.Unstructured
-		prunedObjs     []*unstructured.Unstructured
-		pruneEventObjs []*unstructured.Unstructured
+		pruneObjs       []*unstructured.Unstructured
+		destroy         bool
+		options         Options
+		currentUIDs     sets.String
+		localNamespaces sets.String
+		expectedEvents  []testutil.ExpEvent
 	}{
-		"Past and current objects are empty; no pruned objects": {
-			pastObjs:       []*unstructured.Unstructured{},
-			currentObjs:    []*unstructured.Unstructured{},
-			prunedObjs:     []*unstructured.Unstructured{},
-			pruneEventObjs: []*unstructured.Unstructured{},
+		"No pruned objects; no prune/delete events": {
+			pruneObjs:       []*unstructured.Unstructured{},
+			options:         defaultOptions,
+			localNamespaces: sets.NewString(),
+			expectedEvents:  []testutil.ExpEvent{},
 		},
-		"Past and current objects are the same; no pruned objects": {
-			pastObjs:       []*unstructured.Unstructured{namespace, pdb},
-			currentObjs:    []*unstructured.Unstructured{pdb, namespace},
-			prunedObjs:     []*unstructured.Unstructured{},
-			pruneEventObjs: []*unstructured.Unstructured{},
+		"One successfully pruned object": {
+			pruneObjs:       []*unstructured.Unstructured{pod},
+			options:         defaultOptions,
+			localNamespaces: sets.NewString(),
+			expectedEvents: []testutil.ExpEvent{
+				{
+					EventType: event.PruneType,
+					PruneEvent: &testutil.ExpPruneEvent{
+						Operation: event.Pruned,
+					},
+				},
+			},
 		},
-		"No past objects; no pruned objects": {
-			pastObjs:       []*unstructured.Unstructured{},
-			currentObjs:    []*unstructured.Unstructured{pdb, namespace},
-			pruneEventObjs: []*unstructured.Unstructured{},
-			prunedObjs:     []*unstructured.Unstructured{},
+		"Multiple successfully pruned object": {
+			pruneObjs:       []*unstructured.Unstructured{pod, pdb, namespace},
+			options:         defaultOptions,
+			localNamespaces: sets.NewString(),
+			expectedEvents: []testutil.ExpEvent{
+				{
+					EventType: event.PruneType,
+					PruneEvent: &testutil.ExpPruneEvent{
+						Operation: event.Pruned,
+					},
+				},
+				{
+					EventType: event.PruneType,
+					PruneEvent: &testutil.ExpPruneEvent{
+						Operation: event.Pruned,
+					},
+				},
+				{
+					EventType: event.PruneType,
+					PruneEvent: &testutil.ExpPruneEvent{
+						Operation: event.Pruned,
+					},
+				},
+			},
 		},
-		"No current objects; all previous objects pruned in correct order": {
-			pastObjs:       []*unstructured.Unstructured{pdb, role, pod},
-			currentObjs:    []*unstructured.Unstructured{},
-			prunedObjs:     []*unstructured.Unstructured{pod, pdb, role},
-			pruneEventObjs: []*unstructured.Unstructured{pod, pdb, role},
+		"One successfully deleted object": {
+			pruneObjs:       []*unstructured.Unstructured{pod},
+			destroy:         true,
+			options:         defaultOptions,
+			localNamespaces: sets.NewString(),
+			expectedEvents: []testutil.ExpEvent{
+				{
+					EventType: event.DeleteType,
+					DeleteEvent: &testutil.ExpDeleteEvent{
+						Operation: event.Deleted,
+					},
+				},
+			},
 		},
-		"Omitted object is pruned": {
-			pastObjs:       []*unstructured.Unstructured{pdb, role},
-			currentObjs:    []*unstructured.Unstructured{pdb},
-			prunedObjs:     []*unstructured.Unstructured{role},
-			pruneEventObjs: []*unstructured.Unstructured{role},
+		"Multiple successfully deleted objects": {
+			pruneObjs:       []*unstructured.Unstructured{pod, pdb, namespace},
+			destroy:         true,
+			options:         defaultOptions,
+			localNamespaces: sets.NewString(),
+			expectedEvents: []testutil.ExpEvent{
+				{
+					EventType: event.DeleteType,
+					DeleteEvent: &testutil.ExpDeleteEvent{
+						Operation: event.Deleted,
+					},
+				},
+				{
+					EventType: event.DeleteType,
+					DeleteEvent: &testutil.ExpDeleteEvent{
+						Operation: event.Deleted,
+					},
+				},
+				{
+					EventType: event.DeleteType,
+					DeleteEvent: &testutil.ExpDeleteEvent{
+						Operation: event.Deleted,
+					},
+				},
+			},
 		},
-		"Prevent delete lifecycle annotation stops pruning": {
-			pastObjs:       []*unstructured.Unstructured{preventDelete, pdb},
-			currentObjs:    []*unstructured.Unstructured{pdb, role},
-			prunedObjs:     []*unstructured.Unstructured{},
-			pruneEventObjs: []*unstructured.Unstructured{preventDelete},
+		"Client dry run still pruned event": {
+			pruneObjs:       []*unstructured.Unstructured{pod},
+			options:         clientDryRunOptions,
+			localNamespaces: sets.NewString(),
+			expectedEvents: []testutil.ExpEvent{
+				{
+					EventType: event.PruneType,
+					PruneEvent: &testutil.ExpPruneEvent{
+						Operation: event.Pruned,
+					},
+				},
+			},
 		},
-		"Namespace not pruned if objects are still in it": {
-			pastObjs:       []*unstructured.Unstructured{namespace, pdb, pod},
-			currentObjs:    []*unstructured.Unstructured{pod},
-			prunedObjs:     []*unstructured.Unstructured{pdb},
-			pruneEventObjs: []*unstructured.Unstructured{pdb, namespace},
+		"Server dry run still deleted event": {
+			pruneObjs:       []*unstructured.Unstructured{pod},
+			destroy:         true,
+			options:         serverDryRunOptions,
+			localNamespaces: sets.NewString(),
+			expectedEvents: []testutil.ExpEvent{
+				{
+					EventType: event.DeleteType,
+					DeleteEvent: &testutil.ExpDeleteEvent{
+						Operation: event.Deleted,
+					},
+				},
+			},
 		},
-		"unknown type doesn't emit prune failed event": {
-			pastObjs:       []*unstructured.Unstructured{unknownCR},
-			currentObjs:    []*unstructured.Unstructured{},
-			prunedObjs:     []*unstructured.Unstructured{unknownCR},
-			pruneEventObjs: []*unstructured.Unstructured{},
+		"UID match means no prune": {
+			pruneObjs:       []*unstructured.Unstructured{pod},
+			options:         defaultOptions,
+			localNamespaces: sets.NewString(),
+			currentUIDs:     sets.NewString("uid1"),
+			expectedEvents:  []testutil.ExpEvent{},
+		},
+		"UID match for only one object means only one pruned": {
+			pruneObjs:       []*unstructured.Unstructured{pod, pdb},
+			options:         defaultOptions,
+			currentUIDs:     sets.NewString("uid1"),
+			localNamespaces: sets.NewString(),
+			expectedEvents: []testutil.ExpEvent{
+				{
+					EventType: event.PruneType,
+					PruneEvent: &testutil.ExpPruneEvent{
+						Operation: event.Pruned,
+					},
+				},
+			},
+		},
+		"Prevent delete annotation equals prune skipped": {
+			pruneObjs:       []*unstructured.Unstructured{preventDelete},
+			options:         defaultOptions,
+			localNamespaces: sets.NewString(),
+			expectedEvents: []testutil.ExpEvent{
+				{
+					EventType: event.PruneType,
+					PruneEvent: &testutil.ExpPruneEvent{
+						Operation: event.PruneSkipped,
+					},
+				},
+			},
+		},
+		"Prevent delete annotation equals delete skipped": {
+			pruneObjs:       []*unstructured.Unstructured{preventDelete},
+			destroy:         true,
+			options:         defaultOptions,
+			localNamespaces: sets.NewString(),
+			expectedEvents: []testutil.ExpEvent{
+				{
+					EventType: event.DeleteType,
+					DeleteEvent: &testutil.ExpDeleteEvent{
+						Operation: event.DeleteSkipped,
+					},
+				},
+			},
+		},
+		"Prevent delete annotation, one skipped, one pruned": {
+			pruneObjs:       []*unstructured.Unstructured{preventDelete, pod},
+			options:         defaultOptions,
+			localNamespaces: sets.NewString(),
+			expectedEvents: []testutil.ExpEvent{
+				{
+					EventType: event.PruneType,
+					PruneEvent: &testutil.ExpPruneEvent{
+						Operation: event.PruneSkipped,
+					},
+				},
+				{
+					EventType: event.PruneType,
+					PruneEvent: &testutil.ExpPruneEvent{
+						Operation: event.Pruned,
+					},
+				},
+			},
+		},
+		"Namespace prune skipped": {
+			pruneObjs:       []*unstructured.Unstructured{namespace},
+			options:         defaultOptions,
+			localNamespaces: sets.NewString(namespace.GetName()),
+			expectedEvents: []testutil.ExpEvent{
+				{
+					EventType: event.PruneType,
+					PruneEvent: &testutil.ExpPruneEvent{
+						Operation: event.PruneSkipped,
+					},
+				},
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			po := NewPruneOptions()
+			po.Destroy = tc.destroy
+			po.LocalNamespaces = tc.localNamespaces
+			pruneIds := object.UnstructuredsToObjMetas(tc.pruneObjs)
+			fakeInvClient := inventory.NewFakeInventoryClient(pruneIds)
+			po.InvClient = fakeInvClient
+			currentInventory := createInventoryInfo(tc.pruneObjs...)
+			// Set up the fake dynamic client to recognize all objects, and the RESTMapper.
+			objs := []runtime.Object{}
+			for _, obj := range tc.pruneObjs {
+				objs = append(objs, obj)
+			}
+			po.Client = fake.NewSimpleDynamicClient(scheme.Scheme, objs...)
+			po.Mapper = testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme,
+				scheme.Scheme.PrioritizedVersionsAllGroups()...)
+			// The event channel can not block; make sure its bigger than all
+			// the events that can be put on it.
+			eventChannel := make(chan event.Event, len(tc.pruneObjs))
+			taskContext := taskrunner.NewTaskContext(eventChannel)
+			err := func() error {
+				defer close(eventChannel)
+				// Run the prune and validate.
+				return po.Prune(currentInventory, tc.pruneObjs, tc.currentUIDs, taskContext, tc.options)
+			}()
+
+			if err != nil {
+				t.Fatalf("Unexpected error during Prune(): %#v", err)
+			}
+			var actualEvents []event.Event
+			for e := range eventChannel {
+				actualEvents = append(actualEvents, e)
+			}
+			// Validate the expected/actual events
+			err = testutil.VerifyEvents(tc.expectedEvents, actualEvents)
+			assert.NoError(t, err)
+		})
+	}
+}
+
+func TestPruneWithErrors(t *testing.T) {
+	tests := map[string]struct {
+		pruneObjs      []*unstructured.Unstructured
+		destroy        bool
+		expectedEvents []testutil.ExpEvent
+	}{
+		"Prune delete failure": {
+			pruneObjs: []*unstructured.Unstructured{pdbDeleteFailure},
+			expectedEvents: []testutil.ExpEvent{
+				{
+					EventType: event.PruneType,
+					PruneEvent: &testutil.ExpPruneEvent{
+						Identifier: object.UnstructuredToObjMeta(pdbDeleteFailure),
+						Error:      fmt.Errorf("expected delete error"),
+					},
+				},
+			},
+		},
+		"Destroy delete failure": {
+			pruneObjs: []*unstructured.Unstructured{pdbDeleteFailure},
+			destroy:   true,
+			expectedEvents: []testutil.ExpEvent{
+				{
+					EventType: event.DeleteType,
+					DeleteEvent: &testutil.ExpDeleteEvent{
+						Identifier: object.UnstructuredToObjMeta(pdbDeleteFailure),
+						Error:      fmt.Errorf("expected delete error"),
+					},
+				},
+			},
 		},
 	}
 	for name, tc := range tests {
-		for i := range common.Strategies {
-			drs := common.Strategies[i]
-			t.Run(name, func(t *testing.T) {
-				po := NewPruneOptions()
-				// Set up the union of previously applied objects and the
-				// currently applied objects as the current inventory items.
-				clusterObjs := object.UnstructuredsToObjMetas(tc.pastObjs)
-				currentObjs := object.UnstructuredsToObjMetas(tc.currentObjs)
-				fakeInvClient := inventory.NewFakeInventoryClient(object.Union(clusterObjs, currentObjs))
-				po.InvClient = fakeInvClient
-				// Set up the current inventory with union of objects.
-				unionObjs := unionObjects(tc.pastObjs, tc.currentObjs)
-				currentInventory := createInventoryInfo(unionObjs...)
-				// Set up the fake dynamic client to recognize all objects, and the RESTMapper.
-				objs := []runtime.Object{}
-				for _, obj := range unionObjs {
-					objs = append(objs, obj)
-				}
-				po.client = fake.NewSimpleDynamicClient(scheme.Scheme, objs...)
-				po.mapper = testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme,
-					scheme.Scheme.PrioritizedVersionsAllGroups()...)
-				// The event channel can not block; make sure its bigger than all
-				// the events that can be put on it.
-				eventChannel := make(chan event.Event, len(tc.pastObjs)+1) // Add one for inventory object
-				taskContext := taskrunner.NewTaskContext(eventChannel)
-				for _, u := range tc.currentObjs {
-					o := object.UnstructuredToObjMeta(u)
-					uid := u.GetUID()
-					taskContext.ResourceApplied(o, uid, 0)
-				}
-				err := func() error {
-					defer close(eventChannel)
-					// Run the prune and validate.
-					return po.Prune(currentInventory, tc.currentObjs, populateObjectIds(tc.currentObjs), taskContext, Options{
-						DryRunStrategy: drs,
-					})
-				}()
-
-				if err != nil {
-					t.Fatalf("Unexpected error during Prune(): %#v", err)
-				}
-
-				var actualPruneEvents []event.Event
-				for e := range eventChannel {
-					actualPruneEvents = append(actualPruneEvents, e)
-				}
-				if want, got := len(tc.pruneEventObjs), len(actualPruneEvents); want != got {
-					t.Errorf("Expected (%d) prune events, got (%d)", want, got)
-				}
-
-				for i, obj := range tc.pruneEventObjs {
-					e := actualPruneEvents[i]
-					expKind := obj.GetObjectKind().GroupVersionKind().Kind
-					actKind := e.PruneEvent.Identifier.GroupKind.Kind
-					if expKind != actKind {
-						t.Errorf("Expected kind %s, got %s", expKind, actKind)
-					}
-				}
-			})
-		}
+		t.Run(name, func(t *testing.T) {
+			po := NewPruneOptions()
+			po.Destroy = tc.destroy
+			pruneIds := object.UnstructuredsToObjMetas(tc.pruneObjs)
+			fakeInvClient := inventory.NewFakeInventoryClient(pruneIds)
+			po.InvClient = fakeInvClient
+			currentInventory := createInventoryInfo(tc.pruneObjs...)
+			// Set up the fake dynamic client to recognize all objects, and the RESTMapper.
+			po.Client = &fakeDynamicFailureClient{dynamic: fake.NewSimpleDynamicClient(scheme.Scheme,
+				namespace, pdb, role)}
+			po.Mapper = testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme,
+				scheme.Scheme.PrioritizedVersionsAllGroups()...)
+			// The event channel can not block; make sure its bigger than all
+			// the events that can be put on it.
+			eventChannel := make(chan event.Event, len(tc.pruneObjs))
+			taskContext := taskrunner.NewTaskContext(eventChannel)
+			err := func() error {
+				defer close(eventChannel)
+				// Run the prune and validate.
+				return po.Prune(currentInventory, tc.pruneObjs, sets.NewString(), taskContext, defaultOptions)
+			}()
+			if err != nil {
+				t.Fatalf("Unexpected error during Prune(): %#v", err)
+			}
+			var actualEvents []event.Event
+			for e := range eventChannel {
+				actualEvents = append(actualEvents, e)
+			}
+			err = testutil.VerifyEvents(tc.expectedEvents, actualEvents)
+			assert.NoError(t, err)
+		})
 	}
 }
 
-// unionObjects returns the union of sliceA and sliceB as a slice of unstructured objects.
-func unionObjects(sliceA []*unstructured.Unstructured, sliceB []*unstructured.Unstructured) []*unstructured.Unstructured {
-	m := map[string]*unstructured.Unstructured{}
-	for _, a := range sliceA {
-		metadata := object.UnstructuredToObjMeta(a)
-		m[metadata.String()] = a
+func TestGetPruneObjs(t *testing.T) {
+	tests := map[string]struct {
+		localObjs     []*unstructured.Unstructured
+		prevInventory []*unstructured.Unstructured
+		expectedObjs  []*unstructured.Unstructured
+	}{
+		"no local objects, no inventory equals no prune objs": {
+			localObjs:     []*unstructured.Unstructured{},
+			prevInventory: []*unstructured.Unstructured{},
+			expectedObjs:  []*unstructured.Unstructured{},
+		},
+		"local objects, no inventory equals no prune objs": {
+			localObjs:     []*unstructured.Unstructured{pod, pdb, namespace},
+			prevInventory: []*unstructured.Unstructured{},
+			expectedObjs:  []*unstructured.Unstructured{},
+		},
+		"no local objects, with inventory equals all prune objs": {
+			localObjs:     []*unstructured.Unstructured{},
+			prevInventory: []*unstructured.Unstructured{pod, pdb, namespace},
+			expectedObjs:  []*unstructured.Unstructured{pod, pdb, namespace},
+		},
+		"set difference equals one prune object": {
+			localObjs:     []*unstructured.Unstructured{pod, pdb},
+			prevInventory: []*unstructured.Unstructured{pdb, namespace},
+			expectedObjs:  []*unstructured.Unstructured{namespace},
+		},
+		"local and inventory the same equals no prune objects": {
+			localObjs:     []*unstructured.Unstructured{pod, pdb},
+			prevInventory: []*unstructured.Unstructured{pod, pdb},
+			expectedObjs:  []*unstructured.Unstructured{},
+		},
+		"two prune objects": {
+			localObjs:     []*unstructured.Unstructured{pdb},
+			prevInventory: []*unstructured.Unstructured{pod, pdb, namespace},
+			expectedObjs:  []*unstructured.Unstructured{pod, namespace},
+		},
+		"local objs, inventory disjoint means inventory is pruned": {
+			localObjs:     []*unstructured.Unstructured{pdb},
+			prevInventory: []*unstructured.Unstructured{pod, namespace},
+			expectedObjs:  []*unstructured.Unstructured{pod, namespace},
+		},
 	}
-	for _, b := range sliceB {
-		metadata := object.UnstructuredToObjMeta(b)
-		m[metadata.String()] = b
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			po := NewPruneOptions()
+			po.InvClient = inventory.NewFakeInventoryClient(object.UnstructuredsToObjMetas(tc.prevInventory))
+			currentInventory := createInventoryInfo(tc.prevInventory...)
+			objs := []runtime.Object{}
+			for _, obj := range tc.prevInventory {
+				objs = append(objs, obj)
+			}
+			po.Client = fake.NewSimpleDynamicClient(scheme.Scheme, objs...)
+			po.Mapper = testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme,
+				scheme.Scheme.PrioritizedVersionsAllGroups()...)
+			actualObjs, err := po.GetPruneObjs(currentInventory, tc.localObjs)
+			if err != nil {
+				t.Fatalf("unexpected error %s returned", err)
+			}
+			if len(tc.expectedObjs) != len(actualObjs) {
+				t.Fatalf("expected %d prune objs, got %d", len(tc.expectedObjs), len(actualObjs))
+			}
+			actualIds := object.UnstructuredsToObjMetas(actualObjs)
+			expectedIds := object.UnstructuredsToObjMetas(tc.expectedObjs)
+			if !object.SetEquals(expectedIds, actualIds) {
+				t.Errorf("expected prune objects (%v), got (%v)", expectedIds, actualIds)
+			}
+		})
 	}
-	union := []*unstructured.Unstructured{}
-	for _, u := range m {
-		union = append(union, u)
-	}
-	return union
-}
-
-// populateObjectIds returns a pointer to a set of strings containing
-// the UID's of the passed objects (infos).
-func populateObjectIds(objs []*unstructured.Unstructured) sets.String {
-	uids := sets.NewString()
-	for _, currObj := range objs {
-		uid := string(currObj.GetUID())
-		uids.Insert(uid)
-	}
-	return uids
 }
 
 func TestPreventDeleteAnnotation(t *testing.T) {
@@ -383,143 +603,6 @@ func TestPreventDeleteAnnotation(t *testing.T) {
 			actual := preventDeleteAnnotation(tc.annotations)
 			if tc.expected != actual {
 				t.Errorf("preventDeleteAnnotation Expected (%t), got (%t)", tc.expected, actual)
-			}
-		})
-	}
-}
-
-func TestPruneWithError(t *testing.T) {
-	tests := map[string]struct {
-		// pastObjs/currentObjs do NOT contain the inventory object.
-		// Inventory object is generated from these past/current objects.
-		pastObjs    []*unstructured.Unstructured
-		currentObjs []*unstructured.Unstructured
-		prunedEvent []event.Event
-		isError     bool
-	}{
-		"some objects have failure to get": {
-			pastObjs:    []*unstructured.Unstructured{pdbGetFailure, role},
-			currentObjs: []*unstructured.Unstructured{},
-			prunedEvent: []event.Event{
-				{
-					Type: event.PruneType,
-					PruneEvent: event.PruneEvent{
-						Identifier: object.ObjMetadata{
-							Name:      pdbName + "get-failure",
-							Namespace: testNamespace,
-							GroupKind: schema.GroupKind{
-								Group: "policy/v1beta1",
-								Kind:  "PodDisruptionBudget",
-							},
-						},
-						Error: fmt.Errorf("expected get error"),
-					},
-				},
-				{
-					Type: event.PruneType,
-					PruneEvent: event.PruneEvent{
-						Identifier: object.ObjMetadata{
-							Name:      roleName,
-							Namespace: testNamespace,
-							GroupKind: schema.GroupKind{
-								Group: "v1",
-								Kind:  "Role",
-							},
-						},
-						Error: nil,
-					},
-				},
-			},
-			isError: false,
-		},
-		"some objects have failure to delete": {
-			pastObjs:    []*unstructured.Unstructured{pdbDeleteFailure, role},
-			currentObjs: []*unstructured.Unstructured{},
-			prunedEvent: []event.Event{
-				{
-					Type: event.PruneType,
-					PruneEvent: event.PruneEvent{
-						Identifier: object.ObjMetadata{
-							Name:      pdbName + "delete-failure",
-							Namespace: testNamespace,
-							GroupKind: schema.GroupKind{
-								Group: "policy/v1beta1",
-								Kind:  "PodDisruptionBudget",
-							},
-						},
-						Error: fmt.Errorf("expected delete error"),
-					},
-				},
-				{
-					Type: event.PruneType,
-					PruneEvent: event.PruneEvent{
-						Identifier: object.ObjMetadata{
-							Name:      roleName,
-							Namespace: testNamespace,
-							GroupKind: schema.GroupKind{
-								Group: "v1",
-								Kind:  "Role",
-							},
-						},
-						Error: nil,
-					},
-				},
-			},
-			isError: false,
-		},
-	}
-	for name, tc := range tests {
-		drs := common.DryRunNone
-		t.Run(name, func(t *testing.T) {
-			po := NewPruneOptions()
-			// Set up the previously applied objects.
-			clusterObjs := object.UnstructuredsToObjMetas(tc.pastObjs)
-			po.InvClient = inventory.NewFakeInventoryClient(clusterObjs)
-			// Set up the currently applied objects.
-			currentInventory := createInventoryInfo(tc.currentObjs...)
-			// Set up the fake dynamic client to recognize all objects, and the RESTMapper.
-			po.client = &fakeDynamicFailureClient{dynamic: fake.NewSimpleDynamicClient(scheme.Scheme,
-				namespace, pdb, role)}
-			// po.client = fake.NewSimpleDynamicClient(scheme.Scheme, namespace, pdb, role)
-			po.mapper = testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme,
-				scheme.Scheme.PrioritizedVersionsAllGroups()...)
-			// The event channel can not block; make sure its bigger than all
-			// the events that can be put on it.
-			eventChannel := make(chan event.Event, len(tc.pastObjs)+1) // Add one for inventory object
-			taskContext := taskrunner.NewTaskContext(eventChannel)
-			err := func() error {
-				defer close(eventChannel)
-				// Run the prune and validate.
-				return po.Prune(currentInventory, tc.currentObjs, populateObjectIds(tc.currentObjs), taskContext, Options{
-					DryRunStrategy: drs,
-				})
-			}()
-			if !tc.isError {
-				if err != nil {
-					t.Fatalf("Unexpected error during Prune(): %#v", err)
-				}
-
-				var actualPruneEvents []event.Event
-				for e := range eventChannel {
-					actualPruneEvents = append(actualPruneEvents, e)
-				}
-				if want, got := len(tc.prunedEvent), len(actualPruneEvents); want != got {
-					t.Errorf("Expected (%d) prune events, got (%d)", want, got)
-				}
-
-				for i, expectedEvt := range tc.prunedEvent {
-					e := actualPruneEvents[i]
-					expKind := expectedEvt.PruneEvent.Identifier.GroupKind.Kind
-					actKind := e.PruneEvent.Identifier.GroupKind.Kind
-					if expKind != actKind {
-						t.Errorf("Expected kind %s, got %s", expKind, actKind)
-					}
-					if !reflect.DeepEqual(e.PruneEvent.Error, expectedEvt.PruneEvent.Error) {
-						t.Errorf("Expected error %q, got %q", expectedEvt.PruneEvent.Error, e.PruneEvent.Error)
-					}
-				}
-			} else if err == nil {
-				t.Fatalf("Expected error during Prune() but received none")
 			}
 		})
 	}

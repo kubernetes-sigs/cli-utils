@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -27,6 +28,7 @@ import (
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	"k8s.io/kubectl/pkg/scheme"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
+	"sigs.k8s.io/cli-utils/pkg/apply/prune"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling"
@@ -704,25 +706,25 @@ func TestReadAndPrepareObjects(t *testing.T) {
 		// local inventory input into applier.prepareObjects
 		inventory inventory.InventoryInfo
 		// locally read resources input into applier.prepareObjects
-		resources []*unstructured.Unstructured
+		localObjs []*unstructured.Unstructured
 		// objects already stored in the cluster inventory
 		clusterObjs []*unstructured.Unstructured
 		// expected returned local inventory object
 		localInv inventory.InventoryInfo
 		// expected returned local objects to apply (in order)
-		localObjs []*unstructured.Unstructured
+		applyObjs []*unstructured.Unstructured
 		// expected calculated prune objects
 		pruneObjs []*unstructured.Unstructured
 		// expected error
 		isError bool
 	}{
 		"no inventory object": {
-			resources: []*unstructured.Unstructured{obj1},
+			localObjs: []*unstructured.Unstructured{obj1},
 			isError:   true,
 		},
 		"multiple inventory objects": {
 			inventory: localInv,
-			resources: []*unstructured.Unstructured{inventoryObj},
+			localObjs: []*unstructured.Unstructured{inventoryObj},
 			isError:   true,
 		},
 		"only inventory object": {
@@ -739,26 +741,26 @@ func TestReadAndPrepareObjects(t *testing.T) {
 		},
 		"inventory object already at the beginning": {
 			inventory: localInv,
-			resources: []*unstructured.Unstructured{obj1, clusterScopedObj},
-			localInv:  localInv,
 			localObjs: []*unstructured.Unstructured{obj1, clusterScopedObj},
+			localInv:  localInv,
+			applyObjs: []*unstructured.Unstructured{obj1, clusterScopedObj},
 			isError:   false,
 		},
 		"inventory object already at the beginning, prune one": {
 			inventory:   localInv,
-			resources:   []*unstructured.Unstructured{obj1, clusterScopedObj},
+			localObjs:   []*unstructured.Unstructured{obj1, clusterScopedObj},
 			clusterObjs: []*unstructured.Unstructured{obj2},
 			localInv:    localInv,
-			localObjs:   []*unstructured.Unstructured{obj1, clusterScopedObj},
+			applyObjs:   []*unstructured.Unstructured{obj1, clusterScopedObj},
 			pruneObjs:   []*unstructured.Unstructured{obj2},
 			isError:     false,
 		},
 		"inventory object not at the beginning": {
 			inventory:   localInv,
-			resources:   []*unstructured.Unstructured{obj1, obj2, clusterScopedObj},
+			localObjs:   []*unstructured.Unstructured{obj1, obj2, clusterScopedObj},
 			clusterObjs: []*unstructured.Unstructured{obj2},
 			localInv:    localInv,
-			localObjs:   []*unstructured.Unstructured{obj1, obj2, clusterScopedObj},
+			applyObjs:   []*unstructured.Unstructured{obj1, obj2, clusterScopedObj},
 			pruneObjs:   []*unstructured.Unstructured{},
 			isError:     false,
 		},
@@ -769,9 +771,22 @@ func TestReadAndPrepareObjects(t *testing.T) {
 			// Set up objects already stored in cluster inventory.
 			clusterObjs := object.UnstructuredsToObjMetas(tc.clusterObjs)
 			fakeInvClient := inventory.NewFakeInventoryClient(clusterObjs)
+			// Set up the fake dynamic client to recognize all objects, and the RESTMapper.
+			po := prune.NewPruneOptions()
+			objs := []runtime.Object{}
+			for _, obj := range tc.clusterObjs {
+				objs = append(objs, obj)
+			}
+			po.InvClient = fakeInvClient
+			po.Client = dynamicfake.NewSimpleDynamicClient(scheme.Scheme, objs...)
+			po.Mapper = testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme,
+				scheme.Scheme.PrioritizedVersionsAllGroups()...)
 			// Create applier with fake inventory client, and call prepareObjects
-			applier := &Applier{invClient: fakeInvClient}
-			resourceObjs, err := applier.prepareObjects(tc.inventory, tc.resources)
+			applier := &Applier{
+				PruneOptions: po,
+				invClient:    fakeInvClient,
+			}
+			applyObjs, pruneObjs, err := applier.prepareObjects(tc.inventory, tc.localObjs)
 			if !tc.isError && err != nil {
 				t.Fatalf("unexpected error received: %s", err)
 			}
@@ -781,22 +796,14 @@ func TestReadAndPrepareObjects(t *testing.T) {
 				}
 				return
 			}
-			// Validate the returned ResourceObjs
-			expected := tc.localInv
-			actual := resourceObjs.LocalInv
-			if expected.Namespace() != actual.Namespace() ||
-				expected.Name() != actual.Name() ||
-				expected.ID() != actual.ID() {
-				t.Errorf("expected local inventory (%v), got (%v)",
-					tc.localInv, resourceObjs.LocalInv)
-			}
-			if !objSetsEqual(tc.localObjs, resourceObjs.Resources) {
+			// Validate the returned applyObjs and pruneObjs
+			if !objSetsEqual(tc.applyObjs, applyObjs) {
 				t.Errorf("expected local infos (%v), got (%v)",
-					tc.localObjs, resourceObjs.Resources)
+					tc.localObjs, applyObjs)
 			}
-			if len(tc.pruneObjs) != len(resourceObjs.PruneIds) {
+			if !objSetsEqual(tc.pruneObjs, pruneObjs) {
 				t.Errorf("expected prune ids (%v), got (%v)",
-					tc.pruneObjs, resourceObjs.PruneIds)
+					tc.pruneObjs, pruneObjs)
 			}
 		})
 	}

@@ -7,11 +7,13 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/go-errors/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/info"
@@ -83,107 +85,42 @@ func (a *Applier) Initialize() error {
 	return nil
 }
 
-// prepareObjects returns ResourceObjects or an error if one occurred.
-func (a *Applier) prepareObjects(localInv inventory.InventoryInfo, localObjs []*unstructured.Unstructured) (*ResourceObjects, error) {
-	klog.V(4).Infof("applier preparing %d objects", len(localObjs))
+// prepareObjects returns the set of objects to apply and to prune or
+// an error if one occurred.
+func (a *Applier) prepareObjects(localInv inventory.InventoryInfo, localObjs []*unstructured.Unstructured) (
+	[]*unstructured.Unstructured, []*unstructured.Unstructured, error) {
 	if localInv == nil {
-		return nil, fmt.Errorf("the local inventory can't be nil")
+		return nil, nil, fmt.Errorf("the local inventory can't be nil")
 	}
 	if err := inventory.ValidateNoInventory(localObjs); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-
 	// If the inventory uses the Name strategy and an inventory ID is provided,
 	// verify that the existing inventory object (if there is one) has an ID
 	// label that matches.
+	// TODO(seans): This inventory id validation should happen in destroy and status.
 	if localInv.Strategy() == inventory.NameStrategy && localInv.ID() != "" {
-		invObjs, err := a.invClient.GetClusterInventoryObjs(localInv)
+		prevInvObjs, err := a.invClient.GetClusterInventoryObjs(localInv)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-
-		if len(invObjs) > 1 {
-			panic(fmt.Errorf("found %d inv objects with Name strategy", len(invObjs)))
+		if len(prevInvObjs) > 1 {
+			panic(fmt.Errorf("found %d inv objects with Name strategy", len(prevInvObjs)))
 		}
-
-		if len(invObjs) == 1 {
-			invObj := invObjs[0]
+		if len(prevInvObjs) == 1 {
+			invObj := prevInvObjs[0]
 			val := invObj.GetLabels()[common.InventoryLabel]
 			if val != localInv.ID() {
-				return nil, fmt.Errorf("inventory-id of inventory object in cluster doesn't match provided id %q", localInv.ID())
+				return nil, nil, fmt.Errorf("inventory-id of inventory object in cluster doesn't match provided id %q", localInv.ID())
 			}
 		}
 	}
-
-	// Retrieve previous inventory objects to calculate prune ids.
-	prevInv, err := a.invClient.GetClusterObjs(localInv)
+	pruneObjs, err := a.PruneOptions.GetPruneObjs(localInv, localObjs)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	locals := object.UnstructuredsToObjMetas(localObjs)
-	pruneIds := object.SetDiff(prevInv, locals)
-	klog.V(4).Infof("applier calculated %d prune objects", len(pruneIds))
-
-	// Sort order for applied resources.
 	sort.Sort(ordering.SortableUnstructureds(localObjs))
-
-	return &ResourceObjects{
-		LocalInv:  localInv,
-		Resources: localObjs,
-		PruneIds:  pruneIds,
-		PrevInv:   prevInv,
-	}, nil
-}
-
-// ResourceObjects contains information about the resources that
-// will be applied and the existing inventories used to determine
-// resources that should be pruned.
-type ResourceObjects struct {
-	LocalInv  inventory.InventoryInfo
-	Resources []*unstructured.Unstructured
-	PruneIds  []object.ObjMetadata
-	PrevInv   []object.ObjMetadata
-}
-
-// ObjsForApply returns the unstructured representation for all the resources
-// that should be applied, not including the inventory object. The
-// resources will be in sorted order.
-func (r *ResourceObjects) ObjsForApply() []*unstructured.Unstructured {
-	return r.Resources
-}
-
-// Inventory returns the unstructured representation of the inventory object.
-func (r *ResourceObjects) Inventory() inventory.InventoryInfo {
-	return r.LocalInv
-}
-
-// IdsForApply returns the Ids for all resources that should be applied,
-// including the inventory object.
-func (r *ResourceObjects) IdsForApply() []object.ObjMetadata {
-	var ids []object.ObjMetadata
-	for _, obj := range r.ObjsForApply() {
-		ids = append(ids, object.UnstructuredToObjMeta(obj))
-	}
-	return ids
-}
-
-// IdsForPrune returns the Ids for all resources that should
-// be pruned.
-func (r *ResourceObjects) IdsForPrune() []object.ObjMetadata {
-	return r.PruneIds
-}
-
-// IdsForPrevInv returns the Ids for the previous inventory. These
-// Ids reference the objects managed by the inventory object which
-// are already in the cluster.
-func (r *ResourceObjects) IdsForPrevInv() []object.ObjMetadata {
-	return r.PrevInv
-}
-
-// AllIds returns the Ids for all resources that are relevant. This
-// includes resources that will be applied or pruned.
-func (r *ResourceObjects) AllIds() []object.ObjMetadata {
-	return append(r.IdsForApply(), r.IdsForPrune()...)
+	return localObjs, pruneObjs, nil
 }
 
 // Run performs the Apply step. This happens asynchronously with updates
@@ -201,10 +138,7 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.InventoryInfo, obje
 	a.invClient.SetDryRunStrategy(options.DryRunStrategy) // client shared with prune, so sets dry-run for prune too.
 	go func() {
 		defer close(eventChannel)
-		// This provides us with a slice of all the objects that will be
-		// applied to the cluster. This takes care of ordering resources
-		// and handling the inventory object.
-		resourceObjs, err := a.prepareObjects(invInfo, objects)
+		applyObjs, pruneObjs, err := a.prepareObjects(invInfo, objects)
 		if err != nil {
 			handleError(eventChannel, err)
 			return
@@ -216,6 +150,8 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.InventoryInfo, obje
 		}
 		// Fetch the queue (channel) of tasks that should be executed.
 		klog.V(4).Infoln("applier building task queue...")
+		// TODO(seans): Remove this once Filter interface implemented.
+		a.PruneOptions.LocalNamespaces = localNamespaces(invInfo, object.UnstructuredsToObjMetas(objects))
 		taskBuilder := &solver.TaskQueueBuilder{
 			PruneOptions: a.PruneOptions,
 			Factory:      a.provider.Factory(),
@@ -234,10 +170,10 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.InventoryInfo, obje
 		}
 		// Build the task queue by appending tasks in the proper order.
 		taskQueue := taskBuilder.
-			AppendInvAddTask(resourceObjs).
-			AppendApplyWaitTasks(resourceObjs, opts).
-			AppendPruneWaitTasks(resourceObjs, opts).
-			AppendInvSetTask(resourceObjs).
+			AppendInvAddTask(invInfo, applyObjs).
+			AppendApplyWaitTasks(invInfo, applyObjs, opts).
+			AppendPruneWaitTasks(invInfo, pruneObjs, opts).
+			AppendInvSetTask(invInfo).
 			Build()
 		// Send event to inform the caller about the resources that
 		// will be applied/pruned.
@@ -249,7 +185,8 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.InventoryInfo, obje
 		}
 		// Create a new TaskStatusRunner to execute the taskQueue.
 		klog.V(4).Infoln("applier building TaskStatusRunner...")
-		runner := taskrunner.NewTaskStatusRunner(resourceObjs.AllIds(), a.StatusPoller)
+		allIds := object.UnstructuredsToObjMetas(append(applyObjs, pruneObjs...))
+		runner := taskrunner.NewTaskStatusRunner(allIds, a.StatusPoller)
 		klog.V(4).Infoln("applier running TaskStatusRunner...")
 		err = runner.Run(ctx, taskQueue.ToChannel(), eventChannel, taskrunner.Options{
 			PollInterval:     options.PollInterval,
@@ -320,4 +257,23 @@ func handleError(eventChannel chan event.Event, err error) {
 			Err: err,
 		},
 	}
+}
+
+// localNamespaces stores a set of strings of all the namespaces
+// for the passed non cluster-scoped localObjs, plus the namespace
+// of the passed inventory object. This is used to skip deleting
+// namespaces which have currently applied objects in them.
+func localNamespaces(localInv inventory.InventoryInfo, localObjs []object.ObjMetadata) sets.String {
+	namespaces := sets.NewString()
+	for _, obj := range localObjs {
+		namespace := strings.TrimSpace(strings.ToLower(obj.Namespace))
+		if namespace != "" {
+			namespaces.Insert(namespace)
+		}
+	}
+	invNamespace := strings.TrimSpace(strings.ToLower(localInv.Namespace()))
+	if invNamespace != "" {
+		namespaces.Insert(invNamespace)
+	}
+	return namespaces
 }
