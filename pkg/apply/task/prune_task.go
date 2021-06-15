@@ -7,10 +7,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
+	"sigs.k8s.io/cli-utils/pkg/apply/filter"
 	"sigs.k8s.io/cli-utils/pkg/apply/prune"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
 	"sigs.k8s.io/cli-utils/pkg/common"
-	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
@@ -21,11 +21,10 @@ type PruneTask struct {
 	TaskName string
 
 	PruneOptions      *prune.PruneOptions
-	InventoryObject   inventory.InventoryInfo
 	Objects           []*unstructured.Unstructured
+	Filters           []filter.ValidationFilter
 	DryRunStrategy    common.DryRunStrategy
 	PropagationPolicy metav1.DeletionPropagation
-	InventoryPolicy   inventory.InventoryPolicy
 }
 
 func (p *PruneTask) Name() string {
@@ -50,12 +49,16 @@ func (p *PruneTask) Identifiers() []object.ObjMetadata {
 // to signal to the taskrunner that the task has completed (or failed).
 func (p *PruneTask) Start(taskContext *taskrunner.TaskContext) {
 	go func() {
-		currentUIDs := taskContext.AllResourceUIDs()
-		err := p.PruneOptions.Prune(p.InventoryObject, p.Objects,
-			currentUIDs, taskContext, prune.Options{
+		// Create filter to prevent deletion of currently applied
+		// objects. Must be done here to wait for applied UIDs.
+		uidFilter := filter.CurrentUIDFilter{
+			CurrentUIDs: taskContext.AllResourceUIDs(),
+		}
+		p.Filters = append(p.Filters, uidFilter)
+		err := p.PruneOptions.Prune(p.Objects,
+			p.Filters, taskContext, prune.Options{
 				DryRunStrategy:    p.DryRunStrategy,
 				PropagationPolicy: p.PropagationPolicy,
-				InventoryPolicy:   p.InventoryPolicy,
 			})
 		taskContext.TaskChannel() <- taskrunner.TaskResult{
 			Err: err,

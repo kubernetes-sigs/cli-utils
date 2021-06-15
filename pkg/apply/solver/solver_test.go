@@ -11,6 +11,7 @@ import (
 	"gotest.tools/assert"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/cli-runtime/pkg/resource"
+	"sigs.k8s.io/cli-utils/pkg/apply/filter"
 	"sigs.k8s.io/cli-utils/pkg/apply/prune"
 	"sigs.k8s.io/cli-utils/pkg/apply/task"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
@@ -267,7 +268,7 @@ func TestTaskQueueBuilder_BuildTaskQueue(t *testing.T) {
 			tq := tqb.
 				AppendInvAddTask(localInv, tc.objs).
 				AppendApplyWaitTasks(localInv, tc.objs, tc.options).
-				AppendPruneWaitTasks(localInv, emptyPruneObjs, tc.options).
+				AppendPruneWaitTasks(emptyPruneObjs, []filter.ValidationFilter{}, tc.options).
 				AppendInvSetTask(localInv).
 				Build()
 

@@ -27,6 +27,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
+	"sigs.k8s.io/cli-utils/pkg/apply/filter"
 	"sigs.k8s.io/cli-utils/pkg/apply/info"
 	"sigs.k8s.io/cli-utils/pkg/apply/prune"
 	"sigs.k8s.io/cli-utils/pkg/apply/task"
@@ -180,17 +181,17 @@ func (t *TaskQueueBuilder) AppendWaitTask(waitIds []object.ObjMetadata) *TaskQue
 
 // AppendInvAddTask appends a task to delete objects from the cluster to the task queue.
 // Returns a pointer to the Builder to chain function calls.
-func (t *TaskQueueBuilder) AppendPruneTask(inv inventory.InventoryInfo, pruneObjs []*unstructured.Unstructured, o Options) *TaskQueueBuilder {
+func (t *TaskQueueBuilder) AppendPruneTask(pruneObjs []*unstructured.Unstructured,
+	pruneFilters []filter.ValidationFilter, o Options) *TaskQueueBuilder {
 	klog.V(5).Infoln("adding prune task")
 	t.tasks = append(t.tasks,
 		&task.PruneTask{
 			TaskName:          fmt.Sprintf("prune-%d", t.pruneCounter),
 			Objects:           pruneObjs,
-			InventoryObject:   inv,
+			Filters:           pruneFilters,
 			PruneOptions:      t.PruneOptions,
 			PropagationPolicy: o.PrunePropagationPolicy,
 			DryRunStrategy:    o.DryRunStrategy,
-			InventoryPolicy:   o.InventoryPolicy,
 		},
 	)
 	t.pruneCounter += 1
@@ -221,9 +222,10 @@ func (t *TaskQueueBuilder) AppendApplyWaitTasks(inv inventory.InventoryInfo, app
 // AppendPruneWaitTasks adds prune and wait tasks to the task queue
 // based on build variables (like dry-run). Returns a pointer to the
 // Builder to chain function calls.
-func (t *TaskQueueBuilder) AppendPruneWaitTasks(inv inventory.InventoryInfo, pruneObjs []*unstructured.Unstructured, o Options) *TaskQueueBuilder {
+func (t *TaskQueueBuilder) AppendPruneWaitTasks(pruneObjs []*unstructured.Unstructured,
+	pruneFilters []filter.ValidationFilter, o Options) *TaskQueueBuilder {
 	if o.Prune {
-		t.AppendPruneTask(inv, pruneObjs, o)
+		t.AppendPruneTask(pruneObjs, pruneFilters, o)
 		if !o.DryRunStrategy.ClientOrServerDryRun() && o.PruneTimeout != time.Duration(0) {
 			pruneIds := object.UnstructuredsToObjMetas(pruneObjs)
 			t.AppendWaitTask(pruneIds)
