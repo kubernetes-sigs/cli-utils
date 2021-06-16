@@ -10,11 +10,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-errors/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
+	"k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/info"
 	"sigs.k8s.io/cli-utils/pkg/apply/poller"
@@ -26,22 +26,33 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/ordering"
 	"sigs.k8s.io/cli-utils/pkg/provider"
-	"sigs.k8s.io/cli-utils/pkg/util/factory"
 )
 
-// newApplier returns a new Applier. It will set up the ApplyOptions and
+// NewApplier returns a new Applier. It will set up the ApplyOptions and
 // StatusOptions which are responsible for capturing any command line flags.
 // It currently requires IOStreams, but this is a legacy from when
 // the ApplyOptions were responsible for printing progress. This is now
 // handled by a separate printer with the KubectlPrinterAdapter bridging
 // between the two.
-func NewApplier(provider provider.Provider) *Applier {
-	a := &Applier{
-		PruneOptions: prune.NewPruneOptions(),
-		provider:     provider,
-		infoHelper:   info.NewInfoHelper(provider.Factory()),
+func NewApplier(provider provider.Provider, statusPoller poller.Poller) (*Applier, error) {
+	invClient, err := provider.InventoryClient()
+	if err != nil {
+		return nil, err
 	}
-	return a
+	factory := provider.Factory()
+	pruneOpts := prune.NewPruneOptions()
+	err = pruneOpts.Initialize(factory, invClient)
+	if err != nil {
+		return nil, err
+	}
+	a := &Applier{
+		pruneOptions: pruneOpts,
+		statusPoller: statusPoller,
+		factory:      factory,
+		invClient:    invClient,
+		infoHelper:   info.NewInfoHelper(factory),
+	}
+	return a, nil
 }
 
 // Applier performs the step of applying a set of resources into a cluster,
@@ -55,34 +66,11 @@ func NewApplier(provider provider.Provider) *Applier {
 // parameters and/or the set of resources that needs to be applied to the
 // cluster, different sets of tasks might be needed.
 type Applier struct {
-	provider provider.Provider
-
-	PruneOptions *prune.PruneOptions
-	StatusPoller poller.Poller
+	pruneOptions *prune.PruneOptions
+	statusPoller poller.Poller
+	factory      util.Factory
 	invClient    inventory.InventoryClient
 	infoHelper   info.InfoHelper
-}
-
-// Initialize sets up the Applier for actually doing an apply against
-// a cluster. This involves validating command line inputs and configuring
-// clients for communicating with the cluster.
-func (a *Applier) Initialize() error {
-	var err error
-	a.invClient, err = a.provider.InventoryClient()
-	if err != nil {
-		return err
-	}
-	err = a.PruneOptions.Initialize(a.provider.Factory(), a.invClient)
-	if err != nil {
-		return errors.WrapPrefix(err, "error setting up PruneOptions", 1)
-	}
-
-	statusPoller, err := factory.NewStatusPoller(a.provider.Factory())
-	if err != nil {
-		return errors.WrapPrefix(err, "error creating resolver", 1)
-	}
-	a.StatusPoller = statusPoller
-	return nil
 }
 
 // prepareObjects returns the set of objects to apply and to prune or
@@ -115,7 +103,7 @@ func (a *Applier) prepareObjects(localInv inventory.InventoryInfo, localObjs []*
 			}
 		}
 	}
-	pruneObjs, err := a.PruneOptions.GetPruneObjs(localInv, localObjs)
+	pruneObjs, err := a.pruneOptions.GetPruneObjs(localInv, localObjs)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -143,7 +131,7 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.InventoryInfo, obje
 			handleError(eventChannel, err)
 			return
 		}
-		mapper, err := a.provider.Factory().ToRESTMapper()
+		mapper, err := a.factory.ToRESTMapper()
 		if err != nil {
 			handleError(eventChannel, err)
 			return
@@ -151,10 +139,10 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.InventoryInfo, obje
 		// Fetch the queue (channel) of tasks that should be executed.
 		klog.V(4).Infoln("applier building task queue...")
 		// TODO(seans): Remove this once Filter interface implemented.
-		a.PruneOptions.LocalNamespaces = localNamespaces(invInfo, object.UnstructuredsToObjMetas(objects))
+		a.pruneOptions.LocalNamespaces = localNamespaces(invInfo, object.UnstructuredsToObjMetas(objects))
 		taskBuilder := &solver.TaskQueueBuilder{
-			PruneOptions: a.PruneOptions,
-			Factory:      a.provider.Factory(),
+			PruneOptions: a.pruneOptions,
+			Factory:      a.factory,
 			InfoHelper:   a.infoHelper,
 			Mapper:       mapper,
 			InvClient:    a.invClient,
@@ -186,7 +174,7 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.InventoryInfo, obje
 		// Create a new TaskStatusRunner to execute the taskQueue.
 		klog.V(4).Infoln("applier building TaskStatusRunner...")
 		allIds := object.UnstructuredsToObjMetas(append(applyObjs, pruneObjs...))
-		runner := taskrunner.NewTaskStatusRunner(allIds, a.StatusPoller)
+		runner := taskrunner.NewTaskStatusRunner(allIds, a.statusPoller)
 		klog.V(4).Infoln("applier running TaskStatusRunner...")
 		err = runner.Run(ctx, taskQueue.ToChannel(), eventChannel, taskrunner.Options{
 			PollInterval:     options.PollInterval,

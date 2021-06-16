@@ -12,7 +12,6 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/i18n"
-
 	"sigs.k8s.io/cli-utils/cmd/flagutils"
 	"sigs.k8s.io/cli-utils/cmd/printers"
 	"sigs.k8s.io/cli-utils/pkg/apply"
@@ -21,6 +20,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/manifestreader"
 	"sigs.k8s.io/cli-utils/pkg/provider"
+	"sigs.k8s.io/cli-utils/pkg/util/factory"
 )
 
 var (
@@ -31,7 +31,6 @@ var (
 // GetPreviewRunner creates and returns the PreviewRunner which stores the cobra command.
 func GetPreviewRunner(provider provider.Provider, loader manifestreader.ManifestLoader, ioStreams genericclioptions.IOStreams) *PreviewRunner {
 	r := &PreviewRunner{
-		Applier:   apply.NewApplier(provider),
 		Destroyer: apply.NewDestroyer(provider),
 		ioStreams: ioStreams,
 		provider:  provider,
@@ -75,7 +74,6 @@ type PreviewRunner struct {
 	Command    *cobra.Command
 	PreProcess func(info inventory.InventoryInfo, strategy common.DryRunStrategy) (inventory.InventoryPolicy, error)
 	ioStreams  genericclioptions.IOStreams
-	Applier    *apply.Applier
 	Destroyer  *apply.Destroyer
 	provider   provider.Provider
 	loader     manifestreader.ManifestLoader
@@ -123,7 +121,15 @@ func (r *PreviewRunner) RunE(cmd *cobra.Command, args []string) error {
 	// if destroy flag is set in preview, transmit it to destroyer DryRunStrategy flag
 	// and pivot execution to destroy with dry-run
 	if !previewDestroy {
-		err = r.Applier.Initialize()
+		_, err = common.DemandOneDirectory(args)
+		if err != nil {
+			return err
+		}
+		statusPoller, err := factory.NewStatusPoller(r.provider.Factory())
+		if err != nil {
+			return err
+		}
+		a, err := apply.NewApplier(r.provider, statusPoller)
 		if err != nil {
 			return err
 		}
@@ -131,14 +137,9 @@ func (r *PreviewRunner) RunE(cmd *cobra.Command, args []string) error {
 		// Create a context
 		ctx := context.Background()
 
-		_, err := common.DemandOneDirectory(args)
-		if err != nil {
-			return err
-		}
-
 		// Run the applier. It will return a channel where we can receive updates
 		// to keep track of progress and any issues.
-		ch = r.Applier.Run(ctx, inv, objs, apply.Options{
+		ch = a.Run(ctx, inv, objs, apply.Options{
 			EmitStatusEvents:  false,
 			NoPrune:           noPrune,
 			DryRunStrategy:    drs,

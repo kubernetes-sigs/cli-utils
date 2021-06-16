@@ -4,7 +4,6 @@
 package info
 
 import (
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/resource"
@@ -60,10 +59,6 @@ func (ih *infoHelper) BuildInfo(obj *unstructured.Unstructured) (*resource.Info,
 	}
 	err = ih.UpdateInfo(info)
 	return info, err
-}
-
-func (ih *infoHelper) ToRESTMapper() (meta.RESTMapper, error) {
-	return ih.factory.ToRESTMapper()
 }
 
 func (ih *infoHelper) getClient(gv schema.GroupVersion) (*rest.RESTClient, error) {

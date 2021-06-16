@@ -205,10 +205,7 @@ func deleteNamespace(c client.Client, namespace *v1.Namespace) {
 }
 
 func newDefaultInvApplier() *apply.Applier {
-	applier := apply.NewApplier(newDefaultInvProvider())
-	err := applier.Initialize()
-	Expect(err).NotTo(HaveOccurred())
-	return applier
+	return newApplierFromProvider(newDefaultInvProvider())
 }
 
 func newDefaultInvDestroyer() *apply.Destroyer {
@@ -245,10 +242,7 @@ func defaultInvCountVerifyFunc(c client.Client, namespace string, count int) {
 }
 
 func newCustomInvApplier() *apply.Applier {
-	applier := apply.NewApplier(newCustomInvProvider())
-	err := applier.Initialize()
-	Expect(err).NotTo(HaveOccurred())
-	return applier
+	return newApplierFromProvider(newCustomInvProvider())
 }
 
 func newCustomInvDestroyer() *apply.Destroyer {
@@ -296,4 +290,13 @@ func customInvCountVerifyFunc(c client.Client, namespace string, count int) {
 	err := c.List(context.TODO(), &u, client.InNamespace(namespace))
 	Expect(err).NotTo(HaveOccurred())
 	Expect(len(u.Items)).To(Equal(count))
+}
+
+func newApplierFromProvider(prov provider.Provider) *apply.Applier {
+	statusPoller, err := factory.NewStatusPoller(prov.Factory())
+	Expect(err).NotTo(HaveOccurred())
+
+	a, err := apply.NewApplier(prov, statusPoller)
+	Expect(err).NotTo(HaveOccurred())
+	return a
 }
