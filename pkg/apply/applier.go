@@ -16,6 +16,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
+	"sigs.k8s.io/cli-utils/pkg/apply/filter"
 	"sigs.k8s.io/cli-utils/pkg/apply/info"
 	"sigs.k8s.io/cli-utils/pkg/apply/poller"
 	"sigs.k8s.io/cli-utils/pkg/apply/prune"
@@ -138,8 +139,6 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.InventoryInfo, obje
 		}
 		// Fetch the queue (channel) of tasks that should be executed.
 		klog.V(4).Infoln("applier building task queue...")
-		// TODO(seans): Remove this once Filter interface implemented.
-		a.pruneOptions.LocalNamespaces = localNamespaces(invInfo, object.UnstructuredsToObjMetas(objects))
 		taskBuilder := &solver.TaskQueueBuilder{
 			PruneOptions: a.pruneOptions,
 			Factory:      a.factory,
@@ -156,11 +155,22 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.InventoryInfo, obje
 			PruneTimeout:           options.PruneTimeout,
 			InventoryPolicy:        options.InventoryPolicy,
 		}
+		// Build list of prune validation filters.
+		pruneFilters := []filter.ValidationFilter{
+			filter.PreventRemoveFilter{},
+			filter.InventoryPolicyFilter{
+				Inv:       invInfo,
+				InvPolicy: options.InventoryPolicy,
+			},
+			filter.LocalNamespacesFilter{
+				LocalNamespaces: localNamespaces(invInfo, object.UnstructuredsToObjMetas(objects)),
+			},
+		}
 		// Build the task queue by appending tasks in the proper order.
 		taskQueue := taskBuilder.
 			AppendInvAddTask(invInfo, applyObjs).
 			AppendApplyWaitTasks(invInfo, applyObjs, opts).
-			AppendPruneWaitTasks(invInfo, pruneObjs, opts).
+			AppendPruneWaitTasks(pruneObjs, pruneFilters, opts).
 			AppendInvSetTask(invInfo).
 			Build()
 		// Send event to inform the caller about the resources that

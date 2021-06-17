@@ -837,7 +837,7 @@ func TestApplyTaskWithDifferentInventoryAnnotation(t *testing.T) {
 				assert.Equal(t, tc.expectedEvents[i].Type, e.Type)
 				assert.Equal(t, tc.expectedEvents[i].ApplyEvent.Error.Error(), e.ApplyEvent.Error.Error())
 			}
-			actualUids := taskContext.AllResourceUIDs()
+			actualUids := taskContext.AppliedResourceUIDs()
 			assert.Equal(t, len(actualUids), 1)
 		})
 	}

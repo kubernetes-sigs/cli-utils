@@ -20,6 +20,7 @@ import (
 	"k8s.io/client-go/dynamic/fake"
 	"k8s.io/kubectl/pkg/scheme"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
+	"sigs.k8s.io/cli-utils/pkg/apply/filter"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
@@ -70,7 +71,7 @@ var pod = &unstructured.Unstructured{
 		"metadata": map[string]interface{}{
 			"name":      podName,
 			"namespace": testNamespace,
-			"uid":       "uid1",
+			"uid":       "pod-uid",
 			"annotations": map[string]interface{}{
 				"config.k8s.io/owning-inventory": testInventoryLabel,
 			},
@@ -160,39 +161,33 @@ var (
 	defaultOptions = Options{
 		DryRunStrategy:    common.DryRunNone,
 		PropagationPolicy: metav1.DeletePropagationBackground,
-		InventoryPolicy:   inventory.InventoryPolicyMustMatch,
 	}
 	clientDryRunOptions = Options{
 		DryRunStrategy:    common.DryRunClient,
 		PropagationPolicy: metav1.DeletePropagationBackground,
-		InventoryPolicy:   inventory.InventoryPolicyMustMatch,
 	}
 	serverDryRunOptions = Options{
 		DryRunStrategy:    common.DryRunServer,
 		PropagationPolicy: metav1.DeletePropagationBackground,
-		InventoryPolicy:   inventory.InventoryPolicyMustMatch,
 	}
 )
 
 func TestPrune(t *testing.T) {
 	tests := map[string]struct {
-		pruneObjs       []*unstructured.Unstructured
-		destroy         bool
-		options         Options
-		currentUIDs     sets.String
-		localNamespaces sets.String
-		expectedEvents  []testutil.ExpEvent
+		pruneObjs      []*unstructured.Unstructured
+		pruneFilters   []filter.ValidationFilter
+		destroy        bool
+		options        Options
+		expectedEvents []testutil.ExpEvent
 	}{
 		"No pruned objects; no prune/delete events": {
-			pruneObjs:       []*unstructured.Unstructured{},
-			options:         defaultOptions,
-			localNamespaces: sets.NewString(),
-			expectedEvents:  []testutil.ExpEvent{},
+			pruneObjs:      []*unstructured.Unstructured{},
+			options:        defaultOptions,
+			expectedEvents: []testutil.ExpEvent{},
 		},
 		"One successfully pruned object": {
-			pruneObjs:       []*unstructured.Unstructured{pod},
-			options:         defaultOptions,
-			localNamespaces: sets.NewString(),
+			pruneObjs: []*unstructured.Unstructured{pod},
+			options:   defaultOptions,
 			expectedEvents: []testutil.ExpEvent{
 				{
 					EventType: event.PruneType,
@@ -203,9 +198,8 @@ func TestPrune(t *testing.T) {
 			},
 		},
 		"Multiple successfully pruned object": {
-			pruneObjs:       []*unstructured.Unstructured{pod, pdb, namespace},
-			options:         defaultOptions,
-			localNamespaces: sets.NewString(),
+			pruneObjs: []*unstructured.Unstructured{pod, pdb, namespace},
+			options:   defaultOptions,
 			expectedEvents: []testutil.ExpEvent{
 				{
 					EventType: event.PruneType,
@@ -228,10 +222,9 @@ func TestPrune(t *testing.T) {
 			},
 		},
 		"One successfully deleted object": {
-			pruneObjs:       []*unstructured.Unstructured{pod},
-			destroy:         true,
-			options:         defaultOptions,
-			localNamespaces: sets.NewString(),
+			pruneObjs: []*unstructured.Unstructured{pod},
+			destroy:   true,
+			options:   defaultOptions,
 			expectedEvents: []testutil.ExpEvent{
 				{
 					EventType: event.DeleteType,
@@ -242,10 +235,9 @@ func TestPrune(t *testing.T) {
 			},
 		},
 		"Multiple successfully deleted objects": {
-			pruneObjs:       []*unstructured.Unstructured{pod, pdb, namespace},
-			destroy:         true,
-			options:         defaultOptions,
-			localNamespaces: sets.NewString(),
+			pruneObjs: []*unstructured.Unstructured{pod, pdb, namespace},
+			destroy:   true,
+			options:   defaultOptions,
 			expectedEvents: []testutil.ExpEvent{
 				{
 					EventType: event.DeleteType,
@@ -268,9 +260,8 @@ func TestPrune(t *testing.T) {
 			},
 		},
 		"Client dry run still pruned event": {
-			pruneObjs:       []*unstructured.Unstructured{pod},
-			options:         clientDryRunOptions,
-			localNamespaces: sets.NewString(),
+			pruneObjs: []*unstructured.Unstructured{pod},
+			options:   clientDryRunOptions,
 			expectedEvents: []testutil.ExpEvent{
 				{
 					EventType: event.PruneType,
@@ -281,10 +272,9 @@ func TestPrune(t *testing.T) {
 			},
 		},
 		"Server dry run still deleted event": {
-			pruneObjs:       []*unstructured.Unstructured{pod},
-			destroy:         true,
-			options:         serverDryRunOptions,
-			localNamespaces: sets.NewString(),
+			pruneObjs: []*unstructured.Unstructured{pod},
+			destroy:   true,
+			options:   serverDryRunOptions,
 			expectedEvents: []testutil.ExpEvent{
 				{
 					EventType: event.DeleteType,
@@ -294,19 +284,40 @@ func TestPrune(t *testing.T) {
 				},
 			},
 		},
-		"UID match means no prune": {
-			pruneObjs:       []*unstructured.Unstructured{pod},
-			options:         defaultOptions,
-			localNamespaces: sets.NewString(),
-			currentUIDs:     sets.NewString("uid1"),
-			expectedEvents:  []testutil.ExpEvent{},
-		},
-		"UID match for only one object means only one pruned": {
-			pruneObjs:       []*unstructured.Unstructured{pod, pdb},
-			options:         defaultOptions,
-			currentUIDs:     sets.NewString("uid1"),
-			localNamespaces: sets.NewString(),
+		"UID match means prune skipped": {
+			pruneObjs: []*unstructured.Unstructured{pod},
+			pruneFilters: []filter.ValidationFilter{
+				filter.CurrentUIDFilter{
+					// Add pod UID to set of current UIDs
+					CurrentUIDs: sets.NewString("pod-uid"),
+				},
+			},
+			options: defaultOptions,
 			expectedEvents: []testutil.ExpEvent{
+				{
+					EventType: event.PruneType,
+					PruneEvent: &testutil.ExpPruneEvent{
+						Operation: event.PruneSkipped,
+					},
+				},
+			},
+		},
+		"UID match for only one object one pruned, one skipped": {
+			pruneObjs: []*unstructured.Unstructured{pod, pdb},
+			pruneFilters: []filter.ValidationFilter{
+				filter.CurrentUIDFilter{
+					// Add pod UID to set of current UIDs
+					CurrentUIDs: sets.NewString("pod-uid"),
+				},
+			},
+			options: defaultOptions,
+			expectedEvents: []testutil.ExpEvent{
+				{
+					EventType: event.PruneType,
+					PruneEvent: &testutil.ExpPruneEvent{
+						Operation: event.PruneSkipped,
+					},
+				},
 				{
 					EventType: event.PruneType,
 					PruneEvent: &testutil.ExpPruneEvent{
@@ -316,9 +327,9 @@ func TestPrune(t *testing.T) {
 			},
 		},
 		"Prevent delete annotation equals prune skipped": {
-			pruneObjs:       []*unstructured.Unstructured{preventDelete},
-			options:         defaultOptions,
-			localNamespaces: sets.NewString(),
+			pruneObjs:    []*unstructured.Unstructured{preventDelete},
+			pruneFilters: []filter.ValidationFilter{filter.PreventRemoveFilter{}},
+			options:      defaultOptions,
 			expectedEvents: []testutil.ExpEvent{
 				{
 					EventType: event.PruneType,
@@ -329,10 +340,10 @@ func TestPrune(t *testing.T) {
 			},
 		},
 		"Prevent delete annotation equals delete skipped": {
-			pruneObjs:       []*unstructured.Unstructured{preventDelete},
-			destroy:         true,
-			options:         defaultOptions,
-			localNamespaces: sets.NewString(),
+			pruneObjs:    []*unstructured.Unstructured{preventDelete},
+			pruneFilters: []filter.ValidationFilter{filter.PreventRemoveFilter{}},
+			destroy:      true,
+			options:      defaultOptions,
 			expectedEvents: []testutil.ExpEvent{
 				{
 					EventType: event.DeleteType,
@@ -343,9 +354,9 @@ func TestPrune(t *testing.T) {
 			},
 		},
 		"Prevent delete annotation, one skipped, one pruned": {
-			pruneObjs:       []*unstructured.Unstructured{preventDelete, pod},
-			options:         defaultOptions,
-			localNamespaces: sets.NewString(),
+			pruneObjs:    []*unstructured.Unstructured{preventDelete, pod},
+			pruneFilters: []filter.ValidationFilter{filter.PreventRemoveFilter{}},
+			options:      defaultOptions,
 			expectedEvents: []testutil.ExpEvent{
 				{
 					EventType: event.PruneType,
@@ -362,9 +373,13 @@ func TestPrune(t *testing.T) {
 			},
 		},
 		"Namespace prune skipped": {
-			pruneObjs:       []*unstructured.Unstructured{namespace},
-			options:         defaultOptions,
-			localNamespaces: sets.NewString(namespace.GetName()),
+			pruneObjs: []*unstructured.Unstructured{namespace},
+			pruneFilters: []filter.ValidationFilter{
+				filter.LocalNamespacesFilter{
+					LocalNamespaces: sets.NewString(namespace.GetName()),
+				},
+			},
+			options: defaultOptions,
 			expectedEvents: []testutil.ExpEvent{
 				{
 					EventType: event.PruneType,
@@ -380,11 +395,9 @@ func TestPrune(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			po := NewPruneOptions()
 			po.Destroy = tc.destroy
-			po.LocalNamespaces = tc.localNamespaces
 			pruneIds := object.UnstructuredsToObjMetas(tc.pruneObjs)
 			fakeInvClient := inventory.NewFakeInventoryClient(pruneIds)
 			po.InvClient = fakeInvClient
-			currentInventory := createInventoryInfo(tc.pruneObjs...)
 			// Set up the fake dynamic client to recognize all objects, and the RESTMapper.
 			objs := []runtime.Object{}
 			for _, obj := range tc.pruneObjs {
@@ -395,12 +408,12 @@ func TestPrune(t *testing.T) {
 				scheme.Scheme.PrioritizedVersionsAllGroups()...)
 			// The event channel can not block; make sure its bigger than all
 			// the events that can be put on it.
-			eventChannel := make(chan event.Event, len(tc.pruneObjs))
+			eventChannel := make(chan event.Event, len(tc.pruneObjs)+1)
 			taskContext := taskrunner.NewTaskContext(eventChannel)
 			err := func() error {
 				defer close(eventChannel)
 				// Run the prune and validate.
-				return po.Prune(currentInventory, tc.pruneObjs, tc.currentUIDs, taskContext, tc.options)
+				return po.Prune(tc.pruneObjs, tc.pruneFilters, taskContext, tc.options)
 			}()
 
 			if err != nil {
@@ -456,7 +469,6 @@ func TestPruneWithErrors(t *testing.T) {
 			pruneIds := object.UnstructuredsToObjMetas(tc.pruneObjs)
 			fakeInvClient := inventory.NewFakeInventoryClient(pruneIds)
 			po.InvClient = fakeInvClient
-			currentInventory := createInventoryInfo(tc.pruneObjs...)
 			// Set up the fake dynamic client to recognize all objects, and the RESTMapper.
 			po.Client = &fakeDynamicFailureClient{dynamic: fake.NewSimpleDynamicClient(scheme.Scheme,
 				namespace, pdb, role)}
@@ -469,7 +481,7 @@ func TestPruneWithErrors(t *testing.T) {
 			err := func() error {
 				defer close(eventChannel)
 				// Run the prune and validate.
-				return po.Prune(currentInventory, tc.pruneObjs, sets.NewString(), taskContext, defaultOptions)
+				return po.Prune(tc.pruneObjs, []filter.ValidationFilter{}, taskContext, defaultOptions)
 			}()
 			if err != nil {
 				t.Fatalf("Unexpected error during Prune(): %#v", err)
@@ -549,60 +561,6 @@ func TestGetPruneObjs(t *testing.T) {
 			expectedIds := object.UnstructuredsToObjMetas(tc.expectedObjs)
 			if !object.SetEquals(expectedIds, actualIds) {
 				t.Errorf("expected prune objects (%v), got (%v)", expectedIds, actualIds)
-			}
-		})
-	}
-}
-
-func TestPreventDeleteAnnotation(t *testing.T) {
-	tests := map[string]struct {
-		annotations map[string]string
-		expected    bool
-	}{
-		"Nil map returns false": {
-			annotations: nil,
-			expected:    false,
-		},
-		"Empty map returns false": {
-			annotations: map[string]string{},
-			expected:    false,
-		},
-		"Wrong annotation key/value is false": {
-			annotations: map[string]string{
-				"foo": "bar",
-			},
-			expected: false,
-		},
-		"Annotation key without value is false": {
-			annotations: map[string]string{
-				common.OnRemoveAnnotation: "bar",
-			},
-			expected: false,
-		},
-		"Annotation key and value is true": {
-			annotations: map[string]string{
-				common.OnRemoveAnnotation: common.OnRemoveKeep,
-			},
-			expected: true,
-		},
-		"Annotation key client.lifecycle.config.k8s.io/deletion without value is false": {
-			annotations: map[string]string{
-				common.LifecycleDeleteAnnotation: "any",
-			},
-			expected: false,
-		},
-		"Annotation key client.lifecycle.config.k8s.io/deletion and value is true": {
-			annotations: map[string]string{
-				common.LifecycleDeleteAnnotation: common.PreventDeletion,
-			},
-			expected: true,
-		},
-	}
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			actual := preventDeleteAnnotation(tc.annotations)
-			if tc.expected != actual {
-				t.Errorf("preventDeleteAnnotation Expected (%t), got (%t)", tc.expected, actual)
 			}
 		})
 	}

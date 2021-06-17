@@ -76,9 +76,9 @@ func (tc *TaskContext) AppliedResources() []object.ObjMetadata {
 	return all
 }
 
-// AllResourceUIDs returns a set with the UIDs of all the resources in the
-// context.
-func (tc *TaskContext) AllResourceUIDs() sets.String {
+// AppliedResourceUIDs returns a set with the UIDs of all the
+// successfully applied resources.
+func (tc *TaskContext) AppliedResourceUIDs() sets.String {
 	uids := sets.NewString()
 	for _, ai := range tc.appliedResources {
 		uid := strings.TrimSpace(string(ai.uid))

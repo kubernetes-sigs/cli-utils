@@ -13,16 +13,15 @@ package prune
 
 import (
 	"context"
-	"fmt"
 	"sort"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/cmd/util"
+	"sigs.k8s.io/cli-utils/pkg/apply/filter"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
@@ -39,8 +38,6 @@ type PruneOptions struct {
 	// True if we are destroying, which deletes the inventory object
 	// as well (possibly) the inventory namespace.
 	Destroy bool
-	// TODO(seans): Replace this with Filter interface to generalize prune skipping.
-	LocalNamespaces sets.String
 }
 
 // NewPruneOptions returns a struct (PruneOptions) encapsulating the necessary
@@ -48,8 +45,7 @@ type PruneOptions struct {
 // gathering this information.
 func NewPruneOptions() *PruneOptions {
 	po := &PruneOptions{
-		Destroy:         false,
-		LocalNamespaces: sets.NewString(),
+		Destroy: false,
 	}
 	return po
 }
@@ -77,55 +73,57 @@ type Options struct {
 	DryRunStrategy common.DryRunStrategy
 
 	PropagationPolicy metav1.DeletionPropagation
-
-	// InventoryPolicy defines the inventory policy of prune.
-	InventoryPolicy inventory.InventoryPolicy
 }
 
-// Prune deletes the set of passed pruneObjs.
+// Prune deletes the set of passed pruneObjs. A prune skip/failure is
+// captured in the TaskContext, so we do not lose track of these
+// objects from the inventory. The passed prune filters are used to
+// determine if permission exists to delete the object. An example
+// of a prune filter is PreventDeleteFilter, which checks if an
+// annotation exists on the object to ensure the objects is not
+// deleted (e.g. a PersistentVolume that we do no want to
+// automatically prune/delete).
 //
 // Parameters:
-//   localInv - locally read inventory object
 //   pruneObjs - objects to prune (delete)
-//   currentUIDs - UIDs for successfully applied objects
+//   pruneFilters - list of filters for deletion permission
 //   taskContext - task for apply/prune
-func (po *PruneOptions) Prune(localInv inventory.InventoryInfo,
-	pruneObjs []*unstructured.Unstructured,
-	currentUIDs sets.String,
+//   o - options for dry-run
+func (po *PruneOptions) Prune(pruneObjs []*unstructured.Unstructured,
+	pruneFilters []filter.ValidationFilter,
 	taskContext *taskrunner.TaskContext,
 	o Options) error {
-	// Validate parameters
-	if localInv == nil {
-		return fmt.Errorf("the local inventory object can't be nil")
-	}
-	// Sort the resources in reverse order using the same rules as is
-	// used for apply.
 	eventFactory := CreateEventFactory(po.Destroy)
+	// Iterate through objects to prune (delete). If an object is not pruned
+	// and we need to keep it in the inventory, we must capture the prune failure.
 	for _, pruneObj := range pruneObjs {
 		pruneID := object.UnstructuredToObjMeta(pruneObj)
 		klog.V(5).Infof("attempting prune: %s", pruneID)
-		// Do not prune objects that are in set of currently applied objects.
-		uid := string(pruneObj.GetUID())
-		if currentUIDs.Has(uid) {
-			klog.V(5).Infof("prune object in current apply; do not prune: %s", uid)
+		// Check filters to see if we're prevented from pruning/deleting object.
+		var filtered bool
+		var err error
+		for _, filter := range pruneFilters {
+			klog.V(6).Infof("prune filter %s: %s", filter.Name(), pruneID)
+			filtered, err = filter.Filter(pruneObj)
+			if err != nil {
+				if klog.V(5).Enabled() {
+					klog.Errorf("error during %s, (%s): %s", filter.Name(), pruneID, err)
+				}
+				taskContext.EventChannel() <- eventFactory.CreateFailedEvent(pruneID, err)
+				taskContext.CapturePruneFailure(pruneID)
+				break
+			}
+			if filtered {
+				klog.V(4).Infof("prune filtered by %s: %s", filter.Name(), pruneID)
+				taskContext.EventChannel() <- eventFactory.CreateSkippedEvent(pruneObj)
+				taskContext.CapturePruneFailure(pruneID)
+				break
+			}
+		}
+		if filtered || err != nil {
 			continue
 		}
-		// Handle lifecycle directive preventing deletion.
-		if !canPrune(localInv, pruneObj, o.InventoryPolicy, uid) {
-			klog.V(4).Infof("skip prune for lifecycle directive %s", pruneID)
-			taskContext.EventChannel() <- eventFactory.CreateSkippedEvent(pruneObj)
-			taskContext.CapturePruneFailure(pruneID)
-			continue
-		}
-		// If regular pruning (not destroying), skip deleting namespace containing
-		// currently applied objects.
-		if pruneID.GroupKind == object.CoreV1Namespace.GroupKind() &&
-			po.LocalNamespaces.Has(pruneID.Name) {
-			klog.V(4).Infof("skip pruning namespace: %s", pruneID.Name)
-			taskContext.EventChannel() <- eventFactory.CreateSkippedEvent(pruneObj)
-			taskContext.CapturePruneFailure(pruneID)
-			continue
-		}
+		// Filters passed--actually delete object if not dry run.
 		if !o.DryRunStrategy.ClientOrServerDryRun() {
 			klog.V(4).Infof("prune object delete: %s", pruneID)
 			namespacedClient, err := po.namespacedClient(pruneID)
@@ -192,28 +190,4 @@ func (po *PruneOptions) namespacedClient(obj object.ObjMetadata) (dynamic.Resour
 		return nil, err
 	}
 	return po.Client.Resource(mapping.Resource).Namespace(obj.Namespace), nil
-}
-
-// preventDeleteAnnotation returns true if the "onRemove:keep"
-// annotation exists within the annotation map; false otherwise.
-func preventDeleteAnnotation(annotations map[string]string) bool {
-	for annotation, value := range annotations {
-		if common.NoDeletion(annotation, value) {
-			return true
-		}
-	}
-	return false
-}
-
-func canPrune(localInv inventory.InventoryInfo, obj *unstructured.Unstructured,
-	policy inventory.InventoryPolicy, uid string) bool {
-	if !inventory.CanPrune(localInv, obj, policy) {
-		klog.V(4).Infof("skip pruning object that doesn't belong to current inventory: %s", uid)
-		return false
-	}
-	if preventDeleteAnnotation(obj.GetAnnotations()) {
-		klog.V(4).Infof("prune object lifecycle directive; do not prune: %s", uid)
-		return false
-	}
-	return true
 }

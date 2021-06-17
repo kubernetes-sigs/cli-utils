@@ -12,6 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
+	"sigs.k8s.io/cli-utils/pkg/apply/filter"
 	"sigs.k8s.io/cli-utils/pkg/apply/poller"
 	"sigs.k8s.io/cli-utils/pkg/apply/prune"
 	"sigs.k8s.io/cli-utils/pkg/apply/solver"
@@ -118,11 +119,17 @@ func (d *Destroyer) Run(inv inventory.InventoryInfo, option *DestroyerOption) <-
 			PruneTimeout:           option.DeleteTimeout,
 			DryRunStrategy:         option.DryRunStrategy,
 			PrunePropagationPolicy: option.DeletePropagationPolicy,
-			InventoryPolicy:        option.InventoryPolicy,
+		}
+		deleteFilters := []filter.ValidationFilter{
+			filter.PreventRemoveFilter{},
+			filter.InventoryPolicyFilter{
+				Inv:       inv,
+				InvPolicy: option.InventoryPolicy,
+			},
 		}
 		// Build the ordered set of tasks to execute.
 		taskQueue := taskBuilder.
-			AppendPruneWaitTasks(inv, deleteObjs, opts).
+			AppendPruneWaitTasks(deleteObjs, deleteFilters, opts).
 			AppendDeleteInvTask(inv).
 			Build()
 		// Send event to inform the caller about the resources that
