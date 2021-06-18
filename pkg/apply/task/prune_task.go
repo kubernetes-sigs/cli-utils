@@ -25,6 +25,9 @@ type PruneTask struct {
 	Filters           []filter.ValidationFilter
 	DryRunStrategy    common.DryRunStrategy
 	PropagationPolicy metav1.DeletionPropagation
+	// True if we are destroying, which deletes the inventory object
+	// as well (possibly) the inventory namespace.
+	Destroy bool
 }
 
 func (p *PruneTask) Name() string {
@@ -33,7 +36,7 @@ func (p *PruneTask) Name() string {
 
 func (p *PruneTask) Action() event.ResourceAction {
 	action := event.PruneAction
-	if p.PruneOptions.Destroy {
+	if p.Destroy {
 		action = event.DeleteAction
 	}
 	return action
@@ -59,6 +62,7 @@ func (p *PruneTask) Start(taskContext *taskrunner.TaskContext) {
 			p.Filters, taskContext, prune.Options{
 				DryRunStrategy:    p.DryRunStrategy,
 				PropagationPolicy: p.PropagationPolicy,
+				Destroy:           p.Destroy,
 			})
 		taskContext.TaskChannel() <- taskrunner.TaskResult{
 			Err: err,

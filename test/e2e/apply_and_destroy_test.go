@@ -56,8 +56,8 @@ func applyAndDestroyTest(c client.Client, invConfig InventoryConfig, inventoryNa
 	destroyer := invConfig.DestroyerFactoryFunc()
 
 	destroyInv := createInventoryInfo(invConfig, inventoryName, namespaceName, inventoryID)
-	option := &apply.DestroyerOption{InventoryPolicy: inventory.AdoptIfNoInventory}
-	destroyerEvents := runCollectNoErr(destroyer.Run(destroyInv, option))
+	options := apply.DestroyerOptions{InventoryPolicy: inventory.AdoptIfNoInventory}
+	destroyerEvents := runCollectNoErr(destroyer.Run(destroyInv, options))
 	err = testutil.VerifyEvents([]testutil.ExpEvent{
 		{
 			EventType: event.DeleteType,

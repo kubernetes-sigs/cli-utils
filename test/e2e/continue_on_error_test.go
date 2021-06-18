@@ -59,8 +59,8 @@ func continueOnErrorTest(_ client.Client, invConfig InventoryConfig, inventoryNa
 
 	By("destroy the resources")
 	destroyer := invConfig.DestroyerFactoryFunc()
-	option := &apply.DestroyerOption{InventoryPolicy: inventory.AdoptIfNoInventory}
-	destroyerEvents := runCollectNoErr(destroyer.Run(inv, option))
+	options := apply.DestroyerOptions{InventoryPolicy: inventory.AdoptIfNoInventory}
+	destroyerEvents := runCollectNoErr(destroyer.Run(inv, options))
 	err = testutil.VerifyEvents([]testutil.ExpEvent{
 		{
 			EventType: event.DeleteType,

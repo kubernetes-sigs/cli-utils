@@ -31,7 +31,6 @@ var (
 // GetPreviewRunner creates and returns the PreviewRunner which stores the cobra command.
 func GetPreviewRunner(provider provider.Provider, loader manifestreader.ManifestLoader, ioStreams genericclioptions.IOStreams) *PreviewRunner {
 	r := &PreviewRunner{
-		Destroyer: apply.NewDestroyer(provider),
 		ioStreams: ioStreams,
 		provider:  provider,
 		loader:    loader,
@@ -74,7 +73,6 @@ type PreviewRunner struct {
 	Command    *cobra.Command
 	PreProcess func(info inventory.InventoryInfo, strategy common.DryRunStrategy) (inventory.InventoryPolicy, error)
 	ioStreams  genericclioptions.IOStreams
-	Destroyer  *apply.Destroyer
 	provider   provider.Provider
 	loader     manifestreader.ManifestLoader
 
@@ -118,14 +116,15 @@ func (r *PreviewRunner) RunE(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	statusPoller, err := factory.NewStatusPoller(r.provider.Factory())
+	if err != nil {
+		return err
+	}
+
 	// if destroy flag is set in preview, transmit it to destroyer DryRunStrategy flag
 	// and pivot execution to destroy with dry-run
 	if !previewDestroy {
 		_, err = common.DemandOneDirectory(args)
-		if err != nil {
-			return err
-		}
-		statusPoller, err := factory.NewStatusPoller(r.provider.Factory())
 		if err != nil {
 			return err
 		}
@@ -147,15 +146,14 @@ func (r *PreviewRunner) RunE(cmd *cobra.Command, args []string) error {
 			InventoryPolicy:   inventoryPolicy,
 		})
 	} else {
-		err = r.Destroyer.Initialize()
+		d, err := apply.NewDestroyer(r.provider, statusPoller)
 		if err != nil {
 			return err
 		}
-		option := &apply.DestroyerOption{
+		ch = d.Run(inv, apply.DestroyerOptions{
 			InventoryPolicy: inventoryPolicy,
 			DryRunStrategy:  drs,
-		}
-		ch = r.Destroyer.Run(inv, option)
+		})
 	}
 
 	// The printer will print updates from the channel. It will block

@@ -35,34 +35,26 @@ type PruneOptions struct {
 	InvClient inventory.InventoryClient
 	Client    dynamic.Interface
 	Mapper    meta.RESTMapper
-	// True if we are destroying, which deletes the inventory object
-	// as well (possibly) the inventory namespace.
-	Destroy bool
 }
 
 // NewPruneOptions returns a struct (PruneOptions) encapsulating the necessary
 // information to run the prune. Returns an error if an error occurs
 // gathering this information.
-func NewPruneOptions() *PruneOptions {
-	po := &PruneOptions{
-		Destroy: false,
-	}
-	return po
-}
-
-func (po *PruneOptions) Initialize(factory util.Factory, invClient inventory.InventoryClient) error {
-	var err error
+func NewPruneOptions(factory util.Factory, invClient inventory.InventoryClient) (*PruneOptions, error) {
 	// Client/Builder fields from the Factory.
-	po.Client, err = factory.DynamicClient()
+	client, err := factory.DynamicClient()
 	if err != nil {
-		return err
+		return nil, err
 	}
-	po.Mapper, err = factory.ToRESTMapper()
+	mapper, err := factory.ToRESTMapper()
 	if err != nil {
-		return err
+		return nil, err
 	}
-	po.InvClient = invClient
-	return nil
+	return &PruneOptions{
+		InvClient: invClient,
+		Client:    client,
+		Mapper:    mapper,
+	}, nil
 }
 
 // Options defines a set of parameters that can be used to tune
@@ -73,6 +65,10 @@ type Options struct {
 	DryRunStrategy common.DryRunStrategy
 
 	PropagationPolicy metav1.DeletionPropagation
+
+	// True if we are destroying, which deletes the inventory object
+	// as well (possibly) the inventory namespace.
+	Destroy bool
 }
 
 // Prune deletes the set of passed pruneObjs. A prune skip/failure is
@@ -93,7 +89,7 @@ func (po *PruneOptions) Prune(pruneObjs []*unstructured.Unstructured,
 	pruneFilters []filter.ValidationFilter,
 	taskContext *taskrunner.TaskContext,
 	o Options) error {
-	eventFactory := CreateEventFactory(po.Destroy)
+	eventFactory := CreateEventFactory(o.Destroy)
 	// Iterate through objects to prune (delete). If an object is not pruned
 	// and we need to keep it in the inventory, we must capture the prune failure.
 	for _, pruneObj := range pruneObjs {
