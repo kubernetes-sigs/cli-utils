@@ -766,30 +766,26 @@ func TestReadAndPrepareObjects(t *testing.T) {
 			clusterObjs := object.UnstructuredsToObjMetas(tc.clusterObjs)
 			fakeInvClient := inventory.NewFakeInventoryClient(clusterObjs)
 			// Set up the fake dynamic client to recognize all objects, and the RESTMapper.
-			po := prune.NewPruneOptions()
-			objs := []runtime.Object{}
+			objs := make([]runtime.Object, 0, len(tc.clusterObjs))
 			for _, obj := range tc.clusterObjs {
 				objs = append(objs, obj)
 			}
-			po.InvClient = fakeInvClient
-			po.Client = dynamicfake.NewSimpleDynamicClient(scheme.Scheme, objs...)
-			po.Mapper = testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme,
-				scheme.Scheme.PrioritizedVersionsAllGroups()...)
 			// Create applier with fake inventory client, and call prepareObjects
-			applier := &Applier{
-				pruneOptions: po,
-				invClient:    fakeInvClient,
+			applier := Applier{
+				pruneOptions: &prune.PruneOptions{
+					InvClient: fakeInvClient,
+					Client:    dynamicfake.NewSimpleDynamicClient(scheme.Scheme, objs...),
+					Mapper: testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme,
+						scheme.Scheme.PrioritizedVersionsAllGroups()...),
+				},
+				invClient: fakeInvClient,
 			}
 			applyObjs, pruneObjs, err := applier.prepareObjects(tc.inventory, tc.localObjs)
-			if !tc.isError && err != nil {
-				t.Fatalf("unexpected error received: %s", err)
-			}
 			if tc.isError {
-				if err == nil {
-					t.Fatalf("expected error, but received none")
-				}
+				assert.Error(t, err)
 				return
 			}
+			require.NoError(t, err)
 			// Validate the returned applyObjs and pruneObjs
 			if !objSetsEqual(tc.applyObjs, applyObjs) {
 				t.Errorf("expected local infos (%v), got (%v)",

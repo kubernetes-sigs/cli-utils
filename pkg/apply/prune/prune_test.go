@@ -162,12 +162,13 @@ var (
 		DryRunStrategy:    common.DryRunNone,
 		PropagationPolicy: metav1.DeletePropagationBackground,
 	}
+	defaultOptionsDestroy = Options{
+		DryRunStrategy:    common.DryRunNone,
+		PropagationPolicy: metav1.DeletePropagationBackground,
+		Destroy:           true,
+	}
 	clientDryRunOptions = Options{
 		DryRunStrategy:    common.DryRunClient,
-		PropagationPolicy: metav1.DeletePropagationBackground,
-	}
-	serverDryRunOptions = Options{
-		DryRunStrategy:    common.DryRunServer,
 		PropagationPolicy: metav1.DeletePropagationBackground,
 	}
 )
@@ -176,7 +177,6 @@ func TestPrune(t *testing.T) {
 	tests := map[string]struct {
 		pruneObjs      []*unstructured.Unstructured
 		pruneFilters   []filter.ValidationFilter
-		destroy        bool
 		options        Options
 		expectedEvents []testutil.ExpEvent
 	}{
@@ -223,8 +223,7 @@ func TestPrune(t *testing.T) {
 		},
 		"One successfully deleted object": {
 			pruneObjs: []*unstructured.Unstructured{pod},
-			destroy:   true,
-			options:   defaultOptions,
+			options:   defaultOptionsDestroy,
 			expectedEvents: []testutil.ExpEvent{
 				{
 					EventType: event.DeleteType,
@@ -236,8 +235,7 @@ func TestPrune(t *testing.T) {
 		},
 		"Multiple successfully deleted objects": {
 			pruneObjs: []*unstructured.Unstructured{pod, pdb, namespace},
-			destroy:   true,
-			options:   defaultOptions,
+			options:   defaultOptionsDestroy,
 			expectedEvents: []testutil.ExpEvent{
 				{
 					EventType: event.DeleteType,
@@ -273,8 +271,11 @@ func TestPrune(t *testing.T) {
 		},
 		"Server dry run still deleted event": {
 			pruneObjs: []*unstructured.Unstructured{pod},
-			destroy:   true,
-			options:   serverDryRunOptions,
+			options: Options{
+				DryRunStrategy:    common.DryRunServer,
+				PropagationPolicy: metav1.DeletePropagationBackground,
+				Destroy:           true,
+			},
 			expectedEvents: []testutil.ExpEvent{
 				{
 					EventType: event.DeleteType,
@@ -342,8 +343,7 @@ func TestPrune(t *testing.T) {
 		"Prevent delete annotation equals delete skipped": {
 			pruneObjs:    []*unstructured.Unstructured{preventDelete},
 			pruneFilters: []filter.ValidationFilter{filter.PreventRemoveFilter{}},
-			destroy:      true,
-			options:      defaultOptions,
+			options:      defaultOptionsDestroy,
 			expectedEvents: []testutil.ExpEvent{
 				{
 					EventType: event.DeleteType,
@@ -393,19 +393,18 @@ func TestPrune(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			po := NewPruneOptions()
-			po.Destroy = tc.destroy
-			pruneIds := object.UnstructuredsToObjMetas(tc.pruneObjs)
-			fakeInvClient := inventory.NewFakeInventoryClient(pruneIds)
-			po.InvClient = fakeInvClient
 			// Set up the fake dynamic client to recognize all objects, and the RESTMapper.
-			objs := []runtime.Object{}
+			objs := make([]runtime.Object, 0, len(tc.pruneObjs))
 			for _, obj := range tc.pruneObjs {
 				objs = append(objs, obj)
 			}
-			po.Client = fake.NewSimpleDynamicClient(scheme.Scheme, objs...)
-			po.Mapper = testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme,
-				scheme.Scheme.PrioritizedVersionsAllGroups()...)
+			pruneIds := object.UnstructuredsToObjMetas(tc.pruneObjs)
+			po := PruneOptions{
+				InvClient: inventory.NewFakeInventoryClient(pruneIds),
+				Client:    fake.NewSimpleDynamicClient(scheme.Scheme, objs...),
+				Mapper: testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme,
+					scheme.Scheme.PrioritizedVersionsAllGroups()...),
+			}
 			// The event channel can not block; make sure its bigger than all
 			// the events that can be put on it.
 			eventChannel := make(chan event.Event, len(tc.pruneObjs)+1)
@@ -464,24 +463,29 @@ func TestPruneWithErrors(t *testing.T) {
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			po := NewPruneOptions()
-			po.Destroy = tc.destroy
 			pruneIds := object.UnstructuredsToObjMetas(tc.pruneObjs)
-			fakeInvClient := inventory.NewFakeInventoryClient(pruneIds)
-			po.InvClient = fakeInvClient
-			// Set up the fake dynamic client to recognize all objects, and the RESTMapper.
-			po.Client = &fakeDynamicFailureClient{dynamic: fake.NewSimpleDynamicClient(scheme.Scheme,
-				namespace, pdb, role)}
-			po.Mapper = testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme,
-				scheme.Scheme.PrioritizedVersionsAllGroups()...)
+			po := PruneOptions{
+				InvClient: inventory.NewFakeInventoryClient(pruneIds),
+				// Set up the fake dynamic client to recognize all objects, and the RESTMapper.
+				Client: &fakeDynamicFailureClient{dynamic: fake.NewSimpleDynamicClient(scheme.Scheme,
+					namespace, pdb, role)},
+				Mapper: testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme,
+					scheme.Scheme.PrioritizedVersionsAllGroups()...),
+			}
 			// The event channel can not block; make sure its bigger than all
 			// the events that can be put on it.
 			eventChannel := make(chan event.Event, len(tc.pruneObjs))
 			taskContext := taskrunner.NewTaskContext(eventChannel)
 			err := func() error {
 				defer close(eventChannel)
+				var opts Options
+				if tc.destroy {
+					opts = defaultOptionsDestroy
+				} else {
+					opts = defaultOptions
+				}
 				// Run the prune and validate.
-				return po.Prune(tc.pruneObjs, []filter.ValidationFilter{}, taskContext, defaultOptions)
+				return po.Prune(tc.pruneObjs, []filter.ValidationFilter{}, taskContext, opts)
 			}()
 			if err != nil {
 				t.Fatalf("Unexpected error during Prune(): %#v", err)
@@ -540,16 +544,17 @@ func TestGetPruneObjs(t *testing.T) {
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			po := NewPruneOptions()
-			po.InvClient = inventory.NewFakeInventoryClient(object.UnstructuredsToObjMetas(tc.prevInventory))
-			currentInventory := createInventoryInfo(tc.prevInventory...)
-			objs := []runtime.Object{}
+			objs := make([]runtime.Object, 0, len(tc.prevInventory))
 			for _, obj := range tc.prevInventory {
 				objs = append(objs, obj)
 			}
-			po.Client = fake.NewSimpleDynamicClient(scheme.Scheme, objs...)
-			po.Mapper = testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme,
-				scheme.Scheme.PrioritizedVersionsAllGroups()...)
+			po := PruneOptions{
+				InvClient: inventory.NewFakeInventoryClient(object.UnstructuredsToObjMetas(tc.prevInventory)),
+				Client:    fake.NewSimpleDynamicClient(scheme.Scheme, objs...),
+				Mapper: testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme,
+					scheme.Scheme.PrioritizedVersionsAllGroups()...),
+			}
+			currentInventory := createInventoryInfo(tc.prevInventory...)
 			actualObjs, err := po.GetPruneObjs(currentInventory, tc.localObjs)
 			if err != nil {
 				t.Fatalf("unexpected error %s returned", err)

@@ -45,6 +45,9 @@ type TaskQueueBuilder struct {
 	Factory      util.Factory
 	Mapper       meta.RESTMapper
 	InvClient    inventory.InventoryClient
+	// True if we are destroying, which deletes the inventory object
+	// as well (possibly) the inventory namespace.
+	Destroy bool
 	// The accumulated tasks and counter variables to name tasks.
 	invAddCounter    int
 	invSetCounter    int
@@ -192,6 +195,7 @@ func (t *TaskQueueBuilder) AppendPruneTask(pruneObjs []*unstructured.Unstructure
 			PruneOptions:      t.PruneOptions,
 			PropagationPolicy: o.PrunePropagationPolicy,
 			DryRunStrategy:    o.DryRunStrategy,
+			Destroy:           t.Destroy,
 		},
 	)
 	t.pruneCounter += 1

@@ -11,6 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/klog/v2"
+	"k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/filter"
 	"sigs.k8s.io/cli-utils/pkg/apply/poller"
@@ -21,7 +22,6 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/provider"
-	"sigs.k8s.io/cli-utils/pkg/util/factory"
 )
 
 // NewDestroyer returns a new destroyer. It will set up the ApplyOptions and
@@ -30,23 +30,34 @@ import (
 // the ApplyOptions were responsible for printing progress. This is now
 // handled by a separate printer with the KubectlPrinterAdapter bridging
 // between the two.
-func NewDestroyer(provider provider.Provider) *Destroyer {
-	return &Destroyer{
-		PruneOptions: prune.NewPruneOptions(),
-		provider:     provider,
+func NewDestroyer(provider provider.Provider, statusPoller poller.Poller) (*Destroyer, error) {
+	invClient, err := provider.InventoryClient()
+	if err != nil {
+		return nil, errors.WrapPrefix(err, "error creating inventory client", 1)
 	}
+	factory := provider.Factory()
+	pruneOpts, err := prune.NewPruneOptions(factory, invClient)
+	if err != nil {
+		return nil, errors.WrapPrefix(err, "error setting up PruneOptions", 1)
+	}
+	return &Destroyer{
+		pruneOptions: pruneOpts,
+		statusPoller: statusPoller,
+		factory:      factory,
+		invClient:    invClient,
+	}, nil
 }
 
 // Destroyer performs the step of grabbing all the previous inventory objects and
 // prune them. This also deletes all the previous inventory objects
 type Destroyer struct {
-	provider     provider.Provider
-	StatusPoller poller.Poller
-	PruneOptions *prune.PruneOptions
+	pruneOptions *prune.PruneOptions
+	statusPoller poller.Poller
+	factory      util.Factory
 	invClient    inventory.InventoryClient
 }
 
-type DestroyerOption struct {
+type DestroyerOptions struct {
 	// InventoryPolicy defines the inventory policy of apply.
 	InventoryPolicy inventory.InventoryPolicy
 
@@ -64,67 +75,46 @@ type DestroyerOption struct {
 	DeletePropagationPolicy metav1.DeletionPropagation
 }
 
-// Initialize sets up the Destroyer for actually doing an destroy against
-// a cluster. This involves validating command line inputs and configuring
-// clients for communicating with the cluster.
-func (d *Destroyer) Initialize() error {
-	statusPoller, err := factory.NewStatusPoller(d.provider.Factory())
-	if err != nil {
-		return errors.WrapPrefix(err, "error creating status poller", 1)
-	}
-	d.StatusPoller = statusPoller
-	invClient, err := d.provider.InventoryClient()
-	if err != nil {
-		return errors.WrapPrefix(err, "error creating inventory client", 1)
-	}
-	d.invClient = invClient
-	err = d.PruneOptions.Initialize(d.provider.Factory(), invClient)
-	if err != nil {
-		return errors.WrapPrefix(err, "error setting up PruneOptions", 1)
-	}
-	d.PruneOptions.Destroy = true
-	return nil
-}
-
 // Run performs the destroy step. Passes the inventory object. This
 // happens asynchronously on progress and any errors are reported
 // back on the event channel.
-func (d *Destroyer) Run(inv inventory.InventoryInfo, option *DestroyerOption) <-chan event.Event {
+func (d *Destroyer) Run(inv inventory.InventoryInfo, options DestroyerOptions) <-chan event.Event {
 	eventChannel := make(chan event.Event)
-	d.invClient.SetDryRunStrategy(option.DryRunStrategy)
+	d.invClient.SetDryRunStrategy(options.DryRunStrategy)
 	go func() {
 		defer close(eventChannel)
 		// Retrieve the objects to be deleted from the cluster. Second parameter is empty
 		// because no local objects returns all inventory objects for deletion.
 		emptyLocalObjs := []*unstructured.Unstructured{}
-		deleteObjs, err := d.PruneOptions.GetPruneObjs(inv, emptyLocalObjs)
+		deleteObjs, err := d.pruneOptions.GetPruneObjs(inv, emptyLocalObjs)
 		if err != nil {
 			handleError(eventChannel, err)
 			return
 		}
-		mapper, err := d.provider.Factory().ToRESTMapper()
+		mapper, err := d.factory.ToRESTMapper()
 		if err != nil {
 			handleError(eventChannel, err)
 			return
 		}
 		klog.V(4).Infoln("destroyer building task queue...")
 		taskBuilder := &solver.TaskQueueBuilder{
-			PruneOptions: d.PruneOptions,
-			Factory:      d.provider.Factory(),
+			PruneOptions: d.pruneOptions,
+			Factory:      d.factory,
 			Mapper:       mapper,
 			InvClient:    d.invClient,
+			Destroy:      true,
 		}
 		opts := solver.Options{
 			Prune:                  true,
-			PruneTimeout:           option.DeleteTimeout,
-			DryRunStrategy:         option.DryRunStrategy,
-			PrunePropagationPolicy: option.DeletePropagationPolicy,
+			PruneTimeout:           options.DeleteTimeout,
+			DryRunStrategy:         options.DryRunStrategy,
+			PrunePropagationPolicy: options.DeletePropagationPolicy,
 		}
 		deleteFilters := []filter.ValidationFilter{
 			filter.PreventRemoveFilter{},
 			filter.InventoryPolicyFilter{
 				Inv:       inv,
-				InvPolicy: option.InventoryPolicy,
+				InvPolicy: options.InventoryPolicy,
 			},
 		}
 		// Build the ordered set of tasks to execute.
@@ -143,7 +133,7 @@ func (d *Destroyer) Run(inv inventory.InventoryInfo, option *DestroyerOption) <-
 		// Create a new TaskStatusRunner to execute the taskQueue.
 		klog.V(4).Infoln("destroyer building TaskStatusRunner...")
 		deleteIds := object.UnstructuredsToObjMetas(deleteObjs)
-		runner := taskrunner.NewTaskStatusRunner(deleteIds, d.StatusPoller)
+		runner := taskrunner.NewTaskStatusRunner(deleteIds, d.statusPoller)
 		klog.V(4).Infoln("destroyer running TaskStatusRunner...")
 		// TODO(seans): Make the poll interval configurable like the applier.
 		err = runner.Run(context.Background(), taskQueue.ToChannel(), eventChannel, taskrunner.Options{

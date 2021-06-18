@@ -209,10 +209,7 @@ func newDefaultInvApplier() *apply.Applier {
 }
 
 func newDefaultInvDestroyer() *apply.Destroyer {
-	destroyer := apply.NewDestroyer(newDefaultInvProvider())
-	err := destroyer.Initialize()
-	Expect(err).NotTo(HaveOccurred())
-	return destroyer
+	return newDestroyerFromProvider(newDefaultInvProvider())
 }
 
 func newDefaultInvProvider() provider.Provider {
@@ -246,10 +243,7 @@ func newCustomInvApplier() *apply.Applier {
 }
 
 func newCustomInvDestroyer() *apply.Destroyer {
-	destroyer := apply.NewDestroyer(newCustomInvProvider())
-	err := destroyer.Initialize()
-	Expect(err).NotTo(HaveOccurred())
-	return destroyer
+	return newDestroyerFromProvider(newCustomInvProvider())
 }
 
 func newCustomInvProvider() provider.Provider {
@@ -299,4 +293,13 @@ func newApplierFromProvider(prov provider.Provider) *apply.Applier {
 	a, err := apply.NewApplier(prov, statusPoller)
 	Expect(err).NotTo(HaveOccurred())
 	return a
+}
+
+func newDestroyerFromProvider(prov provider.Provider) *apply.Destroyer {
+	statusPoller, err := factory.NewStatusPoller(prov.Factory())
+	Expect(err).NotTo(HaveOccurred())
+
+	d, err := apply.NewDestroyer(prov, statusPoller)
+	Expect(err).NotTo(HaveOccurred())
+	return d
 }

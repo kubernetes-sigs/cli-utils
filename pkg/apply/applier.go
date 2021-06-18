@@ -41,19 +41,17 @@ func NewApplier(provider provider.Provider, statusPoller poller.Poller) (*Applie
 		return nil, err
 	}
 	factory := provider.Factory()
-	pruneOpts := prune.NewPruneOptions()
-	err = pruneOpts.Initialize(factory, invClient)
+	pruneOpts, err := prune.NewPruneOptions(factory, invClient)
 	if err != nil {
 		return nil, err
 	}
-	a := &Applier{
+	return &Applier{
 		pruneOptions: pruneOpts,
 		statusPoller: statusPoller,
 		factory:      factory,
 		invClient:    invClient,
 		infoHelper:   info.NewInfoHelper(factory),
-	}
-	return a, nil
+	}, nil
 }
 
 // Applier performs the step of applying a set of resources into a cluster,
@@ -145,6 +143,7 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.InventoryInfo, obje
 			InfoHelper:   a.infoHelper,
 			Mapper:       mapper,
 			InvClient:    a.invClient,
+			Destroy:      false,
 		}
 		opts := solver.Options{
 			ServerSideOptions:      options.ServerSideOptions,

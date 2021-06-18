@@ -19,12 +19,12 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/manifestreader"
 	"sigs.k8s.io/cli-utils/pkg/provider"
+	"sigs.k8s.io/cli-utils/pkg/util/factory"
 )
 
 // GetDestroyRunner creates and returns the DestroyRunner which stores the cobra command.
 func GetDestroyRunner(provider provider.Provider, loader manifestreader.ManifestLoader, ioStreams genericclioptions.IOStreams) *DestroyRunner {
 	r := &DestroyRunner{
-		Destroyer: apply.NewDestroyer(provider),
 		ioStreams: ioStreams,
 		provider:  provider,
 		loader:    loader,
@@ -62,7 +62,6 @@ type DestroyRunner struct {
 	Command    *cobra.Command
 	PreProcess func(info inventory.InventoryInfo, strategy common.DryRunStrategy) (inventory.InventoryPolicy, error)
 	ioStreams  genericclioptions.IOStreams
-	Destroyer  *apply.Destroyer
 	provider   provider.Provider
 	loader     manifestreader.ManifestLoader
 
@@ -102,18 +101,21 @@ func (r *DestroyRunner) RunE(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Run the destroyer. It will return a channel where we can receive updates
-	// to keep track of progress and any issues.
-	err = r.Destroyer.Initialize()
+	statusPoller, err := factory.NewStatusPoller(r.provider.Factory())
 	if err != nil {
 		return err
 	}
-	option := &apply.DestroyerOption{
+	d, err := apply.NewDestroyer(r.provider, statusPoller)
+	if err != nil {
+		return err
+	}
+	// Run the destroyer. It will return a channel where we can receive updates
+	// to keep track of progress and any issues.
+	ch := d.Run(inv, apply.DestroyerOptions{
 		DeleteTimeout:           r.deleteTimeout,
 		DeletePropagationPolicy: deletePropPolicy,
 		InventoryPolicy:         inventoryPolicy,
-	}
-	ch := r.Destroyer.Run(inv, option)
+	})
 
 	// The printer will print updates from the channel. It will block
 	// until the channel is closed.
