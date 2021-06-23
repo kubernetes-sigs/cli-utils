@@ -18,12 +18,9 @@ import (
 	"fmt"
 	"time"
 
-	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
@@ -256,7 +253,7 @@ func splitAfterCRDs(objs []*unstructured.Unstructured) (crdSplitResult, bool) {
 
 	var crds []*unstructured.Unstructured
 	for _, obj := range objs {
-		if IsCRD(obj) {
+		if object.IsCRD(obj) {
 			crds = append(crds, obj)
 			continue
 		}
@@ -272,24 +269,4 @@ func splitAfterCRDs(objs []*unstructured.Unstructured) (crdSplitResult, bool) {
 		after:  after,
 		crds:   crds,
 	}, len(crds) > 0
-}
-
-func IsCRD(info *unstructured.Unstructured) bool {
-	gvk, found := toGVK(info)
-	if !found {
-		return false
-	}
-	if (gvk.Group == v1.SchemeGroupVersion.Group ||
-		gvk.Group == v1beta1.SchemeGroupVersion.Group) &&
-		gvk.Kind == "CustomResourceDefinition" {
-		return true
-	}
-	return false
-}
-
-func toGVK(obj *unstructured.Unstructured) (schema.GroupVersionKind, bool) {
-	if obj != nil {
-		return obj.GroupVersionKind(), true
-	}
-	return schema.GroupVersionKind{}, false
 }

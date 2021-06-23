@@ -11,8 +11,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"sigs.k8s.io/cli-utils/pkg/apply/solver"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
+	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/kustomize/kyaml/kio/filters"
 	"sigs.k8s.io/kustomize/kyaml/kio/kioutil"
 	"sigs.k8s.io/kustomize/kyaml/yaml"
@@ -43,7 +43,7 @@ func SetNamespaces(mapper meta.RESTMapper, objs []*unstructured.Unstructured,
 
 	// find any crds in the set of resources.
 	for _, obj := range objs {
-		if solver.IsCRD(obj) {
+		if object.IsCRD(obj) {
 			crdObjs = append(crdObjs, obj)
 		}
 	}
