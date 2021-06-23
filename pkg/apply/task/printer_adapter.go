@@ -33,10 +33,14 @@ type resourcePrinterImpl struct {
 // PrintObj takes the provided object and operation and emits
 // it on the channel.
 func (r *resourcePrinterImpl) PrintObj(obj runtime.Object, _ io.Writer) error {
+	id, err := object.RuntimeToObjMeta(obj)
+	if err != nil {
+		return err
+	}
 	r.ch <- event.Event{
 		Type: event.ApplyType,
 		ApplyEvent: event.ApplyEvent{
-			Identifier: object.RuntimeToObjMeta(obj),
+			Identifier: id,
 			Operation:  r.applyOperation,
 			Resource:   obj.(*unstructured.Unstructured),
 		},

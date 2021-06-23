@@ -5,6 +5,7 @@ package manifestreader
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -18,6 +19,7 @@ import (
 	"sigs.k8s.io/kustomize/kyaml/yaml"
 )
 
+// UnknownTypesError captures information about unknown types encountered.
 type UnknownTypesError struct {
 	GroupKinds []schema.GroupKind
 }
@@ -56,59 +58,41 @@ func SetNamespaces(mapper meta.RESTMapper, objs []*unstructured.Unstructured,
 			continue
 		}
 
-		// if the resource already has the namespace set, we don't
-		// need to do anything
-		if ns := obj.GetNamespace(); ns != "" {
-			if enforceNamespace && ns != defaultNamespace {
-				return fmt.Errorf("the namespace from the provided object %q "+
-					"does not match the namespace %q. You must pass '--namespace=%s' to perform this operation",
-					ns, defaultNamespace, ns)
-			}
-			continue
-		}
-
-		gk := obj.GetObjectKind().GroupVersionKind().GroupKind()
-		mapping, err := mapper.RESTMapping(gk)
-
-		if err != nil && !meta.IsNoMatchError(err) {
-			return err
-		}
-
-		if err == nil {
-			// If we find a mapping for the resource type in the RESTMapper,
-			// we just use it.
-			if mapping.Scope == meta.RESTScopeNamespace {
-				// This means the resource does not have the namespace set,
-				// but it is a namespaced resource. So we set the namespace
-				// to the provided default value.
-				obj.SetNamespace(defaultNamespace)
-			}
-			continue
-		}
-
-		// If we get here, it means the resource does not have the namespace
-		// set and we didn't find the resource type in the RESTMapper. As
-		// a last try, we look at all the CRDS that are part of the set and
-		// see if we get a match on the resource type. If so, we can determine
-		// from the CRD whether the resource type is cluster-scoped or
-		// namespace-scoped. If it is the latter, we set the namespace
-		// to the provided default.
-		var scope string
-		for _, crdObj := range crdObjs {
-			group, _, _ := unstructured.NestedString(crdObj.Object, "spec", "group")
-			kind, _, _ := unstructured.NestedString(crdObj.Object, "spec", "names", "kind")
-			if gk.Kind == kind && gk.Group == group {
-				scope, _, _ = unstructured.NestedString(crdObj.Object, "spec", "scope")
+		// Look up the scope of the resource so we know if the resource
+		// should have a namespace set or not.
+		scope, err := object.LookupResourceScope(obj, crdObjs, mapper)
+		if err != nil {
+			var unknownTypeError *object.UnknownTypeError
+			if errors.As(err, &unknownTypeError) {
+				// If no scope was found, just add the resource type to the list
+				// of unknown types.
+				unknownGKs = append(unknownGKs, unknownTypeError.GroupKind)
+				continue
+			} else {
+				// If something went wrong when looking up the scope, just
+				// give up.
+				return err
 			}
 		}
 
 		switch scope {
-		case "":
-			unknownGKs = append(unknownGKs, gk)
-		case "Cluster":
-			continue
-		case "Namespaced":
-			obj.SetNamespace(defaultNamespace)
+		case meta.RESTScopeNamespace:
+			if obj.GetNamespace() == "" {
+				obj.SetNamespace(defaultNamespace)
+			} else {
+				ns := obj.GetNamespace()
+				if enforceNamespace && ns != defaultNamespace {
+					return fmt.Errorf("the namespace from the provided object %q "+
+						"does not match the namespace %q. You must pass '--namespace=%s' to perform this operation",
+						ns, defaultNamespace, ns)
+				}
+			}
+		case meta.RESTScopeRoot:
+			if ns := obj.GetNamespace(); ns != "" {
+				return fmt.Errorf("resource is cluster-scoped but has a non-empty namespace %q", ns)
+			}
+		default:
+			return fmt.Errorf("unknown RESTScope %q", scope.Name())
 		}
 	}
 	if len(unknownGKs) > 0 {

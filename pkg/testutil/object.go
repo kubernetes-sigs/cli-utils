@@ -39,7 +39,7 @@ type Mutator interface {
 	Mutate(u *unstructured.Unstructured)
 }
 
-// ToIdentifer translates object yaml config into ObjMetadata.
+// ToIdentifier translates object yaml config into ObjMetadata.
 func ToIdentifier(t *testing.T, manifest string) object.ObjMetadata {
 	obj := Unstructured(t, manifest)
 	return object.ObjMetadata{

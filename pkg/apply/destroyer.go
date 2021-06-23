@@ -130,7 +130,7 @@ func (d *Destroyer) Run(inv inventory.InventoryInfo, options DestroyerOptions) <
 		}
 		// Create a new TaskStatusRunner to execute the taskQueue.
 		klog.V(4).Infoln("destroyer building TaskStatusRunner...")
-		deleteIds := object.UnstructuredsToObjMetas(deleteObjs)
+		deleteIds := object.UnstructuredsToObjMetasOrDie(deleteObjs)
 		runner := taskrunner.NewTaskStatusRunner(deleteIds, d.statusPoller)
 		klog.V(4).Infoln("destroyer running TaskStatusRunner...")
 		// TODO(seans): Make the poll interval configurable like the applier.

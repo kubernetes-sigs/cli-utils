@@ -6,6 +6,7 @@ package task
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
@@ -68,9 +69,9 @@ var obj3 = &unstructured.Unstructured{
 const taskName = "test-inventory-task"
 
 func TestInvAddTask(t *testing.T) {
-	id1 := object.UnstructuredToObjMeta(obj1)
-	id2 := object.UnstructuredToObjMeta(obj2)
-	id3 := object.UnstructuredToObjMeta(obj3)
+	id1 := object.UnstructuredToObjMetaOrDie(obj1)
+	id2 := object.UnstructuredToObjMetaOrDie(obj2)
+	id3 := object.UnstructuredToObjMetaOrDie(obj3)
 
 	tests := map[string]struct {
 		initialObjs  []object.ObjMetadata
@@ -118,7 +119,9 @@ func TestInvAddTask(t *testing.T) {
 			if taskName != task.Name() {
 				t.Errorf("expected task name (%s), got (%s)", taskName, task.Name())
 			}
-			applyIds := object.UnstructuredsToObjMetas(tc.applyObjs)
+			applyIds, err := object.UnstructuredsToObjMetas(tc.applyObjs)
+			require.NoError(t, err)
+
 			if !object.SetEquals(applyIds, task.Identifiers()) {
 				t.Errorf("expected task ids (%s), got (%s)", applyIds, task.Identifiers())
 			}

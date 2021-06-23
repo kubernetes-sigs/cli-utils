@@ -275,7 +275,7 @@ func (cic *ClusterInventoryClient) getClusterInventoryObjsByLabel(inv InventoryI
 	if localInv == nil {
 		return nil, fmt.Errorf("retrieving cluster inventory object with nil local inventory")
 	}
-	localObj := object.UnstructuredToObjMeta(localInv)
+	localObj := object.UnstructuredToObjMetaOrDie(localInv)
 	mapping, err := cic.mapper.RESTMapping(localObj.GroupKind)
 	if err != nil {
 		return nil, err

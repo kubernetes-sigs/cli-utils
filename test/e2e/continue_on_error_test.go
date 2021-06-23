@@ -44,7 +44,7 @@ func continueOnErrorTest(_ client.Client, invConfig InventoryConfig, inventoryNa
 		{
 			EventType: event.ApplyType,
 			ApplyEvent: &testutil.ExpApplyEvent{
-				Identifier: object.UnstructuredToObjMeta(manifestToUnstructured(invalidCrd)),
+				Identifier: object.UnstructuredToObjMetaOrDie(manifestToUnstructured(invalidCrd)),
 				Error:      fmt.Errorf("failed to apply"),
 			},
 		},

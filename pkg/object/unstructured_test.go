@@ -1,72 +1,71 @@
 // Copyright 2021 The Kubernetes Authors.
 // SPDX-License-Identifier: Apache-2.0
 
-package object
+package object_test
 
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
+	"k8s.io/kubectl/pkg/scheme"
+	. "sigs.k8s.io/cli-utils/pkg/object"
+	"sigs.k8s.io/cli-utils/pkg/testutil"
 )
 
-var rbac = &unstructured.Unstructured{
-	Object: map[string]interface{}{
-		"apiVersion": "rbac.authorization.k8s.io/v1",
-		"kind":       "ClusterRole",
-		"metadata": map[string]interface{}{
-			"name": "test-cluster-role",
-		},
-	},
-}
+var rbac = `
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: test-cluster-role
+`
 
-var testCRD = &unstructured.Unstructured{
-	Object: map[string]interface{}{
-		"apiVersion": "apiextensions.k8s.io/v1",
-		"kind":       "CustomResourceDefinition",
-		"metadata": map[string]interface{}{
-			"name": "test-crd",
-		},
-		"spec": map[string]interface{}{
-			"group": "example.com",
-			"names": map[string]interface{}{
-				"kind": "crontab",
-			},
-		},
-	},
-}
+var testCRD = `
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: test-crd
+spec:
+  group: example.com
+  scope: Cluster
+  names:
+    kind: crontab
+`
 
-var testNamespace = &unstructured.Unstructured{
-	Object: map[string]interface{}{
-		"apiVersion": "v1",
-		"kind":       "Namespace",
-		"metadata": map[string]interface{}{
-			"name": "test-namespace",
-		},
-	},
-}
+var testCR = `
+apiVersion: example.com/v1
+kind: crontab
+metadata:
+  name: test-cr
+`
 
-var testPod = &unstructured.Unstructured{
-	Object: map[string]interface{}{
-		"apiVersion": "v1",
-		"kind":       "Pod",
-		"metadata": map[string]interface{}{
-			"name":      "test-pod",
-			"namespace": "test-namespace",
-		},
-	},
-}
+var testNamespace = `
+apiVersion: v1,
+kind: Namespace
+metadata:
+  name: test-namespace
+`
 
-var defaultNamespacePod = &unstructured.Unstructured{
-	Object: map[string]interface{}{
-		"apiVersion": "v1",
-		"kind":       "Pod",
-		"metadata": map[string]interface{}{
-			"name":      "test-pod",
-			"namespace": "default",
-		},
-	},
-}
+var testPod = `
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-pod
+  namespace: test-namespace
+`
+
+var defaultNamespacePod = `
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-pod
+  namespace: default
+`
 
 func TestUnstructuredToObjMeta(t *testing.T) {
 	tests := map[string]struct {
@@ -74,7 +73,7 @@ func TestUnstructuredToObjMeta(t *testing.T) {
 		expected ObjMetadata
 	}{
 		"test RBAC translation": {
-			obj: rbac,
+			obj: testutil.Unstructured(t, rbac),
 			expected: ObjMetadata{
 				Name: "test-cluster-role",
 				GroupKind: schema.GroupKind{
@@ -84,7 +83,7 @@ func TestUnstructuredToObjMeta(t *testing.T) {
 			},
 		},
 		"test CRD translation": {
-			obj: testCRD,
+			obj: testutil.Unstructured(t, testCRD),
 			expected: ObjMetadata{
 				Name: "test-crd",
 				GroupKind: schema.GroupKind{
@@ -94,7 +93,7 @@ func TestUnstructuredToObjMeta(t *testing.T) {
 			},
 		},
 		"test pod translation": {
-			obj: testPod,
+			obj: testutil.Unstructured(t, testPod),
 			expected: ObjMetadata{
 				Name:      "test-pod",
 				Namespace: "test-namespace",
@@ -108,7 +107,7 @@ func TestUnstructuredToObjMeta(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			actual := UnstructuredToObjMeta(tc.obj)
+			actual := UnstructuredToObjMetaOrDie(tc.obj)
 			if tc.expected != actual {
 				t.Errorf("expected ObjMetadata (%s), got (%s)", tc.expected, actual)
 			}
@@ -122,19 +121,19 @@ func TestIsKindNamespace(t *testing.T) {
 		isKindNamespace bool
 	}{
 		"cluster-scoped RBAC is not a namespace": {
-			obj:             rbac,
+			obj:             testutil.Unstructured(t, rbac),
 			isKindNamespace: false,
 		},
 		"test namespace is a namespace": {
-			obj:             testNamespace,
+			obj:             testutil.Unstructured(t, testNamespace),
 			isKindNamespace: true,
 		},
 		"test pod is not a namespace": {
-			obj:             testPod,
+			obj:             testutil.Unstructured(t, testPod),
 			isKindNamespace: false,
 		},
 		"default namespaced pod is not a namespace": {
-			obj:             defaultNamespacePod,
+			obj:             testutil.Unstructured(t, defaultNamespacePod),
 			isKindNamespace: false,
 		},
 	}
@@ -156,19 +155,19 @@ func TestIsCRD(t *testing.T) {
 		isCRD bool
 	}{
 		"RBAC is not a CRD": {
-			obj:   rbac,
+			obj:   testutil.Unstructured(t, rbac),
 			isCRD: false,
 		},
 		"test namespace is not a CRD": {
-			obj:   testNamespace,
+			obj:   testutil.Unstructured(t, testNamespace),
 			isCRD: false,
 		},
 		"test CRD is a CRD": {
-			obj:   testCRD,
+			obj:   testutil.Unstructured(t, testCRD),
 			isCRD: true,
 		},
 		"test pod is not a CRD": {
-			obj:   testPod,
+			obj:   testutil.Unstructured(t, testPod),
 			isCRD: false,
 		},
 	}
@@ -189,23 +188,23 @@ func TestIsNamespaced(t *testing.T) {
 		isNamespaced bool
 	}{
 		"cluster-scoped RBAC is not namespaced": {
-			obj:          rbac,
+			obj:          testutil.Unstructured(t, rbac),
 			isNamespaced: false,
 		},
 		"a CRD is cluster-scoped": {
-			obj:          testCRD,
+			obj:          testutil.Unstructured(t, testCRD),
 			isNamespaced: false,
 		},
 		"a namespace is cluster-scoped": {
-			obj:          testNamespace,
+			obj:          testutil.Unstructured(t, testNamespace),
 			isNamespaced: false,
 		},
 		"pod is namespaced": {
-			obj:          testPod,
+			obj:          testutil.Unstructured(t, testPod),
 			isNamespaced: true,
 		},
 		"default namespaced pod is namespaced": {
-			obj:          defaultNamespacePod,
+			obj:          testutil.Unstructured(t, defaultNamespacePod),
 			isNamespaced: true,
 		},
 	}
@@ -228,17 +227,17 @@ func TestGetCRDGroupKind(t *testing.T) {
 		groupKind string
 	}{
 		"RBAC is not a CRD": {
-			obj:       rbac,
+			obj:       testutil.Unstructured(t, rbac),
 			isCRD:     false,
 			groupKind: "",
 		},
 		"pod is not a CRD": {
-			obj:       testPod,
+			obj:       testutil.Unstructured(t, testPod),
 			isCRD:     false,
 			groupKind: "",
 		},
 		"testCRD has example.com/crontab GroupKind": {
-			obj:       testCRD,
+			obj:       testutil.Unstructured(t, testCRD),
 			isCRD:     true,
 			groupKind: "crontab.example.com",
 		},
@@ -254,6 +253,57 @@ func TestGetCRDGroupKind(t *testing.T) {
 				t.Errorf("expected CRD GroupKind (%s), got (%s) for (%s)",
 					tc.groupKind, actualGroupKind, tc.obj)
 			}
+		})
+	}
+}
+
+func TestLookupResourceScope(t *testing.T) {
+	_ = apiextv1.AddToScheme(scheme.Scheme)
+	testCases := map[string]struct {
+		resource      *unstructured.Unstructured
+		crds          []*unstructured.Unstructured
+		expectedScope meta.RESTScope
+		expectedErr   error
+	}{
+		"regular resource": {
+			resource:      testutil.Unstructured(t, testPod),
+			expectedScope: meta.RESTScopeNamespace,
+		},
+		"CR not found in the RESTMapper or the provided CRDs": {
+			resource: testutil.Unstructured(t, testCR),
+			expectedErr: &UnknownTypeError{
+				GroupKind: schema.GroupKind{
+					Group: "example.com",
+					Kind:  "crontab",
+				},
+			},
+		},
+		"CR found in in the provided CRDs": {
+			resource: testutil.Unstructured(t, testCR),
+			crds: []*unstructured.Unstructured{
+				testutil.Unstructured(t, testCRD),
+			},
+			expectedScope: meta.RESTScopeRoot,
+		},
+	}
+
+	for tn, tc := range testCases {
+		t.Run(tn, func(t *testing.T) {
+			tf := cmdtesting.NewTestFactory().WithNamespace("test-ns")
+			defer tf.Cleanup()
+
+			mapper, err := tf.ToRESTMapper()
+			require.NoError(t, err)
+
+			scope, err := LookupResourceScope(tc.resource, tc.crds, mapper)
+
+			if tc.expectedErr != nil {
+				require.Equal(t, tc.expectedErr, err)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tc.expectedScope, scope)
 		})
 	}
 }

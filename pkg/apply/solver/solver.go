@@ -207,14 +207,14 @@ func (t *TaskQueueBuilder) AppendApplyWaitTasks(inv inventory.InventoryInfo, app
 	if hasCRDs {
 		t.AppendApplyTask(inv, append(crdSplitRes.before, crdSplitRes.crds...), crdSplitRes, o)
 		if !o.DryRunStrategy.ClientOrServerDryRun() {
-			waitIds := object.UnstructuredsToObjMetas(crdSplitRes.crds)
+			waitIds := object.UnstructuredsToObjMetasOrDie(crdSplitRes.crds)
 			t.AppendWaitTask(waitIds)
 		}
 		applyObjs = crdSplitRes.after
 	}
 	t.AppendApplyTask(inv, applyObjs, crdSplitRes, o)
 	if !o.DryRunStrategy.ClientOrServerDryRun() && o.ReconcileTimeout != time.Duration(0) {
-		waitIds := object.UnstructuredsToObjMetas(applyObjs)
+		waitIds := object.UnstructuredsToObjMetasOrDie(applyObjs)
 		t.AppendWaitTask(waitIds)
 	}
 	return t
@@ -228,7 +228,7 @@ func (t *TaskQueueBuilder) AppendPruneWaitTasks(pruneObjs []*unstructured.Unstru
 	if o.Prune {
 		t.AppendPruneTask(pruneObjs, pruneFilters, o)
 		if !o.DryRunStrategy.ClientOrServerDryRun() && o.PruneTimeout != time.Duration(0) {
-			pruneIds := object.UnstructuredsToObjMetas(pruneObjs)
+			pruneIds := object.UnstructuredsToObjMetasOrDie(pruneObjs)
 			t.AppendWaitTask(pruneIds)
 		}
 	}

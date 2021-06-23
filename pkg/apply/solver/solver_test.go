@@ -257,7 +257,7 @@ func TestTaskQueueBuilder_BuildTaskQueue(t *testing.T) {
 
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
-			applyIds := object.UnstructuredsToObjMetas(tc.objs)
+			applyIds := object.UnstructuredsToObjMetasOrDie(tc.objs)
 			fakeInvClient := inventory.NewFakeInventoryClient(applyIds)
 			tqb := TaskQueueBuilder{
 				PruneOptions: pruneOptions,
@@ -341,6 +341,6 @@ func getType(task taskrunner.Task) reflect.Type {
 }
 
 func ignoreErrInfoToObjMeta(info *unstructured.Unstructured) object.ObjMetadata {
-	objMeta := object.UnstructuredToObjMeta(info)
+	objMeta := object.UnstructuredToObjMetaOrDie(info)
 	return objMeta
 }

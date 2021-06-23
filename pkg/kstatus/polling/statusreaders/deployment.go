@@ -12,6 +12,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/engine"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
+	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
 func NewDeploymentResourceReader(reader engine.ClusterReader, mapper meta.RESTMapper, rsStatusReader resourceTypeStatusReader) engine.StatusReader {
@@ -41,7 +42,7 @@ type deploymentResourceReader struct {
 var _ resourceTypeStatusReader = &deploymentResourceReader{}
 
 func (d *deploymentResourceReader) ReadStatusForObject(ctx context.Context, deployment *unstructured.Unstructured) *event.ResourceStatus {
-	identifier := toIdentifier(deployment)
+	identifier := object.UnstructuredToObjMetaOrDie(deployment)
 
 	replicaSetStatuses, err := statusForGeneratedResources(ctx, d.mapper, d.reader, d.rsStatusReader, deployment,
 		appsv1.SchemeGroupVersion.WithKind("ReplicaSet").GroupKind(), "spec", "selector")

@@ -13,9 +13,9 @@ import (
 )
 
 func TestInvSetTask(t *testing.T) {
-	id1 := object.UnstructuredToObjMeta(obj1)
-	id2 := object.UnstructuredToObjMeta(obj2)
-	id3 := object.UnstructuredToObjMeta(obj3)
+	id1 := object.UnstructuredToObjMetaOrDie(obj1)
+	id2 := object.UnstructuredToObjMetaOrDie(obj2)
+	id3 := object.UnstructuredToObjMetaOrDie(obj3)
 
 	tests := map[string]struct {
 		appliedObjs   []object.ObjMetadata

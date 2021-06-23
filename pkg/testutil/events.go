@@ -68,8 +68,6 @@ func VerifyEvents(expEvents []ExpEvent, events []event.Event) error {
 	return fmt.Errorf("event %s not found", expEvents[expEventIndex].EventType)
 }
 
-var nilIdentifier = object.ObjMetadata{}
-
 // nolint:gocyclo
 // TODO(mortent): This function is pretty complex and with quite a bit of
 // duplication. We should see if there is a better way to provide a flexible
@@ -105,7 +103,7 @@ func isMatch(ee ExpEvent, e event.Event) bool {
 		}
 		ae := e.ApplyEvent
 
-		if aee.Identifier != nilIdentifier {
+		if aee.Identifier != object.NilObjMetadata {
 			if aee.Identifier != ae.Identifier {
 				return false
 			}
@@ -147,7 +145,7 @@ func isMatch(ee ExpEvent, e event.Event) bool {
 		}
 		pe := e.PruneEvent
 
-		if pee.Identifier != nilIdentifier {
+		if pee.Identifier != object.NilObjMetadata {
 			if pee.Identifier != pe.Identifier {
 				return false
 			}
@@ -169,7 +167,7 @@ func isMatch(ee ExpEvent, e event.Event) bool {
 		}
 		de := e.DeleteEvent
 
-		if dee.Identifier != nilIdentifier {
+		if dee.Identifier != object.NilObjMetadata {
 			if dee.Identifier != de.Identifier {
 				return false
 			}

@@ -59,7 +59,7 @@ func inventoryPolicyMustMatchTest(c client.Client, invConfig InventoryConfig, na
 		{
 			EventType: event.ApplyType,
 			ApplyEvent: &testutil.ExpApplyEvent{
-				Identifier: object.UnstructuredToObjMeta(deploymentManifest(namespaceName)),
+				Identifier: object.UnstructuredToObjMetaOrDie(deploymentManifest(namespaceName)),
 				Error:      inventory.NewInventoryOverlapError(fmt.Errorf("test")),
 			},
 		},
@@ -109,7 +109,7 @@ func inventoryPolicyAdoptIfNoInventoryTest(c client.Client, invConfig InventoryC
 			EventType: event.ApplyType,
 			ApplyEvent: &testutil.ExpApplyEvent{
 				Operation:  event.Configured,
-				Identifier: object.UnstructuredToObjMeta(deploymentManifest(namespaceName)),
+				Identifier: object.UnstructuredToObjMetaOrDie(deploymentManifest(namespaceName)),
 				Error:      nil,
 			},
 		},
@@ -169,7 +169,7 @@ func inventoryPolicyAdoptAllTest(c client.Client, invConfig InventoryConfig, nam
 			EventType: event.ApplyType,
 			ApplyEvent: &testutil.ExpApplyEvent{
 				Operation:  event.Configured,
-				Identifier: object.UnstructuredToObjMeta(deploymentManifest(namespaceName)),
+				Identifier: object.UnstructuredToObjMetaOrDie(deploymentManifest(namespaceName)),
 				Error:      nil,
 			},
 		},

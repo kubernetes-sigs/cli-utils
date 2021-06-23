@@ -47,14 +47,14 @@ func crdTest(_ client.Client, invConfig InventoryConfig, inventoryName, namespac
 			EventType: event.ApplyType,
 			ApplyEvent: &testutil.ExpApplyEvent{
 				Operation:  event.Created,
-				Identifier: object.UnstructuredToObjMeta(manifestToUnstructured(crd)),
+				Identifier: object.UnstructuredToObjMetaOrDie(manifestToUnstructured(crd)),
 				Error:      nil,
 			},
 		},
 		{
 			EventType: event.StatusType,
 			StatusEvent: &testutil.ExpStatusEvent{
-				Identifier: object.UnstructuredToObjMeta(manifestToUnstructured(crd)),
+				Identifier: object.UnstructuredToObjMetaOrDie(manifestToUnstructured(crd)),
 				Status:     status.CurrentStatus,
 				Error:      nil,
 			},
@@ -97,7 +97,7 @@ func crdTest(_ client.Client, invConfig InventoryConfig, inventoryName, namespac
 			EventType: event.DeleteType,
 			DeleteEvent: &testutil.ExpDeleteEvent{
 				Operation:  event.Deleted,
-				Identifier: object.UnstructuredToObjMeta(manifestToUnstructured(crd)),
+				Identifier: object.UnstructuredToObjMetaOrDie(manifestToUnstructured(crd)),
 				Error:      nil,
 			},
 		},
