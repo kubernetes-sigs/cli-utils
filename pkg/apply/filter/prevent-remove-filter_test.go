@@ -71,12 +71,18 @@ func TestPreventDeleteAnnotation(t *testing.T) {
 			filter := PreventRemoveFilter{}
 			obj := defaultObj.DeepCopy()
 			obj.SetAnnotations(tc.annotations)
-			actual, err := filter.Filter(obj)
+			actual, reason, err := filter.Filter(obj)
 			if err != nil {
 				t.Fatalf("PreventRemoveFilter unexpected error (%s)", err)
 			}
 			if tc.expected != actual {
 				t.Errorf("PreventRemoveFilter expected (%t), got (%t)", tc.expected, actual)
+			}
+			if tc.expected && len(reason) == 0 {
+				t.Errorf("PreventRemoveFilter expected Reason, but none found")
+			}
+			if !tc.expected && len(reason) > 0 {
+				t.Errorf("PreventRemoveFilter expected no Reason, but found (%s)", reason)
 			}
 		})
 	}

@@ -137,7 +137,9 @@ type PruneEvent struct {
 	Identifier object.ObjMetadata
 	Operation  PruneEventOperation
 	Object     *unstructured.Unstructured
-	Error      error
+	// If prune is skipped, this reason string explains why
+	Reason string
+	Error  error
 }
 
 //go:generate stringer -type=DeleteEventOperation
@@ -153,5 +155,7 @@ type DeleteEvent struct {
 	Identifier object.ObjMetadata
 	Operation  DeleteEventOperation
 	Object     *unstructured.Unstructured
-	Error      error
+	// If delete is skipped, this reason string explains why
+	Reason string
+	Error  error
 }

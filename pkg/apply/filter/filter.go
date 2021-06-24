@@ -14,6 +14,8 @@ import (
 type ValidationFilter interface {
 	// Name returns a filter name (usually for logging).
 	Name() string
-	// Filter returns true if validation fails or an error.
-	Filter(obj *unstructured.Unstructured) (bool, error)
+	// Filter returns true if validation fails. If true a
+	// reason string is included in the return. If an error happens
+	// during filtering it is returned.
+	Filter(obj *unstructured.Unstructured) (bool, string, error)
 }

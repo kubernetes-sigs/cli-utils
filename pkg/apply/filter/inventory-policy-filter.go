@@ -4,6 +4,8 @@
 package filter
 
 import (
+	"fmt"
+
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 )
@@ -18,17 +20,20 @@ type InventoryPolicyFilter struct {
 
 // Name returns a filter identifier for logging.
 func (ipf InventoryPolicyFilter) Name() string {
-	return "InventoryPolictyFilter"
+	return "InventoryPolicyFilter"
 }
 
 // Filter returns true if the passed object should NOT be pruned (deleted)
 // because the "prevent remove" annotation is present; otherwise returns
 // false. Never returns an error.
-func (ipf InventoryPolicyFilter) Filter(obj *unstructured.Unstructured) (bool, error) {
+func (ipf InventoryPolicyFilter) Filter(obj *unstructured.Unstructured) (bool, string, error) {
 	// Check the inventory id "match" and the adopt policy to determine
 	// if an object should be pruned (deleted).
 	if !inventory.CanPrune(ipf.Inv, obj, ipf.InvPolicy) {
-		return true, nil
+		invMatch := inventory.InventoryIDMatch(ipf.Inv, obj)
+		reason := fmt.Sprintf("object removal prevented; inventory match %v : inventory policy: %v",
+			invMatch, ipf.InvPolicy)
+		return true, reason, nil
 	}
-	return false, nil
+	return false, "", nil
 }

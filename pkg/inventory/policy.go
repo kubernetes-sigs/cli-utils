@@ -77,7 +77,7 @@ const (
 	NoMatch
 )
 
-func inventoryIDMatch(inv InventoryInfo, obj *unstructured.Unstructured) inventoryIDMatchStatus {
+func InventoryIDMatch(inv InventoryInfo, obj *unstructured.Unstructured) inventoryIDMatchStatus {
 	annotations := obj.GetAnnotations()
 	value, found := annotations[owningInventoryKey]
 	if !found {
@@ -93,7 +93,7 @@ func CanApply(inv InventoryInfo, obj *unstructured.Unstructured, policy Inventor
 	if obj == nil {
 		return true, nil
 	}
-	matchStatus := inventoryIDMatch(inv, obj)
+	matchStatus := InventoryIDMatch(inv, obj)
 	switch matchStatus {
 	case Empty:
 		if policy != InventoryPolicyMustMatch {
@@ -118,7 +118,7 @@ func CanPrune(inv InventoryInfo, obj *unstructured.Unstructured, policy Inventor
 	if obj == nil {
 		return false
 	}
-	matchStatus := inventoryIDMatch(inv, obj)
+	matchStatus := InventoryIDMatch(inv, obj)
 	switch matchStatus {
 	case Empty:
 		return policy == AdoptIfNoInventory || policy == AdoptAll

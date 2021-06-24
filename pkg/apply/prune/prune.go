@@ -97,10 +97,11 @@ func (po *PruneOptions) Prune(pruneObjs []*unstructured.Unstructured,
 		klog.V(5).Infof("attempting prune: %s", pruneID)
 		// Check filters to see if we're prevented from pruning/deleting object.
 		var filtered bool
+		var reason string
 		var err error
 		for _, filter := range pruneFilters {
 			klog.V(6).Infof("prune filter %s: %s", filter.Name(), pruneID)
-			filtered, err = filter.Filter(pruneObj)
+			filtered, reason, err = filter.Filter(pruneObj)
 			if err != nil {
 				if klog.V(5).Enabled() {
 					klog.Errorf("error during %s, (%s): %s", filter.Name(), pruneID, err)
@@ -111,7 +112,7 @@ func (po *PruneOptions) Prune(pruneObjs []*unstructured.Unstructured,
 			}
 			if filtered {
 				klog.V(4).Infof("prune filtered by %s: %s", filter.Name(), pruneID)
-				taskContext.EventChannel() <- eventFactory.CreateSkippedEvent(pruneObj)
+				taskContext.EventChannel() <- eventFactory.CreateSkippedEvent(pruneObj, reason)
 				taskContext.CapturePruneFailure(pruneID)
 				break
 			}

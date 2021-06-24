@@ -4,6 +4,8 @@
 package filter
 
 import (
+	"fmt"
+
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/cli-utils/pkg/common"
 )
@@ -22,11 +24,12 @@ func (prf PreventRemoveFilter) Name() string {
 // Filter returns true if the passed object should NOT be pruned (deleted)
 // because the "prevent remove" annotation is present; otherwise returns
 // false. Never returns an error.
-func (prf PreventRemoveFilter) Filter(obj *unstructured.Unstructured) (bool, error) {
+func (prf PreventRemoveFilter) Filter(obj *unstructured.Unstructured) (bool, string, error) {
 	for annotation, value := range obj.GetAnnotations() {
 		if common.NoDeletion(annotation, value) {
-			return true, nil
+			reason := fmt.Sprintf("object removal prevented; delete annotation: %s/%s", annotation, value)
+			return true, reason, nil
 		}
 	}
-	return false, nil
+	return false, "", nil
 }

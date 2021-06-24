@@ -75,7 +75,7 @@ func TestInventoryIDMatch(t *testing.T) {
 		},
 	}
 	for _, tc := range testcases {
-		actual := inventoryIDMatch(tc.inv, tc.obj)
+		actual := InventoryIDMatch(tc.inv, tc.obj)
 		if actual != tc.expected {
 			t.Errorf("expected %v, but got %v", tc.expected, actual)
 		}
