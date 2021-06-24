@@ -19,7 +19,6 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/manifestreader"
-	"sigs.k8s.io/cli-utils/pkg/provider"
 	"sigs.k8s.io/cli-utils/pkg/util/factory"
 )
 
@@ -29,11 +28,13 @@ var (
 )
 
 // GetPreviewRunner creates and returns the PreviewRunner which stores the cobra command.
-func GetPreviewRunner(provider provider.Provider, loader manifestreader.ManifestLoader, ioStreams genericclioptions.IOStreams) *PreviewRunner {
+func GetPreviewRunner(factory cmdutil.Factory, invFactory inventory.InventoryClientFactory,
+	loader manifestreader.ManifestLoader, ioStreams genericclioptions.IOStreams) *PreviewRunner {
 	r := &PreviewRunner{
-		ioStreams: ioStreams,
-		provider:  provider,
-		loader:    loader,
+		factory:    factory,
+		invFactory: invFactory,
+		loader:     loader,
+		ioStreams:  ioStreams,
 	}
 	cmd := &cobra.Command{
 		Use:                   "preview (DIRECTORY | STDIN)",
@@ -62,19 +63,19 @@ func GetPreviewRunner(provider provider.Provider, loader manifestreader.Manifest
 }
 
 // PreviewCommand creates the PreviewRunner, returning the cobra command associated with it.
-func PreviewCommand(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
-	provider := provider.NewProvider(f)
-	loader := manifestreader.NewManifestLoader(f)
-	return GetPreviewRunner(provider, loader, ioStreams).Command
+func PreviewCommand(f cmdutil.Factory, invFactory inventory.InventoryClientFactory, loader manifestreader.ManifestLoader,
+	ioStreams genericclioptions.IOStreams) *cobra.Command {
+	return GetPreviewRunner(f, invFactory, loader, ioStreams).Command
 }
 
 // PreviewRunner encapsulates data necessary to run the preview command.
 type PreviewRunner struct {
 	Command    *cobra.Command
 	PreProcess func(info inventory.InventoryInfo, strategy common.DryRunStrategy) (inventory.InventoryPolicy, error)
-	ioStreams  genericclioptions.IOStreams
-	provider   provider.Provider
+	factory    cmdutil.Factory
+	invFactory inventory.InventoryClientFactory
 	loader     manifestreader.ManifestLoader
+	ioStreams  genericclioptions.IOStreams
 
 	serverSideOptions common.ServerSideOptions
 	output            string
@@ -116,7 +117,12 @@ func (r *PreviewRunner) RunE(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	statusPoller, err := factory.NewStatusPoller(r.provider.Factory())
+	statusPoller, err := factory.NewStatusPoller(r.factory)
+	if err != nil {
+		return err
+	}
+
+	invClient, err := r.invFactory.NewInventoryClient(r.factory)
 	if err != nil {
 		return err
 	}
@@ -128,7 +134,7 @@ func (r *PreviewRunner) RunE(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return err
 		}
-		a, err := apply.NewApplier(r.provider, statusPoller)
+		a, err := apply.NewApplier(r.factory, invClient, statusPoller)
 		if err != nil {
 			return err
 		}
@@ -146,7 +152,7 @@ func (r *PreviewRunner) RunE(cmd *cobra.Command, args []string) error {
 			InventoryPolicy:   inventoryPolicy,
 		})
 	} else {
-		d, err := apply.NewDestroyer(r.provider, statusPoller)
+		d, err := apply.NewDestroyer(r.factory, invClient, statusPoller)
 		if err != nil {
 			return err
 		}

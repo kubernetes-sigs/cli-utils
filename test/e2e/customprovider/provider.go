@@ -12,7 +12,6 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/object"
-	"sigs.k8s.io/cli-utils/pkg/provider"
 )
 
 var InventoryCRD = []byte(strings.TrimSpace(`
@@ -75,24 +74,13 @@ var InventoryGVK = schema.GroupVersionKind{
 	Kind:    "Inventory",
 }
 
-var _ provider.Provider = &CustomProvider{}
+var _ inventory.InventoryClientFactory = CustomInventoryClientFactory{}
 
-func NewCustomProvider(f util.Factory) provider.Provider {
-	return &CustomProvider{
-		factory: f,
-	}
+type CustomInventoryClientFactory struct {
 }
 
-type CustomProvider struct {
-	factory util.Factory
-}
-
-func (c *CustomProvider) Factory() util.Factory {
-	return c.factory
-}
-
-func (c *CustomProvider) InventoryClient() (inventory.InventoryClient, error) {
-	return inventory.NewInventoryClient(c.factory, WrapInventoryObj, invToUnstructuredFunc)
+func (CustomInventoryClientFactory) NewInventoryClient(factory util.Factory) (inventory.InventoryClient, error) {
+	return inventory.NewInventoryClient(factory, WrapInventoryObj, invToUnstructuredFunc)
 }
 
 func invToUnstructuredFunc(inv inventory.InventoryInfo) *unstructured.Unstructured {

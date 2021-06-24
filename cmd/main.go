@@ -19,6 +19,8 @@ import (
 	"sigs.k8s.io/cli-utils/cmd/preview"
 	"sigs.k8s.io/cli-utils/cmd/status"
 	"sigs.k8s.io/cli-utils/pkg/errors"
+	"sigs.k8s.io/cli-utils/pkg/inventory"
+	"sigs.k8s.io/cli-utils/pkg/manifestreader"
 	"sigs.k8s.io/cli-utils/pkg/util/factory"
 
 	// This is here rather than in the libraries because of
@@ -57,15 +59,17 @@ func main() {
 	names := []string{"init", "apply", "preview", "diff", "destroy", "status"}
 	initCmd := initcmd.NewCmdInit(f, ioStreams)
 	updateHelp(names, initCmd)
-	applyCmd := apply.ApplyCommand(f, ioStreams)
+	loader := manifestreader.NewManifestLoader(f)
+	invFactory := inventory.ClusterInventoryClientFactory{}
+	applyCmd := apply.ApplyCommand(f, invFactory, loader, ioStreams)
 	updateHelp(names, applyCmd)
-	previewCmd := preview.PreviewCommand(f, ioStreams)
+	previewCmd := preview.PreviewCommand(f, invFactory, loader, ioStreams)
 	updateHelp(names, previewCmd)
 	diffCmd := diff.NewCmdDiff(f, ioStreams)
 	updateHelp(names, diffCmd)
-	destroyCmd := destroy.DestroyCommand(f, ioStreams)
+	destroyCmd := destroy.DestroyCommand(f, invFactory, loader, ioStreams)
 	updateHelp(names, destroyCmd)
-	statusCmd := status.StatusCommand(f)
+	statusCmd := status.StatusCommand(f, invFactory, loader)
 	updateHelp(names, statusCmd)
 
 	cmd.AddCommand(initCmd, applyCmd, diffCmd, destroyCmd, previewCmd, statusCmd)

@@ -14,7 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
-	"k8s.io/kubectl/pkg/cmd/util"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/filter"
 	"sigs.k8s.io/cli-utils/pkg/apply/info"
@@ -26,21 +26,10 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/ordering"
-	"sigs.k8s.io/cli-utils/pkg/provider"
 )
 
-// NewApplier returns a new Applier. It will set up the ApplyOptions and
-// StatusOptions which are responsible for capturing any command line flags.
-// It currently requires IOStreams, but this is a legacy from when
-// the ApplyOptions were responsible for printing progress. This is now
-// handled by a separate printer with the KubectlPrinterAdapter bridging
-// between the two.
-func NewApplier(provider provider.Provider, statusPoller poller.Poller) (*Applier, error) {
-	invClient, err := provider.InventoryClient()
-	if err != nil {
-		return nil, err
-	}
-	factory := provider.Factory()
+// NewApplier returns a new Applier.
+func NewApplier(factory cmdutil.Factory, invClient inventory.InventoryClient, statusPoller poller.Poller) (*Applier, error) {
 	pruneOpts, err := prune.NewPruneOptions(factory, invClient)
 	if err != nil {
 		return nil, err
@@ -67,7 +56,7 @@ func NewApplier(provider provider.Provider, statusPoller poller.Poller) (*Applie
 type Applier struct {
 	pruneOptions *prune.PruneOptions
 	statusPoller poller.Poller
-	factory      util.Factory
+	factory      cmdutil.Factory
 	invClient    inventory.InventoryClient
 	infoHelper   info.InfoHelper
 }
