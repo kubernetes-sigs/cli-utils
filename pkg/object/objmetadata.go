@@ -22,13 +22,10 @@ import (
 	"strconv"
 	"strings"
 
-	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/cli-runtime/pkg/resource"
 )
 
 const (
@@ -49,9 +46,6 @@ var RBACGroupKind = map[schema.GroupKind]bool{
 	{Group: rbacv1.GroupName, Kind: "RoleBinding"}:        true,
 	{Group: rbacv1.GroupName, Kind: "ClusterRoleBinding"}: true,
 }
-
-// CoreV1Namespace is Namespace GVK.
-var CoreV1Namespace = corev1.SchemeGroupVersion.WithKind("Namespace")
 
 // ObjMetadata organizes and stores the indentifying information
 // for an object. This struct (as a string) is stored in a
@@ -163,51 +157,6 @@ func (o *ObjMetadata) String() string {
 		name, fieldSeparator,
 		o.GroupKind.Group, fieldSeparator,
 		o.GroupKind.Kind)
-}
-
-// BuildObjectMetadata returns object metadata (ObjMetadata) for the
-// passed objects (infos).
-func InfosToObjMetas(infos []*resource.Info) ([]ObjMetadata, error) {
-	objMetas := make([]ObjMetadata, 0, len(infos))
-	for _, info := range infos {
-		objMeta, err := InfoToObjMeta(info)
-		if err != nil {
-			return nil, err
-		}
-		objMetas = append(objMetas, objMeta)
-	}
-	return objMetas, nil
-}
-
-// InfoToObjMeta takes information from the provided info and
-// returns an ObjMetadata that identifies the resource.
-func InfoToObjMeta(info *resource.Info) (ObjMetadata, error) {
-	if info == nil || info.Object == nil {
-		return ObjMetadata{}, fmt.Errorf("attempting to transform info, but it is empty")
-	}
-	obj := info.Object
-	gk := obj.GetObjectKind().GroupVersionKind().GroupKind()
-	return CreateObjMetadata(info.Namespace, info.Name, gk)
-}
-
-func UnstructuredsToObjMetas(objs []*unstructured.Unstructured) []ObjMetadata {
-	objMetas := make([]ObjMetadata, 0, len(objs))
-	for _, obj := range objs {
-		objMetas = append(objMetas, ObjMetadata{
-			Name:      obj.GetName(),
-			Namespace: obj.GetNamespace(),
-			GroupKind: obj.GroupVersionKind().GroupKind(),
-		})
-	}
-	return objMetas
-}
-
-func UnstructuredToObjMeta(obj *unstructured.Unstructured) ObjMetadata {
-	return ObjMetadata{
-		Name:      obj.GetName(),
-		Namespace: obj.GetNamespace(),
-		GroupKind: obj.GroupVersionKind().GroupKind(),
-	}
 }
 
 func RuntimeToObjMeta(obj runtime.Object) ObjMetadata {

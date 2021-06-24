@@ -4,15 +4,45 @@
 package object
 
 import (
+	"fmt"
+
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/cli-runtime/pkg/resource"
 	"sigs.k8s.io/kustomize/kyaml/kio/kioutil"
 )
 
+// InfosToObjMetas returns object metadata (ObjMetadata) for the
+// passed objects (infos); returns an error if one occurs.
+func InfosToObjMetas(infos []*resource.Info) ([]ObjMetadata, error) {
+	objMetas := make([]ObjMetadata, 0, len(infos))
+	for _, info := range infos {
+		objMeta, err := InfoToObjMeta(info)
+		if err != nil {
+			return nil, err
+		}
+		objMetas = append(objMetas, objMeta)
+	}
+	return objMetas, nil
+}
+
+// InfoToObjMeta takes information from the provided info and
+// returns an ObjMetadata that identifies the resource.
+func InfoToObjMeta(info *resource.Info) (ObjMetadata, error) {
+	if info == nil || info.Object == nil {
+		return ObjMetadata{}, fmt.Errorf("attempting to transform info, but it is empty")
+	}
+	obj := info.Object
+	gk := obj.GetObjectKind().GroupVersionKind().GroupKind()
+	return CreateObjMetadata(info.Namespace, info.Name, gk)
+}
+
+// InfoToUnstructured transforms the passed info object into unstructured format.
 func InfoToUnstructured(info *resource.Info) *unstructured.Unstructured {
 	return info.Object.(*unstructured.Unstructured)
 }
 
+// UnstructuredToInfo transforms the passed Unstructured object into Info format,
+// or an error if one occurs.
 func UnstructuredToInfo(obj *unstructured.Unstructured) (*resource.Info, error) {
 	annos := obj.GetAnnotations()
 
@@ -32,6 +62,7 @@ func UnstructuredToInfo(obj *unstructured.Unstructured) (*resource.Info, error) 
 	}, nil
 }
 
+// InfosToUnstructureds transforms the passed objects in Info format to Unstructured.
 func InfosToUnstructureds(infos []*resource.Info) []*unstructured.Unstructured {
 	var objs []*unstructured.Unstructured
 	for _, info := range infos {
@@ -40,6 +71,8 @@ func InfosToUnstructureds(infos []*resource.Info) []*unstructured.Unstructured {
 	return objs
 }
 
+// UnstructuredsToInfos transforms the passed Unstructured objects into Info format
+// or an error if one occurs.
 func UnstructuredsToInfos(objs []*unstructured.Unstructured) ([]*resource.Info, error) {
 	var infos []*resource.Info
 	for _, obj := range objs {
