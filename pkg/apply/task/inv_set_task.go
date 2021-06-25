@@ -36,6 +36,7 @@ func (i *InvSetTask) Identifiers() []object.ObjMetadata {
 // and prune tasks have completed.
 func (i *InvSetTask) Start(taskContext *taskrunner.TaskContext) {
 	go func() {
+		klog.V(2).Infoln("starting inventory replace task")
 		appliedObjs := taskContext.AppliedResources()
 		klog.V(4).Infof("set inventory %d applied objects", len(appliedObjs))
 		pruneFailures := taskContext.PruneFailures()

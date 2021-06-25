@@ -12,6 +12,7 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/client-go/restmapper"
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
 	"sigs.k8s.io/cli-utils/pkg/object"
@@ -93,6 +94,7 @@ func (w *WaitTask) Identifiers() []object.ObjMetadata {
 // Start kicks off the task. For the wait task, this just means
 // setting up the timeout timer.
 func (w *WaitTask) Start(taskContext *TaskContext) {
+	klog.V(2).Infof("starting wait task (%d objects)", len(w.Ids))
 	w.setTimer(taskContext)
 }
 
