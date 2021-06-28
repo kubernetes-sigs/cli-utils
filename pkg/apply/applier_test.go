@@ -69,49 +69,6 @@ spec:
 	}
 )
 
-func Unstructured(t *testing.T, manifest string, mutators ...mutator) *unstructured.Unstructured {
-	u := &unstructured.Unstructured{}
-	err := runtime.DecodeInto(codec, []byte(manifest), u)
-	if !assert.NoError(t, err) {
-		t.FailNow()
-	}
-	for _, m := range mutators {
-		m.Mutate(u)
-	}
-	return u
-}
-
-type mutator interface {
-	Mutate(u *unstructured.Unstructured)
-}
-
-func addOwningInv(t *testing.T, inv string) mutator {
-	return owningInvMutator{
-		t:   t,
-		inv: inv,
-	}
-}
-
-type owningInvMutator struct {
-	t   *testing.T
-	inv string
-}
-
-func (a owningInvMutator) Mutate(u *unstructured.Unstructured) {
-	annos, found, err := unstructured.NestedStringMap(u.Object, "metadata", "annotations")
-	if !assert.NoError(a.t, err) {
-		a.t.FailNow()
-	}
-	if !found {
-		annos = make(map[string]string)
-	}
-	annos["config.k8s.io/owning-inventory"] = a.inv
-	err = unstructured.SetNestedStringMap(u.Object, annos, "metadata", "annotations")
-	if !assert.NoError(a.t, err) {
-		a.t.FailNow()
-	}
-}
-
 type resourceInfo struct {
 	resource *unstructured.Unstructured
 	exists   bool
@@ -157,7 +114,7 @@ func TestApplier(t *testing.T) {
 		"initial apply without status or prune": {
 			namespace: "default",
 			resources: []*unstructured.Unstructured{
-				Unstructured(t, resources["deployment"]),
+				testutil.Unstructured(t, resources["deployment"]),
 			},
 			invInfo: inventoryInfo{
 				name:      "abc-123",
@@ -186,8 +143,8 @@ func TestApplier(t *testing.T) {
 		"first apply multiple resources with status and prune": {
 			namespace: "default",
 			resources: []*unstructured.Unstructured{
-				Unstructured(t, resources["deployment"]),
-				Unstructured(t, resources["secret"]),
+				testutil.Unstructured(t, resources["deployment"]),
+				testutil.Unstructured(t, resources["secret"]),
 			},
 			invInfo: inventoryInfo{
 				name:      "inv-123",
@@ -202,25 +159,25 @@ func TestApplier(t *testing.T) {
 				{
 					EventType: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
-						Identifier: toIdentifier(t, resources["deployment"]),
+						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
 						Status:     status.InProgressStatus,
-						Resource:   Unstructured(t, resources["deployment"]),
+						Resource:   testutil.Unstructured(t, resources["deployment"]),
 					},
 				},
 				{
 					EventType: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
-						Identifier: toIdentifier(t, resources["deployment"]),
+						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
 						Status:     status.CurrentStatus,
-						Resource:   Unstructured(t, resources["deployment"]),
+						Resource:   testutil.Unstructured(t, resources["deployment"]),
 					},
 				},
 				{
 					EventType: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
-						Identifier: toIdentifier(t, resources["secret"]),
+						Identifier: testutil.ToIdentifier(t, resources["secret"]),
 						Status:     status.CurrentStatus,
-						Resource:   Unstructured(t, resources["secret"]),
+						Resource:   testutil.Unstructured(t, resources["secret"]),
 					},
 				},
 			},
@@ -266,8 +223,8 @@ func TestApplier(t *testing.T) {
 		"apply multiple existing resources with status and prune": {
 			namespace: "default",
 			resources: []*unstructured.Unstructured{
-				Unstructured(t, resources["deployment"]),
-				Unstructured(t, resources["secret"]),
+				testutil.Unstructured(t, resources["deployment"]),
+				testutil.Unstructured(t, resources["secret"]),
 			},
 			invInfo: inventoryInfo{
 				name:      "inv-123",
@@ -275,12 +232,12 @@ func TestApplier(t *testing.T) {
 				id:        "test",
 				list: []object.ObjMetadata{
 					object.UnstructuredToObjMeta(
-						Unstructured(t, resources["deployment"]),
+						testutil.Unstructured(t, resources["deployment"]),
 					),
 				},
 			},
 			clusterObjs: []*unstructured.Unstructured{
-				Unstructured(t, resources["deployment"]),
+				testutil.Unstructured(t, resources["deployment"]),
 			},
 			reconcileTimeout: time.Minute,
 			prune:            true,
@@ -289,17 +246,17 @@ func TestApplier(t *testing.T) {
 				{
 					EventType: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
-						Identifier: toIdentifier(t, resources["deployment"]),
+						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
 						Status:     status.CurrentStatus,
-						Resource:   Unstructured(t, resources["deployment"]),
+						Resource:   testutil.Unstructured(t, resources["deployment"]),
 					},
 				},
 				{
 					EventType: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
-						Identifier: toIdentifier(t, resources["secret"]),
+						Identifier: testutil.ToIdentifier(t, resources["secret"]),
 						Status:     status.CurrentStatus,
-						Resource:   Unstructured(t, resources["secret"]),
+						Resource:   testutil.Unstructured(t, resources["secret"]),
 					},
 				},
 			},
@@ -348,16 +305,16 @@ func TestApplier(t *testing.T) {
 				id:        "test",
 				list: []object.ObjMetadata{
 					object.UnstructuredToObjMeta(
-						Unstructured(t, resources["deployment"]),
+						testutil.Unstructured(t, resources["deployment"]),
 					),
 					object.UnstructuredToObjMeta(
-						Unstructured(t, resources["secret"]),
+						testutil.Unstructured(t, resources["secret"]),
 					),
 				},
 			},
 			clusterObjs: []*unstructured.Unstructured{
-				Unstructured(t, resources["deployment"], addOwningInv(t, "test")),
-				Unstructured(t, resources["secret"], addOwningInv(t, "test")),
+				testutil.Unstructured(t, resources["deployment"], testutil.AddOwningInv(t, "test")),
+				testutil.Unstructured(t, resources["secret"], testutil.AddOwningInv(t, "test")),
 			},
 			reconcileTimeout: time.Minute,
 			prune:            true,
@@ -402,7 +359,7 @@ func TestApplier(t *testing.T) {
 		"apply resource with existing object belonging to different inventory": {
 			namespace: "default",
 			resources: []*unstructured.Unstructured{
-				Unstructured(t, resources["deployment"]),
+				testutil.Unstructured(t, resources["deployment"]),
 			},
 			invInfo: inventoryInfo{
 				name:      "abc-123",
@@ -410,7 +367,7 @@ func TestApplier(t *testing.T) {
 				id:        "test",
 			},
 			clusterObjs: []*unstructured.Unstructured{
-				Unstructured(t, resources["deployment"], addOwningInv(t, "unmatched")),
+				testutil.Unstructured(t, resources["deployment"], testutil.AddOwningInv(t, "unmatched")),
 			},
 			reconcileTimeout: time.Minute,
 			prune:            true,
@@ -419,14 +376,14 @@ func TestApplier(t *testing.T) {
 				{
 					EventType: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
-						Identifier: toIdentifier(t, resources["deployment"]),
+						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
 						Status:     status.InProgressStatus,
 					},
 				},
 				{
 					EventType: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
-						Identifier: toIdentifier(t, resources["deployment"]),
+						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
 						Status:     status.CurrentStatus,
 					},
 				},
@@ -470,12 +427,12 @@ func TestApplier(t *testing.T) {
 				id:        "test",
 				list: []object.ObjMetadata{
 					object.UnstructuredToObjMeta(
-						Unstructured(t, resources["deployment"]),
+						testutil.Unstructured(t, resources["deployment"]),
 					),
 				},
 			},
 			clusterObjs: []*unstructured.Unstructured{
-				Unstructured(t, resources["deployment"], addOwningInv(t, "unmatched")),
+				testutil.Unstructured(t, resources["deployment"], testutil.AddOwningInv(t, "unmatched")),
 			},
 			reconcileTimeout: 0,
 			prune:            true,
@@ -513,12 +470,12 @@ func TestApplier(t *testing.T) {
 				id:        "test",
 				list: []object.ObjMetadata{
 					object.UnstructuredToObjMeta(
-						Unstructured(t, resources["deployment"]),
+						testutil.Unstructured(t, resources["deployment"]),
 					),
 				},
 			},
 			clusterObjs: []*unstructured.Unstructured{
-				Unstructured(t, resources["deployment"], addOwningInv(t, "test")),
+				testutil.Unstructured(t, resources["deployment"], testutil.AddOwningInv(t, "test")),
 			},
 			reconcileTimeout: 0,
 			prune:            true,
@@ -829,15 +786,6 @@ func newFakeRESTClient(t *testing.T, handlers []handler) *fake.RESTClient {
 			t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 			return nil, nil
 		}),
-	}
-}
-
-func toIdentifier(t *testing.T, manifest string) object.ObjMetadata {
-	obj := Unstructured(t, manifest)
-	return object.ObjMetadata{
-		GroupKind: obj.GetObjectKind().GroupVersionKind().GroupKind(),
-		Name:      obj.GetName(),
-		Namespace: "default",
 	}
 }
 
