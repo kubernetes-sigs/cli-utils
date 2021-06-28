@@ -4,6 +4,8 @@
 package filter
 
 import (
+	"fmt"
+
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/cli-utils/pkg/object"
@@ -25,11 +27,12 @@ func (lnf LocalNamespacesFilter) Name() string {
 // because the it is a namespace that objects still reside in; otherwise
 // returns false. This filter should not be added to the list of filters
 // for "destroying", since every object is being delete. Never returns an error.
-func (lnf LocalNamespacesFilter) Filter(obj *unstructured.Unstructured) (bool, error) {
+func (lnf LocalNamespacesFilter) Filter(obj *unstructured.Unstructured) (bool, string, error) {
 	id := object.UnstructuredToObjMeta(obj)
 	if id.GroupKind == object.CoreV1Namespace.GroupKind() &&
 		lnf.LocalNamespaces.Has(id.Name) {
-		return true, nil
+		reason := fmt.Sprintf("namespace removal prevented; still in use: %s", id.Name)
+		return true, reason, nil
 	}
-	return false, nil
+	return false, "", nil
 }

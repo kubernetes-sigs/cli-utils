@@ -89,12 +89,18 @@ func TestInventoryPolicyFilter(t *testing.T) {
 			}
 			obj := defaultObj.DeepCopy()
 			obj.SetAnnotations(objIDAnnotation)
-			actual, err := filter.Filter(obj)
+			actual, reason, err := filter.Filter(obj)
 			if err != nil {
 				t.Fatalf("InventoryPolicyFilter unexpected error (%s)", err)
 			}
 			if tc.filtered != actual {
 				t.Errorf("InventoryPolicyFilter expected filter (%t), got (%t)", tc.filtered, actual)
+			}
+			if tc.filtered && len(reason) == 0 {
+				t.Errorf("InventoryPolicyFilter filtered; expected but missing Reason")
+			}
+			if !tc.filtered && len(reason) > 0 {
+				t.Errorf("InventoryPolicyFilter not filtered; received unexpected Reason: %s", reason)
 			}
 		})
 	}

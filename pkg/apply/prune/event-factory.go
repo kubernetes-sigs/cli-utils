@@ -14,7 +14,7 @@ import (
 // events for pruning or deleting.
 type EventFactory interface {
 	CreateSuccessEvent(obj *unstructured.Unstructured) event.Event
-	CreateSkippedEvent(obj *unstructured.Unstructured) event.Event
+	CreateSkippedEvent(obj *unstructured.Unstructured, reason string) event.Event
 	CreateFailedEvent(id object.ObjMetadata, err error) event.Event
 }
 
@@ -42,13 +42,14 @@ func (pef PruneEventFactory) CreateSuccessEvent(obj *unstructured.Unstructured) 
 	}
 }
 
-func (pef PruneEventFactory) CreateSkippedEvent(obj *unstructured.Unstructured) event.Event {
+func (pef PruneEventFactory) CreateSkippedEvent(obj *unstructured.Unstructured, reason string) event.Event {
 	return event.Event{
 		Type: event.PruneType,
 		PruneEvent: event.PruneEvent{
 			Operation:  event.PruneSkipped,
 			Object:     obj,
 			Identifier: object.UnstructuredToObjMeta(obj),
+			Reason:     reason,
 		},
 	}
 }
@@ -78,13 +79,14 @@ func (def DeleteEventFactory) CreateSuccessEvent(obj *unstructured.Unstructured)
 	}
 }
 
-func (def DeleteEventFactory) CreateSkippedEvent(obj *unstructured.Unstructured) event.Event {
+func (def DeleteEventFactory) CreateSkippedEvent(obj *unstructured.Unstructured, reason string) event.Event {
 	return event.Event{
 		Type: event.DeleteType,
 		DeleteEvent: event.DeleteEvent{
 			Operation:  event.DeleteSkipped,
 			Object:     obj,
 			Identifier: object.UnstructuredToObjMeta(obj),
+			Reason:     reason,
 		},
 	}
 }

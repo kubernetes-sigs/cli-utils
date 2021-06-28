@@ -50,12 +50,18 @@ func TestLocalNamespacesFilter(t *testing.T) {
 			}
 			namespace := testNamespace.DeepCopy()
 			namespace.SetName(tc.namespace)
-			actual, err := filter.Filter(namespace)
+			actual, reason, err := filter.Filter(namespace)
 			if err != nil {
 				t.Fatalf("LocalNamespacesFilter unexpected error (%s)", err)
 			}
 			if tc.filtered != actual {
 				t.Errorf("LocalNamespacesFilter expected filter (%t), got (%t)", tc.filtered, actual)
+			}
+			if tc.filtered && len(reason) == 0 {
+				t.Errorf("LocalNamespacesFilter filtered; expected but missing Reason")
+			}
+			if !tc.filtered && len(reason) > 0 {
+				t.Errorf("LocalNamespacesFilter not filtered; received unexpected Reason: %s", reason)
 			}
 		})
 	}

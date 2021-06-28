@@ -4,6 +4,8 @@
 package filter
 
 import (
+	"fmt"
+
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -24,10 +26,11 @@ func (cuf CurrentUIDFilter) Name() string {
 // because the it is a namespace that objects still reside in; otherwise
 // returns false. This filter should not be added to the list of filters
 // for "destroying", since every object is being deletet. Never returns an error.
-func (cuf CurrentUIDFilter) Filter(obj *unstructured.Unstructured) (bool, error) {
+func (cuf CurrentUIDFilter) Filter(obj *unstructured.Unstructured) (bool, string, error) {
 	uid := string(obj.GetUID())
 	if cuf.CurrentUIDs.Has(uid) {
-		return true, nil
+		reason := fmt.Sprintf("object removal prevented; UID just applied: %s", uid)
+		return true, reason, nil
 	}
-	return false, nil
+	return false, "", nil
 }

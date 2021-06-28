@@ -50,12 +50,18 @@ func TestCurrentUIDFilter(t *testing.T) {
 			}
 			obj := defaultObj.DeepCopy()
 			obj.SetUID(types.UID(tc.objUID))
-			actual, err := filter.Filter(obj)
+			actual, reason, err := filter.Filter(obj)
 			if err != nil {
 				t.Fatalf("CurrentUIDFilter unexpected error (%s)", err)
 			}
 			if tc.filtered != actual {
 				t.Errorf("CurrentUIDFilter expected filter (%t), got (%t)", tc.filtered, actual)
+			}
+			if tc.filtered && len(reason) == 0 {
+				t.Errorf("CurrentUIDFilter filtered; expected but missing Reason")
+			}
+			if !tc.filtered && len(reason) > 0 {
+				t.Errorf("CurrentUIDFilter not filtered; received unexpected Reason: %s", reason)
 			}
 		})
 	}

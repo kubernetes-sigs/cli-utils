@@ -63,7 +63,7 @@ func TestEventFactory(t *testing.T) {
 				t.Errorf("success event expected nil error, got (%s)", err)
 			}
 			// Validate the "skipped" event"
-			actualEvent = eventFactory.CreateSkippedEvent(tc.obj)
+			actualEvent = eventFactory.CreateSkippedEvent(tc.obj, "fake reason")
 			if tc.expectedType != actualEvent.Type {
 				t.Errorf("skipped event expected type (%s), got (%s)",
 					tc.expectedType, actualEvent.Type)
