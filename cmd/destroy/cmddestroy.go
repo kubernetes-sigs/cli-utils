@@ -115,6 +115,7 @@ func (r *DestroyRunner) RunE(cmd *cobra.Command, args []string) error {
 		DeleteTimeout:           r.deleteTimeout,
 		DeletePropagationPolicy: deletePropPolicy,
 		InventoryPolicy:         inventoryPolicy,
+		EmitStatusEvents:        r.deleteTimeout != time.Duration(0),
 	})
 
 	// The printer will print updates from the channel. It will block
