@@ -36,7 +36,7 @@ func (i *DeleteInvTask) Identifiers() []object.ObjMetadata {
 // Start deletes the inventory object from the cluster.
 func (i *DeleteInvTask) Start(taskContext *taskrunner.TaskContext) {
 	go func() {
-		klog.V(4).Infof("delete inventory object (%s/%s)", i.InvInfo.Namespace(), i.InvInfo.Name())
+		klog.V(2).Infoln("starting delete inventory task")
 		err := i.InvClient.DeleteInventoryObj(i.InvInfo)
 		taskContext.TaskChannel() <- taskrunner.TaskResult{Err: err}
 	}()

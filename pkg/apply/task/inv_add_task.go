@@ -38,6 +38,7 @@ func (i *InvAddTask) Identifiers() []object.ObjMetadata {
 // into the current inventory.
 func (i *InvAddTask) Start(taskContext *taskrunner.TaskContext) {
 	go func() {
+		klog.V(2).Infoln("starting inventory add task")
 		if err := inventory.ValidateNoInventory(i.Objects); err != nil {
 			taskContext.TaskChannel() <- taskrunner.TaskResult{Err: err}
 			return
