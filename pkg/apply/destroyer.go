@@ -73,6 +73,10 @@ type DestroyerOptions struct {
 	// that should be used. If this is not provided, the default is to
 	// use the Background policy.
 	DeletePropagationPolicy metav1.DeletionPropagation
+
+	// EmitStatusEvents defines whether status events should be
+	// emitted on the eventChannel to the caller.
+	EmitStatusEvents bool
 }
 
 // Run performs the destroy step. Passes the inventory object. This
@@ -139,7 +143,7 @@ func (d *Destroyer) Run(inv inventory.InventoryInfo, options DestroyerOptions) <
 		err = runner.Run(context.Background(), taskQueue.ToChannel(), eventChannel, taskrunner.Options{
 			UseCache:         true,
 			PollInterval:     poller.DefaultPollInterval,
-			EmitStatusEvents: true,
+			EmitStatusEvents: options.EmitStatusEvents,
 		})
 		if err != nil {
 			handleError(eventChannel, err)

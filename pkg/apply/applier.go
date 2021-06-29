@@ -130,6 +130,7 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.InventoryInfo, obje
 			handleError(eventChannel, err)
 			return
 		}
+		klog.V(4).Infof("calculated %d apply objs; %d prune objs", len(applyObjs), len(pruneObjs))
 		mapper, err := a.factory.ToRESTMapper()
 		if err != nil {
 			handleError(eventChannel, err)
