@@ -4,6 +4,7 @@
 package task
 
 import (
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
@@ -38,6 +39,10 @@ func (i *DeleteInvTask) Start(taskContext *taskrunner.TaskContext) {
 	go func() {
 		klog.V(2).Infoln("starting delete inventory task")
 		err := i.InvClient.DeleteInventoryObj(i.InvInfo)
+		// Not found is not error, since this means it was already deleted.
+		if apierrors.IsNotFound(err) {
+			err = nil
+		}
 		taskContext.TaskChannel() <- taskrunner.TaskResult{Err: err}
 	}()
 }
