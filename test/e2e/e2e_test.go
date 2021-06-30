@@ -20,7 +20,6 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/apply"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
-	"sigs.k8s.io/cli-utils/pkg/provider"
 	"sigs.k8s.io/cli-utils/pkg/util/factory"
 	"sigs.k8s.io/cli-utils/test/e2e/customprovider"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -205,15 +204,11 @@ func deleteNamespace(c client.Client, namespace *v1.Namespace) {
 }
 
 func newDefaultInvApplier() *apply.Applier {
-	return newApplierFromProvider(newDefaultInvProvider())
+	return newApplierFromInvFactory(inventory.ClusterInventoryClientFactory{})
 }
 
 func newDefaultInvDestroyer() *apply.Destroyer {
-	return newDestroyerFromProvider(newDefaultInvProvider())
-}
-
-func newDefaultInvProvider() provider.Provider {
-	return provider.NewProvider(newFactory())
+	return newDestroyerFromInvFactory(inventory.ClusterInventoryClientFactory{})
 }
 
 func defaultInvSizeVerifyFunc(c client.Client, name, namespace, id string, count int) {
@@ -239,15 +234,11 @@ func defaultInvCountVerifyFunc(c client.Client, namespace string, count int) {
 }
 
 func newCustomInvApplier() *apply.Applier {
-	return newApplierFromProvider(newCustomInvProvider())
+	return newApplierFromInvFactory(customprovider.CustomInventoryClientFactory{})
 }
 
 func newCustomInvDestroyer() *apply.Destroyer {
-	return newDestroyerFromProvider(newCustomInvProvider())
-}
-
-func newCustomInvProvider() provider.Provider {
-	return customprovider.NewCustomProvider(newFactory())
+	return newDestroyerFromInvFactory(customprovider.CustomInventoryClientFactory{})
 }
 
 func newFactory() util.Factory {
@@ -286,20 +277,26 @@ func customInvCountVerifyFunc(c client.Client, namespace string, count int) {
 	Expect(len(u.Items)).To(Equal(count))
 }
 
-func newApplierFromProvider(prov provider.Provider) *apply.Applier {
-	statusPoller, err := factory.NewStatusPoller(prov.Factory())
+func newApplierFromInvFactory(invFactory inventory.InventoryClientFactory) *apply.Applier {
+	f := newFactory()
+	invClient, err := invFactory.NewInventoryClient(f)
+	Expect(err).NotTo(HaveOccurred())
+	statusPoller, err := factory.NewStatusPoller(f)
 	Expect(err).NotTo(HaveOccurred())
 
-	a, err := apply.NewApplier(prov, statusPoller)
+	a, err := apply.NewApplier(f, invClient, statusPoller)
 	Expect(err).NotTo(HaveOccurred())
 	return a
 }
 
-func newDestroyerFromProvider(prov provider.Provider) *apply.Destroyer {
-	statusPoller, err := factory.NewStatusPoller(prov.Factory())
+func newDestroyerFromInvFactory(invFactory inventory.InventoryClientFactory) *apply.Destroyer {
+	f := newFactory()
+	invClient, err := invFactory.NewInventoryClient(f)
+	Expect(err).NotTo(HaveOccurred())
+	statusPoller, err := factory.NewStatusPoller(f)
 	Expect(err).NotTo(HaveOccurred())
 
-	d, err := apply.NewDestroyer(prov, statusPoller)
+	d, err := apply.NewDestroyer(f, invClient, statusPoller)
 	Expect(err).NotTo(HaveOccurred())
 	return d
 }

@@ -16,12 +16,12 @@ import (
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/cli-utils/pkg/apply/poller"
+	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling"
 	pollevent "sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
 	"sigs.k8s.io/cli-utils/pkg/manifestreader"
 	"sigs.k8s.io/cli-utils/pkg/object"
-	"sigs.k8s.io/cli-utils/pkg/provider"
 )
 
 var (
@@ -222,11 +222,11 @@ deployment.apps/foo is InProgress: inProgress
 			tf := cmdtesting.NewTestFactory().WithNamespace("namespace")
 			defer tf.Cleanup()
 
-			provider := provider.NewFakeProvider(tf, tc.inventory)
 			loader := manifestreader.NewFakeLoader(tf, tc.inventory)
 			runner := &StatusRunner{
-				provider: provider,
-				loader:   loader,
+				factory:    tf,
+				invFactory: inventory.FakeInventoryClientFactory(tc.inventory),
+				loader:     loader,
 				pollerFactoryFunc: func(c cmdutil.Factory) (poller.Poller, error) {
 					return &fakePoller{tc.events}, nil
 				},

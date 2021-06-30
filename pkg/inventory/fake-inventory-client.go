@@ -5,6 +5,7 @@ package inventory
 
 import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
@@ -15,7 +16,16 @@ type FakeInventoryClient struct {
 	Err  error
 }
 
-var _ InventoryClient = &FakeInventoryClient{}
+var (
+	_ InventoryClient        = &FakeInventoryClient{}
+	_ InventoryClientFactory = FakeInventoryClientFactory{}
+)
+
+type FakeInventoryClientFactory []object.ObjMetadata
+
+func (f FakeInventoryClientFactory) NewInventoryClient(factory cmdutil.Factory) (InventoryClient, error) {
+	return NewFakeInventoryClient(f), nil
+}
 
 // NewFakeInventoryClient returns a FakeInventoryClient.
 func NewFakeInventoryClient(initObjs []object.ObjMetadata) *FakeInventoryClient {

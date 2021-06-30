@@ -36,7 +36,6 @@ import (
 	pollevent "sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
 	"sigs.k8s.io/cli-utils/pkg/object"
-	"sigs.k8s.io/cli-utils/pkg/provider"
 	"sigs.k8s.io/cli-utils/pkg/testutil"
 )
 
@@ -552,20 +551,22 @@ func TestApplier(t *testing.T) {
 			tf.UnstructuredClient = newFakeRESTClient(t, handlers)
 			tf.FakeDynamicClient = fakeDynamicClient(t, mapper, objs...)
 
-			cf := provider.NewProvider(tf)
 			poller := &fakePoller{
 				events: tc.statusEvents,
 				start:  make(chan struct{}),
 			}
-			applier, err := NewApplier(cf, poller)
+			invClient, err := inventory.ClusterInventoryClientFactory{}.NewInventoryClient(tf)
 			require.NoError(t, err)
-			applier.infoHelper = &fakeInfoHelper{
+			infoHelper := &fakeInfoHelper{
 				factory: tf,
 			}
 			// TODO(mortent): This is not great, but at least this keeps the
 			// ugliness in the test code until we can find a way to wire it
 			// up so to avoid it.
-			applier.invClient.(*inventory.ClusterInventoryClient).InfoHelper = applier.infoHelper
+			invClient.(*inventory.ClusterInventoryClient).InfoHelper = infoHelper
+			applier, err := NewApplier(tf, invClient, poller)
+			require.NoError(t, err)
+			applier.infoHelper = infoHelper
 			ctx := context.Background()
 			eventChannel := applier.Run(ctx, tc.invInfo.toWrapped(), tc.resources, Options{
 				ReconcileTimeout: tc.reconcileTimeout,

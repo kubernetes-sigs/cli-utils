@@ -16,19 +16,20 @@ import (
 	"sigs.k8s.io/cli-utils/cmd/status/printers"
 	"sigs.k8s.io/cli-utils/pkg/apply/poller"
 	"sigs.k8s.io/cli-utils/pkg/common"
+	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/aggregator"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/collector"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
 	"sigs.k8s.io/cli-utils/pkg/manifestreader"
-	"sigs.k8s.io/cli-utils/pkg/provider"
 	"sigs.k8s.io/cli-utils/pkg/util/factory"
 )
 
-func GetStatusRunner(provider provider.Provider, loader manifestreader.ManifestLoader) *StatusRunner {
+func GetStatusRunner(factory cmdutil.Factory, invFactory inventory.InventoryClientFactory, loader manifestreader.ManifestLoader) *StatusRunner {
 	r := &StatusRunner{
-		provider:          provider,
+		factory:           factory,
+		invFactory:        invFactory,
 		loader:            loader,
 		pollerFactoryFunc: pollerFactoryFunc,
 	}
@@ -48,18 +49,17 @@ func GetStatusRunner(provider provider.Provider, loader manifestreader.ManifestL
 	return r
 }
 
-func StatusCommand(f cmdutil.Factory) *cobra.Command {
-	provider := provider.NewProvider(f)
-	loader := manifestreader.NewManifestLoader(f)
-	return GetStatusRunner(provider, loader).Command
+func StatusCommand(f cmdutil.Factory, invFactory inventory.InventoryClientFactory, loader manifestreader.ManifestLoader) *cobra.Command {
+	return GetStatusRunner(f, invFactory, loader).Command
 }
 
 // StatusRunner captures the parameters for the command and contains
 // the run function.
 type StatusRunner struct {
-	Command  *cobra.Command
-	provider provider.Provider
-	loader   manifestreader.ManifestLoader
+	Command    *cobra.Command
+	factory    cmdutil.Factory
+	invFactory inventory.InventoryClientFactory
+	loader     manifestreader.ManifestLoader
 
 	period    time.Duration
 	pollUntil string
@@ -92,7 +92,7 @@ func (r *StatusRunner) runE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	invClient, err := r.provider.InventoryClient()
+	invClient, err := r.invFactory.NewInventoryClient(r.factory)
 	if err != nil {
 		return err
 	}
@@ -110,7 +110,7 @@ func (r *StatusRunner) runE(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	statusPoller, err := r.pollerFactoryFunc(r.provider.Factory())
+	statusPoller, err := r.pollerFactoryFunc(r.factory)
 	if err != nil {
 		return err
 	}

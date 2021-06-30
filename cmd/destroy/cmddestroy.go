@@ -18,16 +18,17 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/manifestreader"
-	"sigs.k8s.io/cli-utils/pkg/provider"
 	"sigs.k8s.io/cli-utils/pkg/util/factory"
 )
 
 // GetDestroyRunner creates and returns the DestroyRunner which stores the cobra command.
-func GetDestroyRunner(provider provider.Provider, loader manifestreader.ManifestLoader, ioStreams genericclioptions.IOStreams) *DestroyRunner {
+func GetDestroyRunner(factory cmdutil.Factory, invFactory inventory.InventoryClientFactory,
+	loader manifestreader.ManifestLoader, ioStreams genericclioptions.IOStreams) *DestroyRunner {
 	r := &DestroyRunner{
-		ioStreams: ioStreams,
-		provider:  provider,
-		loader:    loader,
+		ioStreams:  ioStreams,
+		factory:    factory,
+		invFactory: invFactory,
+		loader:     loader,
 	}
 	cmd := &cobra.Command{
 		Use:                   "destroy (DIRECTORY | STDIN)",
@@ -51,10 +52,9 @@ func GetDestroyRunner(provider provider.Provider, loader manifestreader.Manifest
 }
 
 // DestroyCommand creates the DestroyRunner, returning the cobra command associated with it.
-func DestroyCommand(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
-	provider := provider.NewProvider(f)
-	loader := manifestreader.NewManifestLoader(f)
-	return GetDestroyRunner(provider, loader, ioStreams).Command
+func DestroyCommand(f cmdutil.Factory, invFactory inventory.InventoryClientFactory, loader manifestreader.ManifestLoader,
+	ioStreams genericclioptions.IOStreams) *cobra.Command {
+	return GetDestroyRunner(f, invFactory, loader, ioStreams).Command
 }
 
 // DestroyRunner encapsulates data necessary to run the destroy command.
@@ -62,7 +62,8 @@ type DestroyRunner struct {
 	Command    *cobra.Command
 	PreProcess func(info inventory.InventoryInfo, strategy common.DryRunStrategy) (inventory.InventoryPolicy, error)
 	ioStreams  genericclioptions.IOStreams
-	provider   provider.Provider
+	factory    cmdutil.Factory
+	invFactory inventory.InventoryClientFactory
 	loader     manifestreader.ManifestLoader
 
 	output                  string
@@ -101,11 +102,15 @@ func (r *DestroyRunner) RunE(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	statusPoller, err := factory.NewStatusPoller(r.provider.Factory())
+	statusPoller, err := factory.NewStatusPoller(r.factory)
 	if err != nil {
 		return err
 	}
-	d, err := apply.NewDestroyer(r.provider, statusPoller)
+	invClient, err := r.invFactory.NewInventoryClient(r.factory)
+	if err != nil {
+		return err
+	}
+	d, err := apply.NewDestroyer(r.factory, invClient, statusPoller)
 	if err != nil {
 		return err
 	}

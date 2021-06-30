@@ -19,15 +19,16 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/manifestreader"
-	"sigs.k8s.io/cli-utils/pkg/provider"
 	"sigs.k8s.io/cli-utils/pkg/util/factory"
 )
 
-func GetApplyRunner(provider provider.Provider, loader manifestreader.ManifestLoader, ioStreams genericclioptions.IOStreams) *ApplyRunner {
+func GetApplyRunner(factory cmdutil.Factory, invFactory inventory.InventoryClientFactory,
+	loader manifestreader.ManifestLoader, ioStreams genericclioptions.IOStreams) *ApplyRunner {
 	r := &ApplyRunner{
-		ioStreams: ioStreams,
-		provider:  provider,
-		loader:    loader,
+		ioStreams:  ioStreams,
+		factory:    factory,
+		invFactory: invFactory,
+		loader:     loader,
 	}
 	cmd := &cobra.Command{
 		Use:                   "apply (DIRECTORY | STDIN)",
@@ -63,17 +64,17 @@ func GetApplyRunner(provider provider.Provider, loader manifestreader.ManifestLo
 	return r
 }
 
-func ApplyCommand(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
-	provider := provider.NewProvider(f)
-	loader := manifestreader.NewManifestLoader(f)
-	return GetApplyRunner(provider, loader, ioStreams).Command
+func ApplyCommand(f cmdutil.Factory, invFactory inventory.InventoryClientFactory, loader manifestreader.ManifestLoader,
+	ioStreams genericclioptions.IOStreams) *cobra.Command {
+	return GetApplyRunner(f, invFactory, loader, ioStreams).Command
 }
 
 type ApplyRunner struct {
 	Command    *cobra.Command
 	PreProcess func(info inventory.InventoryInfo, strategy common.DryRunStrategy) (inventory.InventoryPolicy, error)
 	ioStreams  genericclioptions.IOStreams
-	provider   provider.Provider
+	factory    cmdutil.Factory
+	invFactory inventory.InventoryClientFactory
 	loader     manifestreader.ManifestLoader
 
 	serverSideOptions      common.ServerSideOptions
@@ -131,15 +132,18 @@ func (r *ApplyRunner) RunE(cmd *cobra.Command, args []string) error {
 			return err
 		}
 	}
-	f := r.provider.Factory()
-	statusPoller, err := factory.NewStatusPoller(f)
+	statusPoller, err := factory.NewStatusPoller(r.factory)
+	if err != nil {
+		return err
+	}
+	invClient, err := r.invFactory.NewInventoryClient(r.factory)
 	if err != nil {
 		return err
 	}
 
 	// Run the applier. It will return a channel where we can receive updates
 	// to keep track of progress and any issues.
-	a, err := apply.NewApplier(r.provider, statusPoller)
+	a, err := apply.NewApplier(r.factory, invClient, statusPoller)
 	if err != nil {
 		return err
 	}

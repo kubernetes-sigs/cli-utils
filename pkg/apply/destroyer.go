@@ -11,7 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/klog/v2"
-	"k8s.io/kubectl/pkg/cmd/util"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/filter"
 	"sigs.k8s.io/cli-utils/pkg/apply/poller"
@@ -21,7 +21,6 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/object"
-	"sigs.k8s.io/cli-utils/pkg/provider"
 )
 
 // NewDestroyer returns a new destroyer. It will set up the ApplyOptions and
@@ -30,12 +29,7 @@ import (
 // the ApplyOptions were responsible for printing progress. This is now
 // handled by a separate printer with the KubectlPrinterAdapter bridging
 // between the two.
-func NewDestroyer(provider provider.Provider, statusPoller poller.Poller) (*Destroyer, error) {
-	invClient, err := provider.InventoryClient()
-	if err != nil {
-		return nil, errors.WrapPrefix(err, "error creating inventory client", 1)
-	}
-	factory := provider.Factory()
+func NewDestroyer(factory cmdutil.Factory, invClient inventory.InventoryClient, statusPoller poller.Poller) (*Destroyer, error) {
 	pruneOpts, err := prune.NewPruneOptions(factory, invClient)
 	if err != nil {
 		return nil, errors.WrapPrefix(err, "error setting up PruneOptions", 1)
@@ -53,7 +47,7 @@ func NewDestroyer(provider provider.Provider, statusPoller poller.Poller) (*Dest
 type Destroyer struct {
 	pruneOptions *prune.PruneOptions
 	statusPoller poller.Poller
-	factory      util.Factory
+	factory      cmdutil.Factory
 	invClient    inventory.InventoryClient
 }
 
