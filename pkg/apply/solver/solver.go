@@ -213,7 +213,7 @@ func (t *TaskQueueBuilder) AppendApplyWaitTasks(inv inventory.InventoryInfo,
 	for _, applySet := range applySets {
 		t.AppendApplyTask(inv, applySet, o)
 		if addWaitTask {
-			applyIds := object.UnstructuredsToObjMetas(applySet)
+			applyIds := object.UnstructuredsToObjMetasOrDie(applySet)
 			t.AppendWaitTask(applyIds, taskrunner.AllCurrent, waitTimeout)
 		}
 	}
@@ -234,7 +234,7 @@ func (t *TaskQueueBuilder) AppendPruneWaitTasks(pruneObjs []*unstructured.Unstru
 		for _, pruneSet := range pruneSets {
 			t.AppendPruneTask(pruneSet, pruneFilters, o)
 			if addWaitTask {
-				pruneIds := object.UnstructuredsToObjMetas(pruneSet)
+				pruneIds := object.UnstructuredsToObjMetasOrDie(pruneSet)
 				t.AppendWaitTask(pruneIds, taskrunner.AllNotFound, waitTimeout)
 			}
 		}

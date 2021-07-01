@@ -586,9 +586,10 @@ func TestApplier(t *testing.T) {
 					}
 					if e.Type == event.ActionGroupType &&
 						e.ActionGroupEvent.Type == event.Finished {
+						// If we do not also check for PruneAction, then the tests
+						// hang, timeout, and fail.
 						if e.ActionGroupEvent.Action == event.ApplyAction ||
-							e.ActionGroupEvent.Action == event.PruneAction ||
-							e.ActionGroupEvent.Action == event.DeleteAction {
+							e.ActionGroupEvent.Action == event.PruneAction {
 							close(poller.start)
 						}
 					}

@@ -6,7 +6,6 @@ package e2e
 import (
 	"context"
 	"strings"
-	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -19,19 +18,21 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func crdTest(_ client.Client, invConfig InventoryConfig, inventoryName, namespaceName string) {
-	By("apply a set of resources that includes both a crd and a cr")
+func dependsOnTest(_ client.Client, invConfig InventoryConfig, inventoryName, namespaceName string) {
+	By("apply resources in order based on depends-on annotation")
 	applier := invConfig.ApplierFactoryFunc()
 
 	inv := invConfig.InvWrapperFunc(invConfig.InventoryFactoryFunc(inventoryName, namespaceName, "test"))
 
+	// Dependency order: pod1 -> pod3 -> pod2
+	// Apply order: pod2, pod3, pod1
 	resources := []*unstructured.Unstructured{
-		manifestToUnstructured(cr),
-		manifestToUnstructured(crd),
+		manifestToUnstructured(pod1),
+		manifestToUnstructured(pod2),
+		manifestToUnstructured(pod3),
 	}
 
 	ch := applier.Run(context.TODO(), inv, resources, apply.Options{
-		ReconcileTimeout: 2 * time.Minute,
 		EmitStatusEvents: false,
 	})
 
@@ -42,15 +43,11 @@ func crdTest(_ client.Client, invConfig InventoryConfig, inventoryName, namespac
 	}
 	err := testutil.VerifyEvents([]testutil.ExpEvent{
 		{
-			// ApplyTask start
-			EventType: event.ActionGroupType,
-		},
-		{
-			// Apply CRD before custom resource
+			// Pod2 is applied first
 			EventType: event.ApplyType,
 			ApplyEvent: &testutil.ExpApplyEvent{
+				Identifier: object.UnstructuredToObjMetaOrDie(manifestToUnstructured(pod2)),
 				Operation:  event.Created,
-				Identifier: object.UnstructuredToObjMetaOrDie(manifestToUnstructured(crd)),
 				Error:      nil,
 			},
 		},
@@ -71,11 +68,36 @@ func crdTest(_ client.Client, invConfig InventoryConfig, inventoryName, namespac
 			EventType: event.ActionGroupType,
 		},
 		{
-			// Apply custom resource after CRD
+			// Pod3 is applied second
 			EventType: event.ApplyType,
 			ApplyEvent: &testutil.ExpApplyEvent{
+				Identifier: object.UnstructuredToObjMetaOrDie(manifestToUnstructured(pod3)),
 				Operation:  event.Created,
-				Identifier: object.UnstructuredToObjMetaOrDie(manifestToUnstructured(cr)),
+				Error:      nil,
+			},
+		},
+		{
+			// ApplyTask finished
+			EventType: event.ActionGroupType,
+		},
+		{
+			// WaitTask start
+			EventType: event.ActionGroupType,
+		},
+		{
+			// WaitTask finished
+			EventType: event.ActionGroupType,
+		},
+		{
+			// ApplyTask start
+			EventType: event.ActionGroupType,
+		},
+		{
+			// Pod1 is applied third
+			EventType: event.ApplyType,
+			ApplyEvent: &testutil.ExpApplyEvent{
+				Identifier: object.UnstructuredToObjMetaOrDie(manifestToUnstructured(pod1)),
+				Operation:  event.Created,
 				Error:      nil,
 			},
 		},
@@ -86,7 +108,7 @@ func crdTest(_ client.Client, invConfig InventoryConfig, inventoryName, namespac
 	}, applierEvents)
 	Expect(err).ToNot(HaveOccurred())
 
-	By("destroy the resources, including the crd")
+	By("destroy resources in opposite order")
 	destroyer := invConfig.DestroyerFactoryFunc()
 	options := apply.DestroyerOptions{InventoryPolicy: inventory.AdoptIfNoInventory}
 	destroyerEvents := runCollectNoErr(destroyer.Run(inv, options))
@@ -100,11 +122,10 @@ func crdTest(_ client.Client, invConfig InventoryConfig, inventoryName, namespac
 			EventType: event.ActionGroupType,
 		},
 		{
-			// Delete custom resource first
 			EventType: event.DeleteType,
 			DeleteEvent: &testutil.ExpDeleteEvent{
 				Operation:  event.Deleted,
-				Identifier: object.UnstructuredToObjMetaOrDie(manifestToUnstructured(cr)),
+				Identifier: object.UnstructuredToObjMetaOrDie(manifestToUnstructured(pod1)),
 				Error:      nil,
 			},
 		},
@@ -129,7 +150,7 @@ func crdTest(_ client.Client, invConfig InventoryConfig, inventoryName, namespac
 			EventType: event.DeleteType,
 			DeleteEvent: &testutil.ExpDeleteEvent{
 				Operation:  event.Deleted,
-				Identifier: object.UnstructuredToObjMetaOrDie(manifestToUnstructured(crd)),
+				Identifier: object.UnstructuredToObjMetaOrDie(manifestToUnstructured(pod3)),
 				Error:      nil,
 			},
 		},
@@ -141,53 +162,42 @@ func crdTest(_ client.Client, invConfig InventoryConfig, inventoryName, namespac
 	Expect(err).ToNot(HaveOccurred())
 }
 
-var crd = []byte(strings.TrimSpace(`
-apiVersion: apiextensions.k8s.io/v1
-kind: CustomResourceDefinition
+var pod1 = []byte(strings.TrimSpace(`
+kind: Pod
+apiVersion: v1
 metadata:
-  name: examples.cli-utils.example.io
+  name: pod1
+  namespace: default
+  annotations:
+    config.kubernetes.io/depends-on: /namespaces/default/Pod/pod3
 spec:
-  conversion:
-    strategy: None
-  group: cli-utils.example.io
-  names:
-    kind: Example
-    listKind: ExampleList
-    plural: examples
-    singular: example
-  scope: Cluster
-  versions:
-  - name: v1alpha1
-    schema:
-      openAPIV3Schema:
-        description: Example for cli-utils e2e tests
-        properties:
-          apiVersion:
-            type: string
-          kind:
-            type: string
-          metadata:
-            type: object
-          spec:
-            description: Example for cli-utils e2e tests
-            properties:
-              replicas:
-                description: Number of replicas 
-                type: integer
-            required:
-            - replicas
-            type: object
-        type: object
-    served: true
-    storage: true
-    subresources: {}
+  containers:
+  - name: kubernetes-pause
+    image: k8s.gcr.io/pause:2.0
 `))
 
-var cr = []byte(strings.TrimSpace(`
-apiVersion: cli-utils.example.io/v1alpha1
-kind: Example
+var pod2 = []byte(strings.TrimSpace(`
+kind: Pod
+apiVersion: v1
 metadata:
-  name: example-cr
+  name: pod2
+  namespace: default
 spec:
-  replicas: 4
+  containers:
+  - name: kubernetes-pause
+    image: k8s.gcr.io/pause:2.0
+`))
+
+var pod3 = []byte(strings.TrimSpace(`
+kind: Pod
+apiVersion: v1
+metadata:
+  name: pod3
+  namespace: default
+  annotations:
+    config.kubernetes.io/depends-on: /namespaces/default/Pod/pod2
+spec:
+  containers:
+  - name: kubernetes-pause
+    image: k8s.gcr.io/pause:2.0
 `))

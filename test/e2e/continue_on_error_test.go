@@ -13,20 +13,18 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/cli-utils/pkg/apply"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
-	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/testutil"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func continueOnErrorTest(_ client.Client, invConfig InventoryConfig, inventoryName, namespaceName string) {
-	By("apply a set of resources that includes an invalid CRD and a deployment")
+	By("apply an invalid CRD")
 	applier := invConfig.ApplierFactoryFunc()
 
 	inv := invConfig.InvWrapperFunc(invConfig.InventoryFactoryFunc(inventoryName, namespaceName, "test"))
 
 	resources := []*unstructured.Unstructured{
-		deploymentManifest(namespaceName),
 		manifestToUnstructured(invalidCrd),
 	}
 
@@ -39,9 +37,11 @@ func continueOnErrorTest(_ client.Client, invConfig InventoryConfig, inventoryNa
 	}
 	err := testutil.VerifyEvents([]testutil.ExpEvent{
 		{
-			EventType: event.InitType,
+			// ApplyTask started
+			EventType: event.ActionGroupType,
 		},
 		{
+			// Apply object which fails
 			EventType: event.ApplyType,
 			ApplyEvent: &testutil.ExpApplyEvent{
 				Identifier: object.UnstructuredToObjMetaOrDie(manifestToUnstructured(invalidCrd)),
@@ -49,27 +49,10 @@ func continueOnErrorTest(_ client.Client, invConfig InventoryConfig, inventoryNa
 			},
 		},
 		{
-			EventType: event.ApplyType,
-			ApplyEvent: &testutil.ExpApplyEvent{
-				Operation: event.Created,
-			},
+			// ApplyTask finished
+			EventType: event.ActionGroupType,
 		},
 	}, applierEvents)
-	Expect(err).ToNot(HaveOccurred())
-
-	By("destroy the resources")
-	destroyer := invConfig.DestroyerFactoryFunc()
-	options := apply.DestroyerOptions{InventoryPolicy: inventory.AdoptIfNoInventory}
-	destroyerEvents := runCollectNoErr(destroyer.Run(inv, options))
-	err = testutil.VerifyEvents([]testutil.ExpEvent{
-		{
-			EventType: event.DeleteType,
-			DeleteEvent: &testutil.ExpDeleteEvent{
-				Operation: event.Deleted,
-				Error:     nil,
-			},
-		},
-	}, destroyerEvents)
 	Expect(err).ToNot(HaveOccurred())
 }
 
