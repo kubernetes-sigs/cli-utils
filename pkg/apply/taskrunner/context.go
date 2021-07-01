@@ -120,6 +120,13 @@ func (tc *TaskContext) PruneFailures() []object.ObjMetadata {
 	return failures
 }
 
+// PruneFailed returns true if the passed object identifier
+// has been stored as a prune failure; false otherwise.
+func (tc *TaskContext) PruneFailed(id object.ObjMetadata) bool {
+	_, found := tc.pruneFailures[id]
+	return found
+}
+
 // applyInfo captures information about resources that have been
 // applied. This is captured in the TaskContext so other tasks
 // running later might use this information.

@@ -142,7 +142,11 @@ func (w *WaitTask) checkCondition(taskContext *TaskContext, coll *resourceStatus
 func (w *WaitTask) computeResourceWaitData(taskContext *TaskContext) []resourceWaitData {
 	var rwd []resourceWaitData
 	for _, id := range w.Ids {
-		if taskContext.ResourceFailed(id) {
+		// Skip checking condition for resources which have failed
+		// to apply or failed to prune/delete (depending on wait condition).
+		// This includes resources which are skipped because of filtering.
+		if (w.Condition == AllCurrent && taskContext.ResourceFailed(id)) ||
+			(w.Condition == AllNotFound && taskContext.PruneFailed(id)) {
 			continue
 		}
 		gen, _ := taskContext.ResourceGeneration(id)
