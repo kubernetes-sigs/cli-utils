@@ -98,7 +98,6 @@ kapply apply $BASE --reconcile-timeout=1m > $OUTPUT/status
 expectedOutputLine "configmap/cm-a created"
 expectedOutputLine "configmap/cm-b created"
 expectedOutputLine "configmap/cm-c created"
-expectedOutputLine "0 resource(s) pruned, 0 skipped"
 
 # There should be only one inventory object
 kubectl get cm --selector='cli-utils.sigs.k8s.io/inventory-id' --no-headers | wc -l > $OUTPUT/status

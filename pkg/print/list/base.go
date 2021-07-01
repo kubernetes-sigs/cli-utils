@@ -115,7 +115,7 @@ func (sc *StatusCollector) LatestStatus() map[object.ObjMetadata]event.StatusEve
 // this should probably be an interface.
 // This function will block until the channel is closed.
 //nolint:gocyclo
-func (b *BaseListPrinter) Print(ch <-chan event.Event, previewStrategy common.DryRunStrategy) error {
+func (b *BaseListPrinter) Print(ch <-chan event.Event, previewStrategy common.DryRunStrategy, printStatus bool) error {
 	var actionGroups []event.ActionGroup
 	applyStats := &ApplyStats{}
 	pruneStats := &PruneStats{}
@@ -123,7 +123,6 @@ func (b *BaseListPrinter) Print(ch <-chan event.Event, previewStrategy common.Dr
 	statusCollector := &StatusCollector{
 		latestStatus: make(map[object.ObjMetadata]event.StatusEvent),
 	}
-	printStatus := false
 	formatter := b.FormatterFactory(previewStrategy)
 	for e := range ch {
 		switch e.Type {
@@ -178,25 +177,6 @@ func (b *BaseListPrinter) Print(ch <-chan event.Event, previewStrategy common.Dr
 				pruneStats, deleteStats, statusCollector); err != nil {
 				return err
 			}
-
-			switch e.ActionGroupEvent.Action {
-			case event.ApplyAction:
-				if e.ActionGroupEvent.Type == event.Started {
-					applyStats = &ApplyStats{}
-				}
-			case event.PruneAction:
-				if e.ActionGroupEvent.Type == event.Started {
-					pruneStats = &PruneStats{}
-				}
-			case event.DeleteAction:
-				if e.ActionGroupEvent.Type == event.Started {
-					deleteStats = &DeleteStats{}
-				}
-			case event.WaitAction:
-				if e.ActionGroupEvent.Type == event.Started {
-					printStatus = true
-				}
-			}
 		}
 	}
 	failedSum := applyStats.Failed + pruneStats.Failed + deleteStats.Failed
@@ -213,4 +193,24 @@ func ActionGroupByName(name string, ags []event.ActionGroup) (event.ActionGroup,
 		}
 	}
 	return event.ActionGroup{}, false
+}
+
+// IsLastActionGroup returns true if the passed ActionGroupEvent is the
+// last of its type in the slice of ActionGroup; false otherwise. For example,
+// this function will determine if an ApplyAction is the last ApplyAction in
+// the initialized task queue. This functionality is current used to determine
+// when to print stats.
+func IsLastActionGroup(age event.ActionGroupEvent, ags []event.ActionGroup) bool {
+	var found bool
+	var action event.ResourceAction
+	for _, ag := range ags {
+		if found && (action == ag.Action) {
+			return false
+		}
+		if age.GroupName == ag.Name {
+			found = true
+			action = age.Action
+		}
+	}
+	return true
 }

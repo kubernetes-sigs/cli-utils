@@ -88,7 +88,9 @@ func (ef *formatter) FormatErrorEvent(_ event.ErrorEvent) error {
 
 func (ef *formatter) FormatActionGroupEvent(age event.ActionGroupEvent, ags []event.ActionGroup,
 	as *list.ApplyStats, ps *list.PruneStats, ds *list.DeleteStats, c list.Collector) error {
-	if age.Action == event.ApplyAction && age.Type == event.Finished {
+	if age.Action == event.ApplyAction &&
+		age.Type == event.Finished &&
+		list.IsLastActionGroup(age, ags) {
 		output := fmt.Sprintf("%d resource(s) applied. %d created, %d unchanged, %d configured, %d failed",
 			as.Sum(), as.Created, as.Unchanged, as.Configured, as.Failed)
 		// Only print information about serverside apply if some of the
@@ -99,11 +101,15 @@ func (ef *formatter) FormatActionGroupEvent(age event.ActionGroupEvent, ags []ev
 		ef.print(output)
 	}
 
-	if age.Action == event.PruneAction && age.Type == event.Finished {
+	if age.Action == event.PruneAction &&
+		age.Type == event.Finished &&
+		list.IsLastActionGroup(age, ags) {
 		ef.print("%d resource(s) pruned, %d skipped, %d failed", ps.Pruned, ps.Skipped, ps.Failed)
 	}
 
-	if age.Action == event.DeleteAction && age.Type == event.Finished {
+	if age.Action == event.DeleteAction &&
+		age.Type == event.Finished &&
+		list.IsLastActionGroup(age, ags) {
 		ef.print("%d resource(s) deleted, %d skipped", ds.Deleted, ds.Skipped)
 	}
 

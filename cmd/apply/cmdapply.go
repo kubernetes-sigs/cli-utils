@@ -97,13 +97,13 @@ func (r *ApplyRunner) RunE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// Only emit status events if we are waiting for status.
+	// Only print status events if we are waiting for status.
 	//TODO: This is not the right way to do this. There are situations where
 	// we do need status events event if we are not waiting for status. The
 	// printers should be updated to handle this.
-	var emitStatusEvents bool
+	var printStatusEvents bool
 	if r.reconcileTimeout != time.Duration(0) || r.pruneTimeout != time.Duration(0) {
-		emitStatusEvents = true
+		printStatusEvents = true
 	}
 
 	// TODO: Fix DemandOneDirectory to no longer return FileNameFlags
@@ -153,7 +153,7 @@ func (r *ApplyRunner) RunE(cmd *cobra.Command, args []string) error {
 		ReconcileTimeout:  r.reconcileTimeout,
 		// If we are not waiting for status, tell the applier to not
 		// emit the events.
-		EmitStatusEvents:       emitStatusEvents,
+		EmitStatusEvents:       printStatusEvents,
 		NoPrune:                r.noPrune,
 		DryRunStrategy:         common.DryRunNone,
 		PrunePropagationPolicy: prunePropPolicy,
@@ -164,5 +164,5 @@ func (r *ApplyRunner) RunE(cmd *cobra.Command, args []string) error {
 	// The printer will print updates from the channel. It will block
 	// until the channel is closed.
 	printer := printers.GetPrinter(r.output, r.ioStreams)
-	return printer.Print(ch, common.DryRunNone)
+	return printer.Print(ch, common.DryRunNone, printStatusEvents)
 }
