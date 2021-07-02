@@ -32,6 +32,18 @@ func (e *UnknownTypesError) Error() string {
 	return fmt.Sprintf("unknown resource types: %s", strings.Join(gks, ","))
 }
 
+// NamespaceMismatchError is returned if all resources must be in a specific
+// namespace, and resources are found using other namespaces.
+type NamespaceMismatchError struct {
+	RequiredNamespace string
+	Namespace         string
+}
+
+func (e *NamespaceMismatchError) Error() string {
+	return fmt.Sprintf("found namespace %q, but all resources must be in namespace %q",
+		e.Namespace, e.RequiredNamespace)
+}
+
 // SetNamespaces verifies that every namespaced resource has the namespace
 // set, and if one does not, it will set the namespace to the provided
 // defaultNamespace.
@@ -82,9 +94,10 @@ func SetNamespaces(mapper meta.RESTMapper, objs []*unstructured.Unstructured,
 			} else {
 				ns := obj.GetNamespace()
 				if enforceNamespace && ns != defaultNamespace {
-					return fmt.Errorf("the namespace from the provided object %q "+
-						"does not match the namespace %q. You must pass '--namespace=%s' to perform this operation",
-						ns, defaultNamespace, ns)
+					return &NamespaceMismatchError{
+						Namespace:         ns,
+						RequiredNamespace: defaultNamespace,
+					}
 				}
 			}
 		case meta.RESTScopeRoot:
