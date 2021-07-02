@@ -4,10 +4,10 @@
 package status
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
-	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )

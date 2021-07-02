@@ -5,9 +5,9 @@ package apply
 
 import (
 	"context"
+	"fmt"
 	"time"
 
-	"github.com/go-errors/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/klog/v2"
@@ -32,7 +32,7 @@ import (
 func NewDestroyer(factory cmdutil.Factory, invClient inventory.InventoryClient, statusPoller poller.Poller) (*Destroyer, error) {
 	pruneOpts, err := prune.NewPruneOptions(factory, invClient)
 	if err != nil {
-		return nil, errors.WrapPrefix(err, "error setting up PruneOptions", 1)
+		return nil, fmt.Errorf("error setting up PruneOptions: %w", err)
 	}
 	return &Destroyer{
 		pruneOptions: pruneOpts,

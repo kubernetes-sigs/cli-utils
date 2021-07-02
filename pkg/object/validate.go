@@ -4,10 +4,10 @@
 package object
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
-	"github.com/go-errors/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
