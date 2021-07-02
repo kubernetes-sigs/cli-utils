@@ -4,7 +4,8 @@
 package factory
 
 import (
-	"github.com/go-errors/errors"
+	"fmt"
+
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling"
@@ -16,17 +17,17 @@ import (
 func NewStatusPoller(f cmdutil.Factory) (*polling.StatusPoller, error) {
 	config, err := f.ToRESTConfig()
 	if err != nil {
-		return nil, errors.WrapPrefix(err, "error getting RESTConfig", 1)
+		return nil, fmt.Errorf("error getting RESTConfig: %w", err)
 	}
 
 	mapper, err := f.ToRESTMapper()
 	if err != nil {
-		return nil, errors.WrapPrefix(err, "error getting RESTMapper", 1)
+		return nil, fmt.Errorf("error getting RESTMapper: %w", err)
 	}
 
 	c, err := client.New(config, client.Options{Scheme: scheme.Scheme, Mapper: mapper})
 	if err != nil {
-		return nil, errors.WrapPrefix(err, "error creating client", 1)
+		return nil, fmt.Errorf("error creating client: %w", err)
 	}
 
 	return polling.NewStatusPoller(c, mapper), nil

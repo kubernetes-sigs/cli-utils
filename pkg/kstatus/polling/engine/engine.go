@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/go-errors/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
@@ -57,8 +56,7 @@ func (s *PollerEngine) Poll(ctx context.Context, identifiers []object.ObjMetadat
 
 		clusterReader, err := options.ClusterReaderFactoryFunc(s.Reader, s.Mapper, identifiers)
 		if err != nil {
-			handleError(eventChannel,
-				errors.WrapPrefix(err, "error creating new ClusterReader", 1))
+			handleError(eventChannel, fmt.Errorf("error creating new ClusterReader: %w", err))
 			return
 		}
 		statusReaders, defaultStatusReader := options.StatusReadersFactoryFunc(clusterReader, s.Mapper)

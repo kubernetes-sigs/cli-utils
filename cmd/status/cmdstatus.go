@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/go-errors/errors"
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -123,7 +122,7 @@ func (r *StatusRunner) runE(cmd *cobra.Command, args []string) error {
 		ErrOut: cmd.ErrOrStderr(),
 	})
 	if err != nil {
-		return errors.WrapPrefix(err, "error creating printer", 1)
+		return fmt.Errorf("error creating printer: %w", err)
 	}
 
 	// If the user has specified a timeout, we create a context with timeout,
