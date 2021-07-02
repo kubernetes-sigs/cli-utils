@@ -37,7 +37,7 @@ func (pef PruneEventFactory) CreateSuccessEvent(obj *unstructured.Unstructured) 
 		PruneEvent: event.PruneEvent{
 			Operation:  event.Pruned,
 			Object:     obj,
-			Identifier: object.UnstructuredToObjMeta(obj),
+			Identifier: object.UnstructuredToObjMetaOrDie(obj),
 		},
 	}
 }
@@ -48,7 +48,7 @@ func (pef PruneEventFactory) CreateSkippedEvent(obj *unstructured.Unstructured, 
 		PruneEvent: event.PruneEvent{
 			Operation:  event.PruneSkipped,
 			Object:     obj,
-			Identifier: object.UnstructuredToObjMeta(obj),
+			Identifier: object.UnstructuredToObjMetaOrDie(obj),
 			Reason:     reason,
 		},
 	}
@@ -74,7 +74,7 @@ func (def DeleteEventFactory) CreateSuccessEvent(obj *unstructured.Unstructured)
 		DeleteEvent: event.DeleteEvent{
 			Operation:  event.Deleted,
 			Object:     obj,
-			Identifier: object.UnstructuredToObjMeta(obj),
+			Identifier: object.UnstructuredToObjMetaOrDie(obj),
 		},
 	}
 }
@@ -85,7 +85,7 @@ func (def DeleteEventFactory) CreateSkippedEvent(obj *unstructured.Unstructured,
 		DeleteEvent: event.DeleteEvent{
 			Operation:  event.DeleteSkipped,
 			Object:     obj,
-			Identifier: object.UnstructuredToObjMeta(obj),
+			Identifier: object.UnstructuredToObjMetaOrDie(obj),
 			Reason:     reason,
 		},
 	}

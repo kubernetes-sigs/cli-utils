@@ -13,6 +13,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/engine"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
+	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
 func newPodControllerStatusReader(reader engine.ClusterReader, mapper meta.RESTMapper, podStatusReader resourceTypeStatusReader) *podControllerStatusReader {
@@ -43,26 +44,26 @@ type podControllerStatusReader struct {
 	statusForGenResourcesFunc statusForGenResourcesFunc
 }
 
-func (p *podControllerStatusReader) readStatus(ctx context.Context, object *unstructured.Unstructured) *event.ResourceStatus {
-	identifier := toIdentifier(object)
+func (p *podControllerStatusReader) readStatus(ctx context.Context, obj *unstructured.Unstructured) *event.ResourceStatus {
+	identifier := object.UnstructuredToObjMetaOrDie(obj)
 
-	podResourceStatuses, err := p.statusForGenResourcesFunc(ctx, p.mapper, p.reader, p.podStatusReader, object,
+	podResourceStatuses, err := p.statusForGenResourcesFunc(ctx, p.mapper, p.reader, p.podStatusReader, obj,
 		p.groupKind, "spec", "selector")
 	if err != nil {
 		return &event.ResourceStatus{
 			Identifier: identifier,
 			Status:     status.UnknownStatus,
-			Resource:   object,
+			Resource:   obj,
 			Error:      err,
 		}
 	}
 
-	res, err := p.statusFunc(object)
+	res, err := p.statusFunc(obj)
 	if err != nil {
 		return &event.ResourceStatus{
 			Identifier:         identifier,
 			Status:             status.UnknownStatus,
-			Resource:           object,
+			Resource:           obj,
 			Error:              err,
 			GeneratedResources: podResourceStatuses,
 		}
@@ -83,7 +84,7 @@ func (p *podControllerStatusReader) readStatus(ctx context.Context, object *unst
 			return &event.ResourceStatus{
 				Identifier:         identifier,
 				Status:             status.FailedStatus,
-				Resource:           object,
+				Resource:           obj,
 				Message:            fmt.Sprintf("%d pods have failed", len(failedPods)),
 				GeneratedResources: podResourceStatuses,
 			}
@@ -93,7 +94,7 @@ func (p *podControllerStatusReader) readStatus(ctx context.Context, object *unst
 	return &event.ResourceStatus{
 		Identifier:         identifier,
 		Status:             res.Status,
-		Resource:           object,
+		Resource:           obj,
 		Message:            res.Message,
 		GeneratedResources: podResourceStatuses,
 	}

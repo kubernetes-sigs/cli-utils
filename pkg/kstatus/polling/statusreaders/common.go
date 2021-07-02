@@ -172,11 +172,3 @@ func toSelector(resource *unstructured.Unstructured, path ...string) (labels.Sel
 	}
 	return metav1.LabelSelectorAsSelector(&s)
 }
-
-func toIdentifier(u *unstructured.Unstructured) object.ObjMetadata {
-	return object.ObjMetadata{
-		GroupKind: u.GroupVersionKind().GroupKind(),
-		Name:      u.GetName(),
-		Namespace: u.GetNamespace(),
-	}
-}

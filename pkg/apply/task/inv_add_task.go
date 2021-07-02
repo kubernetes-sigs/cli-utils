@@ -31,7 +31,7 @@ func (i *InvAddTask) Action() event.ResourceAction {
 }
 
 func (i *InvAddTask) Identifiers() []object.ObjMetadata {
-	return object.UnstructuredsToObjMetas(i.Objects)
+	return object.UnstructuredsToObjMetasOrDie(i.Objects)
 }
 
 // Start updates the inventory by merging the locally applied objects
@@ -52,7 +52,7 @@ func (i *InvAddTask) Start(taskContext *taskrunner.TaskContext) {
 			}
 		}
 		klog.V(4).Infof("merging %d local objects into inventory", len(i.Objects))
-		currentObjs := object.UnstructuredsToObjMetas(i.Objects)
+		currentObjs := object.UnstructuredsToObjMetasOrDie(i.Objects)
 		_, err := i.InvClient.Merge(i.InvInfo, currentObjs)
 		taskContext.TaskChannel() <- taskrunner.TaskResult{Err: err}
 	}()

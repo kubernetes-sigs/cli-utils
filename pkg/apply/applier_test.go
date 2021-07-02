@@ -230,7 +230,7 @@ func TestApplier(t *testing.T) {
 				namespace: "default",
 				id:        "test",
 				list: []object.ObjMetadata{
-					object.UnstructuredToObjMeta(
+					object.UnstructuredToObjMetaOrDie(
 						testutil.Unstructured(t, resources["deployment"]),
 					),
 				},
@@ -303,10 +303,10 @@ func TestApplier(t *testing.T) {
 				namespace: "default",
 				id:        "test",
 				list: []object.ObjMetadata{
-					object.UnstructuredToObjMeta(
+					object.UnstructuredToObjMetaOrDie(
 						testutil.Unstructured(t, resources["deployment"]),
 					),
-					object.UnstructuredToObjMeta(
+					object.UnstructuredToObjMetaOrDie(
 						testutil.Unstructured(t, resources["secret"]),
 					),
 				},
@@ -425,7 +425,7 @@ func TestApplier(t *testing.T) {
 				namespace: "default",
 				id:        "test",
 				list: []object.ObjMetadata{
-					object.UnstructuredToObjMeta(
+					object.UnstructuredToObjMetaOrDie(
 						testutil.Unstructured(t, resources["deployment"]),
 					),
 				},
@@ -468,7 +468,7 @@ func TestApplier(t *testing.T) {
 				namespace: "default",
 				id:        "test",
 				list: []object.ObjMetadata{
-					object.UnstructuredToObjMeta(
+					object.UnstructuredToObjMetaOrDie(
 						testutil.Unstructured(t, resources["deployment"]),
 					),
 				},
@@ -517,14 +517,14 @@ func TestApplier(t *testing.T) {
 
 			objMap := make(map[object.ObjMetadata]resourceInfo)
 			for _, r := range tc.resources {
-				objMeta := object.UnstructuredToObjMeta(r)
+				objMeta := object.UnstructuredToObjMetaOrDie(r)
 				objMap[objMeta] = resourceInfo{
 					resource: r,
 					exists:   false,
 				}
 			}
 			for _, r := range tc.clusterObjs {
-				objMeta := object.UnstructuredToObjMeta(r)
+				objMeta := object.UnstructuredToObjMetaOrDie(r)
 				objMap[objMeta] = resourceInfo{
 					resource: r,
 					exists:   true,
@@ -721,7 +721,7 @@ func TestReadAndPrepareObjects(t *testing.T) {
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			// Set up objects already stored in cluster inventory.
-			clusterObjs := object.UnstructuredsToObjMetas(tc.clusterObjs)
+			clusterObjs := object.UnstructuredsToObjMetasOrDie(tc.clusterObjs)
 			fakeInvClient := inventory.NewFakeInventoryClient(clusterObjs)
 			// Set up the fake dynamic client to recognize all objects, and the RESTMapper.
 			objs := make([]runtime.Object, 0, len(tc.clusterObjs))
@@ -1042,11 +1042,11 @@ func objSetsEqual(setA []*unstructured.Unstructured, setB []*unstructured.Unstru
 		return false
 	}
 	mapA := map[string]bool{}
-	objMetasA := object.UnstructuredsToObjMetas(setA)
+	objMetasA := object.UnstructuredsToObjMetasOrDie(setA)
 	for _, objMetaA := range objMetasA {
 		mapA[objMetaA.String()] = true
 	}
-	objMetasB := object.UnstructuredsToObjMetas(setB)
+	objMetasB := object.UnstructuredsToObjMetasOrDie(setB)
 	for _, objMetaB := range objMetasB {
 		if _, ok := mapA[objMetaB.String()]; !ok {
 			return false

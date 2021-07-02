@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -129,7 +130,7 @@ var role = &unstructured.Unstructured{
 func createInventoryInfo(children ...*unstructured.Unstructured) inventory.InventoryInfo {
 	inventoryObjCopy := inventoryObj.DeepCopy()
 	wrappedInv := inventory.WrapInventoryObj(inventoryObjCopy)
-	objs := object.UnstructuredsToObjMetas(children)
+	objs := object.UnstructuredsToObjMetasOrDie(children)
 	if err := wrappedInv.Store(objs); err != nil {
 		return nil
 	}
@@ -398,7 +399,9 @@ func TestPrune(t *testing.T) {
 			for _, obj := range tc.pruneObjs {
 				objs = append(objs, obj)
 			}
-			pruneIds := object.UnstructuredsToObjMetas(tc.pruneObjs)
+			pruneIds, err := object.UnstructuredsToObjMetas(tc.pruneObjs)
+			require.NoError(t, err)
+
 			po := PruneOptions{
 				InvClient: inventory.NewFakeInventoryClient(pruneIds),
 				Client:    fake.NewSimpleDynamicClient(scheme.Scheme, objs...),
@@ -409,7 +412,7 @@ func TestPrune(t *testing.T) {
 			// the events that can be put on it.
 			eventChannel := make(chan event.Event, len(tc.pruneObjs)+1)
 			taskContext := taskrunner.NewTaskContext(eventChannel)
-			err := func() error {
+			err = func() error {
 				defer close(eventChannel)
 				// Run the prune and validate.
 				return po.Prune(tc.pruneObjs, tc.pruneFilters, taskContext, tc.options)
@@ -441,7 +444,7 @@ func TestPruneWithErrors(t *testing.T) {
 				{
 					EventType: event.PruneType,
 					PruneEvent: &testutil.ExpPruneEvent{
-						Identifier: object.UnstructuredToObjMeta(pdbDeleteFailure),
+						Identifier: object.UnstructuredToObjMetaOrDie(pdbDeleteFailure),
 						Error:      fmt.Errorf("expected delete error"),
 					},
 				},
@@ -454,7 +457,7 @@ func TestPruneWithErrors(t *testing.T) {
 				{
 					EventType: event.DeleteType,
 					DeleteEvent: &testutil.ExpDeleteEvent{
-						Identifier: object.UnstructuredToObjMeta(pdbDeleteFailure),
+						Identifier: object.UnstructuredToObjMetaOrDie(pdbDeleteFailure),
 						Error:      fmt.Errorf("expected delete error"),
 					},
 				},
@@ -463,7 +466,8 @@ func TestPruneWithErrors(t *testing.T) {
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			pruneIds := object.UnstructuredsToObjMetas(tc.pruneObjs)
+			pruneIds, err := object.UnstructuredsToObjMetas(tc.pruneObjs)
+			require.NoError(t, err)
 			po := PruneOptions{
 				InvClient: inventory.NewFakeInventoryClient(pruneIds),
 				// Set up the fake dynamic client to recognize all objects, and the RESTMapper.
@@ -476,7 +480,7 @@ func TestPruneWithErrors(t *testing.T) {
 			// the events that can be put on it.
 			eventChannel := make(chan event.Event, len(tc.pruneObjs))
 			taskContext := taskrunner.NewTaskContext(eventChannel)
-			err := func() error {
+			err = func() error {
 				defer close(eventChannel)
 				var opts Options
 				if tc.destroy {
@@ -549,7 +553,7 @@ func TestGetPruneObjs(t *testing.T) {
 				objs = append(objs, obj)
 			}
 			po := PruneOptions{
-				InvClient: inventory.NewFakeInventoryClient(object.UnstructuredsToObjMetas(tc.prevInventory)),
+				InvClient: inventory.NewFakeInventoryClient(object.UnstructuredsToObjMetasOrDie(tc.prevInventory)),
 				Client:    fake.NewSimpleDynamicClient(scheme.Scheme, objs...),
 				Mapper: testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme,
 					scheme.Scheme.PrioritizedVersionsAllGroups()...),
@@ -562,8 +566,12 @@ func TestGetPruneObjs(t *testing.T) {
 			if len(tc.expectedObjs) != len(actualObjs) {
 				t.Fatalf("expected %d prune objs, got %d", len(tc.expectedObjs), len(actualObjs))
 			}
-			actualIds := object.UnstructuredsToObjMetas(actualObjs)
-			expectedIds := object.UnstructuredsToObjMetas(tc.expectedObjs)
+			actualIds, err := object.UnstructuredsToObjMetas(actualObjs)
+			require.NoError(t, err)
+
+			expectedIds, err := object.UnstructuredsToObjMetas(tc.expectedObjs)
+			require.NoError(t, err)
+
 			if !object.SetEquals(expectedIds, actualIds) {
 				t.Errorf("expected prune objects (%v), got (%v)", expectedIds, actualIds)
 			}

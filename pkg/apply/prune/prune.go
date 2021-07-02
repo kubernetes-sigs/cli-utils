@@ -93,7 +93,7 @@ func (po *PruneOptions) Prune(pruneObjs []*unstructured.Unstructured,
 	// Iterate through objects to prune (delete). If an object is not pruned
 	// and we need to keep it in the inventory, we must capture the prune failure.
 	for _, pruneObj := range pruneObjs {
-		pruneID := object.UnstructuredToObjMeta(pruneObj)
+		pruneID := object.UnstructuredToObjMetaOrDie(pruneObj)
 		klog.V(5).Infof("attempting prune: %s", pruneID)
 		// Check filters to see if we're prevented from pruning/deleting object.
 		var filtered bool
@@ -153,7 +153,7 @@ func (po *PruneOptions) Prune(pruneObjs []*unstructured.Unstructured,
 // if one occurs.
 func (po *PruneOptions) GetPruneObjs(inv inventory.InventoryInfo,
 	localObjs []*unstructured.Unstructured) ([]*unstructured.Unstructured, error) {
-	localIds := object.UnstructuredsToObjMetas(localObjs)
+	localIds := object.UnstructuredsToObjMetasOrDie(localObjs)
 	prevInvIds, err := po.InvClient.GetClusterObjs(inv)
 	if err != nil {
 		return nil, err

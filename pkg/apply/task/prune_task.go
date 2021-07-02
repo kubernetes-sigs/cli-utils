@@ -43,7 +43,7 @@ func (p *PruneTask) Action() event.ResourceAction {
 }
 
 func (p *PruneTask) Identifiers() []object.ObjMetadata {
-	return object.UnstructuredsToObjMetas(p.Objects)
+	return object.UnstructuredsToObjMetasOrDie(p.Objects)
 }
 
 // Start creates a new goroutine that will invoke

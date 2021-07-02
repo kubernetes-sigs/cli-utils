@@ -38,6 +38,10 @@ const (
 	colonTranscoded = "__"
 )
 
+var (
+	NilObjMetadata = ObjMetadata{}
+)
+
 // RBACGroupKind is a map of the RBAC resources. Needed since name validation
 // is different than other k8s resources.
 var RBACGroupKind = map[schema.GroupKind]bool{
@@ -69,17 +73,17 @@ func (oms ObjMetas) Contains(id ObjMetadata) bool {
 	return false
 }
 
-// CreateObjMetadata returns a pointer to an ObjMetadata struct filled
+// CreateObjMetadata returns an ObjMetadata struct filled
 // with the passed values. This function normalizes and validates the
 // passed fields and returns an error for bad parameters.
 func CreateObjMetadata(namespace string, name string, gk schema.GroupKind) (ObjMetadata, error) {
 	// Namespace can be empty, but name cannot.
 	name = strings.TrimSpace(name)
 	if name == "" {
-		return ObjMetadata{}, fmt.Errorf("empty name for object")
+		return NilObjMetadata, fmt.Errorf("empty name for object")
 	}
-	if gk.Empty() {
-		return ObjMetadata{}, fmt.Errorf("empty GroupKind for object")
+	if gk.Kind == "" {
+		return NilObjMetadata, fmt.Errorf("empty kind for object")
 	}
 	return ObjMetadata{
 		Namespace: strings.TrimSpace(namespace),
@@ -103,21 +107,21 @@ func ParseObjMetadata(s string) (ObjMetadata, error) {
 	// Parse first field namespace
 	index := strings.Index(s, fieldSeparator)
 	if index == -1 {
-		return ObjMetadata{}, fmt.Errorf("unable to parse stored object metadata: %s", s)
+		return NilObjMetadata, fmt.Errorf("unable to parse stored object metadata: %s", s)
 	}
 	namespace := s[:index]
 	s = s[index+1:]
 	// Next, parse last field kind
 	index = strings.LastIndex(s, fieldSeparator)
 	if index == -1 {
-		return ObjMetadata{}, fmt.Errorf("unable to parse stored object metadata: %s", s)
+		return NilObjMetadata, fmt.Errorf("unable to parse stored object metadata: %s", s)
 	}
 	kind := s[index+1:]
 	s = s[:index]
 	// Next, parse next to last field group
 	index = strings.LastIndex(s, fieldSeparator)
 	if index == -1 {
-		return ObjMetadata{}, fmt.Errorf("unable to parse stored object metadata: %s", s)
+		return NilObjMetadata, fmt.Errorf("unable to parse stored object metadata: %s", s)
 	}
 	group := s[index+1:]
 	// Finally, second field name. Name may contain colon transcoded as double underscore.
@@ -125,7 +129,7 @@ func ParseObjMetadata(s string) (ObjMetadata, error) {
 	name = strings.ReplaceAll(name, colonTranscoded, ":")
 	// Check that there are no extra fields by search for fieldSeparator.
 	if strings.Contains(name, fieldSeparator) {
-		return ObjMetadata{}, fmt.Errorf("too many fields within: %s", s)
+		return NilObjMetadata, fmt.Errorf("too many fields within: %s", s)
 	}
 	// Create the ObjMetadata object from the four parsed fields.
 	gk := schema.GroupKind{
@@ -159,13 +163,15 @@ func (o *ObjMetadata) String() string {
 		o.GroupKind.Kind)
 }
 
-func RuntimeToObjMeta(obj runtime.Object) ObjMetadata {
-	accessor, _ := meta.Accessor(obj)
-	return ObjMetadata{
-		Namespace: accessor.GetNamespace(),
-		Name:      accessor.GetName(),
-		GroupKind: obj.GetObjectKind().GroupVersionKind().GroupKind(),
+// RuntimeToObjMeta extracts the object metadata information from a
+// runtime.Object and returns it as ObjMetadata.
+func RuntimeToObjMeta(obj runtime.Object) (ObjMetadata, error) {
+	accessor, err := meta.Accessor(obj)
+	if err != nil {
+		return NilObjMetadata, err
 	}
+	return CreateObjMetadata(accessor.GetNamespace(), accessor.GetName(),
+		obj.GetObjectKind().GroupVersionKind().GroupKind())
 }
 
 // Hash returns a hash of the sorted strings from

@@ -37,8 +37,8 @@ var _ sort.Interface = SortableUnstructureds{}
 func (a SortableUnstructureds) Len() int      { return len(a) }
 func (a SortableUnstructureds) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
 func (a SortableUnstructureds) Less(i, j int) bool {
-	first := object.UnstructuredToObjMeta(a[i])
-	second := object.UnstructuredToObjMeta(a[j])
+	first := object.UnstructuredToObjMetaOrDie(a[i])
+	second := object.UnstructuredToObjMetaOrDie(a[j])
 	return less(first, second)
 }
 

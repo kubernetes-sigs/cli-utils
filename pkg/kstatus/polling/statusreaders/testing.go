@@ -47,8 +47,8 @@ func (f *fakeStatusReader) ReadStatus(_ context.Context, _ object.ObjMetadata) *
 	return nil
 }
 
-func (f *fakeStatusReader) ReadStatusForObject(_ context.Context, object *unstructured.Unstructured) *event.ResourceStatus {
-	identifier := toIdentifier(object)
+func (f *fakeStatusReader) ReadStatusForObject(_ context.Context, obj *unstructured.Unstructured) *event.ResourceStatus {
+	identifier := object.UnstructuredToObjMetaOrDie(obj)
 	return &event.ResourceStatus{
 		Identifier: identifier,
 	}

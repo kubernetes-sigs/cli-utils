@@ -77,7 +77,7 @@ func (a *ApplyTask) Action() event.ResourceAction {
 }
 
 func (a *ApplyTask) Identifiers() []object.ObjMetadata {
-	return object.UnstructuredsToObjMetas(a.Objects)
+	return object.UnstructuredsToObjMetasOrDie(a.Objects)
 }
 
 // Start creates a new goroutine that will invoke
@@ -112,7 +112,7 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 			// Created event since the type didn't already exist in the
 			// cluster.
 			for _, obj := range objsWithCRD {
-				taskContext.EventChannel() <- createApplyEvent(object.UnstructuredToObjMeta(obj), event.Created, nil)
+				taskContext.EventChannel() <- createApplyEvent(object.UnstructuredToObjMetaOrDie(obj), event.Created, nil)
 			}
 			// Update the resource set to no longer include the CRs.
 			klog.V(4).Infof("after dry-run filtering custom resources, %d objects left", len(objs))
@@ -148,7 +148,7 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 			// Set the client and mapping fields on the provided
 			// info so they can be applied to the cluster.
 			info, err := a.InfoHelper.BuildInfo(obj)
-			id := object.UnstructuredToObjMeta(obj)
+			id := object.UnstructuredToObjMetaOrDie(obj)
 			if err != nil {
 				if klog.V(4).Enabled() {
 					klog.Errorf("unable to convert obj to info for %s/%s (%s)--continue",
@@ -412,7 +412,7 @@ func createApplyFailedEvent(id object.ObjMetadata, err error) event.Event {
 // a list of resources when failed to initialize the apply process.
 func sendBatchApplyEvents(taskContext *taskrunner.TaskContext, objects []*unstructured.Unstructured, err error) {
 	for _, obj := range objects {
-		id := object.UnstructuredToObjMeta(obj)
+		id := object.UnstructuredToObjMetaOrDie(obj)
 		taskContext.EventChannel() <- createApplyFailedEvent(id,
 			applyerror.NewInitializeApplyOptionError(err))
 		taskContext.CaptureResourceFailure(id)

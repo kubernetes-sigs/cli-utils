@@ -9,7 +9,8 @@ import (
 	"sync"
 	"testing"
 
-	"gotest.tools/assert"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -116,7 +117,9 @@ func TestApplyTask_BasicAppliedObjects(t *testing.T) {
 
 			// The applied resources should be stored in the TaskContext
 			// for the final inventory.
-			expected := object.UnstructuredsToObjMetas(objs)
+			expected, err := object.UnstructuredsToObjMetas(objs)
+			require.NoError(t, err)
+
 			actual := taskContext.AppliedResources()
 			if !object.SetEquals(expected, actual) {
 				t.Errorf("expected (%s) inventory resources, got (%s)", expected, actual)

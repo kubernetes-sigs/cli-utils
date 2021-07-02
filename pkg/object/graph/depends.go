@@ -24,7 +24,7 @@ func SortObjs(objs []*unstructured.Unstructured) [][]*unstructured.Unstructured 
 	g := New()
 	objToUnstructured := map[object.ObjMetadata]*unstructured.Unstructured{}
 	for _, obj := range objs {
-		id := object.UnstructuredToObjMeta(obj)
+		id := object.UnstructuredToObjMetaOrDie(obj)
 		objToUnstructured[id] = obj
 	}
 	// Add object vertices and dependency edges to graph.
@@ -67,7 +67,7 @@ func ReverseSortObjs(objs []*unstructured.Unstructured) [][]*unstructured.Unstru
 // with an explicit "depends-on" annotation.
 func addExplicitEdges(g *Graph, objs []*unstructured.Unstructured) {
 	for _, obj := range objs {
-		id := object.UnstructuredToObjMeta(obj)
+		id := object.UnstructuredToObjMetaOrDie(obj)
 		klog.V(3).Infof("adding vertex: %s", id)
 		g.AddVertex(id)
 		deps, err := object.DependsOnObjs(obj)
@@ -90,7 +90,7 @@ func addCRDEdges(g *Graph, objs []*unstructured.Unstructured) {
 		if object.IsCRD(u) {
 			groupKind, found := object.GetCRDGroupKind(u)
 			if found {
-				obj := object.UnstructuredToObjMeta(u)
+				obj := object.UnstructuredToObjMetaOrDie(u)
 				crds[groupKind.String()] = obj
 			}
 		}
@@ -101,7 +101,7 @@ func addCRDEdges(g *Graph, objs []*unstructured.Unstructured) {
 		gvk := u.GroupVersionKind()
 		groupKind := gvk.GroupKind()
 		if to, found := crds[groupKind.String()]; found {
-			from := object.UnstructuredToObjMeta(u)
+			from := object.UnstructuredToObjMetaOrDie(u)
 			klog.V(3).Infof("adding edge from: custom resource %s, to CRD: %s", from, to)
 			g.AddEdge(from, to)
 		}
@@ -116,7 +116,7 @@ func addNamespaceEdges(g *Graph, objs []*unstructured.Unstructured) {
 	// First create a map of all the namespaces objects live in.
 	for _, obj := range objs {
 		if object.IsKindNamespace(obj) {
-			id := object.UnstructuredToObjMeta(obj)
+			id := object.UnstructuredToObjMetaOrDie(obj)
 			namespace := obj.GetName()
 			namespaces[namespace] = id
 		}
@@ -127,7 +127,7 @@ func addNamespaceEdges(g *Graph, objs []*unstructured.Unstructured) {
 		if object.IsNamespaced(obj) {
 			objNamespace := obj.GetNamespace()
 			if namespace, found := namespaces[objNamespace]; found {
-				id := object.UnstructuredToObjMeta(obj)
+				id := object.UnstructuredToObjMetaOrDie(obj)
 				klog.V(3).Infof("adding edge from: %s to namespace: %s", id, namespace)
 				g.AddEdge(id, namespace)
 			}

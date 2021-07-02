@@ -114,17 +114,29 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.InventoryInfo, obje
 	a.invClient.SetDryRunStrategy(options.DryRunStrategy) // client shared with prune, so sets dry-run for prune too.
 	go func() {
 		defer close(eventChannel)
+
+		mapper, err := a.factory.ToRESTMapper()
+		if err != nil {
+			handleError(eventChannel, err)
+			return
+		}
+
+		// Validate the resources to make sure we catch those problems early
+		// before anything has been updated in the cluster.
+		if err := (&object.Validator{
+			Mapper: mapper,
+		}).Validate(objects); err != nil {
+			handleError(eventChannel, err)
+			return
+		}
+
 		applyObjs, pruneObjs, err := a.prepareObjects(invInfo, objects)
 		if err != nil {
 			handleError(eventChannel, err)
 			return
 		}
 		klog.V(4).Infof("calculated %d apply objs; %d prune objs", len(applyObjs), len(pruneObjs))
-		mapper, err := a.factory.ToRESTMapper()
-		if err != nil {
-			handleError(eventChannel, err)
-			return
-		}
+
 		// Fetch the queue (channel) of tasks that should be executed.
 		klog.V(4).Infoln("applier building task queue...")
 		taskBuilder := &solver.TaskQueueBuilder{
@@ -152,7 +164,7 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.InventoryInfo, obje
 				InvPolicy: options.InventoryPolicy,
 			},
 			filter.LocalNamespacesFilter{
-				LocalNamespaces: localNamespaces(invInfo, object.UnstructuredsToObjMetas(objects)),
+				LocalNamespaces: localNamespaces(invInfo, object.UnstructuredsToObjMetasOrDie(objects)),
 			},
 		}
 		// Build the task queue by appending tasks in the proper order.
@@ -172,7 +184,7 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.InventoryInfo, obje
 		}
 		// Create a new TaskStatusRunner to execute the taskQueue.
 		klog.V(4).Infoln("applier building TaskStatusRunner...")
-		allIds := object.UnstructuredsToObjMetas(append(applyObjs, pruneObjs...))
+		allIds := object.UnstructuredsToObjMetasOrDie(append(applyObjs, pruneObjs...))
 		runner := taskrunner.NewTaskStatusRunner(allIds, a.statusPoller)
 		klog.V(4).Infoln("applier running TaskStatusRunner...")
 		err = runner.Run(ctx, taskQueue.ToChannel(), eventChannel, taskrunner.Options{
