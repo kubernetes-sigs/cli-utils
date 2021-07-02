@@ -6,6 +6,7 @@ package task
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/filter"
 	"sigs.k8s.io/cli-utils/pkg/apply/prune"
@@ -52,6 +53,7 @@ func (p *PruneTask) Identifiers() []object.ObjMetadata {
 // to signal to the taskrunner that the task has completed (or failed).
 func (p *PruneTask) Start(taskContext *taskrunner.TaskContext) {
 	go func() {
+		klog.V(2).Infof("prune task starting (%d objects)", len(p.Objects))
 		// Create filter to prevent deletion of currently applied
 		// objects. Must be done here to wait for applied UIDs.
 		uidFilter := filter.CurrentUIDFilter{

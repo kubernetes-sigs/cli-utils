@@ -116,15 +116,16 @@ func (r *DestroyRunner) RunE(cmd *cobra.Command, args []string) error {
 	}
 	// Run the destroyer. It will return a channel where we can receive updates
 	// to keep track of progress and any issues.
+	printStatusEvents := r.deleteTimeout != time.Duration(0)
 	ch := d.Run(inv, apply.DestroyerOptions{
 		DeleteTimeout:           r.deleteTimeout,
 		DeletePropagationPolicy: deletePropPolicy,
 		InventoryPolicy:         inventoryPolicy,
-		EmitStatusEvents:        r.deleteTimeout != time.Duration(0),
+		EmitStatusEvents:        printStatusEvents,
 	})
 
 	// The printer will print updates from the channel. It will block
 	// until the channel is closed.
 	printer := printers.GetPrinter(r.output, r.ioStreams)
-	return printer.Print(ch, common.DryRunNone)
+	return printer.Print(ch, common.DryRunNone, printStatusEvents)
 }

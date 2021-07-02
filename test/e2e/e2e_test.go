@@ -121,6 +121,9 @@ var _ = Describe("Applier", func() {
 				It("Server-Side Apply", func() {
 					serversideApplyTest(c, invConfig, inventoryName, namespace.GetName())
 				})
+				It("Implements depends-on apply ordering", func() {
+					dependsOnTest(c, invConfig, inventoryName, namespace.GetName())
+				})
 			})
 
 			Context("Inventory policy", func() {

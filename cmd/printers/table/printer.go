@@ -18,7 +18,7 @@ type Printer struct {
 	IOStreams genericclioptions.IOStreams
 }
 
-func (t *Printer) Print(ch <-chan event.Event, _ common.DryRunStrategy) error {
+func (t *Printer) Print(ch <-chan event.Event, _ common.DryRunStrategy, printStatus bool) error {
 	// Wait for the init event that will give us the set of
 	// resources.
 	var initEvent event.InitEvent

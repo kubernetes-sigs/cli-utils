@@ -209,10 +209,6 @@ rm $BASE/configMap.yaml
 
 kapply apply $BASE --reconcile-timeout=120s > $OUTPUT/status;
 
-expectedOutputLine "deployment.apps/the-deployment is Current: Deployment is available. Replicas: 3"
-
-expectedOutputLine "service/the-service is Current: Service is ready"
-
 expectedOutputLine "configmap/the-map2 is Current: Resource is always ready"
 
 expectedOutputLine "configmap/the-map1 pruned"

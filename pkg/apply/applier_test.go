@@ -315,42 +315,41 @@ func TestApplier(t *testing.T) {
 				testutil.Unstructured(t, resources["deployment"], testutil.AddOwningInv(t, "test")),
 				testutil.Unstructured(t, resources["secret"], testutil.AddOwningInv(t, "test")),
 			},
-			reconcileTimeout: time.Minute,
-			prune:            true,
-			inventoryPolicy:  inventory.InventoryPolicyMustMatch,
-			statusEvents:     []pollevent.Event{},
+			prune:           true,
+			inventoryPolicy: inventory.InventoryPolicyMustMatch,
+			statusEvents:    []pollevent.Event{},
 			expectedEvents: []testutil.ExpEvent{
 				{
 					EventType: event.InitType,
 				},
 				{
+					// Inventory task starting
 					EventType: event.ActionGroupType,
 				},
 				{
+					// Inventory task finished
 					EventType: event.ActionGroupType,
 				},
 				{
+					// Prune task starting
 					EventType: event.ActionGroupType,
 				},
 				{
-					EventType: event.ActionGroupType,
-				},
-				{
-					EventType: event.ActionGroupType,
-				},
-				{
+					// Prune object
 					EventType: event.PruneType,
 					PruneEvent: &testutil.ExpPruneEvent{
 						Operation: event.Pruned,
 					},
 				},
 				{
+					// Prune object
 					EventType: event.PruneType,
 					PruneEvent: &testutil.ExpPruneEvent{
 						Operation: event.Pruned,
 					},
 				},
 				{
+					// Prune task finished
 					EventType: event.ActionGroupType,
 				},
 			},
@@ -576,7 +575,7 @@ func TestApplier(t *testing.T) {
 			})
 
 			var events []event.Event
-			timer := time.NewTimer(30 * time.Second)
+			timer := time.NewTimer(10 * time.Second)
 
 		loop:
 			for {
@@ -586,9 +585,13 @@ func TestApplier(t *testing.T) {
 						break loop
 					}
 					if e.Type == event.ActionGroupType &&
-						e.ActionGroupEvent.Action == event.ApplyAction &&
 						e.ActionGroupEvent.Type == event.Finished {
-						close(poller.start)
+						// If we do not also check for PruneAction, then the tests
+						// hang, timeout, and fail.
+						if e.ActionGroupEvent.Action == event.ApplyAction ||
+							e.ActionGroupEvent.Action == event.PruneAction {
+							close(poller.start)
+						}
 					}
 					events = append(events, e)
 				case <-timer.C:

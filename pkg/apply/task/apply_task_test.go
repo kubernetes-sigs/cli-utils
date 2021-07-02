@@ -349,11 +349,10 @@ func TestApplyTask_FetchGeneration(t *testing.T) {
 func TestApplyTask_DryRun(t *testing.T) {
 	testCases := map[string]struct {
 		objs            []*unstructured.Unstructured
-		crds            []*unstructured.Unstructured
 		expectedObjects []object.ObjMetadata
 		expectedEvents  []event.Event
 	}{
-		"dry run with no CRDs or CRs": {
+		"simple dry run": {
 			objs: []*unstructured.Unstructured{
 				toUnstructured(map[string]interface{}{
 					"apiVersion": "apps/v1",
@@ -377,7 +376,7 @@ func TestApplyTask_DryRun(t *testing.T) {
 			expectedEvents: []event.Event{},
 		},
 		"dry run with CRD and CR": {
-			crds: []*unstructured.Unstructured{
+			objs: []*unstructured.Unstructured{
 				toUnstructured(map[string]interface{}{
 					"apiVersion": "apiextensions.k8s.io/v1",
 					"kind":       "CustomResourceDefinition",
@@ -396,8 +395,6 @@ func TestApplyTask_DryRun(t *testing.T) {
 						},
 					},
 				}),
-			},
-			objs: []*unstructured.Unstructured{
 				toUnstructured(map[string]interface{}{
 					"apiVersion": "custom.io/v1alpha1",
 					"kind":       "Custom",
@@ -406,52 +403,13 @@ func TestApplyTask_DryRun(t *testing.T) {
 					},
 				}),
 			},
-			expectedObjects: []object.ObjMetadata{},
-			expectedEvents: []event.Event{
-				{
-					Type: event.ApplyType,
-				},
-			},
-		},
-		"dry run with CRD and CR and CRD already installed": {
-			crds: []*unstructured.Unstructured{
-				toUnstructured(map[string]interface{}{
-					"apiVersion": "apiextensions.k8s.io/v1",
-					"kind":       "CustomResourceDefinition",
-					"metadata": map[string]interface{}{
-						"name": "foo",
-					},
-					"spec": map[string]interface{}{
-						"group": "anothercustom.io",
-						"names": map[string]interface{}{
-							"kind": "AnotherCustom",
-						},
-						"versions": []interface{}{
-							map[string]interface{}{
-								"name": "v2",
-							},
-						},
-					},
-				}),
-			},
-			objs: []*unstructured.Unstructured{
-				toUnstructured(map[string]interface{}{
-					"apiVersion": "anothercustom.io/v2",
-					"kind":       "AnotherCustom",
-					"metadata": map[string]interface{}{
-						"name":      "bar",
-						"namespace": "barbar",
-					},
-				}),
-			},
 			expectedObjects: []object.ObjMetadata{
 				{
 					GroupKind: schema.GroupKind{
-						Group: "anothercustom.io",
-						Kind:  "AnotherCustom",
+						Group: "custom.io",
+						Kind:  "Custom",
 					},
-					Name:      "bar",
-					Namespace: "barbar",
+					Name: "bar",
 				},
 			},
 			expectedEvents: []event.Event{},
@@ -490,7 +448,6 @@ func TestApplyTask_DryRun(t *testing.T) {
 					InfoHelper:     &fakeInfoHelper{},
 					Mapper:         restMapper,
 					DryRunStrategy: drs,
-					CRDs:           tc.crds,
 					InvInfo:        &fakeInventoryInfo{},
 				}
 
@@ -530,12 +487,11 @@ func TestApplyTask_DryRun(t *testing.T) {
 func TestApplyTaskWithError(t *testing.T) {
 	testCases := map[string]struct {
 		objs            []*unstructured.Unstructured
-		crds            []*unstructured.Unstructured
 		expectedObjects []object.ObjMetadata
 		expectedEvents  []event.Event
 	}{
 		"some resources have apply error": {
-			crds: []*unstructured.Unstructured{
+			objs: []*unstructured.Unstructured{
 				toUnstructured(map[string]interface{}{
 					"apiVersion": "apiextensions.k8s.io/v1",
 					"kind":       "CustomResourceDefinition",
@@ -554,8 +510,6 @@ func TestApplyTaskWithError(t *testing.T) {
 						},
 					},
 				}),
-			},
-			objs: []*unstructured.Unstructured{
 				toUnstructured(map[string]interface{}{
 					"apiVersion": "anothercustom.io/v2",
 					"kind":       "AnotherCustom",
@@ -574,6 +528,13 @@ func TestApplyTaskWithError(t *testing.T) {
 				}),
 			},
 			expectedObjects: []object.ObjMetadata{
+				{
+					GroupKind: schema.GroupKind{
+						Group: "apiextensions.k8s.io",
+						Kind:  "CustomResourceDefinition",
+					},
+					Name: "foo",
+				},
 				{
 					GroupKind: schema.GroupKind{
 						Group: "anothercustom.io",
@@ -625,7 +586,6 @@ func TestApplyTaskWithError(t *testing.T) {
 				InfoHelper:     &fakeInfoHelper{},
 				Mapper:         restMapper,
 				DryRunStrategy: drs,
-				CRDs:           tc.crds,
 				InvInfo:        &fakeInventoryInfo{},
 			}
 
