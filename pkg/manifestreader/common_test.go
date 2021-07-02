@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -30,7 +31,7 @@ func TestSetNamespaces(t *testing.T) {
 		enforceNamespace bool
 
 		expectedNamespaces []string
-		expectedErrText    string
+		expectedErr        error
 	}{
 		"resources already have namespace": {
 			objs: []*unstructured.Unstructured{
@@ -86,7 +87,10 @@ func TestSetNamespaces(t *testing.T) {
 			},
 			defaultNamspace:  "bar",
 			enforceNamespace: true,
-			expectedErrText:  "does not match the namespace",
+			expectedErr: &NamespaceMismatchError{
+				RequiredNamespace: "bar",
+				Namespace:         "foo",
+			},
 		},
 		"cluster-scoped CR with CRD": {
 			objs: []*unstructured.Unstructured{
@@ -141,7 +145,18 @@ func TestSetNamespaces(t *testing.T) {
 					Kind:    "AnotherCustom",
 				}, ""),
 			},
-			expectedErrText: "unknown resource types: Custom.custom.io,AnotherCustom.custom.io",
+			expectedErr: &UnknownTypesError{
+				GroupKinds: []schema.GroupKind{
+					{
+						Group: "custom.io",
+						Kind:  "Custom",
+					},
+					{
+						Group: "custom.io",
+						Kind:  "AnotherCustom",
+					},
+				},
+			},
 		},
 	}
 
@@ -157,11 +172,9 @@ func TestSetNamespaces(t *testing.T) {
 
 			err = SetNamespaces(mapper, tc.objs, tc.defaultNamspace, tc.enforceNamespace)
 
-			if tc.expectedErrText != "" {
-				if err == nil {
-					t.Errorf("expected error %s, but not nil", tc.expectedErrText)
-				}
-				assert.Contains(t, err.Error(), tc.expectedErrText)
+			if tc.expectedErr != nil {
+				require.Error(t, err)
+				assert.Equal(t, tc.expectedErr, err)
 				return
 			}
 
