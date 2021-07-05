@@ -14,6 +14,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/engine"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/statusreaders"
+	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -38,10 +39,20 @@ type StatusPoller struct {
 // back on the event channel returned. The statusPollerRunner can be cancelled at any time by cancelling the
 // context passed in.
 func (s *StatusPoller) Poll(ctx context.Context, identifiers []object.ObjMetadata, options Options) <-chan event.Event {
+	statusReaderFactory := createStatusReaders
+	if options.CustomStatusReadersFactoryFunc != nil {
+		statusReaderFactory = func(reader engine.ClusterReader, mapper meta.RESTMapper) (map[schema.GroupKind]engine.StatusReader, engine.StatusReader) {
+			readers, defaultReader := createStatusReaders(reader, mapper)
+			for gk, r := range options.CustomStatusReadersFactoryFunc(reader, mapper) {
+				readers[gk] = r
+			}
+			return readers, defaultReader
+		}
+	}
 	return s.engine.Poll(ctx, identifiers, engine.Options{
 		PollInterval:             options.PollInterval,
 		ClusterReaderFactoryFunc: clusterReaderFactoryFunc(options.UseCache),
-		StatusReadersFactoryFunc: createStatusReaders,
+		StatusReadersFactoryFunc: statusReaderFactory,
 	})
 }
 
@@ -56,6 +67,8 @@ type Options struct {
 	// all needed resources before each polling cycle. If this is set to false,
 	// then each resource will be fetched when needed with GET calls.
 	UseCache bool
+
+	CustomStatusReadersFactoryFunc func(engine.ClusterReader, meta.RESTMapper) map[schema.GroupKind]engine.StatusReader
 }
 
 // createStatusReaders creates an instance of all the statusreaders. This includes a set of statusreaders for
@@ -64,7 +77,7 @@ type Options struct {
 // TODO: We should consider making the registration more automatic instead of having to create each of them
 // here. Also, it might be worth creating them on demand.
 func createStatusReaders(reader engine.ClusterReader, mapper meta.RESTMapper) (map[schema.GroupKind]engine.StatusReader, engine.StatusReader) {
-	defaultStatusReader := statusreaders.NewGenericStatusReader(reader, mapper)
+	defaultStatusReader := statusreaders.NewGenericStatusReader(reader, mapper, status.Compute)
 
 	replicaSetStatusReader := statusreaders.NewReplicaSetStatusReader(reader, mapper, defaultStatusReader)
 	deploymentStatusReader := statusreaders.NewDeploymentResourceReader(reader, mapper, replicaSetStatusReader)
