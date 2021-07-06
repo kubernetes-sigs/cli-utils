@@ -4,6 +4,8 @@
 package collector
 
 import (
+	"errors"
+	"fmt"
 	"sort"
 	"testing"
 	"time"
@@ -33,6 +35,40 @@ func TestCollectorStopsWhenEventChannelIsClosed(t *testing.T) {
 		t.Errorf("expected collector to close the completedCh, but it didn't")
 	case <-completedCh:
 		timer.Stop()
+	}
+}
+
+func TestCollectorWithFatalError(t *testing.T) {
+	var identifiers []object.ObjMetadata
+
+	collector := NewResourceStatusCollector(identifiers)
+
+	eventCh := make(chan event.Event)
+
+	completedCh := collector.Listen(eventCh)
+
+	exampleErr := fmt.Errorf("this is a test error")
+	eventCh <- event.Event{
+		EventType: event.ErrorEvent,
+		Error:     exampleErr,
+	}
+
+	var err error
+	timer := time.NewTimer(3 * time.Second)
+	close(eventCh)
+	select {
+	case <-timer.C:
+		t.Errorf("expected collector to close the completedCh, but it didn't")
+	case msg, ok := <-completedCh:
+		if ok {
+			err = msg.Err
+		} else {
+			timer.Stop()
+		}
+	}
+
+	if !errors.Is(err, exampleErr) {
+		t.Errorf("expected exampleErr, but found %v", err)
 	}
 }
 

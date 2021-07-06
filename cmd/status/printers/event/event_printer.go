@@ -32,7 +32,7 @@ func NewEventPrinter(ioStreams genericclioptions.IOStreams) *eventPrinter {
 // every event and is responsible for stopping the poller when appropriate.
 // This function will block.
 func (ep *eventPrinter) Print(ch <-chan pollevent.Event, identifiers []object.ObjMetadata,
-	cancelFunc collector.ObserverFunc) {
+	cancelFunc collector.ObserverFunc) error {
 	coll := collector.NewResourceStatusCollector(identifiers)
 	// The actual work is done by the collector, which will invoke the
 	// callback on every event. In the callback we print the status
@@ -44,8 +44,12 @@ func (ep *eventPrinter) Print(ch <-chan pollevent.Event, identifiers []object.Ob
 			cancelFunc(statusCollector, e)
 		}),
 	)
-	// Block until the done channel is closed.
-	<-done
+	// Listen to the channel until it is closed.
+	var err error
+	for msg := range done {
+		err = msg.Err
+	}
+	return err
 }
 
 func (ep *eventPrinter) printStatusEvent(se pollevent.Event) {
