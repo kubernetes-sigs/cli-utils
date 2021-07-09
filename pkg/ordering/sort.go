@@ -64,39 +64,41 @@ func less(i, j object.ObjMetadata) bool {
 	return i.Name < j.Name
 }
 
-var kind2index = computeKind2index()
+var groupKind2index = computeGroupKind2index()
 
-func computeKind2index() map[string]int {
+func computeGroupKind2index() map[schema.GroupKind]int {
 	// An attempt to order things to help k8s, e.g.
 	// a Service should come before things that refer to it.
 	// Namespace should be first.
 	// In some cases order just specified to provide determinism.
-	orderFirst := []string{
-		"Namespace",
-		"ResourceQuota",
-		"StorageClass",
-		"CustomResourceDefinition",
-		"MutatingWebhookConfiguration",
-		"ServiceAccount",
-		"PodSecurityPolicy",
-		"Role",
-		"ClusterRole",
-		"RoleBinding",
-		"ClusterRoleBinding",
-		"ConfigMap",
-		"Secret",
-		"Service",
-		"LimitRange",
-		"PriorityClass",
-		"Deployment",
-		"StatefulSet",
-		"CronJob",
-		"PodDisruptionBudget",
+	orderFirst := []schema.GroupKind{
+		{Group: "", Kind: "Namespace"},
+		{Group: "", Kind: "ResourceQuota"},
+		{Group: "storage.k8s.io", Kind: "StorageClass"},
+		{Group: "apiextensions.k8s.io", Kind: "CustomResourceDefinition"},
+		{Group: "admissionregistration.k8s.io", Kind: "MutatingWebhookConfiguration"},
+		{Group: "", Kind: "ServiceAccount"},
+		{Group: "extensions", Kind: "PodSecurityPolicy"}, // deprecated=1.11, removed=1.16
+		{Group: "policy", Kind: "PodSecurityPolicy"},     // deprecated=1.21, removed=1.25
+		{Group: "rbac.authorization.k8s.io", Kind: "Role"},
+		{Group: "rbac.authorization.k8s.io", Kind: "ClusterRole"},
+		{Group: "rbac.authorization.k8s.io", Kind: "RoleBinding"},
+		{Group: "rbac.authorization.k8s.io", Kind: "ClusterRoleBinding"},
+		{Group: "", Kind: "ConfigMap"},
+		{Group: "", Kind: "Secret"},
+		{Group: "", Kind: "Service"},
+		{Group: "", Kind: "LimitRange"},
+		{Group: "scheduling.k8s.io", Kind: "PriorityClass"},
+		{Group: "extensions", Kind: "Deployment"}, // deprecated=1.8, removed=1.16
+		{Group: "apps", Kind: "Deployment"},
+		{Group: "apps", Kind: "StatefulSet"},
+		{Group: "batch", Kind: "CronJob"},
+		{Group: "policy", Kind: "PodDisruptionBudget"},
 	}
-	orderLast := []string{
-		"ValidatingWebhookConfiguration",
+	orderLast := []schema.GroupKind{
+		{Group: "admissionregistration.k8s.io", Kind: "ValidatingWebhookConfiguration"},
 	}
-	kind2indexResult := make(map[string]int, len(orderFirst)+len(orderLast))
+	kind2indexResult := make(map[schema.GroupKind]int, len(orderFirst)+len(orderLast))
 	for i, n := range orderFirst {
 		kind2indexResult[n] = -len(orderFirst) + i
 	}
@@ -106,18 +108,13 @@ func computeKind2index() map[string]int {
 	return kind2indexResult
 }
 
-// getIndexByKind returns the index of the kind respecting the order
-func getIndexByKind(kind string) int {
-	return kind2index[kind]
-}
-
 func Equals(i, j schema.GroupKind) bool {
 	return i.Group == j.Group && i.Kind == j.Kind
 }
 
 func IsLessThan(i, j schema.GroupKind) bool {
-	indexI := getIndexByKind(i.Kind)
-	indexJ := getIndexByKind(j.Kind)
+	indexI := groupKind2index[i]
+	indexJ := groupKind2index[j]
 	if indexI != indexJ {
 		return indexI < indexJ
 	}

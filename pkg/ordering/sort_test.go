@@ -7,7 +7,7 @@ import (
 	"sort"
 	"testing"
 
-	"gotest.tools/assert"
+	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/resource"
@@ -36,7 +36,7 @@ var namespaceObj = unstructured.Unstructured{
 
 var deploymentObj = unstructured.Unstructured{
 	Object: map[string]interface{}{
-		"apiVersion": "v1",
+		"apiVersion": "apps/v1",
 		"kind":       "Deployment",
 		"metadata": map[string]interface{}{
 			"name":      "testdeployment",
@@ -47,7 +47,7 @@ var deploymentObj = unstructured.Unstructured{
 
 var deploymentObj2 = unstructured.Unstructured{
 	Object: map[string]interface{}{
-		"apiVersion": "v1",
+		"apiVersion": "apps/v1",
 		"kind":       "Deployment",
 		"metadata": map[string]interface{}{
 			"name":      "testdeployment2",
@@ -93,7 +93,7 @@ func TestResourceOrdering(t *testing.T) {
 
 func TestGvkLessThan(t *testing.T) {
 	gk1 := schema.GroupKind{
-		Group: "",
+		Group: "apps",
 		Kind:  "Deployment",
 	}
 
@@ -102,19 +102,19 @@ func TestGvkLessThan(t *testing.T) {
 		Kind:  "Namespace",
 	}
 
-	assert.Equal(t, IsLessThan(gk1, gk2), false)
+	assert.False(t, IsLessThan(gk1, gk2))
 }
 
 func TestGvkEquals(t *testing.T) {
 	gk1 := schema.GroupKind{
-		Group: "",
+		Group: "apps",
 		Kind:  "Deployment",
 	}
 
 	gk2 := schema.GroupKind{
-		Group: "",
+		Group: "apps",
 		Kind:  "Deployment",
 	}
 
-	assert.Equal(t, Equals(gk1, gk2), true)
+	assert.True(t, Equals(gk1, gk2))
 }
