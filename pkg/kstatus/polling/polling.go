@@ -68,6 +68,10 @@ type Options struct {
 	// then each resource will be fetched when needed with GET calls.
 	UseCache bool
 
+	// CustomStatusReadersFactoryFunc, when called, provides the StatusPoller with a map of custom
+	// StatusReaders for the given GroupKinds. These will be used along with the StatusReaders shipped with this
+	// library. However, it can also be used to override these with custom StatusReaders if the returned map
+	// has a key for the given GroupKinds, e.g. apps/deployments.
 	CustomStatusReadersFactoryFunc func(engine.ClusterReader, meta.RESTMapper) map[schema.GroupKind]engine.StatusReader
 }
 

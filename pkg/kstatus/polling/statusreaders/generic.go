@@ -14,6 +14,9 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
+// StatusFunc returns the status of the given object. This func is passed into
+// NewGenericStatusReader so that the returned StatusReader can be used for custom types.
+// An example of a StatusFunc is status.Compute.
 type StatusFunc func(u *unstructured.Unstructured) (*status.Result, error)
 
 func NewGenericStatusReader(reader engine.ClusterReader, mapper meta.RESTMapper, statusFunc StatusFunc) engine.StatusReader {
