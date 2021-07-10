@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"gotest.tools/assert"
+	"github.com/stretchr/testify/assert"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"sigs.k8s.io/cli-utils/pkg/testutil"
 )
@@ -152,7 +152,7 @@ func TestProcessPaths(t *testing.T) {
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
 			fileNameFlags, err := DemandOneDirectory(tc.paths)
-			assert.DeepEqual(t, tc.expectedFileNameFlags, fileNameFlags)
+			assert.Equal(t, tc.expectedFileNameFlags, fileNameFlags)
 			if err != nil && err.Error() != tc.errFromDemandOneDirectory {
 				assert.Equal(t, err.Error(), tc.errFromDemandOneDirectory)
 			}

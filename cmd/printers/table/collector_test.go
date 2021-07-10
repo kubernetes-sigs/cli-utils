@@ -6,7 +6,7 @@ package table
 import (
 	"testing"
 
-	"gotest.tools/assert"
+	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	pe "sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"

@@ -6,7 +6,7 @@ package common
 import (
 	"testing"
 
-	"gotest.tools/assert"
+	"github.com/stretchr/testify/assert"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
 )
 
