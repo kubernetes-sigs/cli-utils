@@ -14,14 +14,19 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
-func NewGenericStatusReader(reader engine.ClusterReader, mapper meta.RESTMapper) engine.StatusReader {
+// StatusFunc returns the status of the given object. This func is passed into
+// NewGenericStatusReader so that the returned StatusReader can be used for custom types.
+// An example of a StatusFunc is status.Compute.
+type StatusFunc func(u *unstructured.Unstructured) (*status.Result, error)
+
+func NewGenericStatusReader(reader engine.ClusterReader, mapper meta.RESTMapper, statusFunc StatusFunc) engine.StatusReader {
 	return &baseStatusReader{
 		reader: reader,
 		mapper: mapper,
 		resourceStatusReader: &genericStatusReader{
 			reader:     reader,
 			mapper:     mapper,
-			statusFunc: status.Compute,
+			statusFunc: statusFunc,
 		},
 	}
 }
@@ -36,7 +41,7 @@ type genericStatusReader struct {
 	reader engine.ClusterReader
 	mapper meta.RESTMapper
 
-	statusFunc func(u *unstructured.Unstructured) (*status.Result, error)
+	statusFunc StatusFunc
 }
 
 var _ resourceTypeStatusReader = &genericStatusReader{}
