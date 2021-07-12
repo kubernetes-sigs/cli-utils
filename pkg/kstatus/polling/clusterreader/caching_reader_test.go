@@ -9,7 +9,8 @@ import (
 	"sort"
 	"testing"
 
-	"gotest.tools/assert"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -88,16 +89,16 @@ func TestSync(t *testing.T) {
 			fakeReader := &fakeReader{}
 
 			clusterReader, err := NewCachingClusterReader(fakeReader, fakeMapper, tc.identifiers)
-			assert.NilError(t, err)
+			require.NoError(t, err)
 
 			err = clusterReader.Sync(context.Background())
-			assert.NilError(t, err)
+			require.NoError(t, err)
 
 			synced := fakeReader.syncedGVKNamespaces
 			sortGVKNamespaces(synced)
 			expectedSynced := tc.expectedSynced
 			sortGVKNamespaces(expectedSynced)
-			assert.DeepEqual(t, expectedSynced, synced)
+			assert.Equal(t, expectedSynced, synced)
 
 			assert.Equal(t, len(tc.expectedSynced), len(clusterReader.cache))
 		})
@@ -130,7 +131,7 @@ func TestSync_Errors(t *testing.T) {
 			}, "my-crd"),
 			expectSyncError: false,
 			cacheError:      true,
-			cacheErrorText:  "not found",
+			cacheErrorText:  `customresourcedefinitions.apiextensions.k8s.io "my-crd" not found`,
 		},
 		"reader returns other error": {
 			mapper: testutil.NewFakeRESTMapper(
@@ -145,7 +146,7 @@ func TestSync_Errors(t *testing.T) {
 			mapper:          testutil.NewFakeRESTMapper(),
 			expectSyncError: false,
 			cacheError:      true,
-			cacheErrorText:  "no matches for kind",
+			cacheErrorText:  `no matches for kind "CustomResourceDefinition" in group "apiextensions.k8s.io"`,
 		},
 	}
 
@@ -166,7 +167,7 @@ func TestSync_Errors(t *testing.T) {
 			}
 
 			clusterReader, err := NewCachingClusterReader(fakeReader, tc.mapper, identifiers)
-			assert.NilError(t, err)
+			require.NoError(t, err)
 
 			err = clusterReader.Sync(context.Background())
 
@@ -174,14 +175,14 @@ func TestSync_Errors(t *testing.T) {
 				assert.Equal(t, tc.readerError, err)
 				return
 			}
-			assert.NilError(t, err)
+			require.NoError(t, err)
 
 			cacheEntry, found := clusterReader.cache[gkNamespace{
 				GroupKind: apiextv1.SchemeGroupVersion.WithKind("CustomResourceDefinition").GroupKind(),
 			}]
-			assert.Check(t, found)
+			require.True(t, found)
 			if tc.cacheError {
-				assert.ErrorContains(t, cacheEntry.err, tc.cacheErrorText)
+				assert.EqualError(t, cacheEntry.err, tc.cacheErrorText)
 			}
 		})
 	}

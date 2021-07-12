@@ -9,7 +9,8 @@ import (
 	"sort"
 	"testing"
 
-	"gotest.tools/assert"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -49,19 +50,19 @@ func TestLookupResource(t *testing.T) {
 				Namespace: "default",
 			},
 			expectErr:          true,
-			expectedErrMessage: "",
+			expectedErrMessage: `no matches for kind "Custom" in group "custom.io"`,
 		},
 		"resource does not exist": {
 			identifier:         deploymentIdentifier,
 			readerErr:          errors.NewNotFound(deploymentGVR.GroupResource(), "Foo"),
 			expectErr:          true,
-			expectedErrMessage: "",
+			expectedErrMessage: `deployments.apps "Foo" not found`,
 		},
 		"getting resource fails": {
 			identifier:         deploymentIdentifier,
 			readerErr:          errors.NewInternalError(fmt.Errorf("this is a test")),
 			expectErr:          true,
-			expectedErrMessage: "",
+			expectedErrMessage: "Internal error occurred: this is a test",
 		},
 		"getting resource succeeds": {
 			identifier: deploymentIdentifier,
@@ -86,12 +87,12 @@ func TestLookupResource(t *testing.T) {
 				if err == nil {
 					t.Errorf("expected error, but didn't get one")
 				} else {
-					assert.ErrorContains(t, err, tc.expectedErrMessage)
+					assert.EqualError(t, err, tc.expectedErrMessage)
 				}
 				return
 			}
 
-			assert.NilError(t, err)
+			require.NoError(t, err)
 
 			assert.Equal(t, deploymentGVK, u.GroupVersionKind())
 		})
@@ -140,7 +141,7 @@ spec:
 			},
 			path:        []string{"spec", "selector"},
 			expectError: true,
-			errMessage:  "no matches for kind",
+			errMessage:  `no matches for kind "Custom" in group "custom.io"`,
 		},
 		"error listing replicasets": {
 			manifest: `
@@ -211,15 +212,15 @@ spec:
 					t.Errorf("expected an error, but didn't get one")
 					return
 				}
-				assert.ErrorContains(t, err, tc.errMessage)
+				assert.EqualError(t, err, tc.errMessage)
 				return
 			}
 			if !tc.expectError && err != nil {
 				t.Errorf("did not expect an error, but got %v", err)
 			}
 
-			assert.Equal(t, len(tc.listObjects), len(resourceStatuses))
-			assert.Assert(t, sort.IsSorted(resourceStatuses))
+			assert.Len(t, resourceStatuses, len(tc.listObjects))
+			assert.True(t, sort.IsSorted(resourceStatuses))
 		})
 	}
 }

@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"gotest.tools/assert"
+	"github.com/stretchr/testify/assert"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -134,7 +134,7 @@ func TestStatusPollerRunner(t *testing.T) {
 				}
 			}
 
-			assert.DeepEqual(t, tc.expectedEventTypes, eventTypes)
+			assert.Equal(t, tc.expectedEventTypes, eventTypes)
 		})
 	}
 }
