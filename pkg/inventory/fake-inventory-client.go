@@ -36,7 +36,7 @@ func NewFakeInventoryClient(initObjs []object.ObjMetadata) *FakeInventoryClient 
 }
 
 // GetClusterObjs returns currently stored set of objects.
-func (fic *FakeInventoryClient) GetClusterObjs(inv InventoryInfo) ([]object.ObjMetadata, error) {
+func (fic *FakeInventoryClient) GetClusterObjs(InventoryInfo, common.DryRunStrategy) ([]object.ObjMetadata, error) {
 	if fic.Err != nil {
 		return []object.ObjMetadata{}, fic.Err
 	}
@@ -46,7 +46,7 @@ func (fic *FakeInventoryClient) GetClusterObjs(inv InventoryInfo) ([]object.ObjM
 // Merge stores the passed objects with the current stored cluster inventory
 // objects. Returns the set difference of the current set of objects minus
 // the passed set of objects, or an error if one is set up.
-func (fic *FakeInventoryClient) Merge(inv InventoryInfo, objs []object.ObjMetadata) ([]object.ObjMetadata, error) {
+func (fic *FakeInventoryClient) Merge(_ InventoryInfo, objs []object.ObjMetadata, _ common.DryRunStrategy) ([]object.ObjMetadata, error) {
 	if fic.Err != nil {
 		return []object.ObjMetadata{}, fic.Err
 	}
@@ -57,7 +57,8 @@ func (fic *FakeInventoryClient) Merge(inv InventoryInfo, objs []object.ObjMetada
 
 // Replace the stored cluster inventory objs with the passed obj, or an
 // error if one is set up.
-func (fic *FakeInventoryClient) Replace(inv InventoryInfo, objs []object.ObjMetadata) error {
+
+func (fic *FakeInventoryClient) Replace(_ InventoryInfo, objs []object.ObjMetadata, _ common.DryRunStrategy) error {
 	if fic.Err != nil {
 		return fic.Err
 	}
@@ -66,16 +67,14 @@ func (fic *FakeInventoryClient) Replace(inv InventoryInfo, objs []object.ObjMeta
 }
 
 // DeleteInventoryObj returns an error if one is forced; does nothing otherwise.
-func (fic *FakeInventoryClient) DeleteInventoryObj(inv InventoryInfo) error {
+func (fic *FakeInventoryClient) DeleteInventoryObj(InventoryInfo, common.DryRunStrategy) error {
 	if fic.Err != nil {
 		return fic.Err
 	}
 	return nil
 }
 
-func (fic *FakeInventoryClient) SetDryRunStrategy(drs common.DryRunStrategy) {}
-
-func (fic *FakeInventoryClient) ApplyInventoryNamespace(inv *unstructured.Unstructured) error {
+func (fic *FakeInventoryClient) ApplyInventoryNamespace(*unstructured.Unstructured, common.DryRunStrategy) error {
 	if fic.Err != nil {
 		return fic.Err
 	}
@@ -92,14 +91,10 @@ func (fic *FakeInventoryClient) ClearError() {
 	fic.Err = nil
 }
 
-func (fic *FakeInventoryClient) GetClusterInventoryInfo(inv InventoryInfo) (*unstructured.Unstructured, error) {
+func (fic *FakeInventoryClient) GetClusterInventoryInfo(InventoryInfo, common.DryRunStrategy) (*unstructured.Unstructured, error) {
 	return nil, nil
 }
 
-func (fic *FakeInventoryClient) UpdateLabels(inv InventoryInfo, labels map[string]string) error {
-	return nil
-}
-
-func (fic *FakeInventoryClient) GetClusterInventoryObjs(inv InventoryInfo) ([]*unstructured.Unstructured, error) {
+func (fic *FakeInventoryClient) GetClusterInventoryObjs(_ InventoryInfo) ([]*unstructured.Unstructured, error) {
 	return []*unstructured.Unstructured{}, nil
 }

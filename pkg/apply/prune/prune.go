@@ -152,9 +152,9 @@ func (po *PruneOptions) Prune(pruneObjs []*unstructured.Unstructured,
 // objects minus the set of currently applied objects. Returns an error
 // if one occurs.
 func (po *PruneOptions) GetPruneObjs(inv inventory.InventoryInfo,
-	localObjs []*unstructured.Unstructured) ([]*unstructured.Unstructured, error) {
+	localObjs []*unstructured.Unstructured, o Options) ([]*unstructured.Unstructured, error) {
 	localIds := object.UnstructuredsToObjMetasOrDie(localObjs)
-	prevInvIds, err := po.InvClient.GetClusterObjs(inv)
+	prevInvIds, err := po.InvClient.GetClusterObjs(inv, o.DryRunStrategy)
 	if err != nil {
 		return nil, err
 	}

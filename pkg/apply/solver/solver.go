@@ -100,13 +100,15 @@ func (t *TaskQueueBuilder) Build() *TaskQueue {
 
 // AppendInvAddTask appends an inventory add task to the task queue.
 // Returns a pointer to the Builder to chain function calls.
-func (t *TaskQueueBuilder) AppendInvAddTask(inv inventory.InventoryInfo, applyObjs []*unstructured.Unstructured) *TaskQueueBuilder {
+func (t *TaskQueueBuilder) AppendInvAddTask(inv inventory.InventoryInfo, applyObjs []*unstructured.Unstructured,
+	dryRun common.DryRunStrategy) *TaskQueueBuilder {
 	klog.V(2).Infoln("adding inventory add task")
 	t.tasks = append(t.tasks, &task.InvAddTask{
 		TaskName:  fmt.Sprintf("inventory-add-%d", t.invAddCounter),
 		InvClient: t.InvClient,
 		InvInfo:   inv,
 		Objects:   applyObjs,
+		DryRun:    dryRun,
 	})
 	t.invAddCounter += 1
 	return t
@@ -114,12 +116,13 @@ func (t *TaskQueueBuilder) AppendInvAddTask(inv inventory.InventoryInfo, applyOb
 
 // AppendInvAddTask appends an inventory set task to the task queue.
 // Returns a pointer to the Builder to chain function calls.
-func (t *TaskQueueBuilder) AppendInvSetTask(inv inventory.InventoryInfo) *TaskQueueBuilder {
+func (t *TaskQueueBuilder) AppendInvSetTask(inv inventory.InventoryInfo, dryRun common.DryRunStrategy) *TaskQueueBuilder {
 	klog.V(2).Infoln("adding inventory set task")
 	t.tasks = append(t.tasks, &task.InvSetTask{
 		TaskName:  fmt.Sprintf("inventory-set-%d", t.invSetCounter),
 		InvClient: t.InvClient,
 		InvInfo:   inv,
+		DryRun:    dryRun,
 	})
 	t.invSetCounter += 1
 	return t
@@ -127,12 +130,13 @@ func (t *TaskQueueBuilder) AppendInvSetTask(inv inventory.InventoryInfo) *TaskQu
 
 // AppendInvAddTask appends to the task queue a task to delete the inventory object.
 // Returns a pointer to the Builder to chain function calls.
-func (t *TaskQueueBuilder) AppendDeleteInvTask(inv inventory.InventoryInfo) *TaskQueueBuilder {
+func (t *TaskQueueBuilder) AppendDeleteInvTask(inv inventory.InventoryInfo, dryRun common.DryRunStrategy) *TaskQueueBuilder {
 	klog.V(2).Infoln("adding delete inventory task")
 	t.tasks = append(t.tasks, &task.DeleteInvTask{
 		TaskName:  fmt.Sprintf("delete-inventory-%d", t.deleteInvCounter),
 		InvClient: t.InvClient,
 		InvInfo:   inv,
+		DryRun:    dryRun,
 	})
 	t.deleteInvCounter += 1
 	return t
@@ -143,7 +147,7 @@ func (t *TaskQueueBuilder) AppendDeleteInvTask(inv inventory.InventoryInfo) *Tas
 func (t *TaskQueueBuilder) AppendApplyTask(inv inventory.InventoryInfo,
 	applyObjs []*unstructured.Unstructured, o Options) *TaskQueueBuilder {
 	klog.V(2).Infof("adding apply task (%d objects)", len(applyObjs))
-	prevInvIds, _ := t.InvClient.GetClusterObjs(inv)
+	prevInvIds, _ := t.InvClient.GetClusterObjs(inv, o.DryRunStrategy)
 	prevInventory := make(map[object.ObjMetadata]bool, len(prevInvIds))
 	for _, prevInvID := range prevInvIds {
 		prevInventory[prevInvID] = true

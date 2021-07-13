@@ -559,7 +559,7 @@ func TestGetPruneObjs(t *testing.T) {
 					scheme.Scheme.PrioritizedVersionsAllGroups()...),
 			}
 			currentInventory := createInventoryInfo(tc.prevInventory...)
-			actualObjs, err := po.GetPruneObjs(currentInventory, tc.localObjs)
+			actualObjs, err := po.GetPruneObjs(currentInventory, tc.localObjs, Options{})
 			if err != nil {
 				t.Fatalf("unexpected error %s returned", err)
 			}

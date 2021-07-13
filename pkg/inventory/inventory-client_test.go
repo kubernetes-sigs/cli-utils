@@ -66,7 +66,7 @@ func TestGetClusterInventoryInfo(t *testing.T) {
 			if tc.inv != nil {
 				inv = storeObjsInInventory(tc.inv, tc.localObjs)
 			}
-			clusterInv, err := invClient.GetClusterInventoryInfo(WrapInventoryInfoObj(inv))
+			clusterInv, err := invClient.GetClusterInventoryInfo(WrapInventoryInfoObj(inv), common.DryRunNone)
 			if tc.isError {
 				if err == nil {
 					t.Fatalf("expected error but received none")
@@ -164,14 +164,13 @@ func TestMerge(t *testing.T) {
 				// Create the local inventory object storing "tc.localObjs"
 				invClient, _ := NewInventoryClient(tf,
 					WrapInventoryObj, InvInfoToConfigMap)
-				invClient.SetDryRunStrategy(drs)
 				// Create a fake builder to return "tc.clusterObjs" from
 				// the cluster inventory object.
 				fakeBuilder := FakeBuilder{}
 				fakeBuilder.SetInventoryObjs(tc.clusterObjs)
 				invClient.builderFunc = fakeBuilder.GetBuilder()
 				// Call "Merge" to create the union of clusterObjs and localObjs.
-				pruneObjs, err := invClient.Merge(tc.localInv, tc.localObjs)
+				pruneObjs, err := invClient.Merge(tc.localInv, tc.localObjs, drs)
 				if tc.isError {
 					if err == nil {
 						t.Fatalf("expected error but received none")
@@ -255,7 +254,7 @@ func TestCreateInventory(t *testing.T) {
 			if inv != nil {
 				inv = storeObjsInInventory(tc.inv, tc.localObjs)
 			}
-			err := invClient.createInventoryObj(inv)
+			err := invClient.createInventoryObj(inv, common.DryRunNone)
 			if !tc.isError && err != nil {
 				t.Fatalf("unexpected error received: %s", err)
 			}
@@ -308,13 +307,11 @@ func TestReplace(t *testing.T) {
 
 	// Client and server dry-run do not throw errors.
 	invClient, _ := NewInventoryClient(tf, WrapInventoryObj, InvInfoToConfigMap)
-	invClient.SetDryRunStrategy(common.DryRunClient)
-	err := invClient.Replace(copyInventory(), []object.ObjMetadata{})
+	err := invClient.Replace(copyInventory(), []object.ObjMetadata{}, common.DryRunClient)
 	if err != nil {
 		t.Fatalf("unexpected error received: %s", err)
 	}
-	invClient.SetDryRunStrategy(common.DryRunServer)
-	err = invClient.Replace(copyInventory(), []object.ObjMetadata{})
+	err = invClient.Replace(copyInventory(), []object.ObjMetadata{}, common.DryRunServer)
 	if err != nil {
 		t.Fatalf("unexpected error received: %s", err)
 	}
@@ -390,7 +387,7 @@ func TestGetClusterObjs(t *testing.T) {
 			fakeBuilder.SetInventoryObjs(tc.clusterObjs)
 			invClient.builderFunc = fakeBuilder.GetBuilder()
 			// Call "GetClusterObjs" and compare returned cluster inventory objs to expected.
-			clusterObjs, err := invClient.GetClusterObjs(tc.localInv)
+			clusterObjs, err := invClient.GetClusterObjs(tc.localInv, common.DryRunNone)
 			if tc.isError {
 				if err == nil {
 					t.Fatalf("expected error but received none")
@@ -465,12 +462,11 @@ func TestDeleteInventoryObj(t *testing.T) {
 			t.Run(name, func(t *testing.T) {
 				invClient, _ := NewInventoryClient(tf,
 					WrapInventoryObj, InvInfoToConfigMap)
-				invClient.SetDryRunStrategy(drs)
 				inv := invClient.invToUnstructuredFunc(tc.inv)
 				if inv != nil {
 					inv = storeObjsInInventory(tc.inv, tc.localObjs)
 				}
-				err := invClient.deleteInventoryObjByName(inv)
+				err := invClient.deleteInventoryObjByName(inv, drs)
 				if err != nil {
 					t.Fatalf("unexpected error received: %s", err)
 				}
@@ -564,13 +560,12 @@ func TestMergeInventoryObjs(t *testing.T) {
 			t.Run(name, func(t *testing.T) {
 				invClient, _ := NewInventoryClient(tf,
 					WrapInventoryObj, InvInfoToConfigMap)
-				invClient.SetDryRunStrategy(drs)
 				inventories := []*unstructured.Unstructured{}
 				for _, i := range tc.invs {
 					inv := storeObjsInInventory(i.inv, i.invObjs)
 					inventories = append(inventories, inv)
 				}
-				retained, err := invClient.mergeClusterInventory(inventories)
+				retained, err := invClient.mergeClusterInventory(inventories, drs)
 				if err != nil {
 					t.Fatalf("unexpected error: %s", err)
 				}

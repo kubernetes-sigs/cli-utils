@@ -741,7 +741,7 @@ func TestReadAndPrepareObjects(t *testing.T) {
 				},
 				invClient: fakeInvClient,
 			}
-			applyObjs, pruneObjs, err := applier.prepareObjects(tc.inventory, tc.localObjs)
+			applyObjs, pruneObjs, err := applier.prepareObjects(tc.inventory, tc.localObjs, Options{})
 			if tc.isError {
 				assert.Error(t, err)
 				return
