@@ -78,13 +78,14 @@ type DestroyerOptions struct {
 // back on the event channel.
 func (d *Destroyer) Run(inv inventory.InventoryInfo, options DestroyerOptions) <-chan event.Event {
 	eventChannel := make(chan event.Event)
-	d.invClient.SetDryRunStrategy(options.DryRunStrategy)
 	go func() {
 		defer close(eventChannel)
 		// Retrieve the objects to be deleted from the cluster. Second parameter is empty
 		// because no local objects returns all inventory objects for deletion.
 		emptyLocalObjs := []*unstructured.Unstructured{}
-		deleteObjs, err := d.pruneOptions.GetPruneObjs(inv, emptyLocalObjs)
+		deleteObjs, err := d.pruneOptions.GetPruneObjs(inv, emptyLocalObjs, prune.Options{
+			DryRunStrategy: options.DryRunStrategy,
+		})
 		if err != nil {
 			handleError(eventChannel, err)
 			return
@@ -118,7 +119,7 @@ func (d *Destroyer) Run(inv inventory.InventoryInfo, options DestroyerOptions) <
 		// Build the ordered set of tasks to execute.
 		taskQueue := taskBuilder.
 			AppendPruneWaitTasks(deleteObjs, deleteFilters, opts).
-			AppendDeleteInvTask(inv).
+			AppendDeleteInvTask(inv, options.DryRunStrategy).
 			Build()
 		// Send event to inform the caller about the resources that
 		// will be pruned.

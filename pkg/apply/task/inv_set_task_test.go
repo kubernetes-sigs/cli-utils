@@ -8,6 +8,7 @@ import (
 
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
+	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
@@ -73,7 +74,7 @@ func TestInvSetTask(t *testing.T) {
 			if result.Err != nil {
 				t.Errorf("unexpected error running InvAddTask: %s", result.Err)
 			}
-			actual, _ := client.GetClusterObjs(nil)
+			actual, _ := client.GetClusterObjs(nil, common.DryRunNone)
 			if !object.SetEquals(tc.expectedObjs, actual) {
 				t.Errorf("expected merged inventory (%s), got (%s)", tc.expectedObjs, actual)
 			}

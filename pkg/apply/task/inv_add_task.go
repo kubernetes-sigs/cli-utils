@@ -8,6 +8,7 @@ import (
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
+	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
@@ -20,6 +21,7 @@ type InvAddTask struct {
 	InvClient inventory.InventoryClient
 	InvInfo   inventory.InventoryInfo
 	Objects   []*unstructured.Unstructured
+	DryRun    common.DryRunStrategy
 }
 
 func (i *InvAddTask) Name() string {
@@ -46,14 +48,14 @@ func (i *InvAddTask) Start(taskContext *taskrunner.TaskContext) {
 		// Ensures the namespace exists before applying the inventory object into it.
 		if invNamespace := inventoryNamespaceInSet(i.InvInfo, i.Objects); invNamespace != nil {
 			klog.V(4).Infof("applying inventory namespace %s", invNamespace.GetName())
-			if err := i.InvClient.ApplyInventoryNamespace(invNamespace); err != nil {
+			if err := i.InvClient.ApplyInventoryNamespace(invNamespace, i.DryRun); err != nil {
 				taskContext.TaskChannel() <- taskrunner.TaskResult{Err: err}
 				return
 			}
 		}
 		klog.V(4).Infof("merging %d local objects into inventory", len(i.Objects))
 		currentObjs := object.UnstructuredsToObjMetasOrDie(i.Objects)
-		_, err := i.InvClient.Merge(i.InvInfo, currentObjs)
+		_, err := i.InvClient.Merge(i.InvInfo, currentObjs, i.DryRun)
 		taskContext.TaskChannel() <- taskrunner.TaskResult{Err: err}
 	}()
 }

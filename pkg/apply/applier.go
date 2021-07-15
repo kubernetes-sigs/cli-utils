@@ -63,8 +63,8 @@ type Applier struct {
 
 // prepareObjects returns the set of objects to apply and to prune or
 // an error if one occurred.
-func (a *Applier) prepareObjects(localInv inventory.InventoryInfo, localObjs []*unstructured.Unstructured) (
-	[]*unstructured.Unstructured, []*unstructured.Unstructured, error) {
+func (a *Applier) prepareObjects(localInv inventory.InventoryInfo, localObjs []*unstructured.Unstructured,
+	o Options) ([]*unstructured.Unstructured, []*unstructured.Unstructured, error) {
 	if localInv == nil {
 		return nil, nil, fmt.Errorf("the local inventory can't be nil")
 	}
@@ -91,7 +91,9 @@ func (a *Applier) prepareObjects(localInv inventory.InventoryInfo, localObjs []*
 			}
 		}
 	}
-	pruneObjs, err := a.pruneOptions.GetPruneObjs(localInv, localObjs)
+	pruneObjs, err := a.pruneOptions.GetPruneObjs(localInv, localObjs, prune.Options{
+		DryRunStrategy: o.DryRunStrategy,
+	})
 	if err != nil {
 		return nil, nil, err
 	}
@@ -111,7 +113,6 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.InventoryInfo, obje
 	klog.V(4).Infof("apply run for %d objects", len(objects))
 	eventChannel := make(chan event.Event)
 	setDefaults(&options)
-	a.invClient.SetDryRunStrategy(options.DryRunStrategy) // client shared with prune, so sets dry-run for prune too.
 	go func() {
 		defer close(eventChannel)
 
@@ -130,7 +131,7 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.InventoryInfo, obje
 			return
 		}
 
-		applyObjs, pruneObjs, err := a.prepareObjects(invInfo, objects)
+		applyObjs, pruneObjs, err := a.prepareObjects(invInfo, objects, options)
 		if err != nil {
 			handleError(eventChannel, err)
 			return
@@ -169,10 +170,10 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.InventoryInfo, obje
 		}
 		// Build the task queue by appending tasks in the proper order.
 		taskQueue := taskBuilder.
-			AppendInvAddTask(invInfo, applyObjs).
+			AppendInvAddTask(invInfo, applyObjs, options.DryRunStrategy).
 			AppendApplyWaitTasks(invInfo, applyObjs, opts).
 			AppendPruneWaitTasks(pruneObjs, pruneFilters, opts).
-			AppendInvSetTask(invInfo).
+			AppendInvSetTask(invInfo, options.DryRunStrategy).
 			Build()
 		// Send event to inform the caller about the resources that
 		// will be applied/pruned.

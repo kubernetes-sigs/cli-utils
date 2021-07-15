@@ -8,6 +8,7 @@ import (
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
+	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
@@ -20,6 +21,7 @@ type DeleteInvTask struct {
 	TaskName  string
 	InvClient inventory.InventoryClient
 	InvInfo   inventory.InventoryInfo
+	DryRun    common.DryRunStrategy
 }
 
 func (i *DeleteInvTask) Name() string {
@@ -38,7 +40,7 @@ func (i *DeleteInvTask) Identifiers() []object.ObjMetadata {
 func (i *DeleteInvTask) Start(taskContext *taskrunner.TaskContext) {
 	go func() {
 		klog.V(2).Infoln("starting delete inventory task")
-		err := i.InvClient.DeleteInventoryObj(i.InvInfo)
+		err := i.InvClient.DeleteInventoryObj(i.InvInfo, i.DryRun)
 		// Not found is not error, since this means it was already deleted.
 		if apierrors.IsNotFound(err) {
 			err = nil

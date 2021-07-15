@@ -7,6 +7,7 @@ import (
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
+	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
@@ -17,6 +18,7 @@ type InvSetTask struct {
 	TaskName  string
 	InvClient inventory.InventoryClient
 	InvInfo   inventory.InventoryInfo
+	DryRun    common.DryRunStrategy
 }
 
 func (i *InvSetTask) Name() string {
@@ -43,7 +45,7 @@ func (i *InvSetTask) Start(taskContext *taskrunner.TaskContext) {
 		klog.V(4).Infof("set inventory %d prune failures", len(pruneFailures))
 		invObjs := object.Union(appliedObjs, pruneFailures)
 		klog.V(4).Infof("set inventory %d total objects", len(invObjs))
-		err := i.InvClient.Replace(i.InvInfo, invObjs)
+		err := i.InvClient.Replace(i.InvInfo, invObjs, i.DryRun)
 		taskContext.TaskChannel() <- taskrunner.TaskResult{Err: err}
 	}()
 }

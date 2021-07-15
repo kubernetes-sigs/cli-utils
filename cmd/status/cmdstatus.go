@@ -98,7 +98,7 @@ func (r *StatusRunner) runE(cmd *cobra.Command, args []string) error {
 
 	// Based on the inventory template manifest we look up the inventory
 	// from the live state using the inventory client.
-	identifiers, err := invClient.GetClusterObjs(inv)
+	identifiers, err := invClient.GetClusterObjs(inv, common.DryRunNone)
 	if err != nil {
 		return err
 	}
