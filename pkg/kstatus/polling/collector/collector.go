@@ -58,25 +58,36 @@ type ResourceStatusCollector struct {
 	Error error
 }
 
-// Listen kicks off the goroutine that will listen for the events on the
-// eventChannel.  It returns a channel that will be closed the collector stops
-// listening to the eventChannel.
-func (o *ResourceStatusCollector) Listen(eventChannel <-chan event.Event) <-chan struct{} {
-	return o.ListenWithObserver(eventChannel, nil)
+// ListenerResult is the type of the object passed back to the caller to
+// Listen and ListenWithObserver if a fatal error has been encountered.
+type ListenerResult struct {
+	Err error
 }
 
 // Listen kicks off the goroutine that will listen for the events on the
 // eventChannel.  It returns a channel that will be closed the collector stops
 // listening to the eventChannel.
+func (o *ResourceStatusCollector) Listen(eventChannel <-chan event.Event) <-chan ListenerResult {
+	return o.ListenWithObserver(eventChannel, nil)
+}
+
+// ListenWithObserver kicks off the goroutine that will listen for the events on the
+// eventChannel.  It returns a channel that will be closed the collector stops
+// listening to the eventChannel.
 // The provided observer will be invoked on every event, after the event
 // has been processed.
 func (o *ResourceStatusCollector) ListenWithObserver(eventChannel <-chan event.Event,
-	observer Observer) <-chan struct{} {
-	completed := make(chan struct{})
+	observer Observer) <-chan ListenerResult {
+	completed := make(chan ListenerResult)
 	go func() {
 		defer close(completed)
 		for e := range eventChannel {
-			o.processEvent(e)
+			err := o.processEvent(e)
+			if err != nil {
+				completed <- ListenerResult{
+					Err: err,
+				}
+			}
 			if observer != nil {
 				observer.Notify(o, e)
 			}
@@ -85,18 +96,19 @@ func (o *ResourceStatusCollector) ListenWithObserver(eventChannel <-chan event.E
 	return completed
 }
 
-func (o *ResourceStatusCollector) processEvent(e event.Event) {
+func (o *ResourceStatusCollector) processEvent(e event.Event) error {
 	o.mux.Lock()
 	defer o.mux.Unlock()
 	o.LastEventType = e.EventType
 	if e.EventType == event.ErrorEvent {
 		o.Error = e.Error
-		return
+		return e.Error
 	}
 	if e.EventType == event.ResourceUpdateEvent {
 		resourceStatus := e.Resource
 		o.ResourceStatuses[resourceStatus.Identifier] = resourceStatus
 	}
+	return nil
 }
 
 // Observation contains the latest state known by the collector as returned

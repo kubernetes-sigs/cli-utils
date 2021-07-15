@@ -157,8 +157,7 @@ func (r *StatusRunner) runE(cmd *cobra.Command, args []string) error {
 		UseCache:     true,
 	})
 
-	printer.Print(eventChannel, identifiers, cancelFunc)
-	return nil
+	return printer.Print(eventChannel, identifiers, cancelFunc)
 }
 
 // desiredStatusNotifierFunc returns an Observer function for the
