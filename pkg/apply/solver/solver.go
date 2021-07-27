@@ -118,11 +118,17 @@ func (t *TaskQueueBuilder) AppendInvAddTask(inv inventory.InventoryInfo, applyOb
 // Returns a pointer to the Builder to chain function calls.
 func (t *TaskQueueBuilder) AppendInvSetTask(inv inventory.InventoryInfo, dryRun common.DryRunStrategy) *TaskQueueBuilder {
 	klog.V(2).Infoln("adding inventory set task")
+	prevInvIds, _ := t.InvClient.GetClusterObjs(inv, dryRun)
+	prevInventory := make(map[object.ObjMetadata]bool, len(prevInvIds))
+	for _, prevInvID := range prevInvIds {
+		prevInventory[prevInvID] = true
+	}
 	t.tasks = append(t.tasks, &task.InvSetTask{
-		TaskName:  fmt.Sprintf("inventory-set-%d", t.invSetCounter),
-		InvClient: t.InvClient,
-		InvInfo:   inv,
-		DryRun:    dryRun,
+		TaskName:      fmt.Sprintf("inventory-set-%d", t.invSetCounter),
+		InvClient:     t.InvClient,
+		InvInfo:       inv,
+		PrevInventory: prevInventory,
+		DryRun:        dryRun,
 	})
 	t.invSetCounter += 1
 	return t
@@ -147,15 +153,9 @@ func (t *TaskQueueBuilder) AppendDeleteInvTask(inv inventory.InventoryInfo, dryR
 func (t *TaskQueueBuilder) AppendApplyTask(inv inventory.InventoryInfo,
 	applyObjs []*unstructured.Unstructured, o Options) *TaskQueueBuilder {
 	klog.V(2).Infof("adding apply task (%d objects)", len(applyObjs))
-	prevInvIds, _ := t.InvClient.GetClusterObjs(inv, o.DryRunStrategy)
-	prevInventory := make(map[object.ObjMetadata]bool, len(prevInvIds))
-	for _, prevInvID := range prevInvIds {
-		prevInventory[prevInvID] = true
-	}
 	t.tasks = append(t.tasks, &task.ApplyTask{
 		TaskName:          fmt.Sprintf("apply-%d", t.applyCounter),
 		Objects:           applyObjs,
-		PrevInventory:     prevInventory,
 		ServerSideOptions: o.ServerSideOptions,
 		DryRunStrategy:    o.DryRunStrategy,
 		InfoHelper:        t.InfoHelper,

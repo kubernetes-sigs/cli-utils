@@ -108,6 +108,14 @@ func (tc *TaskContext) CaptureResourceFailure(id object.ObjMetadata) {
 	tc.failedResources[id] = struct{}{}
 }
 
+func (tc *TaskContext) ResourceFailures() []object.ObjMetadata {
+	failures := make([]object.ObjMetadata, 0, len(tc.failedResources))
+	for f := range tc.failedResources {
+		failures = append(failures, f)
+	}
+	return failures
+}
+
 func (tc *TaskContext) CapturePruneFailure(id object.ObjMetadata) {
 	tc.pruneFailures[id] = struct{}{}
 }
