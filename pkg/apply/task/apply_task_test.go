@@ -11,7 +11,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -128,140 +127,6 @@ func TestApplyTask_BasicAppliedObjects(t *testing.T) {
 	}
 }
 
-// Checks the inventory stored in the task context applied
-// resources is correct, given a retrieval error and
-// a specific previous inventory. Also, an apply failure
-// for an object in the previous inventory should remain
-// in the inventory, while an apply failure that is not
-// in the previous inventory (creation) should not be
-// in the final inventory.
-func TestApplyTask_ApplyFailuresAndInventory(t *testing.T) {
-	resInfo := resourceInfo{
-		group:      "apps",
-		apiVersion: "apps/v1",
-		kind:       "Deployment",
-		name:       "foo",
-		namespace:  "default",
-		uid:        types.UID("my-uid"),
-		generation: int64(42),
-	}
-	resID, _ := object.CreateObjMetadata("default", "foo",
-		schema.GroupKind{Group: "apps", Kind: "Deployment"})
-	applyFailInfo := resourceInfo{
-		group:      "apps",
-		apiVersion: "apps/v1",
-		kind:       "Deployment",
-		name:       "failure",
-		namespace:  "default",
-		uid:        types.UID("my-uid"),
-		generation: int64(42),
-	}
-	applyFailID, _ := object.CreateObjMetadata("default", "failure",
-		schema.GroupKind{Group: "apps", Kind: "Deployment"})
-
-	testCases := map[string]struct {
-		applied       []resourceInfo
-		prevInventory []object.ObjMetadata
-		expected      []object.ObjMetadata
-		err           error
-	}{
-		"not found error with successful apply is in final inventory": {
-			applied:       []resourceInfo{resInfo},
-			prevInventory: []object.ObjMetadata{},
-			expected:      []object.ObjMetadata{resID},
-			err:           apierrors.NewNotFound(schema.GroupResource{Group: "", Resource: "pod"}, "fake"),
-		},
-		"unknown error, but in previous inventory: object is in final inventory": {
-			applied:       []resourceInfo{resInfo},
-			prevInventory: []object.ObjMetadata{resID},
-			expected:      []object.ObjMetadata{resID},
-			err:           apierrors.NewUnauthorized("not authorized"),
-		},
-		"unknown error, not in previous inventory: object is NOT in final inventory": {
-			applied:       []resourceInfo{resInfo},
-			prevInventory: []object.ObjMetadata{},
-			expected:      []object.ObjMetadata{},
-			err:           apierrors.NewUnauthorized("not authorized"),
-		},
-		"apply failure, in previous inventory: object is in final inventory": {
-			applied:       []resourceInfo{applyFailInfo},
-			prevInventory: []object.ObjMetadata{applyFailID},
-			expected:      []object.ObjMetadata{applyFailID},
-			err:           nil,
-		},
-		"apply failure, not in previous inventory: object is NOT in final inventory": {
-			applied:       []resourceInfo{applyFailInfo},
-			prevInventory: []object.ObjMetadata{},
-			expected:      []object.ObjMetadata{},
-			err:           nil,
-		},
-	}
-
-	for tn, tc := range testCases {
-		t.Run(tn, func(t *testing.T) {
-			eventChannel := make(chan event.Event)
-			taskContext := taskrunner.NewTaskContext(eventChannel)
-
-			objs := toUnstructureds(tc.applied)
-
-			oldAO := applyOptionsFactoryFunc
-			applyOptionsFactoryFunc = func(chan event.Event, common.ServerSideOptions, common.DryRunStrategy, util.Factory) (applyOptions, dynamic.Interface, error) {
-				return &fakeApplyOptions{}, nil, nil
-			}
-			defer func() { applyOptionsFactoryFunc = oldAO }()
-
-			restMapper := testutil.NewFakeRESTMapper(schema.GroupVersionKind{
-				Group:   "apps",
-				Version: "v1",
-				Kind:    "Deployment",
-			})
-
-			prevInv := map[object.ObjMetadata]bool{}
-			for _, id := range tc.prevInventory {
-				prevInv[id] = true
-			}
-			applyTask := &ApplyTask{
-				Objects:       objs,
-				PrevInventory: prevInv,
-				Mapper:        restMapper,
-				InfoHelper:    &fakeInfoHelper{},
-				InvInfo:       &fakeInventoryInfo{},
-			}
-
-			getClusterObj = func(d dynamic.Interface, info *resource.Info) (*unstructured.Unstructured, error) {
-				return objs[0], nil
-			}
-			if tc.err != nil {
-				getClusterObj = func(d dynamic.Interface, info *resource.Info) (*unstructured.Unstructured, error) {
-					return nil, tc.err
-				}
-			}
-
-			var events []event.Event
-			var wg sync.WaitGroup
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				for msg := range eventChannel {
-					events = append(events, msg)
-				}
-			}()
-
-			applyTask.Start(taskContext)
-			<-taskContext.TaskChannel()
-			close(eventChannel)
-			wg.Wait()
-
-			// The applied resources should be stored in the TaskContext
-			// for the final inventory.
-			actual := taskContext.AppliedResources()
-			if !object.SetEquals(tc.expected, actual) {
-				t.Errorf("expected (%s) inventory resources, got (%s)", tc.expected, actual)
-			}
-		})
-	}
-}
-
 func TestApplyTask_FetchGeneration(t *testing.T) {
 	testCases := map[string]struct {
 		rss []resourceInfo
@@ -321,7 +186,12 @@ func TestApplyTask_FetchGeneration(t *testing.T) {
 			}
 
 			getClusterObj = func(d dynamic.Interface, info *resource.Info) (*unstructured.Unstructured, error) {
-				return objs[0], nil
+				for _, obj := range objs {
+					if info.Name == obj.GetName() && info.Namespace == obj.GetNamespace() {
+						return obj, nil
+					}
+				}
+				return nil, nil
 			}
 			applyTask.Start(taskContext)
 
@@ -801,7 +671,11 @@ func TestApplyTaskWithDifferentInventoryAnnotation(t *testing.T) {
 				assert.Equal(t, tc.expectedEvents[i].ApplyEvent.Error.Error(), e.ApplyEvent.Error.Error())
 			}
 			actualUids := taskContext.AppliedResourceUIDs()
-			assert.Equal(t, len(actualUids), 1)
+			assert.Equal(t, len(tc.expectedObjects), len(actualUids))
+			actualObjs := taskContext.AppliedResources()
+			if !object.SetEquals(tc.expectedObjects, actualObjs) {
+				t.Errorf("expected applied objects (%v), got (%v)", tc.expectedObjects, actualObjs)
+			}
 		})
 	}
 }

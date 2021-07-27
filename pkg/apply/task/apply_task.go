@@ -47,12 +47,10 @@ type applyOptions interface {
 type ApplyTask struct {
 	TaskName string
 
-	Factory    util.Factory
-	InfoHelper info.InfoHelper
-	Mapper     meta.RESTMapper
-	Objects    []*unstructured.Unstructured
-	// Used for determining inventory during errors
-	PrevInventory     map[object.ObjMetadata]bool
+	Factory           util.Factory
+	InfoHelper        info.InfoHelper
+	Mapper            meta.RESTMapper
+	Objects           []*unstructured.Unstructured
 	DryRunStrategy    common.DryRunStrategy
 	ServerSideOptions common.ServerSideOptions
 	InventoryPolicy   inventory.InventoryPolicy
@@ -102,10 +100,6 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 			a.sendTaskResult(taskContext)
 			return
 		}
-
-		klog.V(4).Infof("attempting to apply %d remaining objects", len(objects))
-		// invInfos stores the objects which should be stored in the final inventory.
-		invInfos := make(map[object.ObjMetadata]*resource.Info, len(objects))
 		for _, obj := range objects {
 			// Set the client and mapping fields on the provided
 			// info so they can be applied to the cluster.
@@ -121,7 +115,6 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 				taskContext.CaptureResourceFailure(id)
 				continue
 			}
-
 			clusterObj, err := getClusterObj(dynamic, info)
 			if err != nil {
 				if !apierrors.IsNotFound(err) {
@@ -129,20 +122,11 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 						klog.Errorf("error (%s) retrieving %s/%s from cluster--continue",
 							err, info.Namespace, info.Name)
 					}
-					if a.objInCluster(id) {
-						// Object in cluster stays in the inventory.
-						klog.V(4).Infof("%s/%s apply retrieval failure, but in cluster--keep in inventory",
-							info.Namespace, info.Name)
-						invInfos[id] = info
-					}
 					taskContext.EventChannel() <- createApplyFailedEvent(id, err)
 					taskContext.CaptureResourceFailure(id)
 					continue
 				}
 			}
-			// At this point the object was either 1) successfully retrieved from the cluster, or
-			// 2) returned "Not Found" error (meaning first-time creation). Add to final inventory.
-			invInfos[id] = info
 			canApply, err := inventory.CanApply(a.InvInfo, clusterObj, a.InventoryPolicy)
 			if !canApply {
 				klog.V(5).Infof("can not apply %s/%s--continue",
@@ -171,30 +155,16 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 				if klog.V(4).Enabled() {
 					klog.Errorf("error applying (%s/%s) %s", info.Namespace, info.Name, err)
 				}
-				// If apply failed and the object is not in the cluster, remove
-				// it from the final inventory.
-				if !a.objInCluster(id) {
-					klog.V(5).Infof("not in cluster; removing apply fail object %s/%s from inventory",
-						info.Namespace, info.Name)
-					delete(invInfos, id)
-				}
 				taskContext.EventChannel() <- createApplyFailedEvent(id,
 					applyerror.NewApplyRunError(err))
 				taskContext.CaptureResourceFailure(id)
-			}
-		}
-
-		// Store objects (and some obj metadata) in the task context
-		// for the final inventory.
-		for id, info := range invInfos {
-			if info.Object != nil {
+			} else if info.Object != nil {
 				acc, err := meta.Accessor(info.Object)
-				if err != nil {
-					continue
+				if err == nil {
+					uid := acc.GetUID()
+					gen := acc.GetGeneration()
+					taskContext.ResourceApplied(id, uid, gen)
 				}
-				uid := acc.GetUID()
-				gen := acc.GetGeneration()
-				taskContext.ResourceApplied(id, uid, gen)
 			}
 		}
 		a.sendTaskResult(taskContext)
@@ -251,16 +221,6 @@ func getClusterObject(p dynamic.Interface, info *resource.Info) (*unstructured.U
 
 func (a *ApplyTask) sendTaskResult(taskContext *taskrunner.TaskContext) {
 	taskContext.TaskChannel() <- taskrunner.TaskResult{}
-}
-
-// objInCluster returns true if the passed object is in the slice of
-// previous inventory, because an object in the previous inventory
-// exists in the cluster.
-func (a *ApplyTask) objInCluster(obj object.ObjMetadata) bool {
-	if _, found := a.PrevInventory[obj]; found {
-		return true
-	}
-	return false
 }
 
 // ClearTimeout is not supported by the ApplyTask.

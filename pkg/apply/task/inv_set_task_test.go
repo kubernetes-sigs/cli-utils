@@ -20,6 +20,8 @@ func TestInvSetTask(t *testing.T) {
 
 	tests := map[string]struct {
 		appliedObjs   []object.ObjMetadata
+		applyFailures []object.ObjMetadata
+		prevInventory []object.ObjMetadata
 		pruneFailures []object.ObjMetadata
 		expectedObjs  []object.ObjMetadata
 	}{
@@ -48,6 +50,55 @@ func TestInvSetTask(t *testing.T) {
 			pruneFailures: []object.ObjMetadata{id2, id3},
 			expectedObjs:  []object.ObjMetadata{id1, id2, id3},
 		},
+		"no apply objs, no apply failures, no prune failures; no inventory": {
+			appliedObjs:   []object.ObjMetadata{},
+			applyFailures: []object.ObjMetadata{id3},
+			prevInventory: []object.ObjMetadata{},
+			pruneFailures: []object.ObjMetadata{},
+			expectedObjs:  []object.ObjMetadata{},
+		},
+		"one apply failure not in prev inventory; no inventory": {
+			appliedObjs:   []object.ObjMetadata{},
+			applyFailures: []object.ObjMetadata{id3},
+			prevInventory: []object.ObjMetadata{},
+			pruneFailures: []object.ObjMetadata{},
+			expectedObjs:  []object.ObjMetadata{},
+		},
+		"one apply obj, one apply failure not in prev inventory; one inventory": {
+			appliedObjs:   []object.ObjMetadata{id2},
+			applyFailures: []object.ObjMetadata{id3},
+			prevInventory: []object.ObjMetadata{},
+			pruneFailures: []object.ObjMetadata{},
+			expectedObjs:  []object.ObjMetadata{id2},
+		},
+		"one apply obj, one apply failure in prev inventory; one inventory": {
+			appliedObjs:   []object.ObjMetadata{id2},
+			applyFailures: []object.ObjMetadata{id3},
+			prevInventory: []object.ObjMetadata{id3},
+			pruneFailures: []object.ObjMetadata{},
+			expectedObjs:  []object.ObjMetadata{id2, id3},
+		},
+		"one apply obj, two apply failures with one in prev inventory; two inventory": {
+			appliedObjs:   []object.ObjMetadata{id2},
+			applyFailures: []object.ObjMetadata{id1, id3},
+			prevInventory: []object.ObjMetadata{id3},
+			pruneFailures: []object.ObjMetadata{},
+			expectedObjs:  []object.ObjMetadata{id2, id3},
+		},
+		"three apply failures with two in prev inventory; two inventory": {
+			appliedObjs:   []object.ObjMetadata{},
+			applyFailures: []object.ObjMetadata{id1, id2, id3},
+			prevInventory: []object.ObjMetadata{id2, id3},
+			pruneFailures: []object.ObjMetadata{},
+			expectedObjs:  []object.ObjMetadata{id2, id3},
+		},
+		"three apply failures with three in prev inventory; three inventory": {
+			appliedObjs:   []object.ObjMetadata{},
+			applyFailures: []object.ObjMetadata{id1, id2, id3},
+			prevInventory: []object.ObjMetadata{id2, id3, id1},
+			pruneFailures: []object.ObjMetadata{},
+			expectedObjs:  []object.ObjMetadata{id2, id1, id3},
+		},
 	}
 
 	for name, tc := range tests {
@@ -55,13 +106,21 @@ func TestInvSetTask(t *testing.T) {
 			client := inventory.NewFakeInventoryClient([]object.ObjMetadata{})
 			eventChannel := make(chan event.Event)
 			context := taskrunner.NewTaskContext(eventChannel)
+			prevInventory := make(map[object.ObjMetadata]bool, len(tc.prevInventory))
+			for _, prevInvID := range tc.prevInventory {
+				prevInventory[prevInvID] = true
+			}
 			task := InvSetTask{
-				TaskName:  taskName,
-				InvClient: client,
-				InvInfo:   nil,
+				TaskName:      taskName,
+				InvClient:     client,
+				InvInfo:       nil,
+				PrevInventory: prevInventory,
 			}
 			for _, applyObj := range tc.appliedObjs {
 				context.ResourceApplied(applyObj, "unusued-uid", int64(0))
+			}
+			for _, applyFailure := range tc.applyFailures {
+				context.CaptureResourceFailure(applyFailure)
 			}
 			for _, pruneObj := range tc.pruneFailures {
 				context.CapturePruneFailure(pruneObj)
