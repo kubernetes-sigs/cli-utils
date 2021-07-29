@@ -4,6 +4,7 @@
 package info
 
 import (
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/resource"
@@ -22,23 +23,21 @@ type InfoHelper interface {
 	BuildInfo(obj *unstructured.Unstructured) (*resource.Info, error)
 }
 
-func NewInfoHelper(factory util.Factory) *infoHelper {
+func NewInfoHelper(mapper meta.RESTMapper, factory util.Factory) *infoHelper {
 	return &infoHelper{
+		mapper:  mapper,
 		factory: factory,
 	}
 }
 
 type infoHelper struct {
+	mapper  meta.RESTMapper
 	factory util.Factory
 }
 
 func (ih *infoHelper) UpdateInfo(info *resource.Info) error {
-	mapper, err := ih.factory.ToRESTMapper()
-	if err != nil {
-		return err
-	}
 	gvk := info.Object.GetObjectKind().GroupVersionKind()
-	mapping, err := mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+	mapping, err := ih.mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
 	if err != nil {
 		return err
 	}

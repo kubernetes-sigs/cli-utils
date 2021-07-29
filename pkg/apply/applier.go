@@ -34,12 +34,16 @@ func NewApplier(factory cmdutil.Factory, invClient inventory.InventoryClient, st
 	if err != nil {
 		return nil, err
 	}
+	mapper, err := factory.ToRESTMapper()
+	if err != nil {
+		return nil, err
+	}
 	return &Applier{
 		pruneOptions: pruneOpts,
 		statusPoller: statusPoller,
 		factory:      factory,
 		invClient:    invClient,
-		infoHelper:   info.NewInfoHelper(factory),
+		infoHelper:   info.NewInfoHelper(mapper, factory),
 	}, nil
 }
 
