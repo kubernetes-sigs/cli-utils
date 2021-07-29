@@ -88,7 +88,7 @@ func NewInventoryClient(factory cmdutil.Factory,
 		dryRunStrategy:        common.DryRunNone,
 		InventoryFactoryFunc:  invFunc,
 		invToUnstructuredFunc: invToUnstructuredFunc,
-		InfoHelper:            info.NewInfoHelper(factory),
+		InfoHelper:            info.NewInfoHelper(mapper, factory),
 	}
 	return &clusterInventoryClient, nil
 }
