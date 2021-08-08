@@ -10,7 +10,6 @@ package inventory
 
 import (
 	"fmt"
-	"strings"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/cli-utils/pkg/common"
@@ -59,15 +58,8 @@ func (icm *InventoryConfigMap) Namespace() string {
 }
 
 func (icm *InventoryConfigMap) ID() string {
-	labels := icm.inv.GetLabels()
-	if len(labels) == 0 {
-		return ""
-	}
-	inventoryLabel, exists := labels[common.InventoryLabel]
-	if !exists {
-		return ""
-	}
-	return strings.TrimSpace(inventoryLabel)
+	// Empty string if not set.
+	return icm.inv.GetLabels()[common.InventoryLabel]
 }
 
 func (icm *InventoryConfigMap) Strategy() InventoryStrategy {

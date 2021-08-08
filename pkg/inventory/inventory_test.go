@@ -124,29 +124,6 @@ var pod3Info = &resource.Info{
 	Object: pod3,
 }
 
-var inventoryObjLabelWithSpace = unstructured.Unstructured{
-	Object: map[string]interface{}{
-		"apiVersion": "v1",
-		"kind":       "ConfigMap",
-		"metadata": map[string]interface{}{
-			"name":      inventoryObjName,
-			"namespace": testNamespace,
-			"labels": map[string]interface{}{
-				common.InventoryLabel: "\tinventory-label ",
-			},
-		},
-	},
-}
-
-var invInfoLabelWithSpace = &resource.Info{
-	Namespace: testNamespace,
-	Name:      inventoryObjName,
-	Mapping: &meta.RESTMapping{
-		Scope: meta.RESTScopeNamespace,
-	},
-	Object: &inventoryObjLabelWithSpace,
-}
-
 func TestFindInventoryObj(t *testing.T) {
 	tests := map[string]struct {
 		infos  []*unstructured.Unstructured
@@ -238,12 +215,6 @@ func TestRetrieveInventoryLabel(t *testing.T) {
 			inventoryInfo:  pod2Info,
 			inventoryLabel: "",
 			isError:        true,
-		},
-		// Retrieves label without preceding/trailing whitespace.
-		{
-			inventoryInfo:  invInfoLabelWithSpace,
-			inventoryLabel: "inventory-label",
-			isError:        false,
 		},
 		{
 			inventoryInfo:  invInfo,
