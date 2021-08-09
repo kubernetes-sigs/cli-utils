@@ -4,7 +4,6 @@
 package object
 
 import (
-	"strings"
 	"testing"
 
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -19,29 +18,9 @@ func TestCreateObjMetadata(t *testing.T) {
 		expected  string
 		isError   bool
 	}{
-		"Namespace with only whitespace": {
-			namespace: "  \n",
-			name:      " test-name\t",
-			gk: schema.GroupKind{
-				Group: "apps",
-				Kind:  "ReplicaSet",
-			},
-			expected: "_test-name_apps_ReplicaSet",
-			isError:  false,
-		},
-		"Name with leading/trailing whitespace": {
-			namespace: "test-namespace ",
-			name:      " test-name\t",
-			gk: schema.GroupKind{
-				Group: "apps",
-				Kind:  "ReplicaSet",
-			},
-			expected: "test-namespace_test-name_apps_ReplicaSet",
-			isError:  false,
-		},
 		"Empty name is an error": {
 			namespace: "test-namespace ",
-			name:      " \t",
+			name:      "",
 			gk: schema.GroupKind{
 				Group: "apps",
 				Kind:  "ReplicaSet",
@@ -81,8 +60,8 @@ func TestCreateObjMetadata(t *testing.T) {
 				// so that tests will catch any change to CreateObjMetadata that
 				// would break ParseObjMetadata.
 				expectedObjMetadata := &ObjMetadata{
-					Namespace: strings.TrimSpace(tc.namespace),
-					Name:      strings.TrimSpace(tc.name),
+					Namespace: tc.namespace,
+					Name:      tc.name,
 					GroupKind: tc.gk,
 				}
 				actual, err := ParseObjMetadata(inv.String())
@@ -189,8 +168,8 @@ func TestParseObjMetadata(t *testing.T) {
 		inventory *ObjMetadata
 		isError   bool
 	}{
-		"Simple inventory string parse with empty namespace and whitespace": {
-			invStr: "_test-name_apps_ReplicaSet\t",
+		"Simple inventory string parse with empty namespace": {
+			invStr: "_test-name_apps_ReplicaSet",
 			inventory: &ObjMetadata{
 				Name: "test-name",
 				GroupKind: schema.GroupKind{

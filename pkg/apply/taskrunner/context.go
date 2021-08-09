@@ -4,8 +4,6 @@
 package taskrunner
 
 import (
-	"strings"
-
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
@@ -81,7 +79,7 @@ func (tc *TaskContext) AppliedResources() []object.ObjMetadata {
 func (tc *TaskContext) AppliedResourceUIDs() sets.String {
 	uids := sets.NewString()
 	for _, ai := range tc.appliedResources {
-		uid := strings.TrimSpace(string(ai.uid))
+		uid := string(ai.uid)
 		if uid != "" {
 			uids.Insert(uid)
 		}

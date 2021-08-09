@@ -69,7 +69,7 @@ func TestFormatter_FormatApplyEvent(t *testing.T) {
 			err := formatter.FormatApplyEvent(tc.event)
 			assert.NoError(t, err)
 
-			assert.Equal(t, strings.TrimSpace(tc.expected), strings.TrimSpace(out.String()))
+			assert.Equal(t, tc.expected, strings.TrimSpace(out.String()))
 		})
 	}
 }
@@ -116,7 +116,7 @@ func TestFormatter_FormatStatusEvent(t *testing.T) {
 			err := formatter.FormatStatusEvent(tc.event)
 			assert.NoError(t, err)
 
-			assert.Equal(t, strings.TrimSpace(tc.expected), strings.TrimSpace(out.String()))
+			assert.Equal(t, tc.expected, strings.TrimSpace(out.String()))
 		})
 	}
 }
@@ -161,7 +161,7 @@ func TestFormatter_FormatPruneEvent(t *testing.T) {
 			err := formatter.FormatPruneEvent(tc.event)
 			assert.NoError(t, err)
 
-			assert.Equal(t, strings.TrimSpace(tc.expected), strings.TrimSpace(out.String()))
+			assert.Equal(t, tc.expected, strings.TrimSpace(out.String()))
 		})
 	}
 }
@@ -210,7 +210,7 @@ func TestFormatter_FormatDeleteEvent(t *testing.T) {
 			err := formatter.FormatDeleteEvent(tc.event)
 			assert.NoError(t, err)
 
-			assert.Equal(t, strings.TrimSpace(tc.expected), strings.TrimSpace(out.String()))
+			assert.Equal(t, tc.expected, strings.TrimSpace(out.String()))
 		})
 	}
 }

@@ -78,7 +78,6 @@ func (oms ObjMetas) Contains(id ObjMetadata) bool {
 // passed fields and returns an error for bad parameters.
 func CreateObjMetadata(namespace string, name string, gk schema.GroupKind) (ObjMetadata, error) {
 	// Namespace can be empty, but name cannot.
-	name = strings.TrimSpace(name)
 	if name == "" {
 		return NilObjMetadata, fmt.Errorf("empty name for object")
 	}
@@ -86,7 +85,7 @@ func CreateObjMetadata(namespace string, name string, gk schema.GroupKind) (ObjM
 		return NilObjMetadata, fmt.Errorf("empty kind for object")
 	}
 	return ObjMetadata{
-		Namespace: strings.TrimSpace(namespace),
+		Namespace: namespace,
 		Name:      name,
 		GroupKind: gk,
 	}, nil
@@ -133,8 +132,8 @@ func ParseObjMetadata(s string) (ObjMetadata, error) {
 	}
 	// Create the ObjMetadata object from the four parsed fields.
 	gk := schema.GroupKind{
-		Group: strings.TrimSpace(group),
-		Kind:  strings.TrimSpace(kind),
+		Group: group,
+		Kind:  kind,
 	}
 	return CreateObjMetadata(namespace, name, gk)
 }

@@ -76,7 +76,7 @@ func retrieveInventoryLabel(obj *unstructured.Unstructured) (string, error) {
 	if !exists {
 		return "", fmt.Errorf("inventory label does not exist for inventory object: %s", common.InventoryLabel)
 	}
-	return strings.TrimSpace(inventoryLabel), nil
+	return inventoryLabel, nil
 }
 
 // ValidateNoInventory takes a slice of unstructured.Unstructured objects and

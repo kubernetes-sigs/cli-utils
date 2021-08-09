@@ -270,12 +270,12 @@ func handleError(eventChannel chan event.Event, err error) {
 func localNamespaces(localInv inventory.InventoryInfo, localObjs []object.ObjMetadata) sets.String {
 	namespaces := sets.NewString()
 	for _, obj := range localObjs {
-		namespace := strings.TrimSpace(strings.ToLower(obj.Namespace))
+		namespace := strings.ToLower(obj.Namespace)
 		if namespace != "" {
 			namespaces.Insert(namespace)
 		}
 	}
-	invNamespace := strings.TrimSpace(strings.ToLower(localInv.Namespace()))
+	invNamespace := strings.ToLower(localInv.Namespace())
 	if invNamespace != "" {
 		namespaces.Insert(invNamespace)
 	}
