@@ -7,23 +7,19 @@ import (
 	"io"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/kubectl/pkg/cmd/util"
-	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
 type fakeLoader struct {
-	factory   util.Factory
-	InvClient *inventory.FakeInventoryClient
+	factory util.Factory
 }
 
 var _ ManifestLoader = &fakeLoader{}
 
 func NewFakeLoader(f util.Factory, objs []object.ObjMetadata) *fakeLoader {
 	return &fakeLoader{
-		factory:   f,
-		InvClient: inventory.NewFakeInventoryClient(objs),
+		factory: f,
 	}
 }
 
@@ -42,9 +38,4 @@ func (f *fakeLoader) ManifestReader(reader io.Reader, _ string) (ManifestReader,
 		Reader:        reader,
 		ReaderOptions: readerOptions,
 	}, nil
-}
-
-func (f *fakeLoader) InventoryInfo(objs []*unstructured.Unstructured) (inventory.InventoryInfo, []*unstructured.Unstructured, error) {
-	inv, objs, err := inventory.SplitUnstructureds(objs)
-	return inventory.WrapInventoryInfoObj(inv), objs, err
 }

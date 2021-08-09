@@ -96,10 +96,9 @@ func ValidateNoInventory(objs []*unstructured.Unstructured) error {
 	}
 }
 
-// splitUnstructureds takes a slice of unstructured.Unstructured objects and
-// splits it into one slice that contains the inventory object templates and
-// another one that contains the remaining resources.
-func SplitUnstructureds(objs []*unstructured.Unstructured) (*unstructured.Unstructured, []*unstructured.Unstructured, error) {
+// SplitInventory returns the passed inventory object (if it exists), and the
+// remaining non-inventory objects, or an error.
+func SplitInventory(objs []*unstructured.Unstructured) (InventoryInfo, []*unstructured.Unstructured, error) {
 	invs := make([]*unstructured.Unstructured, 0)
 	resources := make([]*unstructured.Unstructured, 0)
 	for _, obj := range objs {
@@ -110,13 +109,13 @@ func SplitUnstructureds(objs []*unstructured.Unstructured) (*unstructured.Unstru
 		}
 	}
 	if len(invs) == 0 {
-		return nil, resources, NoInventoryObjError{}
+		return nil, resources, nil
 	} else if len(invs) > 1 {
 		return nil, resources, MultipleInventoryObjError{
 			InventoryObjectTemplates: invs,
 		}
 	}
-	return invs[0], resources, nil
+	return WrapInventoryInfoObj(invs[0]), resources, nil
 }
 
 // addSuffixToName adds the passed suffix (usually a hash) as a suffix

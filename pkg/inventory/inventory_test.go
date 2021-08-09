@@ -239,7 +239,7 @@ func TestRetrieveInventoryLabel(t *testing.T) {
 	}
 }
 
-func TestSplitUnstructureds(t *testing.T) {
+func TestSplitInventory(t *testing.T) {
 	tests := map[string]struct {
 		allObjs []*unstructured.Unstructured
 		invObj  *unstructured.Unstructured
@@ -250,7 +250,7 @@ func TestSplitUnstructureds(t *testing.T) {
 			allObjs: []*unstructured.Unstructured{},
 			invObj:  nil,
 			objs:    []*unstructured.Unstructured{},
-			isError: true,
+			isError: false,
 		},
 		"Only inventory object is true": {
 			allObjs: []*unstructured.Unstructured{inventoryObj},
@@ -258,17 +258,17 @@ func TestSplitUnstructureds(t *testing.T) {
 			objs:    []*unstructured.Unstructured{},
 			isError: false,
 		},
-		"Missing inventory object is false": {
+		"Missing inventory object returns just passed in object": {
 			allObjs: []*unstructured.Unstructured{pod1},
 			invObj:  nil,
 			objs:    []*unstructured.Unstructured{pod1},
-			isError: true,
+			isError: false,
 		},
-		"Multiple non-inventory objects is false": {
+		"Multiple non-inventory objects returns passed in objectss": {
 			allObjs: []*unstructured.Unstructured{pod1, pod2, pod3},
 			invObj:  nil,
 			objs:    []*unstructured.Unstructured{pod1, pod2, pod3},
-			isError: true,
+			isError: false,
 		},
 		"Inventory object with multiple others is true": {
 			allObjs: []*unstructured.Unstructured{pod1, pod2, inventoryObj, pod3},
@@ -280,8 +280,7 @@ func TestSplitUnstructureds(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			invObj, infos, err := SplitUnstructureds(tc.allObjs)
-			inv := WrapInventoryInfoObj(invObj)
+			inv, infos, err := SplitInventory(tc.allObjs)
 			if !tc.isError && err != nil {
 				t.Fatalf("unexpected error received: %s", err)
 			}
@@ -291,10 +290,11 @@ func TestSplitUnstructureds(t *testing.T) {
 				}
 				return
 			}
-
-			if tc.invObj.GetName() != inv.Name() ||
-				tc.invObj.GetNamespace() != inv.Namespace() {
-				t.Errorf("expected inventory (%v); got (%v)", tc.invObj, inv)
+			if tc.invObj != nil {
+				if tc.invObj.GetName() != inv.Name() ||
+					tc.invObj.GetNamespace() != inv.Namespace() {
+					t.Errorf("expected inventory (%v); got (%v)", tc.invObj, inv)
+				}
 			}
 			if len(tc.objs) != len(infos) {
 				t.Errorf("expected %d objects; got %d", len(tc.objs), len(infos))

@@ -105,7 +105,7 @@ func (r *PreviewRunner) RunE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	inv, objs, err := r.loader.InventoryInfo(objs)
+	inv, objs, err := inventory.SplitInventory(objs)
 	if err != nil {
 		return err
 	}

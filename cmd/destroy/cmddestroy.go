@@ -90,7 +90,7 @@ func (r *DestroyRunner) RunE(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	inv, _, err := r.loader.InventoryInfo(objs)
+	inv, _, err := inventory.SplitInventory(objs)
 	if err != nil {
 		return err
 	}

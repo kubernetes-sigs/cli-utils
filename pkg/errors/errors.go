@@ -29,14 +29,6 @@ var statusCodeForType map[reflect.Type]int
 //nolint:gochecknoinits
 func init() {
 	errorMsgForType = make(map[reflect.Type]string)
-	errorMsgForType[reflect.TypeOf(inventory.NoInventoryObjError{})] = `
-Package uninitialized. Please run "{{.cmdNameBase}} init" command.
-
-The package needs to be initialized to generate the template
-which will store state for resource sets. This state is
-necessary to perform functionality such as deleting an entire
-package or automatically deleting omitted resources (pruning).
-`
 
 	errorMsgForType[reflect.TypeOf(inventory.MultipleInventoryObjError{})] = `
 Package has multiple inventory object templates.

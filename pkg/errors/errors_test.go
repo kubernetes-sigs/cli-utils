@@ -24,18 +24,6 @@ func TestTextForError(t *testing.T) {
 		expectFound     bool
 		expectedErrText string
 	}{
-		"kapply command base name": {
-			err:             inventory.NoInventoryObjError{},
-			cmdNameBase:     "kapply",
-			expectFound:     true,
-			expectedErrText: "Please run \"kapply init\" command.",
-		},
-		"different command base name": {
-			err:             inventory.NoInventoryObjError{},
-			cmdNameBase:     "mycommand",
-			expectFound:     true,
-			expectedErrText: "Please run \"mycommand init\" command.",
-		},
 		"known error without directives in the template": {
 			err:             inventory.MultipleInventoryObjError{},
 			cmdNameBase:     "kapply",
