@@ -132,7 +132,9 @@ func (po *PruneOptions) Prune(pruneObjs []*unstructured.Unstructured,
 				taskContext.CapturePruneFailure(pruneID)
 				continue
 			}
-			err = namespacedClient.Delete(context.TODO(), pruneID.Name, metav1.DeleteOptions{})
+			err = namespacedClient.Delete(context.TODO(), pruneID.Name, metav1.DeleteOptions{
+				PropagationPolicy: &o.PropagationPolicy,
+			})
 			if err != nil {
 				if klog.V(4).Enabled() {
 					klog.Errorf("prune failed for %s (%s)", pruneID, err)

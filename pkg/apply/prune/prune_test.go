@@ -33,7 +33,6 @@ var testNamespace = "test-inventory-namespace"
 var inventoryObjName = "test-inventory-obj"
 var podName = "pod-1"
 var pdbName = "pdb"
-var roleName = "role"
 
 var testInventoryLabel = "test-app-label"
 
@@ -103,21 +102,6 @@ var pdbDeleteFailure = &unstructured.Unstructured{
 			"name":      pdbName + "delete-failure",
 			"namespace": testNamespace,
 			"uid":       "uid2",
-			"annotations": map[string]interface{}{
-				"config.k8s.io/owning-inventory": testInventoryLabel,
-			},
-		},
-	},
-}
-
-var role = &unstructured.Unstructured{
-	Object: map[string]interface{}{
-		"apiVersion": "rbac.authorization.k8s.io/v1",
-		"kind":       "Role",
-		"metadata": map[string]interface{}{
-			"name":      roleName,
-			"namespace": testNamespace,
-			"uid":       "uid3",
 			"annotations": map[string]interface{}{
 				"config.k8s.io/owning-inventory": testInventoryLabel,
 			},
@@ -432,6 +416,27 @@ func TestPrune(t *testing.T) {
 	}
 }
 
+// failureNamespaceClient wrappers around a namespaceClient with the overwriting to Get and Delete functions.
+type failureNamespaceClient struct {
+	dynamic.ResourceInterface
+}
+
+var _ dynamic.ResourceInterface = &failureNamespaceClient{}
+
+func (c *failureNamespaceClient) Delete(ctx context.Context, name string, options metav1.DeleteOptions, subresources ...string) error {
+	if strings.Contains(name, "delete-failure") {
+		return fmt.Errorf("expected delete error")
+	}
+	return nil
+}
+
+func (c *failureNamespaceClient) Get(ctx context.Context, name string, options metav1.GetOptions, subresources ...string) (*unstructured.Unstructured, error) {
+	if strings.Contains(name, "get-failure") {
+		return nil, fmt.Errorf("expected get error")
+	}
+	return pdb, nil
+}
+
 func TestPruneWithErrors(t *testing.T) {
 	tests := map[string]struct {
 		pruneObjs      []*unstructured.Unstructured
@@ -471,8 +476,9 @@ func TestPruneWithErrors(t *testing.T) {
 			po := PruneOptions{
 				InvClient: inventory.NewFakeInventoryClient(pruneIds),
 				// Set up the fake dynamic client to recognize all objects, and the RESTMapper.
-				Client: &fakeDynamicFailureClient{dynamic: fake.NewSimpleDynamicClient(scheme.Scheme,
-					namespace, pdb, role)},
+				Client: &fakeDynamicClient{
+					resourceInterface: &failureNamespaceClient{},
+				},
 				Mapper: testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme,
 					scheme.Scheme.PrioritizedVersionsAllGroups()...),
 			}
@@ -579,44 +585,71 @@ func TestGetPruneObjs(t *testing.T) {
 	}
 }
 
-type fakeDynamicFailureClient struct {
-	dynamic dynamic.Interface
+type optionsCaptureNamespaceClient struct {
+	dynamic.ResourceInterface
+	options metav1.DeleteOptions
 }
 
-var _ dynamic.Interface = &fakeDynamicFailureClient{}
+var _ dynamic.ResourceInterface = &optionsCaptureNamespaceClient{}
 
-func (c *fakeDynamicFailureClient) Resource(resource schema.GroupVersionResource) dynamic.NamespaceableResourceInterface {
-	if resource.Resource == "poddisruptionbudgets" {
-		return &fakeDynamicResourceClient{NamespaceableResourceInterface: c.dynamic.Resource(resource)}
+func (c *optionsCaptureNamespaceClient) Delete(_ context.Context, _ string, options metav1.DeleteOptions, _ ...string) error {
+	c.options = options
+	return nil
+}
+
+func TestPrune_PropagationPolicy(t *testing.T) {
+	testCases := map[string]struct {
+		propagationPolicy metav1.DeletionPropagation
+	}{
+		"background propagation policy": {
+			propagationPolicy: metav1.DeletePropagationBackground,
+		},
+		"foreground propagation policy": {
+			propagationPolicy: metav1.DeletePropagationForeground,
+		},
 	}
-	return c.dynamic.Resource(resource)
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			captureClient := &optionsCaptureNamespaceClient{}
+			po := PruneOptions{
+				InvClient: inventory.NewFakeInventoryClient([]object.ObjMetadata{}),
+				Client: &fakeDynamicClient{
+					resourceInterface: captureClient,
+				},
+				Mapper: testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme,
+					scheme.Scheme.PrioritizedVersionsAllGroups()...),
+			}
+
+			eventChannel := make(chan event.Event, 1)
+			taskContext := taskrunner.NewTaskContext(eventChannel)
+			err := po.Prune([]*unstructured.Unstructured{pdb}, []filter.ValidationFilter{}, taskContext, Options{
+				PropagationPolicy: tc.propagationPolicy,
+			})
+			assert.NoError(t, err)
+			require.NotNil(t, captureClient.options.PropagationPolicy)
+			assert.Equal(t, tc.propagationPolicy, *captureClient.options.PropagationPolicy)
+		})
+	}
+}
+
+type fakeDynamicClient struct {
+	resourceInterface dynamic.ResourceInterface
+}
+
+var _ dynamic.Interface = &fakeDynamicClient{}
+
+func (c *fakeDynamicClient) Resource(resource schema.GroupVersionResource) dynamic.NamespaceableResourceInterface {
+	return &fakeDynamicResourceClient{
+		resourceInterface:              c.resourceInterface,
+		NamespaceableResourceInterface: fake.NewSimpleDynamicClient(scheme.Scheme).Resource(resource),
+	}
 }
 
 type fakeDynamicResourceClient struct {
 	dynamic.NamespaceableResourceInterface
+	resourceInterface dynamic.ResourceInterface
 }
 
 func (c *fakeDynamicResourceClient) Namespace(ns string) dynamic.ResourceInterface {
-	return &fakeNamespaceClient{ResourceInterface: c.NamespaceableResourceInterface.Namespace(ns)}
-}
-
-// fakeNamespaceClient wrappers around a namespaceClient with the overwriting to Get and Delete functions.
-type fakeNamespaceClient struct {
-	dynamic.ResourceInterface
-}
-
-var _ dynamic.ResourceInterface = &fakeNamespaceClient{}
-
-func (c *fakeNamespaceClient) Delete(ctx context.Context, name string, options metav1.DeleteOptions, subresources ...string) error {
-	if strings.Contains(name, "delete-failure") {
-		return fmt.Errorf("expected delete error")
-	}
-	return nil
-}
-
-func (c *fakeNamespaceClient) Get(ctx context.Context, name string, options metav1.GetOptions, subresources ...string) (*unstructured.Unstructured, error) {
-	if strings.Contains(name, "get-failure") {
-		return nil, fmt.Errorf("expected get error")
-	}
-	return pdb, nil
+	return c.resourceInterface
 }

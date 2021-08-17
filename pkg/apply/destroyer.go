@@ -71,6 +71,19 @@ type DestroyerOptions struct {
 	// EmitStatusEvents defines whether status events should be
 	// emitted on the eventChannel to the caller.
 	EmitStatusEvents bool
+
+	// PollInterval defines how often we should poll for the status
+	// of resources.
+	PollInterval time.Duration
+}
+
+func setDestroyerDefaults(o *DestroyerOptions) {
+	if o.PollInterval == time.Duration(0) {
+		o.PollInterval = poller.DefaultPollInterval
+	}
+	if o.DeletePropagationPolicy == "" {
+		o.DeletePropagationPolicy = metav1.DeletePropagationBackground
+	}
 }
 
 // Run performs the destroy step. Passes the inventory object. This
@@ -78,6 +91,7 @@ type DestroyerOptions struct {
 // back on the event channel.
 func (d *Destroyer) Run(inv inventory.InventoryInfo, options DestroyerOptions) <-chan event.Event {
 	eventChannel := make(chan event.Event)
+	setDestroyerDefaults(&options)
 	go func() {
 		defer close(eventChannel)
 		// Retrieve the objects to be deleted from the cluster. Second parameter is empty
@@ -137,7 +151,7 @@ func (d *Destroyer) Run(inv inventory.InventoryInfo, options DestroyerOptions) <
 		// TODO(seans): Make the poll interval configurable like the applier.
 		err = runner.Run(context.Background(), taskQueue.ToChannel(), eventChannel, taskrunner.Options{
 			UseCache:         true,
-			PollInterval:     poller.DefaultPollInterval,
+			PollInterval:     options.PollInterval,
 			EmitStatusEvents: options.EmitStatusEvents,
 		})
 		if err != nil {

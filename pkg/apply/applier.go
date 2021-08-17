@@ -249,7 +249,7 @@ func setDefaults(o *Options) {
 	if o.PollInterval == time.Duration(0) {
 		o.PollInterval = poller.DefaultPollInterval
 	}
-	if o.PrunePropagationPolicy == metav1.DeletionPropagation("") {
+	if o.PrunePropagationPolicy == "" {
 		o.PrunePropagationPolicy = metav1.DeletePropagationBackground
 	}
 }
