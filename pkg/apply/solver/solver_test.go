@@ -121,10 +121,12 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 		applyObjs     []*unstructured.Unstructured
 		options       Options
 		expectedTasks []taskrunner.Task
+		isError       bool
 	}{
 		"no resources, no tasks": {
 			applyObjs:     []*unstructured.Unstructured{},
 			expectedTasks: []taskrunner.Task{},
+			isError:       false,
 		},
 		"single resource, one apply task": {
 			applyObjs: []*unstructured.Unstructured{
@@ -138,6 +140,7 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 					},
 				},
 			},
+			isError: false,
 		},
 		"multiple resources with reconcile timeout": {
 			applyObjs: []*unstructured.Unstructured{
@@ -164,6 +167,7 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 					taskrunner.AllCurrent, 1*time.Second,
 					testutil.NewFakeRESTMapper()),
 			},
+			isError: false,
 		},
 		"multiple resources with reconcile timeout and dryrun": {
 			applyObjs: []*unstructured.Unstructured{
@@ -184,6 +188,7 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 					},
 				},
 			},
+			isError: false,
 		},
 		"multiple resources with reconcile timeout and server-dryrun": {
 			applyObjs: []*unstructured.Unstructured{
@@ -204,6 +209,7 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 					},
 				},
 			},
+			isError: false,
 		},
 		"multiple resources including CRD": {
 			applyObjs: []*unstructured.Unstructured{
@@ -241,6 +247,7 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 					taskrunner.AllCurrent, 1*time.Second,
 					testutil.NewFakeRESTMapper()),
 			},
+			isError: false,
 		},
 		"no wait with CRDs if it is a dryrun": {
 			applyObjs: []*unstructured.Unstructured{
@@ -267,6 +274,7 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 					},
 				},
 			},
+			isError: false,
 		},
 		"resources in namespace creates multiple apply tasks": {
 			applyObjs: []*unstructured.Unstructured{
@@ -304,6 +312,7 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 					taskrunner.AllCurrent, 1*time.Second,
 					testutil.NewFakeRESTMapper()),
 			},
+			isError: false,
 		},
 		"deployment depends on secret creates multiple tasks": {
 			applyObjs: []*unstructured.Unstructured{
@@ -339,6 +348,17 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 					taskrunner.AllCurrent, 1*time.Second,
 					testutil.NewFakeRESTMapper()),
 			},
+			isError: false,
+		},
+		"cyclic dependency returns error": {
+			applyObjs: []*unstructured.Unstructured{
+				testutil.Unstructured(t, resources["deployment"],
+					testutil.AddDependsOn(t, testutil.Unstructured(t, resources["secret"]))),
+				testutil.Unstructured(t, resources["secret"],
+					testutil.AddDependsOn(t, testutil.Unstructured(t, resources["deployment"]))),
+			},
+			expectedTasks: []taskrunner.Task{},
+			isError:       true,
 		},
 	}
 
@@ -351,8 +371,12 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 				Mapper:       testutil.NewFakeRESTMapper(),
 				InvClient:    fakeInvClient,
 			}
-			tq := tqb.AppendApplyWaitTasks(localInv, tc.applyObjs, tc.options).Build()
-
+			tq, err := tqb.AppendApplyWaitTasks(localInv, tc.applyObjs, tc.options).Build()
+			if tc.isError {
+				assert.NotNil(t, err, "expected error, but received none")
+				return
+			}
+			assert.Nil(t, err, "unexpected error received")
 			assert.Equal(t, len(tc.expectedTasks), len(tq.tasks))
 			for i, expTask := range tc.expectedTasks {
 				actualTask := tq.tasks[i]
@@ -385,11 +409,13 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 		pruneObjs     []*unstructured.Unstructured
 		options       Options
 		expectedTasks []taskrunner.Task
+		isError       bool
 	}{
 		"no resources, no tasks": {
 			pruneObjs:     []*unstructured.Unstructured{},
 			options:       Options{Prune: true},
 			expectedTasks: []taskrunner.Task{},
+			isError:       false,
 		},
 		"single resource, one prune task": {
 			pruneObjs: []*unstructured.Unstructured{
@@ -404,6 +430,7 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 					},
 				},
 			},
+			isError: false,
 		},
 		"multiple resources, one prune task": {
 			pruneObjs: []*unstructured.Unstructured{
@@ -420,6 +447,7 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 					},
 				},
 			},
+			isError: false,
 		},
 		"dependent resources, two prune tasks, two wait tasks": {
 			pruneObjs: []*unstructured.Unstructured{
@@ -457,6 +485,7 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 					taskrunner.AllCurrent, 1*time.Second,
 					testutil.NewFakeRESTMapper()),
 			},
+			isError: false,
 		},
 		"multiple resources with prune timeout and server-dryrun": {
 			pruneObjs: []*unstructured.Unstructured{
@@ -478,6 +507,7 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 					},
 				},
 			},
+			isError: false,
 		},
 		"multiple resources including CRD": {
 			pruneObjs: []*unstructured.Unstructured{
@@ -517,6 +547,7 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 					taskrunner.AllCurrent, 1*time.Second,
 					testutil.NewFakeRESTMapper()),
 			},
+			isError: false,
 		},
 		"no wait with CRDs if it is a dryrun": {
 			pruneObjs: []*unstructured.Unstructured{
@@ -544,6 +575,7 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 					},
 				},
 			},
+			isError: false,
 		},
 		"resources in namespace creates multiple apply tasks": {
 			pruneObjs: []*unstructured.Unstructured{
@@ -582,6 +614,18 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 					taskrunner.AllCurrent, 1*time.Second,
 					testutil.NewFakeRESTMapper()),
 			},
+			isError: false,
+		},
+		"cyclic dependency returns error": {
+			pruneObjs: []*unstructured.Unstructured{
+				testutil.Unstructured(t, resources["deployment"],
+					testutil.AddDependsOn(t, testutil.Unstructured(t, resources["secret"]))),
+				testutil.Unstructured(t, resources["secret"],
+					testutil.AddDependsOn(t, testutil.Unstructured(t, resources["deployment"]))),
+			},
+			options:       Options{Prune: true},
+			expectedTasks: []taskrunner.Task{},
+			isError:       true,
 		},
 	}
 
@@ -595,8 +639,12 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 				InvClient:    fakeInvClient,
 			}
 			emptyPruneFilters := []filter.ValidationFilter{}
-			tq := tqb.AppendPruneWaitTasks(tc.pruneObjs, emptyPruneFilters, tc.options).Build()
-
+			tq, err := tqb.AppendPruneWaitTasks(tc.pruneObjs, emptyPruneFilters, tc.options).Build()
+			if tc.isError {
+				assert.NotNil(t, err, "expected error, but received none")
+				return
+			}
+			assert.Nil(t, err, "unexpected error received")
 			assert.Equal(t, len(tc.expectedTasks), len(tq.tasks))
 			for i, expTask := range tc.expectedTasks {
 				actualTask := tq.tasks[i]

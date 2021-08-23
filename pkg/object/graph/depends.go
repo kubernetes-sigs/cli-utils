@@ -16,9 +16,9 @@ import (
 // Each of the objects in an apply set is applied together. The order of
 // the returned applied sets is a topological ordering of the sets to apply.
 // Returns an single empty apply set if there are no objects to apply.
-func SortObjs(objs []*unstructured.Unstructured) [][]*unstructured.Unstructured {
+func SortObjs(objs []*unstructured.Unstructured) ([][]*unstructured.Unstructured, error) {
 	if len(objs) == 0 {
-		return [][]*unstructured.Unstructured{}
+		return [][]*unstructured.Unstructured{}, nil
 	}
 	// Create the graph, and build a map of object metadata to the object (Unstructured).
 	g := New()
@@ -35,7 +35,7 @@ func SortObjs(objs []*unstructured.Unstructured) [][]*unstructured.Unstructured 
 	objSets := [][]*unstructured.Unstructured{}
 	sortedObjSets, err := g.Sort()
 	if err != nil {
-		return objSets
+		return [][]*unstructured.Unstructured{}, err
 	}
 	// Map the object metadata back to the sorted sets of unstructured objects.
 	for _, objSet := range sortedObjSets {
@@ -49,18 +49,21 @@ func SortObjs(objs []*unstructured.Unstructured) [][]*unstructured.Unstructured 
 		}
 		objSets = append(objSets, currentSet)
 	}
-	return objSets
+	return objSets, nil
 }
 
 // ReverseSortObjs is the same as SortObjs but using reverse ordering.
-func ReverseSortObjs(objs []*unstructured.Unstructured) [][]*unstructured.Unstructured {
+func ReverseSortObjs(objs []*unstructured.Unstructured) ([][]*unstructured.Unstructured, error) {
 	// Sorted objects using normal ordering.
-	s := SortObjs(objs)
+	s, err := SortObjs(objs)
+	if err != nil {
+		return [][]*unstructured.Unstructured{}, err
+	}
 	// Reverse the ordering of the object sets using swaps.
 	for i, j := 0, len(s)-1; i < j; i, j = i+1, j-1 {
 		s[i], s[j] = s[j], s[i]
 	}
-	return s
+	return s, nil
 }
 
 // addExplicitEdges updates the graph with edges from objects

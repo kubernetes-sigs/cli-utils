@@ -131,10 +131,13 @@ func (d *Destroyer) Run(inv inventory.InventoryInfo, options DestroyerOptions) <
 			},
 		}
 		// Build the ordered set of tasks to execute.
-		taskQueue := taskBuilder.
+		taskQueue, err := taskBuilder.
 			AppendPruneWaitTasks(deleteObjs, deleteFilters, opts).
 			AppendDeleteInvTask(inv, options.DryRunStrategy).
 			Build()
+		if err != nil {
+			handleError(eventChannel, err)
+		}
 		// Send event to inform the caller about the resources that
 		// will be pruned.
 		eventChannel <- event.Event{

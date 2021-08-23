@@ -7,6 +7,7 @@
 package graph
 
 import (
+	"bytes"
 	"fmt"
 
 	"sigs.k8s.io/cli-utils/pkg/object"
@@ -129,9 +130,12 @@ func (g *Graph) Sort() ([][]object.ObjMetadata, error) {
 				leafVertices = append(leafVertices, v)
 			}
 		}
-		// No leaf vertices means cycle in the directed graph.
+		// No leaf vertices means cycle in the directed graph,
+		// where remaining edges define the cycle.
 		if len(leafVertices) == 0 {
-			return sorted, fmt.Errorf("cycle in directed graph")
+			return [][]object.ObjMetadata{}, CyclicDependencyError{
+				Edges: g.GetEdges(),
+			}
 		}
 		// Remove all edges to leaf vertices.
 		for _, v := range leafVertices {
@@ -140,4 +144,21 @@ func (g *Graph) Sort() ([][]object.ObjMetadata, error) {
 		sorted = append(sorted, leafVertices)
 	}
 	return sorted, nil
+}
+
+// CyclicDependencyError when directed acyclic graph contains a cycle.
+// The cycle makes it impossible to topological sort.
+type CyclicDependencyError struct {
+	Edges []Edge
+}
+
+func (cde CyclicDependencyError) Error() string {
+	var errorBuf bytes.Buffer
+	errorBuf.WriteString("cyclic dependency")
+	for _, edge := range cde.Edges {
+		from := fmt.Sprintf("%s/%s", edge.From.Namespace, edge.From.Name)
+		to := fmt.Sprintf("%s/%s", edge.To.Namespace, edge.To.Name)
+		errorBuf.WriteString(fmt.Sprintf("\n\t%s -> %s", from, to))
+	}
+	return errorBuf.String()
 }

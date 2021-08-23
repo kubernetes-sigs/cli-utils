@@ -6,6 +6,7 @@ package graph
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/testutil"
@@ -235,11 +236,38 @@ func TestSortObjs(t *testing.T) {
 			},
 			isError: false,
 		},
+		"two objects depends on each other is cyclic dependency": {
+			objs: []*unstructured.Unstructured{
+				testutil.Unstructured(t, resources["deployment"],
+					testutil.AddDependsOn(t, testutil.Unstructured(t, resources["secret"]))),
+				testutil.Unstructured(t, resources["secret"],
+					testutil.AddDependsOn(t, testutil.Unstructured(t, resources["deployment"]))),
+			},
+			expected: [][]*unstructured.Unstructured{},
+			isError:  true,
+		},
+		"three objects in cyclic dependency": {
+			objs: []*unstructured.Unstructured{
+				testutil.Unstructured(t, resources["deployment"],
+					testutil.AddDependsOn(t, testutil.Unstructured(t, resources["secret"]))),
+				testutil.Unstructured(t, resources["secret"],
+					testutil.AddDependsOn(t, testutil.Unstructured(t, resources["pod"]))),
+				testutil.Unstructured(t, resources["pod"],
+					testutil.AddDependsOn(t, testutil.Unstructured(t, resources["deployment"]))),
+			},
+			expected: [][]*unstructured.Unstructured{},
+			isError:  true,
+		},
 	}
 
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
-			actual := SortObjs(tc.objs)
+			actual, err := SortObjs(tc.objs)
+			if tc.isError {
+				assert.NotNil(t, err, "expected error, but received none")
+				return
+			}
+			assert.Nil(t, err, "unexpected error received")
 			verifyObjSets(t, tc.expected, actual)
 		})
 	}
@@ -328,7 +356,12 @@ func TestReverseSortObjs(t *testing.T) {
 
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
-			actual := ReverseSortObjs(tc.objs)
+			actual, err := ReverseSortObjs(tc.objs)
+			if tc.isError {
+				assert.NotNil(t, err, "expected error, but received none")
+				return
+			}
+			assert.Nil(t, err, "unexpected error received")
 			verifyObjSets(t, tc.expected, actual)
 		})
 	}
