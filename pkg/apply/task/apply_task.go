@@ -140,8 +140,6 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 				taskContext.CaptureResourceFailure(id)
 				continue
 			}
-			// add the inventory annotation to the resource being applied.
-			inventory.AddInventoryIDAnnotation(obj, a.InvInfo)
 			ao.SetObjects([]*resource.Info{info})
 			klog.V(5).Infof("applying %s/%s...", info.Namespace, info.Name)
 			err = ao.Run()

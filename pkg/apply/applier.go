@@ -75,6 +75,10 @@ func (a *Applier) prepareObjects(localInv inventory.InventoryInfo, localObjs []*
 	if err := inventory.ValidateNoInventory(localObjs); err != nil {
 		return nil, nil, err
 	}
+	// Add the inventory annotation to the resources being applied.
+	for _, localObj := range localObjs {
+		inventory.AddInventoryIDAnnotation(localObj, localInv)
+	}
 	// If the inventory uses the Name strategy and an inventory ID is provided,
 	// verify that the existing inventory object (if there is one) has an ID
 	// label that matches.
