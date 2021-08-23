@@ -54,6 +54,7 @@ type TaskQueueBuilder struct {
 	waitCounter      int
 	pruneCounter     int
 	tasks            []taskrunner.Task
+	err              error
 }
 
 type TaskQueue struct {
@@ -92,10 +93,15 @@ type Options struct {
 }
 
 // Build returns the queue of tasks that have been created.
-func (t *TaskQueueBuilder) Build() *TaskQueue {
+// TODO(seans): Now that we're reporting errors, we probably
+// want to move away from the Builder patter for the TaskBuilder.
+func (t *TaskQueueBuilder) Build() (*TaskQueue, error) {
+	if t.err != nil {
+		return nil, t.err
+	}
 	return &TaskQueue{
 		tasks: t.tasks,
-	}
+	}, nil
 }
 
 // AppendInvAddTask appends an inventory add task to the task queue.
@@ -211,7 +217,10 @@ func (t *TaskQueueBuilder) AppendApplyWaitTasks(inv inventory.InventoryInfo,
 	applyObjs []*unstructured.Unstructured, o Options) *TaskQueueBuilder {
 	// Use the "depends-on" annotation to create a graph, ands sort the
 	// objects to apply into sets using a topological sort.
-	applySets := graph.SortObjs(applyObjs)
+	applySets, err := graph.SortObjs(applyObjs)
+	if err != nil {
+		t.err = err
+	}
 	addWaitTask, waitTimeout := waitTaskTimeout(o.DryRunStrategy.ClientOrServerDryRun(),
 		len(applySets), o.ReconcileTimeout)
 	for _, applySet := range applySets {
@@ -232,7 +241,10 @@ func (t *TaskQueueBuilder) AppendPruneWaitTasks(pruneObjs []*unstructured.Unstru
 	if o.Prune {
 		// Use the "depends-on" annotation to create a graph, ands sort the
 		// objects to prune into sets using a (reverse) topological sort.
-		pruneSets := graph.ReverseSortObjs(pruneObjs)
+		pruneSets, err := graph.ReverseSortObjs(pruneObjs)
+		if err != nil {
+			t.err = err
+		}
 		addWaitTask, waitTimeout := waitTaskTimeout(o.DryRunStrategy.ClientOrServerDryRun(),
 			len(pruneSets), o.ReconcileTimeout)
 		for _, pruneSet := range pruneSets {

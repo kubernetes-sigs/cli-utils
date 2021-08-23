@@ -173,12 +173,15 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.InventoryInfo, obje
 			},
 		}
 		// Build the task queue by appending tasks in the proper order.
-		taskQueue := taskBuilder.
+		taskQueue, err := taskBuilder.
 			AppendInvAddTask(invInfo, applyObjs, options.DryRunStrategy).
 			AppendApplyWaitTasks(invInfo, applyObjs, opts).
 			AppendPruneWaitTasks(pruneObjs, pruneFilters, opts).
 			AppendInvSetTask(invInfo, options.DryRunStrategy).
 			Build()
+		if err != nil {
+			handleError(eventChannel, err)
+		}
 		// Send event to inform the caller about the resources that
 		// will be applied/pruned.
 		eventChannel <- event.Event{
