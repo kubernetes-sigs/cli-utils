@@ -211,12 +211,6 @@ func TestApplier(t *testing.T) {
 				{
 					EventType: event.ActionGroupType,
 				},
-				{
-					EventType: event.ActionGroupType,
-				},
-				{
-					EventType: event.ActionGroupType,
-				},
 			},
 		},
 		"apply multiple existing resources with status and prune": {
@@ -283,12 +277,6 @@ func TestApplier(t *testing.T) {
 				},
 				{
 					EventType: event.StatusType,
-				},
-				{
-					EventType: event.ActionGroupType,
-				},
-				{
-					EventType: event.ActionGroupType,
 				},
 				{
 					EventType: event.ActionGroupType,
@@ -398,12 +386,6 @@ func TestApplier(t *testing.T) {
 					ApplyEvent: &testutil.ExpApplyEvent{
 						Error: inventory.NewInventoryOverlapError(fmt.Errorf("")),
 					},
-				},
-				{
-					EventType: event.ActionGroupType,
-				},
-				{
-					EventType: event.ActionGroupType,
 				},
 				{
 					EventType: event.ActionGroupType,

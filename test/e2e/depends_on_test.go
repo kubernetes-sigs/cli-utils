@@ -24,12 +24,12 @@ func dependsOnTest(_ client.Client, invConfig InventoryConfig, inventoryName, na
 
 	inv := invConfig.InvWrapperFunc(invConfig.InventoryFactoryFunc(inventoryName, namespaceName, "test"))
 
-	// Dependency order: pod1 -> pod3 -> pod2
-	// Apply order: pod2, pod3, pod1
+	// Dependency order: configmap1 -> configmap3 -> configmap2
+	// Apply order: configmap2, configmap3, configmap1
 	resources := []*unstructured.Unstructured{
-		manifestToUnstructured(pod1),
-		manifestToUnstructured(pod2),
-		manifestToUnstructured(pod3),
+		manifestToUnstructured(configmap1),
+		manifestToUnstructured(configmap2),
+		manifestToUnstructured(configmap3),
 	}
 
 	ch := applier.Run(context.TODO(), inv, resources, apply.Options{
@@ -43,10 +43,10 @@ func dependsOnTest(_ client.Client, invConfig InventoryConfig, inventoryName, na
 	}
 	err := testutil.VerifyEvents([]testutil.ExpEvent{
 		{
-			// Pod2 is applied first
+			// Configmap2 is applied first
 			EventType: event.ApplyType,
 			ApplyEvent: &testutil.ExpApplyEvent{
-				Identifier: object.UnstructuredToObjMetaOrDie(manifestToUnstructured(pod2)),
+				Identifier: object.UnstructuredToObjMetaOrDie(manifestToUnstructured(configmap2)),
 				Operation:  event.Created,
 				Error:      nil,
 			},
@@ -68,10 +68,10 @@ func dependsOnTest(_ client.Client, invConfig InventoryConfig, inventoryName, na
 			EventType: event.ActionGroupType,
 		},
 		{
-			// Pod3 is applied second
+			// Configmap3 is applied second
 			EventType: event.ApplyType,
 			ApplyEvent: &testutil.ExpApplyEvent{
-				Identifier: object.UnstructuredToObjMetaOrDie(manifestToUnstructured(pod3)),
+				Identifier: object.UnstructuredToObjMetaOrDie(manifestToUnstructured(configmap3)),
 				Operation:  event.Created,
 				Error:      nil,
 			},
@@ -93,10 +93,10 @@ func dependsOnTest(_ client.Client, invConfig InventoryConfig, inventoryName, na
 			EventType: event.ActionGroupType,
 		},
 		{
-			// Pod1 is applied third
+			// Configmap1 is applied third
 			EventType: event.ApplyType,
 			ApplyEvent: &testutil.ExpApplyEvent{
-				Identifier: object.UnstructuredToObjMetaOrDie(manifestToUnstructured(pod1)),
+				Identifier: object.UnstructuredToObjMetaOrDie(manifestToUnstructured(configmap1)),
 				Operation:  event.Created,
 				Error:      nil,
 			},
@@ -125,7 +125,7 @@ func dependsOnTest(_ client.Client, invConfig InventoryConfig, inventoryName, na
 			EventType: event.DeleteType,
 			DeleteEvent: &testutil.ExpDeleteEvent{
 				Operation:  event.Deleted,
-				Identifier: object.UnstructuredToObjMetaOrDie(manifestToUnstructured(pod1)),
+				Identifier: object.UnstructuredToObjMetaOrDie(manifestToUnstructured(configmap1)),
 				Error:      nil,
 			},
 		},
@@ -150,7 +150,7 @@ func dependsOnTest(_ client.Client, invConfig InventoryConfig, inventoryName, na
 			EventType: event.DeleteType,
 			DeleteEvent: &testutil.ExpDeleteEvent{
 				Operation:  event.Deleted,
-				Identifier: object.UnstructuredToObjMetaOrDie(manifestToUnstructured(pod3)),
+				Identifier: object.UnstructuredToObjMetaOrDie(manifestToUnstructured(configmap3)),
 				Error:      nil,
 			},
 		},
@@ -162,42 +162,30 @@ func dependsOnTest(_ client.Client, invConfig InventoryConfig, inventoryName, na
 	Expect(err).ToNot(HaveOccurred())
 }
 
-var pod1 = []byte(strings.TrimSpace(`
-kind: Pod
+var configmap1 = []byte(strings.TrimSpace(`
+kind: ConfigMap
 apiVersion: v1
 metadata:
-  name: pod1
+  name: configmap1
   namespace: default
   annotations:
-    config.kubernetes.io/depends-on: /namespaces/default/Pod/pod3
-spec:
-  containers:
-  - name: kubernetes-pause
-    image: k8s.gcr.io/pause:2.0
+    config.kubernetes.io/depends-on: /namespaces/default/ConfigMap/configmap3
 `))
 
-var pod2 = []byte(strings.TrimSpace(`
-kind: Pod
+var configmap2 = []byte(strings.TrimSpace(`
+kind: ConfigMap
 apiVersion: v1
 metadata:
-  name: pod2
+  name: configmap2
   namespace: default
-spec:
-  containers:
-  - name: kubernetes-pause
-    image: k8s.gcr.io/pause:2.0
 `))
 
-var pod3 = []byte(strings.TrimSpace(`
-kind: Pod
+var configmap3 = []byte(strings.TrimSpace(`
+kind: ConfigMap
 apiVersion: v1
 metadata:
-  name: pod3
+  name: configmap3
   namespace: default
   annotations:
-    config.kubernetes.io/depends-on: /namespaces/default/Pod/pod2
-spec:
-  containers:
-  - name: kubernetes-pause
-    image: k8s.gcr.io/pause:2.0
+    config.kubernetes.io/depends-on: /namespaces/default/ConfigMap/configmap2
 `))

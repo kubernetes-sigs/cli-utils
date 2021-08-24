@@ -158,14 +158,6 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 						testutil.Unstructured(t, resources["secret"]),
 					},
 				},
-				taskrunner.NewWaitTask(
-					"wait-0",
-					[]object.ObjMetadata{
-						testutil.ToIdentifier(t, resources["deployment"]),
-						testutil.ToIdentifier(t, resources["secret"]),
-					},
-					taskrunner.AllCurrent, 1*time.Second,
-					testutil.NewFakeRESTMapper()),
 			},
 			isError: false,
 		},
@@ -238,14 +230,6 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 						testutil.Unstructured(t, resources["crontab2"]),
 					},
 				},
-				taskrunner.NewWaitTask(
-					"wait-1",
-					[]object.ObjMetadata{
-						testutil.ToIdentifier(t, resources["crontab1"]),
-						testutil.ToIdentifier(t, resources["crontab2"]),
-					},
-					taskrunner.AllCurrent, 1*time.Second,
-					testutil.NewFakeRESTMapper()),
 			},
 			isError: false,
 		},
@@ -303,14 +287,6 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 						testutil.Unstructured(t, resources["secret"]),
 					},
 				},
-				taskrunner.NewWaitTask(
-					"wait-1",
-					[]object.ObjMetadata{
-						testutil.ToIdentifier(t, resources["pod"]),
-						testutil.ToIdentifier(t, resources["secret"]),
-					},
-					taskrunner.AllCurrent, 1*time.Second,
-					testutil.NewFakeRESTMapper()),
 			},
 			isError: false,
 		},
@@ -340,13 +316,6 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 						testutil.Unstructured(t, resources["deployment"]),
 					},
 				},
-				taskrunner.NewWaitTask(
-					"wait-1",
-					[]object.ObjMetadata{
-						testutil.ToIdentifier(t, resources["deployment"]),
-					},
-					taskrunner.AllCurrent, 1*time.Second,
-					testutil.NewFakeRESTMapper()),
 			},
 			isError: false,
 		},
@@ -477,13 +446,6 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 						testutil.Unstructured(t, resources["secret"]),
 					},
 				},
-				taskrunner.NewWaitTask(
-					"wait-1",
-					[]object.ObjMetadata{
-						testutil.ToIdentifier(t, resources["secret"]),
-					},
-					taskrunner.AllCurrent, 1*time.Second,
-					testutil.NewFakeRESTMapper()),
 			},
 			isError: false,
 		},
@@ -539,13 +501,6 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 						testutil.Unstructured(t, resources["crd"]),
 					},
 				},
-				taskrunner.NewWaitTask(
-					"wait-1",
-					[]object.ObjMetadata{
-						testutil.ToIdentifier(t, resources["crd"]),
-					},
-					taskrunner.AllCurrent, 1*time.Second,
-					testutil.NewFakeRESTMapper()),
 			},
 			isError: false,
 		},
@@ -606,13 +561,6 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 						testutil.Unstructured(t, resources["namespace"]),
 					},
 				},
-				taskrunner.NewWaitTask(
-					"wait-1",
-					[]object.ObjMetadata{
-						testutil.ToIdentifier(t, resources["namespace"]),
-					},
-					taskrunner.AllCurrent, 1*time.Second,
-					testutil.NewFakeRESTMapper()),
 			},
 			isError: false,
 		},

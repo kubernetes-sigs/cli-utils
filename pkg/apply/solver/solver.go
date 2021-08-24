@@ -223,9 +223,10 @@ func (t *TaskQueueBuilder) AppendApplyWaitTasks(inv inventory.InventoryInfo,
 	}
 	addWaitTask, waitTimeout := waitTaskTimeout(o.DryRunStrategy.ClientOrServerDryRun(),
 		len(applySets), o.ReconcileTimeout)
-	for _, applySet := range applySets {
+	for i, applySet := range applySets {
 		t.AppendApplyTask(inv, applySet, o)
-		if addWaitTask {
+		lastTask := (i == (len(applySets) - 1)) // Do not add trailing/last wait task
+		if addWaitTask && !lastTask {
 			applyIds := object.UnstructuredsToObjMetasOrDie(applySet)
 			t.AppendWaitTask(applyIds, taskrunner.AllCurrent, waitTimeout)
 		}
@@ -247,9 +248,10 @@ func (t *TaskQueueBuilder) AppendPruneWaitTasks(pruneObjs []*unstructured.Unstru
 		}
 		addWaitTask, waitTimeout := waitTaskTimeout(o.DryRunStrategy.ClientOrServerDryRun(),
 			len(pruneSets), o.ReconcileTimeout)
-		for _, pruneSet := range pruneSets {
+		for i, pruneSet := range pruneSets {
 			t.AppendPruneTask(pruneSet, pruneFilters, o)
-			if addWaitTask {
+			lastTask := (i == (len(pruneSets) - 1)) // Do not add trailing/last wait task
+			if addWaitTask && !lastTask {
 				pruneIds := object.UnstructuredsToObjMetasOrDie(pruneSet)
 				t.AppendWaitTask(pruneIds, taskrunner.AllNotFound, waitTimeout)
 			}
