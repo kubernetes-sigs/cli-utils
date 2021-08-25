@@ -39,7 +39,7 @@ generate: install-stringer
 	go generate ./...
 
 license: install-addlicense
-	$(GOPATH)/bin/addlicense -y 2021 -c "The Kubernetes Authors." -f LICENSE_TEMPLATE ./..
+	$(GOPATH)/bin/addlicense -v -y 2021 -c "The Kubernetes Authors." -f LICENSE_TEMPLATE .
 
 verify-license: install-addlicense
 	$(GOPATH)/bin/addlicense  -check .
