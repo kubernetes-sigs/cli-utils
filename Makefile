@@ -26,23 +26,28 @@ fix:
 fmt:
 	go fmt ./...
 
-generate:
-	(which $(GOPATH)/bin/stringer || go install golang.org/x/tools/cmd/stringer@a3eb095d6aeed806877423d9ef571b9a50ca8a2a) # latest as of 2021-05-27
+install-stringer:
+	(which $(GOPATH)/bin/stringer || go install golang.org/x/tools/cmd/stringer@v0.1.5)
+
+install-addlicense:
+	(which $(GOPATH)/bin/addlicense || go install github.com/google/addlicense@v1.0.0)
+
+install-lint:
+	(which $(GOPATH)/bin/golangci-lint || go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.40.1)
+
+generate: install-stringer
 	go generate ./...
 
-license:
-	(which $(GOPATH)/bin/addlicense || go install github.com/google/addlicense@6d92264d717064f28b32464f0f9693a5b4ef0239) # latest as of 2021-05-27
-	$(GOPATH)/bin/addlicense  -y 2020 -c "The Kubernetes Authors." -f LICENSE_TEMPLATE .
+license: install-addlicense
+	$(GOPATH)/bin/addlicense -y 2021 -c "The Kubernetes Authors." -f LICENSE_TEMPLATE ./..
 
-verify-license:
-	(which $(GOPATH)/bin/addlicense || go install github.com/google/addlicense@6d92264d717064f28b32464f0f9693a5b4ef0239) # latest as of 2021-05-27
+verify-license: install-addlicense
 	$(GOPATH)/bin/addlicense  -check .
 
 tidy:
 	go mod tidy
 
-lint:
-	(which $(GOPATH)/bin/golangci-lint || go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.40.1)
+lint: install-lint
 	$(GOPATH)/bin/golangci-lint run ./...
 
 test:
