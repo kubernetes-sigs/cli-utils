@@ -15,12 +15,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/cli-runtime/pkg/resource"
-	"k8s.io/client-go/dynamic"
 	"k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
 	"sigs.k8s.io/cli-utils/pkg/common"
-	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/testutil"
 )
@@ -86,8 +84,8 @@ func TestApplyTask_BasicAppliedObjects(t *testing.T) {
 			objs := toUnstructureds(tc.applied)
 
 			oldAO := applyOptionsFactoryFunc
-			applyOptionsFactoryFunc = func(chan event.Event, common.ServerSideOptions, common.DryRunStrategy, util.Factory) (applyOptions, dynamic.Interface, error) {
-				return &fakeApplyOptions{}, nil, nil
+			applyOptionsFactoryFunc = func(chan event.Event, common.ServerSideOptions, common.DryRunStrategy, util.Factory) (applyOptions, error) {
+				return &fakeApplyOptions{}, nil
 			}
 			defer func() { applyOptionsFactoryFunc = oldAO }()
 
@@ -105,12 +103,8 @@ func TestApplyTask_BasicAppliedObjects(t *testing.T) {
 				Objects:    objs,
 				Mapper:     restMapper,
 				InfoHelper: &fakeInfoHelper{},
-				InvInfo:    &fakeInventoryInfo{},
 			}
 
-			getClusterObj = func(d dynamic.Interface, info *resource.Info) (*unstructured.Unstructured, error) {
-				return objs[0], nil
-			}
 			applyTask.Start(taskContext)
 			<-taskContext.TaskChannel()
 
@@ -175,23 +169,13 @@ func TestApplyTask_FetchGeneration(t *testing.T) {
 			objs := toUnstructureds(tc.rss)
 
 			oldAO := applyOptionsFactoryFunc
-			applyOptionsFactoryFunc = func(chan event.Event, common.ServerSideOptions, common.DryRunStrategy, util.Factory) (applyOptions, dynamic.Interface, error) {
-				return &fakeApplyOptions{}, nil, nil
+			applyOptionsFactoryFunc = func(chan event.Event, common.ServerSideOptions, common.DryRunStrategy, util.Factory) (applyOptions, error) {
+				return &fakeApplyOptions{}, nil
 			}
 			defer func() { applyOptionsFactoryFunc = oldAO }()
 			applyTask := &ApplyTask{
 				Objects:    objs,
 				InfoHelper: &fakeInfoHelper{},
-				InvInfo:    &fakeInventoryInfo{},
-			}
-
-			getClusterObj = func(d dynamic.Interface, info *resource.Info) (*unstructured.Unstructured, error) {
-				for _, obj := range objs {
-					if info.Name == obj.GetName() && info.Namespace == obj.GetNamespace() {
-						return obj, nil
-					}
-				}
-				return nil, nil
 			}
 			applyTask.Start(taskContext)
 
@@ -305,20 +289,16 @@ func TestApplyTask_DryRun(t *testing.T) {
 
 				ao := &fakeApplyOptions{}
 				oldAO := applyOptionsFactoryFunc
-				applyOptionsFactoryFunc = func(chan event.Event, common.ServerSideOptions, common.DryRunStrategy, util.Factory) (applyOptions, dynamic.Interface, error) {
-					return ao, nil, nil
+				applyOptionsFactoryFunc = func(chan event.Event, common.ServerSideOptions, common.DryRunStrategy, util.Factory) (applyOptions, error) {
+					return ao, nil
 				}
 				defer func() { applyOptionsFactoryFunc = oldAO }()
-				getClusterObj = func(d dynamic.Interface, info *resource.Info) (*unstructured.Unstructured, error) {
-					return addOwningInventory(tc.objs[0], "id"), nil
-				}
 
 				applyTask := &ApplyTask{
 					Objects:        tc.objs,
 					InfoHelper:     &fakeInfoHelper{},
 					Mapper:         restMapper,
 					DryRunStrategy: drs,
-					InvInfo:        &fakeInventoryInfo{},
 				}
 
 				var events []event.Event
@@ -443,20 +423,16 @@ func TestApplyTaskWithError(t *testing.T) {
 
 			ao := &fakeApplyOptions{}
 			oldAO := applyOptionsFactoryFunc
-			applyOptionsFactoryFunc = func(chan event.Event, common.ServerSideOptions, common.DryRunStrategy, util.Factory) (applyOptions, dynamic.Interface, error) {
-				return ao, nil, nil
+			applyOptionsFactoryFunc = func(chan event.Event, common.ServerSideOptions, common.DryRunStrategy, util.Factory) (applyOptions, error) {
+				return ao, nil
 			}
 			defer func() { applyOptionsFactoryFunc = oldAO }()
 
-			getClusterObj = func(d dynamic.Interface, info *resource.Info) (*unstructured.Unstructured, error) {
-				return addOwningInventory(tc.objs[0], "id"), nil
-			}
 			applyTask := &ApplyTask{
 				Objects:        tc.objs,
 				InfoHelper:     &fakeInfoHelper{},
 				Mapper:         restMapper,
 				DryRunStrategy: drs,
-				InvInfo:        &fakeInventoryInfo{},
 			}
 
 			var events []event.Event
@@ -487,194 +463,6 @@ func TestApplyTaskWithError(t *testing.T) {
 			for i, e := range events {
 				assert.Equal(t, tc.expectedEvents[i].Type, e.Type)
 				assert.Equal(t, tc.expectedEvents[i].ApplyEvent.Error.Error(), e.ApplyEvent.Error.Error())
-			}
-		})
-	}
-}
-
-var deployment = toUnstructured(map[string]interface{}{
-	"apiVersion": "apps/v1",
-	"kind":       "Deployment",
-	"metadata": map[string]interface{}{
-		"name":      "deploy",
-		"namespace": "default",
-		"uid":       "uid-deployment",
-	},
-})
-
-var deploymentObjMetadata = []object.ObjMetadata{
-	{
-		GroupKind: schema.GroupKind{
-			Group: "apps",
-			Kind:  "Deployment",
-		},
-		Name:      "deploy",
-		Namespace: "default",
-	},
-}
-
-func TestApplyTaskWithDifferentInventoryAnnotation(t *testing.T) {
-	testCases := map[string]struct {
-		obj             *unstructured.Unstructured
-		clusterObj      *unstructured.Unstructured
-		policy          inventory.InventoryPolicy
-		expectedObjects []object.ObjMetadata
-		expectedEvents  []event.Event
-	}{
-		"InventoryPolicyMustMatch with object doesn't exist on cluster - Can Apply": {
-			obj:             deployment,
-			clusterObj:      nil,
-			policy:          inventory.InventoryPolicyMustMatch,
-			expectedObjects: deploymentObjMetadata,
-			expectedEvents:  []event.Event{},
-		},
-		"InventoryPolicyMustMatch with object annotation is empty - Can't Apply": {
-			obj:             deployment,
-			clusterObj:      removeOwningInventory(deployment),
-			policy:          inventory.InventoryPolicyMustMatch,
-			expectedObjects: nil,
-			expectedEvents: []event.Event{
-				{
-					Type: event.ApplyType,
-					ApplyEvent: event.ApplyEvent{
-						Error: inventory.NewNeedAdoptionError(
-							fmt.Errorf("can't adopt an object without the annotation config.k8s.io/owning-inventory")),
-					},
-				},
-			},
-		},
-		"InventoryPolicyMustMatch with object annotation doesn't match - Can't Apply": {
-			obj:             deployment,
-			clusterObj:      addOwningInventory(deployment, "unmatchd"),
-			policy:          inventory.InventoryPolicyMustMatch,
-			expectedObjects: nil,
-			expectedEvents: []event.Event{
-				{
-					Type: event.ApplyType,
-					ApplyEvent: event.ApplyEvent{
-						Error: inventory.NewInventoryOverlapError(
-							fmt.Errorf("can't apply the resource since its annotation config.k8s.io/owning-inventory is a different inventory object")),
-					},
-				},
-			},
-		},
-		"InventoryPolicyMustMatch with object annotation matches - Can Apply": {
-			obj:             deployment,
-			clusterObj:      addOwningInventory(deployment, "id"),
-			policy:          inventory.InventoryPolicyMustMatch,
-			expectedObjects: deploymentObjMetadata,
-			expectedEvents:  nil,
-		},
-		"AdoptIfNoInventory with object doesn't exist on cluster - Can Apply": {
-			obj:             deployment,
-			clusterObj:      nil,
-			policy:          inventory.AdoptIfNoInventory,
-			expectedObjects: deploymentObjMetadata,
-			expectedEvents:  []event.Event{},
-		},
-		"AdoptIfNoInventory with object annotation is empty - Can Apply": {
-			obj:             deployment,
-			clusterObj:      removeOwningInventory(deployment),
-			policy:          inventory.AdoptIfNoInventory,
-			expectedObjects: deploymentObjMetadata,
-			expectedEvents:  []event.Event{},
-		},
-		"AdoptIfNoInventory with object annotation doesn't match - Can't Apply": {
-			obj:             deployment,
-			clusterObj:      addOwningInventory(deployment, "notmatch"),
-			policy:          inventory.AdoptIfNoInventory,
-			expectedObjects: nil,
-			expectedEvents: []event.Event{
-				{
-					Type: event.ApplyType,
-					ApplyEvent: event.ApplyEvent{
-						Error: inventory.NewInventoryOverlapError(
-							fmt.Errorf("can't apply the resource since its annotation config.k8s.io/owning-inventory is a different inventory object")),
-					},
-				},
-			},
-		},
-		"AdoptIfNoInventory with object annotation matches - Can Apply": {
-			obj:             deployment,
-			clusterObj:      addOwningInventory(deployment, "id"),
-			policy:          inventory.AdoptIfNoInventory,
-			expectedObjects: deploymentObjMetadata,
-			expectedEvents:  []event.Event{},
-		},
-		"AdoptAll with object doesn't exist on cluster - Can Apply": {
-			obj:             deployment,
-			clusterObj:      nil,
-			policy:          inventory.AdoptAll,
-			expectedObjects: deploymentObjMetadata,
-			expectedEvents:  []event.Event{},
-		},
-	}
-
-	for tn, tc := range testCases {
-		drs := common.DryRunNone
-		t.Run(tn, func(t *testing.T) {
-			eventChannel := make(chan event.Event)
-			taskContext := taskrunner.NewTaskContext(eventChannel)
-
-			restMapper := testutil.NewFakeRESTMapper(schema.GroupVersionKind{
-				Group:   "apps",
-				Version: "v1",
-				Kind:    "Deployment",
-			})
-
-			ao := &fakeApplyOptions{}
-			oldAO := applyOptionsFactoryFunc
-			applyOptionsFactoryFunc = func(chan event.Event, common.ServerSideOptions, common.DryRunStrategy, util.Factory) (applyOptions, dynamic.Interface, error) {
-				return ao, nil, nil
-			}
-			defer func() { applyOptionsFactoryFunc = oldAO }()
-
-			getClusterObj = func(d dynamic.Interface, info *resource.Info) (*unstructured.Unstructured, error) {
-				return tc.clusterObj, nil
-			}
-			applyTask := &ApplyTask{
-				Objects:         []*unstructured.Unstructured{tc.obj},
-				InfoHelper:      &fakeInfoHelper{},
-				Mapper:          restMapper,
-				DryRunStrategy:  drs,
-				InvInfo:         &fakeInventoryInfo{},
-				InventoryPolicy: tc.policy,
-			}
-
-			var events []event.Event
-			var wg sync.WaitGroup
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				for msg := range eventChannel {
-					events = append(events, msg)
-				}
-			}()
-
-			applyTask.Start(taskContext)
-			<-taskContext.TaskChannel()
-			close(eventChannel)
-			wg.Wait()
-
-			assert.Equal(t, len(tc.expectedObjects), len(ao.passedObjects))
-			for i, obj := range ao.passedObjects {
-				actual, err := object.InfoToObjMeta(obj)
-				if err != nil {
-					continue
-				}
-				assert.Equal(t, tc.expectedObjects[i], actual)
-			}
-
-			assert.Equal(t, len(tc.expectedEvents), len(events))
-			for i, e := range events {
-				assert.Equal(t, tc.expectedEvents[i].Type, e.Type)
-				assert.Equal(t, tc.expectedEvents[i].ApplyEvent.Error.Error(), e.ApplyEvent.Error.Error())
-			}
-			actualUids := taskContext.AppliedResourceUIDs()
-			assert.Equal(t, len(tc.expectedObjects), len(actualUids))
-			actualObjs := taskContext.AppliedResources()
-			if !object.SetEquals(tc.expectedObjects, actualObjs) {
-				t.Errorf("expected applied objects (%v), got (%v)", tc.expectedObjects, actualObjs)
 			}
 		})
 	}
@@ -742,51 +530,4 @@ func (f *fakeInfoHelper) BuildInfos(objs []*unstructured.Unstructured) ([]*resou
 
 func (f *fakeInfoHelper) BuildInfo(obj *unstructured.Unstructured) (*resource.Info, error) {
 	return object.UnstructuredToInfo(obj)
-}
-
-type fakeInventoryInfo struct{}
-
-func (fi *fakeInventoryInfo) Name() string {
-	return "name"
-}
-
-func (fi *fakeInventoryInfo) Namespace() string {
-	return "namespace"
-}
-
-func (fi *fakeInventoryInfo) ID() string {
-	return "id"
-}
-
-func (fi *fakeInventoryInfo) Strategy() inventory.InventoryStrategy {
-	return inventory.NameStrategy
-}
-
-func addOwningInventory(obj *unstructured.Unstructured, id string) *unstructured.Unstructured {
-	if obj == nil {
-		return nil
-	}
-	newObj := obj.DeepCopy()
-	annotations := newObj.GetAnnotations()
-	if len(annotations) == 0 {
-		annotations = make(map[string]string)
-	}
-
-	annotations["config.k8s.io/owning-inventory"] = id
-	newObj.SetAnnotations(annotations)
-	return newObj
-}
-
-func removeOwningInventory(obj *unstructured.Unstructured) *unstructured.Unstructured {
-	if obj == nil {
-		return nil
-	}
-	newObj := obj.DeepCopy()
-	annotations := newObj.GetAnnotations()
-	if len(annotations) == 0 {
-		return newObj
-	}
-	delete(annotations, "config.k8s.io/owning-inventory")
-	newObj.SetAnnotations(annotations)
-	return newObj
 }
