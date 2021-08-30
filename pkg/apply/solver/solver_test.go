@@ -101,21 +101,6 @@ metadata:
 	}
 )
 
-var inventoryObj = &unstructured.Unstructured{
-	Object: map[string]interface{}{
-		"apiVersion": "v1",
-		"kind":       "ConfigMap",
-		"metadata": map[string]interface{}{
-			"name":      "test-inventory-name",
-			"namespace": "test-inventory-namespace",
-			"labels": map[string]interface{}{
-				common.InventoryLabel: "test-inventory-label",
-			},
-		},
-	},
-}
-var localInv = inventory.WrapInventoryInfoObj(inventoryObj)
-
 func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 	testCases := map[string]struct {
 		applyObjs     []*unstructured.Unstructured
@@ -371,7 +356,7 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 				Mapper:       testutil.NewFakeRESTMapper(),
 				InvClient:    fakeInvClient,
 			}
-			tq, err := tqb.AppendApplyWaitTasks(localInv, tc.applyObjs, tc.options).Build()
+			tq, err := tqb.AppendApplyWaitTasks(tc.applyObjs, []filter.ValidationFilter{}, tc.options).Build()
 			if tc.isError {
 				assert.NotNil(t, err, "expected error, but received none")
 				return

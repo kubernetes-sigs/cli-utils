@@ -4,28 +4,24 @@
 package task
 
 import (
-	"context"
 	"io/ioutil"
 	"strings"
 
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
-	"k8s.io/client-go/dynamic"
 	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/cmd/apply"
 	cmddelete "k8s.io/kubectl/pkg/cmd/delete"
 	"k8s.io/kubectl/pkg/cmd/util"
 	applyerror "sigs.k8s.io/cli-utils/pkg/apply/error"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
+	"sigs.k8s.io/cli-utils/pkg/apply/filter"
 	"sigs.k8s.io/cli-utils/pkg/apply/info"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
 	"sigs.k8s.io/cli-utils/pkg/common"
-	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
@@ -51,18 +47,14 @@ type ApplyTask struct {
 	InfoHelper        info.InfoHelper
 	Mapper            meta.RESTMapper
 	Objects           []*unstructured.Unstructured
+	Filters           []filter.ValidationFilter
 	DryRunStrategy    common.DryRunStrategy
 	ServerSideOptions common.ServerSideOptions
-	InventoryPolicy   inventory.InventoryPolicy
-	InvInfo           inventory.InventoryInfo
 }
 
 // applyOptionsFactoryFunc is a factory function for creating a new
 // applyOptions implementation. Used to allow unit testing.
 var applyOptionsFactoryFunc = newApplyOptions
-
-// getClusterObj gets the cluster object. Used for allow unit testing.
-var getClusterObj = getClusterObject
 
 func (a *ApplyTask) Name() string {
 	return a.TaskName
@@ -90,7 +82,7 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 		klog.V(2).Infof("apply task starting (%d objects)", len(objects))
 		// Create a new instance of the applyOptions interface and use it
 		// to apply the objects.
-		ao, dynamic, err := applyOptionsFactoryFunc(taskContext.EventChannel(),
+		ao, err := applyOptionsFactoryFunc(taskContext.EventChannel(),
 			a.ServerSideOptions, a.DryRunStrategy, a.Factory)
 		if err != nil {
 			if klog.V(4).Enabled() {
@@ -115,29 +107,29 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 				taskContext.CaptureResourceFailure(id)
 				continue
 			}
-			clusterObj, err := getClusterObj(dynamic, info)
-			if err != nil {
-				if !apierrors.IsNotFound(err) {
-					if klog.V(4).Enabled() {
-						klog.Errorf("error (%s) retrieving %s/%s from cluster--continue",
-							err, info.Namespace, info.Name)
+			// Check filters to see if we're prevented from applying.
+			var filtered bool
+			var filterErr error
+			for _, filter := range a.Filters {
+				klog.V(6).Infof("apply filter %s: %s", filter.Name(), id)
+				var reason string
+				filtered, reason, filterErr = filter.Filter(obj)
+				if filterErr != nil {
+					if klog.V(5).Enabled() {
+						klog.Errorf("error during %s, (%s): %s", filter.Name(), id, filterErr)
 					}
-					taskContext.EventChannel() <- createApplyFailedEvent(id, err)
+					taskContext.EventChannel() <- createApplyFailedEvent(id, filterErr)
 					taskContext.CaptureResourceFailure(id)
-					continue
+					break
+				}
+				if filtered {
+					klog.V(4).Infof("apply filtered by %s because (%s): %s", filter.Name(), reason, id)
+					taskContext.EventChannel() <- createApplyEvent(id, event.Unchanged, obj)
+					taskContext.CaptureResourceFailure(id)
+					break
 				}
 			}
-			canApply, err := inventory.CanApply(a.InvInfo, clusterObj, a.InventoryPolicy)
-			if !canApply {
-				klog.V(5).Infof("can not apply %s/%s--continue",
-					clusterObj.GetNamespace(), clusterObj.GetName())
-				if err != nil {
-					taskContext.EventChannel() <- createApplyFailedEvent(id, err)
-				} else {
-					taskContext.EventChannel() <- createApplyEvent(id,
-						event.Unchanged, clusterObj)
-				}
-				taskContext.CaptureResourceFailure(id)
+			if filtered || filterErr != nil {
 				continue
 			}
 			ao.SetObjects([]*resource.Info{info})
@@ -170,16 +162,15 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 }
 
 func newApplyOptions(eventChannel chan event.Event, serverSideOptions common.ServerSideOptions,
-	strategy common.DryRunStrategy, factory util.Factory) (applyOptions, dynamic.Interface, error) {
+	strategy common.DryRunStrategy, factory util.Factory) (applyOptions, error) {
 	discovery, err := factory.ToDiscoveryClient()
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	dynamic, err := factory.DynamicClient()
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-
 	emptyString := ""
 	return &apply.ApplyOptions{
 		VisitedNamespaces: sets.NewString(),
@@ -209,12 +200,7 @@ func newApplyOptions(eventChannel chan event.Event, serverSideOptions common.Ser
 		}).toPrinterFunc(),
 		DynamicClient:  dynamic,
 		DryRunVerifier: resource.NewDryRunVerifier(dynamic, discovery),
-	}, dynamic, nil
-}
-
-func getClusterObject(p dynamic.Interface, info *resource.Info) (*unstructured.Unstructured, error) {
-	namespacedClient := p.Resource(info.Mapping.Resource).Namespace(info.Namespace)
-	return namespacedClient.Get(context.TODO(), info.Name, metav1.GetOptions{})
+	}, nil
 }
 
 func (a *ApplyTask) sendTaskResult(taskContext *taskrunner.TaskContext) {
@@ -269,7 +255,7 @@ func isStreamError(err error) bool {
 }
 
 func clientSideApply(info *resource.Info, eventChannel chan event.Event, strategy common.DryRunStrategy, factory util.Factory) error {
-	ao, _, err := applyOptionsFactoryFunc(eventChannel, common.ServerSideOptions{ServerSideApply: false}, strategy, factory)
+	ao, err := applyOptionsFactoryFunc(eventChannel, common.ServerSideOptions{ServerSideApply: false}, strategy, factory)
 	if err != nil {
 		return err
 	}

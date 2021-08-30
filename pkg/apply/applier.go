@@ -124,6 +124,11 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.InventoryInfo, obje
 	go func() {
 		defer close(eventChannel)
 
+		client, err := a.factory.DynamicClient()
+		if err != nil {
+			handleError(eventChannel, err)
+			return
+		}
 		mapper, err := a.factory.ToRESTMapper()
 		if err != nil {
 			handleError(eventChannel, err)
@@ -165,6 +170,15 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.InventoryInfo, obje
 			PruneTimeout:           options.PruneTimeout,
 			InventoryPolicy:        options.InventoryPolicy,
 		}
+		// Build list of apply validation filters.
+		applyFilters := []filter.ValidationFilter{
+			filter.InventoryPolicyApplyFilter{
+				Client:    client,
+				Mapper:    mapper,
+				Inv:       invInfo,
+				InvPolicy: options.InventoryPolicy,
+			},
+		}
 		// Build list of prune validation filters.
 		pruneFilters := []filter.ValidationFilter{
 			filter.PreventRemoveFilter{},
@@ -179,7 +193,7 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.InventoryInfo, obje
 		// Build the task queue by appending tasks in the proper order.
 		taskQueue, err := taskBuilder.
 			AppendInvAddTask(invInfo, applyObjs, options.DryRunStrategy).
-			AppendApplyWaitTasks(invInfo, applyObjs, opts).
+			AppendApplyWaitTasks(applyObjs, applyFilters, opts).
 			AppendPruneWaitTasks(pruneObjs, pruneFilters, opts).
 			AppendInvSetTask(invInfo, options.DryRunStrategy).
 			Build()
