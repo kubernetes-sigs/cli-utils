@@ -15,6 +15,7 @@ import (
 	"context"
 	"sort"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -165,7 +166,14 @@ func (po *PruneOptions) GetPruneObjs(inv inventory.InventoryInfo,
 	for _, pruneID := range pruneIds {
 		pruneObj, err := po.GetObject(pruneID)
 		if err != nil {
-			return nil, err
+			// If prune object is not in cluster, no need to prune it--skip.
+			if apierrors.IsNotFound(err) {
+				klog.V(4).Infof("prune obj not in cluster--skip (%s/%s)",
+					pruneID.Namespace, pruneID.Name)
+				continue
+			} else {
+				return nil, err
+			}
 		}
 		pruneObjs = append(pruneObjs, pruneObj)
 	}

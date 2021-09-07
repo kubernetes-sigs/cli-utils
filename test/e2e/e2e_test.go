@@ -124,6 +124,9 @@ var _ = Describe("Applier", func() {
 				It("Implements depends-on apply ordering", func() {
 					dependsOnTest(c, invConfig, inventoryName, namespace.GetName())
 				})
+				It("Prune retrieval error correctly handled", func() {
+					pruneRetrieveErrorTest(c, invConfig, inventoryName, namespace.GetName())
+				})
 			})
 
 			Context("Inventory policy", func() {
@@ -302,4 +305,10 @@ func newDestroyerFromInvFactory(invFactory inventory.InventoryClientFactory) *ap
 	d, err := apply.NewDestroyer(f, invClient, statusPoller)
 	Expect(err).NotTo(HaveOccurred())
 	return d
+}
+
+// Delete the passed object from the cluster using the passed client.
+func deleteObj(c client.Client, obj *unstructured.Unstructured) {
+	err := c.Delete(context.TODO(), obj)
+	Expect(err).NotTo(HaveOccurred())
 }
