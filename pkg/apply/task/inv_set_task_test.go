@@ -117,7 +117,7 @@ func TestInvSetTask(t *testing.T) {
 				PrevInventory: prevInventory,
 			}
 			for _, applyObj := range tc.appliedObjs {
-				context.ResourceApplied(applyObj, "unusued-uid", int64(0))
+				context.ResourceApplied(applyObj, nil)
 			}
 			for _, applyFailure := range tc.applyFailures {
 				context.CaptureResourceFailure(applyFailure)

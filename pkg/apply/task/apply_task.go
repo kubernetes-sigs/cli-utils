@@ -4,6 +4,7 @@
 package task
 
 import (
+	"fmt"
 	"io/ioutil"
 	"strings"
 
@@ -23,6 +24,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/object"
+	"sigs.k8s.io/cli-utils/pkg/object/dependson"
 )
 
 // applyOptions defines the two key functions on the ApplyOptions
@@ -132,6 +134,11 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 			if filtered || filterErr != nil {
 				continue
 			}
+			// Before applying, fill in apply-time mutations for this object.
+			if err := mutate(obj, taskContext); err != nil {
+				klog.V(5).Infof("apply mutate error--skip: %s/%s", id.Namespace, id.Name)
+				continue
+			}
 			ao.SetObjects([]*resource.Info{info})
 			klog.V(5).Infof("applying %s/%s...", info.Namespace, info.Name)
 			err = ao.Run()
@@ -149,16 +156,38 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 					applyerror.NewApplyRunError(err))
 				taskContext.CaptureResourceFailure(id)
 			} else if info.Object != nil {
-				acc, err := meta.Accessor(info.Object)
-				if err == nil {
-					uid := acc.GetUID()
-					gen := acc.GetGeneration()
-					taskContext.ResourceApplied(id, uid, gen)
-				}
+				klog.V(5).Infof("successfully applied: %s/%s", info.Namespace, info.Name)
+				taskContext.ResourceApplied(id, object.InfoToUnstructured(info))
 			}
 		}
 		a.sendTaskResult(taskContext)
 	}()
+}
+
+// Mutate updates the passed object with values found in applied objects
+// stored in the passed taskContext. Returns an error if one occurs
+// during the mutation.
+func mutate(obj *unstructured.Unstructured, taskContext *taskrunner.TaskContext) error {
+	if found := dependson.HasAnnotation(obj); !found {
+		return nil
+	}
+	dependsOnIds, err := dependson.ReadAnnotation(obj)
+	if err != nil {
+		return err
+	}
+	for _, depID := range dependsOnIds {
+		depObj := taskContext.GetAppliedResource(depID)
+		if depObj == nil {
+			return fmt.Errorf("expected obj to already be applied: %s/%s", depID.Namespace, depID.Name)
+		}
+		// Retrieve depends-on object here to get the updated values. Check
+		// the "Ready" state after retrieval. If it is not "Ready", then the
+		// WaitTask timed out and this object failed--return an error. There
+		// is no polling required.
+		klog.Infof("mutate %s/%s field here: source depends-on object: %s/%s",
+			obj.GetNamespace(), obj.GetName(), depObj.GetNamespace(), depObj.GetName())
+	}
+	return nil
 }
 
 func newApplyOptions(eventChannel chan event.Event, serverSideOptions common.ServerSideOptions,
