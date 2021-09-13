@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/cli-utils/pkg/object"
+	"sigs.k8s.io/cli-utils/pkg/object/dependson"
 )
 
 // SortObjs returns a slice of the sets of objects to apply (in order).
@@ -73,7 +74,7 @@ func addExplicitEdges(g *Graph, objs []*unstructured.Unstructured) {
 		id := object.UnstructuredToObjMetaOrDie(obj)
 		klog.V(3).Infof("adding vertex: %s", id)
 		g.AddVertex(id)
-		deps, err := object.DependsOnObjs(obj)
+		deps, err := dependson.ReadAnnotation(obj)
 		if err == nil {
 			for _, dep := range deps {
 				klog.V(3).Infof("adding edge from: %s, to: %s", id, dep)

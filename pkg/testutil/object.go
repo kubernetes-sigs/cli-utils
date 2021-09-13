@@ -6,7 +6,6 @@
 package testutil
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -14,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubectl/pkg/scheme"
 	"sigs.k8s.io/cli-utils/pkg/object"
+	"sigs.k8s.io/cli-utils/pkg/object/dependson"
 )
 
 var codec = scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
@@ -101,37 +101,15 @@ type dependsOnMutator struct {
 	depObjs []*unstructured.Unstructured
 }
 
-// Mutate for dependsOnMutator adds the stored object dependencies
-// in the depends-on annotation for the passed mutated object.
+// Mutate writes a depends-on annotation on the supplied object. The value of
+// the annotation is a set of dependencies referencing the dependsOnMutator's
+// depObjs.
 func (d dependsOnMutator) Mutate(u *unstructured.Unstructured) {
-	// Add depends on object annotation to passed object.
-	var objStr string
-	// Iterate through all dependent objects to create the
-	// depends-on annotation string.
-	for i, depObj := range d.depObjs {
-		if i > 0 {
-			objStr += ","
-		}
-		groupKind := depObj.GroupVersionKind().GroupKind()
-		group := groupKind.Group
-		kind := groupKind.Kind
-		name := depObj.GetName()
-		if object.IsNamespaced(depObj) {
-			objStr += fmt.Sprintf("%s/namespaces/%s/%s/%s",
-				group, depObj.GetNamespace(), kind, name)
-		} else {
-			objStr += fmt.Sprintf("%s/%s/%s", group, kind, name)
-		}
-	}
-	annos, found, err := unstructured.NestedStringMap(u.Object, "metadata", "annotations")
+	objMetas, err := object.UnstructuredsToObjMetas(d.depObjs)
 	if !assert.NoError(d.t, err) {
 		d.t.FailNow()
 	}
-	if !found {
-		annos = make(map[string]string)
-	}
-	annos[object.DependsOnAnnotation] = objStr
-	err = unstructured.SetNestedStringMap(u.Object, annos, "metadata", "annotations")
+	err = dependson.WriteAnnotation(u, objMetas)
 	if !assert.NoError(d.t, err) {
 		d.t.FailNow()
 	}
