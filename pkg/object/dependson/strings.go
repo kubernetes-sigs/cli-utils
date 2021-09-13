@@ -26,18 +26,18 @@ const (
 	namespacesField = "namespaces"
 )
 
-// MarshalDependencySet formats the passed dependency set as a string.
+// FormatDependencySet formats the passed dependency set as a string.
 //
 // Object references are separated by ','.
 //
 // Returns the formatted DependencySet or an error if unable to format.
-func MarshalDependencySet(depSet DependencySet) (string, error) {
+func FormatDependencySet(depSet DependencySet) (string, error) {
 	var dependsOnStr string
 	for i, depObj := range depSet {
 		if i > 0 {
 			dependsOnStr += annotationSeparator
 		}
-		objStr, err := MarshalObjMetadata(depObj)
+		objStr, err := FormatObjMetadata(depObj)
 		if err != nil {
 			return "", fmt.Errorf("failed to format object metadata (index: %d): %w", i, err)
 		}
@@ -46,16 +46,16 @@ func MarshalDependencySet(depSet DependencySet) (string, error) {
 	return dependsOnStr, nil
 }
 
-// UnmarshalDependencySet parses the passed string as a set of object
+// ParseDependencySet parses the passed string as a set of object
 // references.
 //
 // Object references are separated by ','.
 //
 // Returns the parsed DependencySet or an error if unable to parse.
-func UnmarshalDependencySet(depsStr string) (DependencySet, error) {
+func ParseDependencySet(depsStr string) (DependencySet, error) {
 	objs := DependencySet{}
 	for _, objStr := range strings.Split(depsStr, annotationSeparator) {
-		obj, err := UnmarshalObjMetadata(objStr)
+		obj, err := ParseObjMetadata(objStr)
 		if err != nil {
 			return objs, fmt.Errorf("failed to parse object metadata: %w", err)
 		}
@@ -64,7 +64,7 @@ func UnmarshalDependencySet(depsStr string) (DependencySet, error) {
 	return objs, nil
 }
 
-// MarshalObjMetadata formats the passed object metadata as a string.
+// FormatObjMetadata formats the passed object metadata as a string.
 //
 // Object references can have either three fields (cluster-scoped object) or
 // five fields (namespace-scoped object).
@@ -78,7 +78,7 @@ func UnmarshalDependencySet(depsStr string) (DependencySet, error) {
 // Group and namespace may be empty, but name and kind may not.
 //
 // Returns the formatted ObjMetadata string or an error if unable to format.
-func MarshalObjMetadata(obj object.ObjMetadata) (string, error) {
+func FormatObjMetadata(obj object.ObjMetadata) (string, error) {
 	gk := obj.GroupKind
 	// group and namespace are allowed to be empty, but name and kind are not
 	if gk.Kind == "" {
@@ -93,7 +93,7 @@ func MarshalObjMetadata(obj object.ObjMetadata) (string, error) {
 	return fmt.Sprintf("%s/%s/%s", gk.Group, gk.Kind, obj.Name), nil
 }
 
-// UnmarshalObjMetadata parses the passed string as a object metadata.
+// ParseObjMetadata parses the passed string as a object metadata.
 //
 // Object references can have either three fields (cluster-scoped object) or
 // five fields (namespace-scoped object).
@@ -107,7 +107,7 @@ func MarshalObjMetadata(obj object.ObjMetadata) (string, error) {
 // Group and namespace may be empty, but name and kind may not.
 //
 // Returns the parsed ObjMetadata or an error if unable to parse.
-func UnmarshalObjMetadata(objStr string) (object.ObjMetadata, error) {
+func ParseObjMetadata(objStr string) (object.ObjMetadata, error) {
 	var obj object.ObjMetadata
 	var group, kind, namespace, name string
 	objStr = strings.TrimSpace(objStr)

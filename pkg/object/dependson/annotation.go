@@ -40,7 +40,7 @@ func ReadAnnotation(u *unstructured.Unstructured) (DependencySet, error) {
 	klog.V(5).Infof("depends-on annotation found for %s/%s: %q",
 		u.GetNamespace(), u.GetName(), depSetStr)
 
-	depSet, err := UnmarshalDependencySet(depSetStr)
+	depSet, err := ParseDependencySet(depSetStr)
 	if err != nil {
 		return depSet, fmt.Errorf("failed to parse dependency set: %w", err)
 	}
@@ -59,7 +59,7 @@ func WriteAnnotation(obj *unstructured.Unstructured, depSet DependencySet) error
 		return errors.New("dependency set is empty")
 	}
 
-	depSetStr, err := MarshalDependencySet(depSet)
+	depSetStr, err := FormatDependencySet(depSet)
 	if err != nil {
 		return fmt.Errorf("failed to format dependency set: %w", err)
 	}

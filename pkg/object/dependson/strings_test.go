@@ -29,7 +29,7 @@ var (
 	}
 )
 
-func TestUnmarshalDependencySet(t *testing.T) {
+func TestParseDependencySet(t *testing.T) {
 	testCases := map[string]struct {
 		annotation string
 		expected   DependencySet
@@ -75,7 +75,7 @@ func TestUnmarshalDependencySet(t *testing.T) {
 
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
-			actual, err := UnmarshalDependencySet(tc.annotation)
+			actual, err := ParseDependencySet(tc.annotation)
 			if err == nil && tc.isError {
 				t.Fatalf("expected error, but received none")
 			}
@@ -89,7 +89,7 @@ func TestUnmarshalDependencySet(t *testing.T) {
 	}
 }
 
-func TestUnmarshalObjMetadata(t *testing.T) {
+func TestParseObjMetadata(t *testing.T) {
 	testCases := map[string]struct {
 		metaStr  string
 		expected object.ObjMetadata
@@ -135,7 +135,7 @@ func TestUnmarshalObjMetadata(t *testing.T) {
 
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
-			actual, err := UnmarshalObjMetadata(tc.metaStr)
+			actual, err := ParseObjMetadata(tc.metaStr)
 			if err == nil && tc.isError {
 				t.Fatalf("expected error, but received none")
 			}
@@ -149,7 +149,7 @@ func TestUnmarshalObjMetadata(t *testing.T) {
 	}
 }
 
-func TestMarshalDependencySet(t *testing.T) {
+func TestFormatDependencySet(t *testing.T) {
 	testCases := map[string]struct {
 		depSet   DependencySet
 		expected string
@@ -203,7 +203,7 @@ func TestMarshalDependencySet(t *testing.T) {
 
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
-			actual, err := MarshalDependencySet(tc.depSet)
+			actual, err := FormatDependencySet(tc.depSet)
 			if err == nil && tc.isError {
 				t.Fatalf("expected error, but received none")
 			}
@@ -217,7 +217,7 @@ func TestMarshalDependencySet(t *testing.T) {
 	}
 }
 
-func TestMarshalObjMetadata(t *testing.T) {
+func TestFormatObjMetadata(t *testing.T) {
 	testCases := map[string]struct {
 		objMeta  object.ObjMetadata
 		expected string
@@ -262,7 +262,7 @@ func TestMarshalObjMetadata(t *testing.T) {
 
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
-			actual, err := MarshalObjMetadata(tc.objMeta)
+			actual, err := FormatObjMetadata(tc.objMeta)
 			if err == nil && tc.isError {
 				t.Fatalf("expected error, but received none")
 			}
