@@ -109,9 +109,11 @@ func dependsOnTest(_ client.Client, invConfig InventoryConfig, inventoryName, na
 	Expect(err).ToNot(HaveOccurred())
 
 	By("destroy resources in opposite order")
+	// TODO: test timeout/cancel behavior
+	ctx := context.TODO()
 	destroyer := invConfig.DestroyerFactoryFunc()
 	options := apply.DestroyerOptions{InventoryPolicy: inventory.AdoptIfNoInventory}
-	destroyerEvents := runCollectNoErr(destroyer.Run(inv, options))
+	destroyerEvents := runCollectNoErr(destroyer.Run(ctx, inv, options))
 	err = testutil.VerifyEvents([]testutil.ExpEvent{
 		{
 			// Initial event

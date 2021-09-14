@@ -51,11 +51,5 @@ func extractDeferredDiscoveryRESTMapper(mapper meta.RESTMapper) (*restmapper.Def
 }
 
 func (r *ResetRESTMapperTask) sendTaskResult(taskContext *taskrunner.TaskContext, err error) {
-	taskContext.TaskChannel() <- taskrunner.TaskResult{
-		Err: err,
-	}
+	taskContext.TaskChannel() <- taskrunner.TaskResult{Err: err}
 }
-
-// ClearTimeout doesn't do anything as ResetRESTMapperTask doesn't support
-// timeouts.
-func (r *ResetRESTMapperTask) ClearTimeout() {}

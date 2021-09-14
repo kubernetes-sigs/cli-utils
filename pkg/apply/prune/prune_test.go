@@ -144,17 +144,17 @@ var preventDelete = &unstructured.Unstructured{
 // Options with different dry-run values.
 var (
 	defaultOptions = Options{
-		DryRunStrategy:    common.DryRunNone,
-		PropagationPolicy: metav1.DeletePropagationBackground,
+		DryRunStrategy:            common.DryRunNone,
+		DeletionPropagationPolicy: metav1.DeletePropagationBackground,
 	}
 	defaultOptionsDestroy = Options{
-		DryRunStrategy:    common.DryRunNone,
-		PropagationPolicy: metav1.DeletePropagationBackground,
-		Destroy:           true,
+		DryRunStrategy:            common.DryRunNone,
+		DeletionPropagationPolicy: metav1.DeletePropagationBackground,
+		Destroy:                   true,
 	}
 	clientDryRunOptions = Options{
-		DryRunStrategy:    common.DryRunClient,
-		PropagationPolicy: metav1.DeletePropagationBackground,
+		DryRunStrategy:            common.DryRunClient,
+		DeletionPropagationPolicy: metav1.DeletePropagationBackground,
 	}
 )
 
@@ -257,9 +257,9 @@ func TestPrune(t *testing.T) {
 		"Server dry run still deleted event": {
 			pruneObjs: []*unstructured.Unstructured{pod},
 			options: Options{
-				DryRunStrategy:    common.DryRunServer,
-				PropagationPolicy: metav1.DeletePropagationBackground,
-				Destroy:           true,
+				DryRunStrategy:            common.DryRunServer,
+				DeletionPropagationPolicy: metav1.DeletePropagationBackground,
+				Destroy:                   true,
 			},
 			expectedEvents: []testutil.ExpEvent{
 				{
@@ -386,7 +386,7 @@ func TestPrune(t *testing.T) {
 			pruneIds, err := object.UnstructuredsToObjMetas(tc.pruneObjs)
 			require.NoError(t, err)
 
-			po := PruneOptions{
+			po := Pruner{
 				InvClient: inventory.NewFakeInventoryClient(pruneIds),
 				Client:    fake.NewSimpleDynamicClient(scheme.Scheme, objs...),
 				Mapper: testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme,
@@ -395,11 +395,11 @@ func TestPrune(t *testing.T) {
 			// The event channel can not block; make sure its bigger than all
 			// the events that can be put on it.
 			eventChannel := make(chan event.Event, len(tc.pruneObjs)+1)
-			taskContext := taskrunner.NewTaskContext(eventChannel)
+			taskContext := taskrunner.NewTaskContext(context.TODO(), eventChannel)
 			err = func() error {
 				defer close(eventChannel)
 				// Run the prune and validate.
-				return po.Prune(tc.pruneObjs, tc.pruneFilters, taskContext, tc.options)
+				return po.Prune(taskContext, tc.pruneObjs, tc.pruneFilters, tc.options)
 			}()
 
 			if err != nil {
@@ -473,7 +473,7 @@ func TestPruneWithErrors(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			pruneIds, err := object.UnstructuredsToObjMetas(tc.pruneObjs)
 			require.NoError(t, err)
-			po := PruneOptions{
+			po := Pruner{
 				InvClient: inventory.NewFakeInventoryClient(pruneIds),
 				// Set up the fake dynamic client to recognize all objects, and the RESTMapper.
 				Client: &fakeDynamicClient{
@@ -485,7 +485,7 @@ func TestPruneWithErrors(t *testing.T) {
 			// The event channel can not block; make sure its bigger than all
 			// the events that can be put on it.
 			eventChannel := make(chan event.Event, len(tc.pruneObjs))
-			taskContext := taskrunner.NewTaskContext(eventChannel)
+			taskContext := taskrunner.NewTaskContext(context.TODO(), eventChannel)
 			err = func() error {
 				defer close(eventChannel)
 				var opts Options
@@ -495,7 +495,7 @@ func TestPruneWithErrors(t *testing.T) {
 					opts = defaultOptions
 				}
 				// Run the prune and validate.
-				return po.Prune(tc.pruneObjs, []filter.ValidationFilter{}, taskContext, opts)
+				return po.Prune(taskContext, tc.pruneObjs, []filter.ValidationFilter{}, opts)
 			}()
 			if err != nil {
 				t.Fatalf("Unexpected error during Prune(): %#v", err)
@@ -558,14 +558,19 @@ func TestGetPruneObjs(t *testing.T) {
 			for _, obj := range tc.prevInventory {
 				objs = append(objs, obj)
 			}
-			po := PruneOptions{
+			po := Pruner{
 				InvClient: inventory.NewFakeInventoryClient(object.UnstructuredsToObjMetasOrDie(tc.prevInventory)),
 				Client:    fake.NewSimpleDynamicClient(scheme.Scheme, objs...),
 				Mapper: testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme,
 					scheme.Scheme.PrioritizedVersionsAllGroups()...),
 			}
 			currentInventory := createInventoryInfo(tc.prevInventory...)
-			actualObjs, err := po.GetPruneObjs(currentInventory, tc.localObjs, Options{})
+			actualObjs, err := po.GetPruneObjs(
+				context.TODO(),
+				currentInventory,
+				tc.localObjs,
+				Options{},
+			)
 			if err != nil {
 				t.Fatalf("unexpected error %s returned", err)
 			}
@@ -611,7 +616,7 @@ func TestPrune_PropagationPolicy(t *testing.T) {
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			captureClient := &optionsCaptureNamespaceClient{}
-			po := PruneOptions{
+			po := Pruner{
 				InvClient: inventory.NewFakeInventoryClient([]object.ObjMetadata{}),
 				Client: &fakeDynamicClient{
 					resourceInterface: captureClient,
@@ -621,10 +626,15 @@ func TestPrune_PropagationPolicy(t *testing.T) {
 			}
 
 			eventChannel := make(chan event.Event, 1)
-			taskContext := taskrunner.NewTaskContext(eventChannel)
-			err := po.Prune([]*unstructured.Unstructured{pdb}, []filter.ValidationFilter{}, taskContext, Options{
-				PropagationPolicy: tc.propagationPolicy,
-			})
+			taskContext := taskrunner.NewTaskContext(context.TODO(), eventChannel)
+			err := po.Prune(
+				taskContext,
+				[]*unstructured.Unstructured{pdb},
+				[]filter.ValidationFilter{},
+				Options{
+					DeletionPropagationPolicy: tc.propagationPolicy,
+				},
+			)
 			assert.NoError(t, err)
 			require.NotNil(t, captureClient.options.PropagationPolicy)
 			assert.Equal(t, tc.propagationPolicy, *captureClient.options.PropagationPolicy)

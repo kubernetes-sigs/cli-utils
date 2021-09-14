@@ -4,14 +4,12 @@
 package task
 
 import (
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/filter"
 	"sigs.k8s.io/cli-utils/pkg/apply/prune"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
-	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
@@ -21,14 +19,10 @@ import (
 type PruneTask struct {
 	TaskName string
 
-	PruneOptions      *prune.PruneOptions
-	Objects           []*unstructured.Unstructured
-	Filters           []filter.ValidationFilter
-	DryRunStrategy    common.DryRunStrategy
-	PropagationPolicy metav1.DeletionPropagation
-	// True if we are destroying, which deletes the inventory object
-	// as well (possibly) the inventory namespace.
-	Destroy bool
+	Options      prune.Options
+	PruneOptions *prune.Pruner
+	Objects      []*unstructured.Unstructured
+	Filters      []filter.ValidationFilter
 }
 
 func (p *PruneTask) Name() string {
@@ -37,7 +31,7 @@ func (p *PruneTask) Name() string {
 
 func (p *PruneTask) Action() event.ResourceAction {
 	action := event.PruneAction
-	if p.Destroy {
+	if p.Options.Destroy {
 		action = event.DeleteAction
 	}
 	return action
@@ -60,17 +54,15 @@ func (p *PruneTask) Start(taskContext *taskrunner.TaskContext) {
 			CurrentUIDs: taskContext.AppliedResourceUIDs(),
 		}
 		p.Filters = append(p.Filters, uidFilter)
-		err := p.PruneOptions.Prune(p.Objects,
-			p.Filters, taskContext, prune.Options{
-				DryRunStrategy:    p.DryRunStrategy,
-				PropagationPolicy: p.PropagationPolicy,
-				Destroy:           p.Destroy,
-			})
-		taskContext.TaskChannel() <- taskrunner.TaskResult{
-			Err: err,
-		}
+		err := p.PruneOptions.Prune(
+			taskContext,
+			p.Objects,
+			p.Filters,
+			p.Options,
+		)
+		taskContext.TaskChannel() <- taskrunner.TaskResult{Err: err}
 	}()
 }
 
-// ClearTimeout is not supported by the PruneTask.
-func (p *PruneTask) ClearTimeout() {}
+// OnStatusEvent is not supported by PruneTask.
+func (p *PruneTask) OnStatusEvent(taskContext *taskrunner.TaskContext, e event.StatusEvent) {}

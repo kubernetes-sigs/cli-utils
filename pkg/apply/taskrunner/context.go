@@ -4,6 +4,8 @@
 package taskrunner
 
 import (
+	"context"
+
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
@@ -11,22 +13,28 @@ import (
 )
 
 // NewTaskContext returns a new TaskContext
-func NewTaskContext(eventChannel chan event.Event) *TaskContext {
+func NewTaskContext(ctx context.Context, eventChannel chan event.Event) *TaskContext {
 	return &TaskContext{
-		taskChannel:      make(chan TaskResult),
-		eventChannel:     eventChannel,
-		appliedResources: make(map[object.ObjMetadata]applyInfo),
-		failedResources:  make(map[object.ObjMetadata]struct{}),
-		pruneFailures:    make(map[object.ObjMetadata]struct{}),
+		context:                 ctx,
+		taskChannel:             make(chan TaskResult),
+		eventChannel:            eventChannel,
+		resourceStatusCollector: NewResourceStatusCollector(),
+		appliedResources:        make(map[object.ObjMetadata]applyInfo),
+		failedResources:         make(map[object.ObjMetadata]struct{}),
+		pruneFailures:           make(map[object.ObjMetadata]struct{}),
 	}
 }
 
 // TaskContext defines a context that is passed between all
 // the tasks that is in a taskqueue.
 type TaskContext struct {
+	context context.Context
+
 	taskChannel chan TaskResult
 
 	eventChannel chan event.Event
+
+	resourceStatusCollector *ResourceStatusCollector
 
 	appliedResources map[object.ObjMetadata]applyInfo
 
@@ -37,12 +45,20 @@ type TaskContext struct {
 	pruneFailures map[object.ObjMetadata]struct{}
 }
 
+func (tc *TaskContext) Context() context.Context {
+	return tc.context
+}
+
 func (tc *TaskContext) TaskChannel() chan TaskResult {
 	return tc.taskChannel
 }
 
-func (tc *TaskContext) EventChannel() chan event.Event {
+func (tc *TaskContext) EventChannel() chan<- event.Event {
 	return tc.eventChannel
+}
+
+func (tc *TaskContext) ResourceStatusCollector() *ResourceStatusCollector {
+	return tc.resourceStatusCollector
 }
 
 // ResourceApplied updates the context with information about the

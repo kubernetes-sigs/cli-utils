@@ -4,6 +4,7 @@
 package filter
 
 import (
+	"context"
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -27,7 +28,7 @@ func (lnf LocalNamespacesFilter) Name() string {
 // because the it is a namespace that objects still reside in; otherwise
 // returns false. This filter should not be added to the list of filters
 // for "destroying", since every object is being delete. Never returns an error.
-func (lnf LocalNamespacesFilter) Filter(obj *unstructured.Unstructured) (bool, string, error) {
+func (lnf LocalNamespacesFilter) Filter(ctx context.Context, obj *unstructured.Unstructured) (bool, string, error) {
 	id := object.UnstructuredToObjMetaOrDie(obj)
 	if id.GroupKind == object.CoreV1Namespace.GroupKind() &&
 		lnf.LocalNamespaces.Has(id.Name) {

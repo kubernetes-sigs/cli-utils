@@ -4,6 +4,7 @@
 package filter
 
 import (
+	"context"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -71,7 +72,8 @@ func TestPreventDeleteAnnotation(t *testing.T) {
 			filter := PreventRemoveFilter{}
 			obj := defaultObj.DeepCopy()
 			obj.SetAnnotations(tc.annotations)
-			actual, reason, err := filter.Filter(obj)
+			ctx := context.TODO()
+			actual, reason, err := filter.Filter(ctx, obj)
 			if err != nil {
 				t.Fatalf("PreventRemoveFilter unexpected error (%s)", err)
 			}

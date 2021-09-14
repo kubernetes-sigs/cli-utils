@@ -72,6 +72,17 @@ type StatusRunner struct {
 // poller to compute status for each of the resources. One of the printer
 // implementations takes care of printing the output.
 func (r *StatusRunner) runE(cmd *cobra.Command, args []string) error {
+	// If specified, cancel with timeout.
+	// Otherwise, cancel when completed to clean up timer.
+	ctx := cmd.Context()
+	var cancel func()
+	if r.timeout != 0 {
+		ctx, cancel = context.WithTimeout(ctx, r.timeout)
+	} else {
+		ctx, cancel = context.WithCancel(ctx)
+	}
+	defer cancel()
+
 	_, err := common.DemandOneDirectory(args)
 	if err != nil {
 		return err
@@ -124,17 +135,6 @@ func (r *StatusRunner) runE(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("error creating printer: %w", err)
 	}
-
-	// If the user has specified a timeout, we create a context with timeout,
-	// otherwise we create a context with cancel.
-	ctx := context.Background()
-	var cancel func()
-	if r.timeout != 0 {
-		ctx, cancel = context.WithTimeout(ctx, r.timeout)
-	} else {
-		ctx, cancel = context.WithCancel(ctx)
-	}
-	defer cancel()
 
 	// Choose the appropriate ObserverFunc based on the criteria for when
 	// the command should exit.

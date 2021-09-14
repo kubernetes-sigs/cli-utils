@@ -34,12 +34,12 @@ func (ipaf InventoryPolicyApplyFilter) Name() string {
 // Filter returns true if the passed object should be filtered (NOT applied) and
 // a filter reason string; false otherwise. Returns an error if one occurred
 // during the filter calculation
-func (ipaf InventoryPolicyApplyFilter) Filter(obj *unstructured.Unstructured) (bool, string, error) {
+func (ipaf InventoryPolicyApplyFilter) Filter(ctx context.Context, obj *unstructured.Unstructured) (bool, string, error) {
 	if obj == nil {
 		return true, "missing object", nil
 	}
 	// Object must be retrieved from the cluster to get the inventory id.
-	clusterObj, err := ipaf.getObject(object.UnstructuredToObjMetaOrDie(obj))
+	clusterObj, err := ipaf.getObject(ctx, object.UnstructuredToObjMetaOrDie(obj))
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			// This simply means the object hasn't been created yet.
@@ -60,7 +60,7 @@ func (ipaf InventoryPolicyApplyFilter) Filter(obj *unstructured.Unstructured) (b
 }
 
 // getObject retrieves the passed object from the cluster, or an error if one occurred.
-func (ipaf InventoryPolicyApplyFilter) getObject(id object.ObjMetadata) (*unstructured.Unstructured, error) {
+func (ipaf InventoryPolicyApplyFilter) getObject(ctx context.Context, id object.ObjMetadata) (*unstructured.Unstructured, error) {
 	mapping, err := ipaf.Mapper.RESTMapping(id.GroupKind)
 	if err != nil {
 		return nil, err
@@ -69,5 +69,5 @@ func (ipaf InventoryPolicyApplyFilter) getObject(id object.ObjMetadata) (*unstru
 	if err != nil {
 		return nil, err
 	}
-	return namespacedClient.Get(context.TODO(), id.Name, metav1.GetOptions{})
+	return namespacedClient.Get(ctx, id.Name, metav1.GetOptions{})
 }

@@ -4,6 +4,7 @@
 package task
 
 import (
+	"context"
 	"testing"
 
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
@@ -105,7 +106,7 @@ func TestInvSetTask(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			client := inventory.NewFakeInventoryClient([]object.ObjMetadata{})
 			eventChannel := make(chan event.Event)
-			context := taskrunner.NewTaskContext(eventChannel)
+			context := taskrunner.NewTaskContext(context.TODO(), eventChannel)
 			prevInventory := make(map[object.ObjMetadata]bool, len(tc.prevInventory))
 			for _, prevInvID := range tc.prevInventory {
 				prevInventory[prevInvID] = true

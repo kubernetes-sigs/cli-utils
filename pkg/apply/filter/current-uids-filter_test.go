@@ -4,6 +4,7 @@
 package filter
 
 import (
+	"context"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/types"
@@ -50,7 +51,8 @@ func TestCurrentUIDFilter(t *testing.T) {
 			}
 			obj := defaultObj.DeepCopy()
 			obj.SetUID(types.UID(tc.objUID))
-			actual, reason, err := filter.Filter(obj)
+			ctx := context.TODO()
+			actual, reason, err := filter.Filter(ctx, obj)
 			if err != nil {
 				t.Fatalf("CurrentUIDFilter unexpected error (%s)", err)
 			}

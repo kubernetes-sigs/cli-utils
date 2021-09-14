@@ -236,12 +236,15 @@ deployment.apps/foo is InProgress: inProgress
 				timeout:   tc.timeout,
 			}
 
-			cmd := &cobra.Command{}
+			cmd := &cobra.Command{
+				RunE: runner.runE,
+			}
 			cmd.SetIn(strings.NewReader(tc.input))
 			var buf bytes.Buffer
 			cmd.SetOut(&buf)
 
-			err := runner.runE(cmd, []string{})
+			// execute with cobra to handle setting the default context
+			err := cmd.Execute()
 
 			if tc.expectedErrMsg != "" {
 				if !assert.Error(t, err) {

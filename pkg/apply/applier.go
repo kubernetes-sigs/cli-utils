@@ -30,7 +30,7 @@ import (
 
 // NewApplier returns a new Applier.
 func NewApplier(factory cmdutil.Factory, invClient inventory.InventoryClient, statusPoller poller.Poller) (*Applier, error) {
-	pruneOpts, err := prune.NewPruneOptions(factory, invClient)
+	pruneOpts, err := prune.NewPruner(factory, invClient)
 	if err != nil {
 		return nil, err
 	}
@@ -39,7 +39,7 @@ func NewApplier(factory cmdutil.Factory, invClient inventory.InventoryClient, st
 		return nil, err
 	}
 	return &Applier{
-		pruneOptions: pruneOpts,
+		pruner:       pruneOpts,
 		statusPoller: statusPoller,
 		factory:      factory,
 		invClient:    invClient,
@@ -58,7 +58,7 @@ func NewApplier(factory cmdutil.Factory, invClient inventory.InventoryClient, st
 // parameters and/or the set of resources that needs to be applied to the
 // cluster, different sets of tasks might be needed.
 type Applier struct {
-	pruneOptions *prune.PruneOptions
+	pruner       *prune.Pruner
 	statusPoller poller.Poller
 	factory      cmdutil.Factory
 	invClient    inventory.InventoryClient
@@ -67,8 +67,12 @@ type Applier struct {
 
 // prepareObjects returns the set of objects to apply and to prune or
 // an error if one occurred.
-func (a *Applier) prepareObjects(localInv inventory.InventoryInfo, localObjs []*unstructured.Unstructured,
-	o Options) ([]*unstructured.Unstructured, []*unstructured.Unstructured, error) {
+func (a *Applier) prepareObjects(
+	ctx context.Context,
+	localInv inventory.InventoryInfo,
+	localObjs []*unstructured.Unstructured,
+	opts Options,
+) ([]*unstructured.Unstructured, []*unstructured.Unstructured, error) {
 	if localInv == nil {
 		return nil, nil, fmt.Errorf("the local inventory can't be nil")
 	}
@@ -99,9 +103,12 @@ func (a *Applier) prepareObjects(localInv inventory.InventoryInfo, localObjs []*
 			}
 		}
 	}
-	pruneObjs, err := a.pruneOptions.GetPruneObjs(localInv, localObjs, prune.Options{
-		DryRunStrategy: o.DryRunStrategy,
-	})
+	pruneObjs, err := a.pruner.GetPruneObjs(
+		ctx,
+		localInv,
+		localObjs,
+		opts.PruneOptions(),
+	)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -117,10 +124,10 @@ func (a *Applier) prepareObjects(localInv inventory.InventoryInfo, localObjs []*
 // before all the given resources have been applied to the cluster. Any
 // cancellation or timeout will only affect how long we Wait for the
 // resources to become current.
-func (a *Applier) Run(ctx context.Context, invInfo inventory.InventoryInfo, objects []*unstructured.Unstructured, options Options) <-chan event.Event {
+func (a *Applier) Run(ctx context.Context, invInfo inventory.InventoryInfo, objects []*unstructured.Unstructured, opts Options) <-chan event.Event {
 	klog.V(4).Infof("apply run for %d objects", len(objects))
 	eventChannel := make(chan event.Event)
-	setDefaults(&options)
+	setDefaults(&opts)
 	go func() {
 		defer close(eventChannel)
 
@@ -144,7 +151,7 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.InventoryInfo, obje
 			return
 		}
 
-		applyObjs, pruneObjs, err := a.prepareObjects(invInfo, objects, options)
+		applyObjs, pruneObjs, err := a.prepareObjects(ctx, invInfo, objects, opts)
 		if err != nil {
 			handleError(eventChannel, err)
 			return
@@ -154,29 +161,21 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.InventoryInfo, obje
 		// Fetch the queue (channel) of tasks that should be executed.
 		klog.V(4).Infoln("applier building task queue...")
 		taskBuilder := &solver.TaskQueueBuilder{
-			PruneOptions: a.pruneOptions,
-			Factory:      a.factory,
-			InfoHelper:   a.infoHelper,
-			Mapper:       mapper,
-			InvClient:    a.invClient,
-			Destroy:      false,
+			Pruner:     a.pruner,
+			Factory:    a.factory,
+			InfoHelper: a.infoHelper,
+			Mapper:     mapper,
+			InvClient:  a.invClient,
+			Destroy:    false, // DO NOT remove pruned resources from inventory
 		}
-		opts := solver.Options{
-			ServerSideOptions:      options.ServerSideOptions,
-			ReconcileTimeout:       options.ReconcileTimeout,
-			Prune:                  !options.NoPrune,
-			DryRunStrategy:         options.DryRunStrategy,
-			PrunePropagationPolicy: options.PrunePropagationPolicy,
-			PruneTimeout:           options.PruneTimeout,
-			InventoryPolicy:        options.InventoryPolicy,
-		}
+		solverOpts := opts.SolverOptions()
 		// Build list of apply validation filters.
 		applyFilters := []filter.ValidationFilter{
 			filter.InventoryPolicyApplyFilter{
 				Client:    client,
 				Mapper:    mapper,
 				Inv:       invInfo,
-				InvPolicy: options.InventoryPolicy,
+				InvPolicy: opts.InventoryPolicy,
 			},
 		}
 		// Build list of prune validation filters.
@@ -184,19 +183,21 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.InventoryInfo, obje
 			filter.PreventRemoveFilter{},
 			filter.InventoryPolicyFilter{
 				Inv:       invInfo,
-				InvPolicy: options.InventoryPolicy,
+				InvPolicy: opts.InventoryPolicy,
 			},
 			filter.LocalNamespacesFilter{
 				LocalNamespaces: localNamespaces(invInfo, object.UnstructuredsToObjMetasOrDie(objects)),
 			},
 		}
-		// Build the task queue by appending tasks in the proper order.
-		taskQueue, err := taskBuilder.
-			AppendInvAddTask(invInfo, applyObjs, options.DryRunStrategy).
-			AppendApplyWaitTasks(applyObjs, applyFilters, opts).
-			AppendPruneWaitTasks(pruneObjs, pruneFilters, opts).
-			AppendInvSetTask(invInfo, options.DryRunStrategy).
-			Build()
+
+		// Build the ordered set of tasks to execute.
+		taskBuilder.AppendInvAddTask(invInfo, applyObjs, opts.DryRunStrategy)
+		taskBuilder.AppendApplyWaitTasks(applyObjs, applyFilters, solverOpts)
+		if !opts.NoPrune {
+			taskBuilder.AppendPruneWaitTasks(pruneObjs, pruneFilters, solverOpts)
+		}
+		taskBuilder.AppendInvSetTask(invInfo, opts.DryRunStrategy)
+		taskQueue, err := taskBuilder.Build()
 		if err != nil {
 			handleError(eventChannel, err)
 		}
@@ -213,11 +214,7 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.InventoryInfo, obje
 		allIds := object.UnstructuredsToObjMetasOrDie(append(applyObjs, pruneObjs...))
 		runner := taskrunner.NewTaskStatusRunner(allIds, a.statusPoller)
 		klog.V(4).Infoln("applier running TaskStatusRunner...")
-		err = runner.Run(ctx, taskQueue.ToChannel(), eventChannel, taskrunner.Options{
-			PollInterval:     options.PollInterval,
-			UseCache:         true,
-			EmitStatusEvents: options.EmitStatusEvents,
-		})
+		err = runner.Run(ctx, taskQueue.ToChannel(), eventChannel, opts.TaskRunnerOptions())
 		if err != nil {
 			handleError(eventChannel, err)
 		}
@@ -250,18 +247,44 @@ type Options struct {
 	// or if it is just talk and no action.
 	DryRunStrategy common.DryRunStrategy
 
-	// PrunePropagationPolicy defines the deletion propagation policy
+	// DeletionPropagationPolicy defines the deletion propagation policy
 	// that should be used for pruning. If this is not provided, the
 	// default is to use the Background policy.
-	PrunePropagationPolicy metav1.DeletionPropagation
+	DeletionPropagationPolicy metav1.DeletionPropagation
 
-	// PruneTimeout defines whether we should wait for all resources
+	// DeleteTimeout defines whether we should wait for all resources
 	// to be fully deleted after pruning, and if so, how long we should
 	// wait.
-	PruneTimeout time.Duration
+	DeleteTimeout time.Duration
 
 	// InventoryPolicy defines the inventory policy of apply.
 	InventoryPolicy inventory.InventoryPolicy
+}
+
+func (o Options) PruneOptions() prune.Options {
+	return prune.Options{
+		DryRunStrategy: o.DryRunStrategy,
+		DeleteTimeout:  o.DeleteTimeout,
+	}
+}
+
+func (o Options) SolverOptions() solver.Options {
+	return solver.Options{
+		ServerSideOptions:       o.ServerSideOptions,
+		ReconcileTimeout:        o.ReconcileTimeout,
+		DryRunStrategy:          o.DryRunStrategy,
+		DeletePropagationPolicy: o.DeletionPropagationPolicy,
+		DeleteTimeout:           o.DeleteTimeout,
+		InventoryPolicy:         o.InventoryPolicy,
+	}
+}
+
+func (o Options) TaskRunnerOptions() taskrunner.Options {
+	return taskrunner.Options{
+		UseCache:         true,
+		PollInterval:     o.PollInterval,
+		EmitStatusEvents: o.EmitStatusEvents,
+	}
 }
 
 // setDefaults set the options to the default values if they
@@ -270,8 +293,8 @@ func setDefaults(o *Options) {
 	if o.PollInterval == time.Duration(0) {
 		o.PollInterval = poller.DefaultPollInterval
 	}
-	if o.PrunePropagationPolicy == "" {
-		o.PrunePropagationPolicy = metav1.DeletePropagationBackground
+	if o.DeletionPropagationPolicy == "" {
+		o.DeletionPropagationPolicy = metav1.DeletePropagationBackground
 	}
 }
 

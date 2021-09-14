@@ -4,6 +4,7 @@
 package destroy
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -46,6 +47,8 @@ func GetDestroyRunner(factory cmdutil.Factory, invFactory inventory.InventoryCli
 		"Timeout threshold for waiting for all deleted resources to complete deletion")
 	cmd.Flags().StringVar(&r.deletePropagationPolicy, "delete-propagation-policy",
 		"Background", "Propagation policy for deletion")
+	cmd.Flags().DurationVar(&r.timeout, "timeout", time.Duration(0),
+		"Timeout threshold for command execution")
 
 	r.Command = cmd
 	return r
@@ -70,9 +73,21 @@ type DestroyRunner struct {
 	deleteTimeout           time.Duration
 	deletePropagationPolicy string
 	inventoryPolicy         string
+	timeout                 time.Duration
 }
 
 func (r *DestroyRunner) RunE(cmd *cobra.Command, args []string) error {
+	// If specified, cancel with timeout.
+	// Otherwise, cancel when completed to clean up timer.
+	ctx := cmd.Context()
+	var cancel func()
+	if r.timeout != 0 {
+		ctx, cancel = context.WithTimeout(ctx, r.timeout)
+	} else {
+		ctx, cancel = context.WithCancel(ctx)
+	}
+	defer cancel()
+
 	deletePropPolicy, err := flagutils.ConvertPropagationPolicy(r.deletePropagationPolicy)
 	if err != nil {
 		return err
@@ -117,7 +132,8 @@ func (r *DestroyRunner) RunE(cmd *cobra.Command, args []string) error {
 	// Run the destroyer. It will return a channel where we can receive updates
 	// to keep track of progress and any issues.
 	printStatusEvents := r.deleteTimeout != time.Duration(0)
-	ch := d.Run(inv, apply.DestroyerOptions{
+
+	ch := d.Run(ctx, inv, apply.DestroyerOptions{
 		DeleteTimeout:           r.deleteTimeout,
 		DeletePropagationPolicy: deletePropPolicy,
 		InventoryPolicy:         inventoryPolicy,

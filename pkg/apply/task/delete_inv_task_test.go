@@ -4,6 +4,7 @@
 package task
 
 import (
+	"context"
 	"testing"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -39,7 +40,7 @@ func TestDeleteInvTask(t *testing.T) {
 			client := inventory.NewFakeInventoryClient([]object.ObjMetadata{})
 			client.Err = tc.err
 			eventChannel := make(chan event.Event)
-			context := taskrunner.NewTaskContext(eventChannel)
+			context := taskrunner.NewTaskContext(context.TODO(), eventChannel)
 			task := DeleteInvTask{
 				TaskName:  taskName,
 				InvClient: client,

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	pollevent "sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
@@ -40,7 +41,6 @@ var (
 
 func TestBaseRunner(t *testing.T) {
 	testCases := map[string]struct {
-		identifiers               []object.ObjMetadata
 		tasks                     []Task
 		statusEventsDelay         time.Duration
 		statusEvents              []pollevent.Event
@@ -49,7 +49,6 @@ func TestBaseRunner(t *testing.T) {
 		expectedTimedOutResources []TimedOutResource
 	}{
 		"wait task runs until condition is met": {
-			identifiers: []object.ObjMetadata{depID, cmID},
 			tasks: []Task{
 				&fakeApplyTask{
 					resultEvent: event.Event{
@@ -97,7 +96,6 @@ func TestBaseRunner(t *testing.T) {
 			},
 		},
 		"wait task times out eventually": {
-			identifiers: []object.ObjMetadata{depID, cmID},
 			tasks: []Task{
 				NewWaitTask("wait", []object.ObjMetadata{depID, cmID}, AllCurrent,
 					2*time.Second, testutil.NewFakeRESTMapper()),
@@ -124,7 +122,6 @@ func TestBaseRunner(t *testing.T) {
 			},
 		},
 		"tasks run in order": {
-			identifiers: []object.ObjMetadata{},
 			tasks: []Task{
 				&fakeApplyTask{
 					resultEvent: event.Event{
@@ -172,7 +169,7 @@ func TestBaseRunner(t *testing.T) {
 
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
-			runner := newBaseRunner(newResourceStatusCollector(tc.identifiers))
+			runner := newBaseRunner()
 			eventChannel := make(chan event.Event)
 			taskQueue := make(chan Task, len(tc.tasks))
 			for _, tsk := range tc.tasks {
@@ -239,16 +236,15 @@ func TestBaseRunnerCancellation(t *testing.T) {
 	testError := fmt.Errorf("this is a test error")
 
 	testCases := map[string]struct {
-		identifiers        []object.ObjMetadata
 		tasks              []Task
 		statusEventsDelay  time.Duration
 		statusEvents       []pollevent.Event
 		contextTimeout     time.Duration
+		contextCancel      time.Duration
 		expectedError      error
 		expectedEventTypes []event.Type
 	}{
-		"cancellation while custom task is running": {
-			identifiers: []object.ObjMetadata{depID},
+		"timeout while custom task is running": {
 			tasks: []Task{
 				&fakeApplyTask{
 					resultEvent: event.Event{
@@ -264,17 +260,22 @@ func TestBaseRunnerCancellation(t *testing.T) {
 				},
 			},
 			contextTimeout: 2 * time.Second,
+			expectedError:  context.DeadlineExceeded,
 			expectedEventTypes: []event.Type{
 				event.ActionGroupType,
 				event.ApplyType,
 				event.ActionGroupType,
 			},
 		},
-		"cancellation while wait task is running": {
-			identifiers: []object.ObjMetadata{depID},
+		"timeout while wait task is running": {
 			tasks: []Task{
-				NewWaitTask("wait", []object.ObjMetadata{depID}, AllCurrent,
-					20*time.Second, testutil.NewFakeRESTMapper()),
+				NewWaitTask(
+					"wait",
+					[]object.ObjMetadata{depID},
+					AllCurrent,
+					20*time.Second,
+					testutil.NewFakeRESTMapper(),
+				),
 				&fakeApplyTask{
 					resultEvent: event.Event{
 						Type: event.PruneType,
@@ -283,13 +284,36 @@ func TestBaseRunnerCancellation(t *testing.T) {
 				},
 			},
 			contextTimeout: 2 * time.Second,
+			expectedError:  context.DeadlineExceeded,
+			expectedEventTypes: []event.Type{
+				event.ActionGroupType,
+				event.ActionGroupType,
+			},
+		},
+		"cancel while wait task is running": {
+			tasks: []Task{
+				NewWaitTask(
+					"wait",
+					[]object.ObjMetadata{depID},
+					AllCurrent,
+					20*time.Second,
+					testutil.NewFakeRESTMapper(),
+				),
+				&fakeApplyTask{
+					resultEvent: event.Event{
+						Type: event.PruneType,
+					},
+					duration: 2 * time.Second,
+				},
+			},
+			contextCancel: 2 * time.Second,
+			expectedError: context.Canceled,
 			expectedEventTypes: []event.Type{
 				event.ActionGroupType,
 				event.ActionGroupType,
 			},
 		},
 		"error while custom task is running": {
-			identifiers: []object.ObjMetadata{depID},
 			tasks: []Task{
 				&fakeApplyTask{
 					resultEvent: event.Event{
@@ -314,7 +338,6 @@ func TestBaseRunnerCancellation(t *testing.T) {
 			},
 		},
 		"error from status poller while wait task is running": {
-			identifiers: []object.ObjMetadata{depID},
 			tasks: []Task{
 				NewWaitTask("wait", []object.ObjMetadata{depID}, AllCurrent,
 					20*time.Second, testutil.NewFakeRESTMapper()),
@@ -333,7 +356,7 @@ func TestBaseRunnerCancellation(t *testing.T) {
 				},
 			},
 			contextTimeout: 30 * time.Second,
-			expectedError:  testError,
+			expectedError:  context.Canceled,
 			expectedEventTypes: []event.Type{
 				event.ActionGroupType,
 				event.ActionGroupType,
@@ -343,7 +366,7 @@ func TestBaseRunnerCancellation(t *testing.T) {
 
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
-			runner := newBaseRunner(newResourceStatusCollector(tc.identifiers))
+			runner := newBaseRunner()
 			eventChannel := make(chan event.Event)
 
 			taskQueue := make(chan Task, len(tc.tasks))
@@ -376,20 +399,34 @@ func TestBaseRunnerCancellation(t *testing.T) {
 				}
 			}()
 
-			ctx, cancel := context.WithTimeout(context.Background(), tc.contextTimeout)
-			defer cancel()
-			err := runner.run(ctx, taskQueue, statusChannel, eventChannel,
-				baseOptions{emitStatusEvents: false})
+			ctx := context.Background()
+			var cancel context.CancelFunc
+			if tc.contextTimeout > 0 {
+				ctx, cancel = context.WithTimeout(ctx, tc.contextTimeout)
+				defer cancel()
+			} else if tc.contextCancel > 0 {
+				ctx, cancel = context.WithCancel(ctx)
+				go func() {
+					time.Sleep(tc.contextCancel)
+					cancel()
+				}()
+				defer cancel()
+			}
+
+			err := runner.run(
+				ctx,
+				taskQueue,
+				statusChannel,
+				eventChannel,
+				baseOptions{emitStatusEvents: false},
+			)
 			close(statusChannel)
 			close(eventChannel)
 			wg.Wait()
 
-			if tc.expectedError == nil && err != nil {
-				t.Errorf("expected no error, but got %v", err)
-			}
-
-			if tc.expectedError != nil && err == nil {
-				t.Errorf("expected error %v, but didn't get one", tc.expectedError)
+			if tc.expectedError != nil {
+				require.Error(t, err)
+				assert.Equal(t, tc.expectedError, err)
 			}
 
 			if want, got := len(tc.expectedEventTypes), len(events); want != got {
@@ -427,12 +464,20 @@ func (f *fakeApplyTask) Identifiers() []object.ObjMetadata {
 
 func (f *fakeApplyTask) Start(taskContext *TaskContext) {
 	go func() {
-		<-time.NewTimer(f.duration).C
-		taskContext.EventChannel() <- f.resultEvent
-		taskContext.TaskChannel() <- TaskResult{
-			Err: f.err,
+		var err error
+		ctx := taskContext.Context()
+		timer := time.NewTimer(f.duration)
+		select {
+		case <-ctx.Done():
+			// context cancel/timeout
+			err = ctx.Err()
+		case <-timer.C:
+			// task duration timeout
+			err = f.err
 		}
+		taskContext.EventChannel() <- f.resultEvent
+		taskContext.TaskChannel() <- TaskResult{Err: err}
 	}()
 }
 
-func (f *fakeApplyTask) ClearTimeout() {}
+func (f *fakeApplyTask) OnStatusEvent(taskContext *TaskContext, e event.StatusEvent) {}

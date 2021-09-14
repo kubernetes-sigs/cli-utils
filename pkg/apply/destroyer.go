@@ -30,12 +30,12 @@ import (
 // handled by a separate printer with the KubectlPrinterAdapter bridging
 // between the two.
 func NewDestroyer(factory cmdutil.Factory, invClient inventory.InventoryClient, statusPoller poller.Poller) (*Destroyer, error) {
-	pruneOpts, err := prune.NewPruneOptions(factory, invClient)
+	pruner, err := prune.NewPruner(factory, invClient)
 	if err != nil {
 		return nil, fmt.Errorf("error setting up PruneOptions: %w", err)
 	}
 	return &Destroyer{
-		pruneOptions: pruneOpts,
+		pruner:       pruner,
 		statusPoller: statusPoller,
 		factory:      factory,
 		invClient:    invClient,
@@ -45,7 +45,7 @@ func NewDestroyer(factory cmdutil.Factory, invClient inventory.InventoryClient, 
 // Destroyer performs the step of grabbing all the previous inventory objects and
 // prune them. This also deletes all the previous inventory objects
 type Destroyer struct {
-	pruneOptions *prune.PruneOptions
+	pruner       *prune.Pruner
 	statusPoller poller.Poller
 	factory      cmdutil.Factory
 	invClient    inventory.InventoryClient
@@ -77,6 +77,32 @@ type DestroyerOptions struct {
 	PollInterval time.Duration
 }
 
+func (do DestroyerOptions) PruneOptions() prune.Options {
+	return prune.Options{
+		DryRunStrategy:            do.DryRunStrategy,
+		DeleteTimeout:             do.DeleteTimeout,
+		DeletionPropagationPolicy: do.DeletePropagationPolicy,
+		// Always remove pruned resources from inventory when destroying.
+		Destroy: true,
+	}
+}
+
+func (do DestroyerOptions) SolverOptions() solver.Options {
+	return solver.Options{
+		DeleteTimeout:           do.DeleteTimeout,
+		DryRunStrategy:          do.DryRunStrategy,
+		DeletePropagationPolicy: do.DeletePropagationPolicy,
+	}
+}
+
+func (do DestroyerOptions) TaskRunnerOptions() taskrunner.Options {
+	return taskrunner.Options{
+		UseCache:         true,
+		PollInterval:     do.PollInterval,
+		EmitStatusEvents: do.EmitStatusEvents,
+	}
+}
+
 func setDestroyerDefaults(o *DestroyerOptions) {
 	if o.PollInterval == time.Duration(0) {
 		o.PollInterval = poller.DefaultPollInterval
@@ -89,17 +115,20 @@ func setDestroyerDefaults(o *DestroyerOptions) {
 // Run performs the destroy step. Passes the inventory object. This
 // happens asynchronously on progress and any errors are reported
 // back on the event channel.
-func (d *Destroyer) Run(inv inventory.InventoryInfo, options DestroyerOptions) <-chan event.Event {
+func (d *Destroyer) Run(ctx context.Context, inv inventory.InventoryInfo, opts DestroyerOptions) <-chan event.Event {
 	eventChannel := make(chan event.Event)
-	setDestroyerDefaults(&options)
+	setDestroyerDefaults(&opts)
 	go func() {
 		defer close(eventChannel)
 		// Retrieve the objects to be deleted from the cluster. Second parameter is empty
 		// because no local objects returns all inventory objects for deletion.
 		emptyLocalObjs := []*unstructured.Unstructured{}
-		deleteObjs, err := d.pruneOptions.GetPruneObjs(inv, emptyLocalObjs, prune.Options{
-			DryRunStrategy: options.DryRunStrategy,
-		})
+		deleteObjs, err := d.pruner.GetPruneObjs(
+			ctx,
+			inv,
+			emptyLocalObjs,
+			opts.PruneOptions(),
+		)
 		if err != nil {
 			handleError(eventChannel, err)
 			return
@@ -111,33 +140,30 @@ func (d *Destroyer) Run(inv inventory.InventoryInfo, options DestroyerOptions) <
 		}
 		klog.V(4).Infoln("destroyer building task queue...")
 		taskBuilder := &solver.TaskQueueBuilder{
-			PruneOptions: d.pruneOptions,
-			Factory:      d.factory,
-			Mapper:       mapper,
-			InvClient:    d.invClient,
-			Destroy:      true,
+			Pruner:    d.pruner,
+			Factory:   d.factory,
+			Mapper:    mapper,
+			InvClient: d.invClient,
+			Destroy:   opts.PruneOptions().Destroy,
 		}
-		opts := solver.Options{
-			Prune:                  true,
-			PruneTimeout:           options.DeleteTimeout,
-			DryRunStrategy:         options.DryRunStrategy,
-			PrunePropagationPolicy: options.DeletePropagationPolicy,
-		}
+		solverOpts := opts.SolverOptions()
 		deleteFilters := []filter.ValidationFilter{
 			filter.PreventRemoveFilter{},
 			filter.InventoryPolicyFilter{
 				Inv:       inv,
-				InvPolicy: options.InventoryPolicy,
+				InvPolicy: opts.InventoryPolicy,
 			},
 		}
+
 		// Build the ordered set of tasks to execute.
-		taskQueue, err := taskBuilder.
-			AppendPruneWaitTasks(deleteObjs, deleteFilters, opts).
-			AppendDeleteInvTask(inv, options.DryRunStrategy).
-			Build()
+		// Destroyer always prunes
+		taskBuilder.AppendPruneWaitTasks(deleteObjs, deleteFilters, solverOpts)
+		taskBuilder.AppendDeleteInvTask(inv, opts.DryRunStrategy)
+		taskQueue, err := taskBuilder.Build()
 		if err != nil {
 			handleError(eventChannel, err)
 		}
+
 		// Send event to inform the caller about the resources that
 		// will be pruned.
 		eventChannel <- event.Event{
@@ -152,11 +178,12 @@ func (d *Destroyer) Run(inv inventory.InventoryInfo, options DestroyerOptions) <
 		runner := taskrunner.NewTaskStatusRunner(deleteIds, d.statusPoller)
 		klog.V(4).Infoln("destroyer running TaskStatusRunner...")
 		// TODO(seans): Make the poll interval configurable like the applier.
-		err = runner.Run(context.Background(), taskQueue.ToChannel(), eventChannel, taskrunner.Options{
-			UseCache:         true,
-			PollInterval:     options.PollInterval,
-			EmitStatusEvents: options.EmitStatusEvents,
-		})
+		err = runner.Run(
+			ctx,
+			taskQueue.ToChannel(),
+			eventChannel,
+			opts.TaskRunnerOptions(),
+		)
 		if err != nil {
 			handleError(eventChannel, err)
 		}

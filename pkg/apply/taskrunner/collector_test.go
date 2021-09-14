@@ -32,92 +32,86 @@ func TestCollector_ConditionMet(t *testing.T) {
 	}
 
 	testCases := map[string]struct {
-		collectorState map[object.ObjMetadata]resourceStatus
-		waitTaskData   []resourceWaitData
+		collectorState map[object.ObjMetadata]ResourceStatus
+		waitTaskData   []ResourceGeneration
 		condition      Condition
 		expectedResult bool
 	}{
 		"single resource with current status": {
-			collectorState: map[object.ObjMetadata]resourceStatus{
+			collectorState: map[object.ObjMetadata]ResourceStatus{
 				identifiers["dep"]: {
-					Identifier:    identifiers["dep"],
 					CurrentStatus: status.CurrentStatus,
 					Generation:    int64(42),
 				},
 			},
-			waitTaskData: []resourceWaitData{
+			waitTaskData: []ResourceGeneration{
 				{
-					identifier: identifiers["dep"],
-					generation: int64(42),
+					Identifier: identifiers["dep"],
+					Generation: int64(42),
 				},
 			},
 			condition:      AllCurrent,
 			expectedResult: true,
 		},
 		"single resource with current status and old generation": {
-			collectorState: map[object.ObjMetadata]resourceStatus{
+			collectorState: map[object.ObjMetadata]ResourceStatus{
 				identifiers["dep"]: {
-					Identifier:    identifiers["dep"],
 					CurrentStatus: status.CurrentStatus,
 					Generation:    int64(41),
 				},
 			},
-			waitTaskData: []resourceWaitData{
+			waitTaskData: []ResourceGeneration{
 				{
-					identifier: identifiers["dep"],
-					generation: int64(42),
+					Identifier: identifiers["dep"],
+					Generation: int64(42),
 				},
 			},
 			condition:      AllCurrent,
 			expectedResult: false,
 		},
 		"multiple resources not all current": {
-			collectorState: map[object.ObjMetadata]resourceStatus{
+			collectorState: map[object.ObjMetadata]ResourceStatus{
 				identifiers["dep"]: {
-					Identifier:    identifiers["dep"],
 					CurrentStatus: status.CurrentStatus,
 					Generation:    int64(41),
 				},
 				identifiers["custom"]: {
-					Identifier:    identifiers["custom"],
 					CurrentStatus: status.InProgressStatus,
 					Generation:    int64(0),
 				},
 			},
-			waitTaskData: []resourceWaitData{
+			waitTaskData: []ResourceGeneration{
 				{
-					identifier: identifiers["dep"],
-					generation: int64(42),
+					Identifier: identifiers["dep"],
+					Generation: int64(42),
 				},
 				{
-					identifier: identifiers["custom"],
-					generation: int64(0),
+					Identifier: identifiers["custom"],
+					Generation: int64(0),
 				},
 			},
 			condition:      AllCurrent,
 			expectedResult: false,
 		},
 		"multiple resources single with old generation": {
-			collectorState: map[object.ObjMetadata]resourceStatus{
+			collectorState: map[object.ObjMetadata]ResourceStatus{
 				identifiers["dep"]: {
-					Identifier:    identifiers["dep"],
 					CurrentStatus: status.CurrentStatus,
 					Generation:    int64(42),
 				},
 				identifiers["custom"]: {
-					Identifier:    identifiers["custom"],
 					CurrentStatus: status.CurrentStatus,
 					Generation:    int64(4),
 				},
 			},
-			waitTaskData: []resourceWaitData{
+			waitTaskData: []ResourceGeneration{
 				{
-					identifier: identifiers["dep"],
-					generation: int64(42),
+					Identifier: identifiers["dep"],
+					Generation: int64(42),
 				},
 				{
-					identifier: identifiers["custom"],
-					generation: int64(5),
+					Identifier: identifiers["custom"],
+					Generation: int64(5),
 				},
 			},
 			condition:      AllCurrent,
@@ -127,10 +121,10 @@ func TestCollector_ConditionMet(t *testing.T) {
 
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
-			rsc := newResourceStatusCollector([]object.ObjMetadata{})
+			rsc := NewResourceStatusCollector()
 			rsc.resourceMap = tc.collectorState
 
-			res := rsc.conditionMet(tc.waitTaskData, tc.condition)
+			res := rsc.ConditionMet(tc.waitTaskData, tc.condition)
 
 			assert.Equal(t, tc.expectedResult, res)
 		})

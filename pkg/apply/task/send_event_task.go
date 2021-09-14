@@ -25,6 +25,5 @@ func (s *SendEventTask) Start(taskContext *taskrunner.TaskContext) {
 	}()
 }
 
-// ClearTimeout doesn't do anything as SendEventTask doesn't support
-// timeouts.
-func (s *SendEventTask) ClearTimeout() {}
+// OnStatusEvent is not supported by SendEventTask.
+func (s *SendEventTask) OnStatusEvent(taskContext *taskrunner.TaskContext, e event.StatusEvent) {}

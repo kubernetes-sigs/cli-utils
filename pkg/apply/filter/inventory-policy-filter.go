@@ -4,6 +4,7 @@
 package filter
 
 import (
+	"context"
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -26,7 +27,7 @@ func (ipf InventoryPolicyFilter) Name() string {
 // Filter returns true if the passed object should NOT be pruned (deleted)
 // because the "prevent remove" annotation is present; otherwise returns
 // false. Never returns an error.
-func (ipf InventoryPolicyFilter) Filter(obj *unstructured.Unstructured) (bool, string, error) {
+func (ipf InventoryPolicyFilter) Filter(ctx context.Context, obj *unstructured.Unstructured) (bool, string, error) {
 	// Check the inventory id "match" and the adopt policy to determine
 	// if an object should be pruned (deleted).
 	if !inventory.CanPrune(ipf.Inv, obj, ipf.InvPolicy) {

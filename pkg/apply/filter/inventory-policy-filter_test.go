@@ -4,6 +4,7 @@
 package filter
 
 import (
+	"context"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -89,7 +90,8 @@ func TestInventoryPolicyFilter(t *testing.T) {
 			}
 			obj := defaultObj.DeepCopy()
 			obj.SetAnnotations(objIDAnnotation)
-			actual, reason, err := filter.Filter(obj)
+			ctx := context.TODO()
+			actual, reason, err := filter.Filter(ctx, obj)
 			if err != nil {
 				t.Fatalf("InventoryPolicyFilter unexpected error (%s)", err)
 			}

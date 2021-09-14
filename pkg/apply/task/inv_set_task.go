@@ -63,5 +63,5 @@ func (i *InvSetTask) Start(taskContext *taskrunner.TaskContext) {
 	}()
 }
 
-// ClearTimeout is not supported by the InvSetTask.
-func (i *InvSetTask) ClearTimeout() {}
+// OnStatusEvent is not supported by InvSetTask.
+func (i *InvSetTask) OnStatusEvent(taskContext *taskrunner.TaskContext, e event.StatusEvent) {}

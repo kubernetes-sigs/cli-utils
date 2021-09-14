@@ -4,8 +4,11 @@
 package taskrunner
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"reflect"
+	"sync"
 	"time"
 
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -14,7 +17,6 @@ import (
 	"k8s.io/client-go/restmapper"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
-	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
@@ -24,25 +26,19 @@ type Task interface {
 	Name() string
 	Action() event.ResourceAction
 	Identifiers() []object.ObjMetadata
-	Start(taskContext *TaskContext)
-	ClearTimeout()
+	Start(*TaskContext)
+	OnStatusEvent(*TaskContext, event.StatusEvent)
 }
 
 // NewWaitTask creates a new wait task where we will wait until
 // the resources specifies by ids all meet the specified condition.
 func NewWaitTask(name string, ids []object.ObjMetadata, cond Condition, timeout time.Duration, mapper meta.RESTMapper) *WaitTask {
-	// Create the token channel and only add one item.
-	tokenChannel := make(chan struct{}, 1)
-	tokenChannel <- struct{}{}
-
 	return &WaitTask{
 		name:      name,
 		Ids:       ids,
 		Condition: cond,
 		Timeout:   timeout,
-
-		mapper: mapper,
-		token:  tokenChannel,
+		mapper:    mapper,
 	}
 }
 
@@ -66,17 +62,9 @@ type WaitTask struct {
 
 	mapper meta.RESTMapper
 
-	// cancelFunc is a function that will cancel the timeout timer
-	// on the task.
-	cancelFunc func()
-
-	// token is a channel that is provided a single item when the
-	// task is created. Goroutines are only allowed to write to the
-	// taskChannel if they are able to get the item from the channel.
-	// This makes sure that the task only results in one message on the
-	// taskChannel, even if the condition is met and the task times out
-	// at the same time.
-	token chan struct{}
+	// once ensures errorCh only receives one error
+	once    sync.Once
+	errorCh chan error
 }
 
 func (w *WaitTask) Name() string {
@@ -95,52 +83,92 @@ func (w *WaitTask) Identifiers() []object.ObjMetadata {
 // setting up the timeout timer.
 func (w *WaitTask) Start(taskContext *TaskContext) {
 	klog.V(2).Infof("starting wait task (%d objects)", len(w.Ids))
-	w.setTimer(taskContext)
-}
 
-// setTimer creates the timer with the timeout value taken from
-// the WaitTask struct. Once the timer expires, it will send
-// a message on the TaskChannel provided in the taskContext.
-func (w *WaitTask) setTimer(taskContext *TaskContext) {
-	timer := time.NewTimer(w.Timeout)
+	// reset task
+	w.once = sync.Once{}
+	w.errorCh = make(chan error)
+
+	// WaitTask gets its own context to diferentiate between WaitTask timeout
+	// and TaskQueue timeout. First timeout wins!
+	taskCtx := context.Background()
+	var taskCancel func()
+	if w.Timeout != 0 {
+		klog.V(5).Infof("wait task timeout: %s", w.Timeout)
+		taskCtx, taskCancel = context.WithTimeout(taskCtx, w.Timeout)
+	} else {
+		taskCtx, taskCancel = context.WithCancel(taskCtx)
+	}
+
+	// Wrap the parent context to ensure it's done.
+	ctx, cancel := context.WithCancel(taskContext.Context())
+
+	// wait until parent timeout or cancel
 	go func() {
-		// TODO(mortent): See if there is a better way to do this. This
-		// solution will cause the goroutine to hang forever if the
-		// Timeout is cancelled.
-		<-timer.C
-		select {
-		// We only send the taskResult if no one has gotten
-		// to the token first.
-		case <-w.token:
-			taskContext.TaskChannel() <- TaskResult{
-				Err: &TimeoutError{
-					Identifiers: w.Ids,
-					Timeout:     w.Timeout,
-					Condition:   w.Condition,
-				},
-			}
-		default:
-			return
+		defer func() {
+			// cancel contexts to free up resources
+			taskCancel()
+			cancel()
+		}()
+
+		<-ctx.Done()
+		klog.V(3).Info("wait task parent context done")
+		w.stop(ctx.Err())
+	}()
+
+	// wait until task timeout or cancel
+	go func() {
+		defer func() {
+			// cancel contexts to free up resources
+			taskCancel()
+			cancel()
+		}()
+
+		<-taskCtx.Done()
+		klog.V(3).Info("wait task context done")
+		w.stop(w.unwrapTaskTimeout(taskCtx.Err()))
+	}()
+
+	// wait until complete (optional error on errorCh)
+	go func() {
+		defer func() {
+			// cancel contexts to free up resources
+			taskCancel()
+			cancel()
+		}()
+
+		err := <-w.errorCh
+		klog.V(3).Info("wait task completed")
+		taskContext.TaskChannel() <- TaskResult{
+			Err: err,
 		}
 	}()
-	w.cancelFunc = func() {
-		timer.Stop()
+
+	if w.conditionMet(taskContext) {
+		klog.V(3).Info("wait condition met, stopping task early")
+		w.stop(nil)
 	}
 }
 
-// checkCondition checks whether the condition set in the task
-// is currently met given the status of resources in the collector.
-func (w *WaitTask) checkCondition(taskContext *TaskContext, coll *resourceStatusCollector) bool {
-	rwd := w.computeResourceWaitData(taskContext)
-	return coll.conditionMet(rwd, w.Condition)
+func (w *WaitTask) OnStatusEvent(taskContext *TaskContext, _ event.StatusEvent) {
+	if w.conditionMet(taskContext) {
+		klog.V(3).Info("wait condition met, stopping task")
+		w.stop(nil)
+	}
 }
 
-// computeResourceWaitData creates a slice of resourceWaitData for
+// conditionMet checks whether the condition set in the task
+// is currently met given the status of resources in the collector.
+func (w *WaitTask) conditionMet(taskContext *TaskContext) bool {
+	rwd := w.resourcesToWaitFor(taskContext)
+	return taskContext.ResourceStatusCollector().ConditionMet(rwd, w.Condition)
+}
+
+// resourcesToWaitFor creates a slice of ResourceGeneration for
 // the resources that is relevant to this wait task. The objective is
 // to match each resource with the generation seen after the resource
 // was applied.
-func (w *WaitTask) computeResourceWaitData(taskContext *TaskContext) []resourceWaitData {
-	var rwd []resourceWaitData
+func (w *WaitTask) resourcesToWaitFor(taskContext *TaskContext) []ResourceGeneration {
+	var rwd []ResourceGeneration
 	for _, id := range w.Ids {
 		// Skip checking condition for resources which have failed
 		// to apply or failed to prune/delete (depending on wait condition).
@@ -150,90 +178,44 @@ func (w *WaitTask) computeResourceWaitData(taskContext *TaskContext) []resourceW
 			continue
 		}
 		gen, _ := taskContext.ResourceGeneration(id)
-		rwd = append(rwd, resourceWaitData{
-			identifier: id,
-			generation: gen,
+		rwd = append(rwd, ResourceGeneration{
+			Identifier: id,
+			Generation: gen,
 		})
 	}
 	return rwd
 }
 
-// startAndComplete is invoked when the condition is already
-// met when the task should be started. In this case there is no
-// need to start a timer. So it just sets the cancelFunc and then
-// completes the task.
-func (w *WaitTask) startAndComplete(taskContext *TaskContext) {
-	w.cancelFunc = func() {}
-	w.complete(taskContext)
+// stop resets the RESTMapper if any Ids are CRDs and sends the error to the
+// errorCh, once per task start.
+func (w *WaitTask) stop(err error) {
+	w.once.Do(func() {
+		klog.V(3).Info("wait task complete")
+		for _, obj := range w.Ids {
+			if (obj.GroupKind.Group == v1.SchemeGroupVersion.Group ||
+				obj.GroupKind.Group == v1beta1.SchemeGroupVersion.Group) &&
+				obj.GroupKind.Kind == "CustomResourceDefinition" {
+				ddRESTMapper, err := extractDeferredDiscoveryRESTMapper(w.mapper)
+				if err == nil {
+					ddRESTMapper.Reset()
+					// We only need to reset once.
+					break
+				}
+			}
+		}
+		w.errorCh <- err
+	})
 }
 
-// complete is invoked by the taskrunner when all the conditions
-// for the task has been met, or something has failed so the task
-// need to be stopped.
-func (w *WaitTask) complete(taskContext *TaskContext) {
-	var err error
-	for _, obj := range w.Ids {
-		if (obj.GroupKind.Group == v1.SchemeGroupVersion.Group ||
-			obj.GroupKind.Group == v1beta1.SchemeGroupVersion.Group) &&
-			obj.GroupKind.Kind == "CustomResourceDefinition" {
-			ddRESTMapper, err := extractDeferredDiscoveryRESTMapper(w.mapper)
-			if err == nil {
-				ddRESTMapper.Reset()
-				// We only need to reset once.
-				break
-			}
-			continue
+func (w *WaitTask) unwrapTaskTimeout(err error) error {
+	if errors.Is(err, context.DeadlineExceeded) {
+		err = &TimeoutError{
+			Identifiers: w.Ids,
+			Timeout:     w.Timeout,
+			Condition:   w.Condition,
 		}
 	}
-	select {
-	// Only do something if we can get the token.
-	case <-w.token:
-		go func() {
-			taskContext.TaskChannel() <- TaskResult{
-				Err: err,
-			}
-		}()
-	default:
-		return
-	}
-}
-
-// ClearTimeout cancels the timeout for the wait task.
-func (w *WaitTask) ClearTimeout() {
-	w.cancelFunc()
-}
-
-type resourceWaitData struct {
-	identifier object.ObjMetadata
-	generation int64
-}
-
-// Condition is a type that defines the types of conditions
-// which a WaitTask can use.
-type Condition string
-
-const (
-	// AllCurrent Condition means all the provided resources
-	// has reached (and remains in) the Current status.
-	AllCurrent Condition = "AllCurrent"
-
-	// AllNotFound Condition means all the provided resources
-	// has reached the NotFound status, i.e. they are all deleted
-	// from the cluster.
-	AllNotFound Condition = "AllNotFound"
-)
-
-// Meets returns true if the provided status meets the condition and
-// false if it does not.
-func (c Condition) Meets(s status.Status) bool {
-	switch c {
-	case AllCurrent:
-		return s == status.CurrentStatus
-	case AllNotFound:
-		return s == status.NotFoundStatus
-	default:
-		return false
-	}
+	return err
 }
 
 // extractDeferredDiscoveryRESTMapper unwraps the provided RESTMapper

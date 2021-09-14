@@ -52,13 +52,15 @@ func GetApplyRunner(factory cmdutil.Factory, invFactory inventory.InventoryClien
 		"Timeout threshold for waiting for all resources to reach the Current status.")
 	cmd.Flags().BoolVar(&r.noPrune, "no-prune", r.noPrune,
 		"If true, do not prune previously applied objects.")
-	cmd.Flags().StringVar(&r.prunePropagationPolicy, "prune-propagation-policy",
-		"Background", "Propagation policy for pruning")
-	cmd.Flags().DurationVar(&r.pruneTimeout, "prune-timeout", time.Duration(0),
-		"Timeout threshold for waiting for all pruned resources to be deleted")
+	cmd.Flags().StringVar(&r.deletePolicy, "delete-propagation-policy",
+		"Background", "Propagation policy for deletion")
+	cmd.Flags().DurationVar(&r.deleteTimeout, "delete-timeout", time.Duration(0),
+		"Timeout threshold for waiting for all deleted resources to complete deletion")
 	cmd.Flags().StringVar(&r.inventoryPolicy, flagutils.InventoryPolicyFlag, flagutils.InventoryPolicyStrict,
 		"It determines the behavior when the resources don't belong to current inventory. Available options "+
 			fmt.Sprintf("%q and %q.", flagutils.InventoryPolicyStrict, flagutils.InventoryPolicyAdopt))
+	cmd.Flags().DurationVar(&r.timeout, "timeout", time.Duration(0),
+		"Timeout threshold for command execution")
 
 	r.Command = cmd
 	return r
@@ -77,18 +79,30 @@ type ApplyRunner struct {
 	invFactory inventory.InventoryClientFactory
 	loader     manifestreader.ManifestLoader
 
-	serverSideOptions      common.ServerSideOptions
-	output                 string
-	period                 time.Duration
-	reconcileTimeout       time.Duration
-	noPrune                bool
-	prunePropagationPolicy string
-	pruneTimeout           time.Duration
-	inventoryPolicy        string
+	serverSideOptions common.ServerSideOptions
+	output            string
+	period            time.Duration
+	reconcileTimeout  time.Duration
+	noPrune           bool
+	deletePolicy      string
+	deleteTimeout     time.Duration
+	inventoryPolicy   string
+	timeout           time.Duration
 }
 
 func (r *ApplyRunner) RunE(cmd *cobra.Command, args []string) error {
-	prunePropPolicy, err := flagutils.ConvertPropagationPolicy(r.prunePropagationPolicy)
+	// If specified, cancel with timeout.
+	// Otherwise, cancel when completed to clean up timer.
+	ctx := cmd.Context()
+	var cancel func()
+	if r.timeout != 0 {
+		ctx, cancel = context.WithTimeout(ctx, r.timeout)
+	} else {
+		ctx, cancel = context.WithCancel(ctx)
+	}
+	defer cancel()
+
+	deletePolicy, err := flagutils.ConvertPropagationPolicy(r.deletePolicy)
 	if err != nil {
 		return err
 	}
@@ -102,7 +116,7 @@ func (r *ApplyRunner) RunE(cmd *cobra.Command, args []string) error {
 	// we do need status events event if we are not waiting for status. The
 	// printers should be updated to handle this.
 	var printStatusEvents bool
-	if r.reconcileTimeout != time.Duration(0) || r.pruneTimeout != time.Duration(0) {
+	if r.reconcileTimeout != time.Duration(0) || r.deleteTimeout != time.Duration(0) {
 		printStatusEvents = true
 	}
 
@@ -147,18 +161,19 @@ func (r *ApplyRunner) RunE(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	ch := a.Run(context.Background(), inv, objs, apply.Options{
+
+	ch := a.Run(ctx, inv, objs, apply.Options{
 		ServerSideOptions: r.serverSideOptions,
 		PollInterval:      r.period,
 		ReconcileTimeout:  r.reconcileTimeout,
 		// If we are not waiting for status, tell the applier to not
 		// emit the events.
-		EmitStatusEvents:       printStatusEvents,
-		NoPrune:                r.noPrune,
-		DryRunStrategy:         common.DryRunNone,
-		PrunePropagationPolicy: prunePropPolicy,
-		PruneTimeout:           r.pruneTimeout,
-		InventoryPolicy:        inventoryPolicy,
+		EmitStatusEvents:          printStatusEvents,
+		NoPrune:                   r.noPrune,
+		DryRunStrategy:            common.DryRunNone,
+		DeletionPropagationPolicy: deletePolicy,
+		DeleteTimeout:             r.deleteTimeout,
+		InventoryPolicy:           inventoryPolicy,
 	})
 
 	// The printer will print updates from the channel. It will block

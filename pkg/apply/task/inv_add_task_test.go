@@ -4,6 +4,7 @@
 package task
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -109,7 +110,7 @@ func TestInvAddTask(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			client := inventory.NewFakeInventoryClient(tc.initialObjs)
 			eventChannel := make(chan event.Event)
-			context := taskrunner.NewTaskContext(eventChannel)
+			context := taskrunner.NewTaskContext(context.TODO(), eventChannel)
 			task := InvAddTask{
 				TaskName:  taskName,
 				InvClient: client,

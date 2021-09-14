@@ -6,6 +6,7 @@ package taskrunner
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"time"
 
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
@@ -22,7 +23,7 @@ func NewTaskStatusRunner(identifiers []object.ObjMetadata, statusPoller poller.P
 		identifiers:  identifiers,
 		statusPoller: statusPoller,
 
-		baseRunner: newBaseRunner(newResourceStatusCollector(identifiers)),
+		baseRunner: newBaseRunner(),
 	}
 }
 
@@ -47,33 +48,53 @@ type Options struct {
 // Run starts the execution of the taskqueue. It will start the
 // statusPoller and then pass the statusChannel to the baseRunner
 // that does most of the work.
-func (tsr *taskStatusRunner) Run(ctx context.Context, taskQueue chan Task,
-	eventChannel chan event.Event, options Options) error {
+func (tsr *taskStatusRunner) Run(
+	ctx context.Context,
+	taskQueue chan Task,
+	eventChannel chan event.Event,
+	opts Options,
+) error {
+	// statusPoller gets its own context to ensure it is cancelled after the
+	// taskQueue is cancelled.
 	statusCtx, cancelFunc := context.WithCancel(context.Background())
-	statusChannel := tsr.statusPoller.Poll(statusCtx, tsr.identifiers, polling.Options{
-		PollInterval: options.PollInterval,
-		UseCache:     options.UseCache,
-	})
 
-	o := baseOptions{
-		emitStatusEvents: options.EmitStatusEvents,
-	}
-	err := tsr.baseRunner.run(ctx, taskQueue, statusChannel, eventChannel, o)
-	// cancel the statusPoller by cancelling the context.
-	cancelFunc()
-	// drain the statusChannel to make sure the lack of a consumer
-	// doesn't block the shutdown of the statusPoller.
-	for range statusChannel {
-	}
-	return err
+	// start polling in the background
+	statusChannel := tsr.statusPoller.Poll(
+		statusCtx,
+		tsr.identifiers,
+		polling.Options{
+			PollInterval: opts.PollInterval,
+			UseCache:     opts.UseCache,
+		},
+	)
+
+	// defer draining, in case the runner panics
+	defer func() {
+		// cancel the statusPoller by cancelling the context.
+		cancelFunc()
+		// drain the statusChannel to make sure the lack of a consumer
+		// doesn't block the shutdown of the statusPoller.
+		for range statusChannel {
+		}
+	}()
+
+	// execute the task queue
+	return tsr.baseRunner.run(
+		ctx,
+		taskQueue,
+		statusChannel,
+		eventChannel,
+		baseOptions{
+			emitStatusEvents: opts.EmitStatusEvents,
+		},
+	)
 }
 
 // NewTaskRunner returns a new taskRunner. It can process taskqueues
 // that does not contain any wait tasks.
 func NewTaskRunner() *taskRunner {
-	collector := newResourceStatusCollector([]object.ObjMetadata{})
 	return &taskRunner{
-		baseRunner: newBaseRunner(collector),
+		baseRunner: newBaseRunner(),
 	}
 }
 
@@ -87,22 +108,28 @@ type taskRunner struct {
 
 // Run starts the execution of the task queue. It delegates the
 // work to the baseRunner, but gives it as nil channel as the statusChannel.
-func (tr *taskRunner) Run(ctx context.Context, taskQueue chan Task,
-	eventChannel chan event.Event) error {
+func (tr *taskRunner) Run(
+	ctx context.Context,
+	taskQueue chan Task,
+	eventChannel chan event.Event,
+) error {
 	var nilStatusChannel chan pollevent.Event
-	o := baseOptions{
-		// The taskRunner doesn't poll for status, so there are not
-		// statusEvents to emit.
-		emitStatusEvents: false,
-	}
-	return tr.baseRunner.run(ctx, taskQueue, nilStatusChannel, eventChannel, o)
+	return tr.baseRunner.run(
+		ctx,
+		taskQueue,
+		nilStatusChannel,
+		eventChannel,
+		baseOptions{
+			// The taskRunner doesn't poll for status, so there are not
+			// statusEvents to emit.
+			emitStatusEvents: false,
+		},
+	)
 }
 
-// newBaseRunner returns a new baseRunner using the given collector.
-func newBaseRunner(collector *resourceStatusCollector) *baseRunner {
-	return &baseRunner{
-		collector: collector,
-	}
+// newBaseRunner returns a new baseRunner
+func newBaseRunner() *baseRunner {
+	return &baseRunner{}
 }
 
 // baseRunner provides the basic task runner functionality. It needs
@@ -111,9 +138,7 @@ func newBaseRunner(collector *resourceStatusCollector) *baseRunner {
 // cases where polling and waiting for status is not needed.
 // This is not meant to be used directly. It is used by the
 // taskRunner and the taskStatusRunner.
-type baseRunner struct {
-	collector *resourceStatusCollector
-}
+type baseRunner struct{}
 
 type baseOptions struct {
 	emitStatusEvents bool
@@ -122,13 +147,21 @@ type baseOptions struct {
 // run is the main function that implements the processing of
 // tasks in the taskqueue. It sets up a loop where a single goroutine
 // will process events from three different channels.
-func (b *baseRunner) run(ctx context.Context, taskQueue chan Task,
-	statusChannel <-chan pollevent.Event, eventChannel chan event.Event,
-	o baseOptions) error {
+func (b *baseRunner) run(
+	ctx context.Context,
+	taskQueue chan Task,
+	statusChannel <-chan pollevent.Event,
+	eventChannel chan event.Event,
+	opts baseOptions,
+) error { // wrap the context to allow task cancellation on error
+	ctx, cancel := context.WithCancel(ctx)
+	// always cancel to clean up resources
+	defer cancel()
+
 	// taskContext is passed into all tasks when they are started. It
 	// provides access to the eventChannel and the taskChannel, and
 	// also provides a way to pass data between tasks.
-	taskContext := NewTaskContext(eventChannel)
+	taskContext := NewTaskContext(ctx, eventChannel)
 
 	// Find and start the first task in the queue.
 	currentTask, done := b.nextTask(taskQueue, taskContext)
@@ -155,7 +188,7 @@ func (b *baseRunner) run(ctx context.Context, taskQueue chan Task,
 		// events are passed through to the eventChannel. This means
 		// that listeners of the eventChannel will get updates on status
 		// even while other tasks (like apply tasks) are running.
-		case statusEvent, ok := <-statusChannel:
+		case kStatusEvent, ok := <-statusChannel:
 			// If the statusChannel has closed or we are preparing
 			// to abort the task processing, we just ignore all
 			// statusEvents.
@@ -168,40 +201,41 @@ func (b *baseRunner) run(ctx context.Context, taskQueue chan Task,
 			// An error event on the statusChannel means the StatusPoller
 			// has encountered a problem so it can't continue. This means
 			// the statusChannel will be closed soon.
-			if statusEvent.EventType == pollevent.ErrorEvent {
+			if kStatusEvent.EventType == pollevent.ErrorEvent {
 				abort = true
 				abortReason = fmt.Errorf("polling for status failed: %v",
-					statusEvent.Error)
-				// If the current task is a wait task, we just set it
-				// to complete so we can exit the loop as soon as possible.
-				completeIfWaitTask(currentTask, taskContext)
+					kStatusEvent.Error)
+
+				// cancel any running tasks
+				cancel()
 				continue
 			}
 
-			if o.emitStatusEvents {
+			// convert types
+			statusEvent := event.StatusEvent{
+				Identifier:       kStatusEvent.Resource.Identifier,
+				PollResourceInfo: kStatusEvent.Resource,
+				Resource:         kStatusEvent.Resource.Resource,
+				Error:            kStatusEvent.Error,
+			}
+
+			if opts.emitStatusEvents {
 				// Forward all normal events to the eventChannel
 				eventChannel <- event.Event{
-					Type: event.StatusType,
-					StatusEvent: event.StatusEvent{
-						Identifier:       statusEvent.Resource.Identifier,
-						PollResourceInfo: statusEvent.Resource,
-						Resource:         statusEvent.Resource.Resource,
-						Error:            statusEvent.Error,
-					},
+					Type:        event.StatusType,
+					StatusEvent: statusEvent,
 				}
 			}
 
 			// The collector needs to keep track of the latest status
 			// for all resources so we can check whether wait task conditions
 			// has been met.
-			b.collector.resourceStatus(statusEvent.Resource)
-			// If the current task is a wait task, we check whether
-			// the condition has been met. If so, we complete the task.
-			if wt, ok := currentTask.(*WaitTask); ok {
-				if wt.checkCondition(taskContext, b.collector) {
-					completeIfWaitTask(currentTask, taskContext)
-				}
-			}
+			taskContext.ResourceStatusCollector().PutEventStatus(kStatusEvent.Resource)
+
+			// Send the event to the current task.
+			// This allows tasks to handle status updates from the status poller.
+			currentTask.OnStatusEvent(taskContext, statusEvent)
+
 		// A message on the taskChannel means that the current task
 		// has either completed or failed. If it has failed, we return
 		// the error. If the abort flag is true, which means something
@@ -209,7 +243,6 @@ func (b *baseRunner) run(ctx context.Context, taskQueue chan Task,
 		// finish, we exit.
 		// If everything is ok, we fetch and start the next task.
 		case msg := <-taskContext.TaskChannel():
-			currentTask.ClearTimeout()
 			taskContext.EventChannel() <- event.Event{
 				Type: event.ActionGroupType,
 				ActionGroupEvent: event.ActionGroupEvent{
@@ -219,7 +252,7 @@ func (b *baseRunner) run(ctx context.Context, taskQueue chan Task,
 				},
 			}
 			if msg.Err != nil {
-				b.amendTimeoutError(msg.Err)
+				b.amendTimeoutError(taskContext, msg.Err)
 				return msg.Err
 			}
 			if abort {
@@ -237,37 +270,24 @@ func (b *baseRunner) run(ctx context.Context, taskQueue chan Task,
 		case <-doneCh:
 			doneCh = nil // Set doneCh to nil so we don't enter a busy loop.
 			abort = true
-			completeIfWaitTask(currentTask, taskContext)
 		}
 	}
 }
 
-func (b *baseRunner) amendTimeoutError(err error) {
+func (b *baseRunner) amendTimeoutError(taskContext *TaskContext, err error) {
 	if timeoutErr, ok := err.(*TimeoutError); ok {
 		var timedOutResources []TimedOutResource
 		for _, id := range timeoutErr.Identifiers {
-			ls, found := b.collector.resourceMap[id]
-			if !found {
-				continue
+			rs := taskContext.ResourceStatusCollector().Get(id)
+			if !timeoutErr.Condition.Meets(rs.CurrentStatus) {
+				timedOutResources = append(timedOutResources, TimedOutResource{
+					Identifier: id,
+					Status:     rs.CurrentStatus,
+					Message:    rs.Message,
+				})
 			}
-			if timeoutErr.Condition.Meets(ls.CurrentStatus) {
-				continue
-			}
-			timedOutResources = append(timedOutResources, TimedOutResource{
-				Identifier: id,
-				Status:     ls.CurrentStatus,
-				Message:    ls.Message,
-			})
 		}
 		timeoutErr.TimedOutResources = timedOutResources
-	}
-}
-
-// completeIfWaitTask checks if the current task is a wait task. If so,
-// we invoke the complete function to complete it.
-func completeIfWaitTask(currentTask Task, taskContext *TaskContext) {
-	if wt, ok := currentTask.(*WaitTask); ok {
-		wt.complete(taskContext)
 	}
 }
 
@@ -296,20 +316,8 @@ func (b *baseRunner) nextTask(taskQueue chan Task,
 		},
 	}
 
-	switch st := tsk.(type) {
-	case *WaitTask:
-		// The wait tasks need to be handled specifically here. Before
-		// starting a new wait task, we check if the condition is already
-		// met. Without this check, a task might end up waiting for
-		// status events when the condition is in fact already met.
-		if st.checkCondition(taskContext, b.collector) {
-			st.startAndComplete(taskContext)
-		} else {
-			st.Start(taskContext)
-		}
-	default:
-		tsk.Start(taskContext)
-	}
+	tsk.Start(taskContext)
+
 	return tsk, false
 }
 
@@ -347,6 +355,21 @@ type TimedOutResource struct {
 func (te TimeoutError) Error() string {
 	return fmt.Sprintf("timeout after %.0f seconds waiting for %d resources to reach condition %s",
 		te.Timeout.Seconds(), len(te.Identifiers), te.Condition)
+}
+
+// Is satisfies the Is interface from errors.Is
+func (te *TimeoutError) Is(err error) bool {
+	if err == nil {
+		return te == nil
+	}
+	bTe, ok := err.(TimeoutError)
+	if !ok {
+		return false
+	}
+	return object.SetEquals(te.Identifiers, bTe.Identifiers) &&
+		te.Timeout == bTe.Timeout &&
+		te.Condition == bTe.Condition &&
+		reflect.DeepEqual(te.TimedOutResources, bTe.TimedOutResources)
 }
 
 // IsTimeoutError checks whether a given error is

@@ -4,6 +4,7 @@
 package filter
 
 import (
+	"context"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -50,7 +51,8 @@ func TestLocalNamespacesFilter(t *testing.T) {
 			}
 			namespace := testNamespace.DeepCopy()
 			namespace.SetName(tc.namespace)
-			actual, reason, err := filter.Filter(namespace)
+			ctx := context.TODO()
+			actual, reason, err := filter.Filter(ctx, namespace)
 			if err != nil {
 				t.Fatalf("LocalNamespacesFilter unexpected error (%s)", err)
 			}

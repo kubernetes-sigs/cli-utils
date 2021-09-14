@@ -4,6 +4,7 @@
 package task
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"sync"
@@ -79,12 +80,12 @@ func TestApplyTask_BasicAppliedObjects(t *testing.T) {
 		t.Run(tn, func(t *testing.T) {
 			eventChannel := make(chan event.Event)
 			defer close(eventChannel)
-			taskContext := taskrunner.NewTaskContext(eventChannel)
+			taskContext := taskrunner.NewTaskContext(context.TODO(), eventChannel)
 
 			objs := toUnstructureds(tc.applied)
 
 			oldAO := applyOptionsFactoryFunc
-			applyOptionsFactoryFunc = func(chan event.Event, common.ServerSideOptions, common.DryRunStrategy, util.Factory) (applyOptions, error) {
+			applyOptionsFactoryFunc = func(chan<- event.Event, common.ServerSideOptions, common.DryRunStrategy, util.Factory) (applyOptions, error) {
 				return &fakeApplyOptions{}, nil
 			}
 			defer func() { applyOptionsFactoryFunc = oldAO }()
@@ -164,12 +165,12 @@ func TestApplyTask_FetchGeneration(t *testing.T) {
 		t.Run(tn, func(t *testing.T) {
 			eventChannel := make(chan event.Event)
 			defer close(eventChannel)
-			taskContext := taskrunner.NewTaskContext(eventChannel)
+			taskContext := taskrunner.NewTaskContext(context.TODO(), eventChannel)
 
 			objs := toUnstructureds(tc.rss)
 
 			oldAO := applyOptionsFactoryFunc
-			applyOptionsFactoryFunc = func(chan event.Event, common.ServerSideOptions, common.DryRunStrategy, util.Factory) (applyOptions, error) {
+			applyOptionsFactoryFunc = func(chan<- event.Event, common.ServerSideOptions, common.DryRunStrategy, util.Factory) (applyOptions, error) {
 				return &fakeApplyOptions{}, nil
 			}
 			defer func() { applyOptionsFactoryFunc = oldAO }()
@@ -275,7 +276,7 @@ func TestApplyTask_DryRun(t *testing.T) {
 			drs := common.Strategies[i]
 			t.Run(tn, func(t *testing.T) {
 				eventChannel := make(chan event.Event)
-				taskContext := taskrunner.NewTaskContext(eventChannel)
+				taskContext := taskrunner.NewTaskContext(context.TODO(), eventChannel)
 
 				restMapper := testutil.NewFakeRESTMapper(schema.GroupVersionKind{
 					Group:   "apps",
@@ -289,7 +290,7 @@ func TestApplyTask_DryRun(t *testing.T) {
 
 				ao := &fakeApplyOptions{}
 				oldAO := applyOptionsFactoryFunc
-				applyOptionsFactoryFunc = func(chan event.Event, common.ServerSideOptions, common.DryRunStrategy, util.Factory) (applyOptions, error) {
+				applyOptionsFactoryFunc = func(chan<- event.Event, common.ServerSideOptions, common.DryRunStrategy, util.Factory) (applyOptions, error) {
 					return ao, nil
 				}
 				defer func() { applyOptionsFactoryFunc = oldAO }()
@@ -409,7 +410,7 @@ func TestApplyTaskWithError(t *testing.T) {
 		drs := common.DryRunNone
 		t.Run(tn, func(t *testing.T) {
 			eventChannel := make(chan event.Event)
-			taskContext := taskrunner.NewTaskContext(eventChannel)
+			taskContext := taskrunner.NewTaskContext(context.TODO(), eventChannel)
 
 			restMapper := testutil.NewFakeRESTMapper(schema.GroupVersionKind{
 				Group:   "apps",
@@ -423,7 +424,7 @@ func TestApplyTaskWithError(t *testing.T) {
 
 			ao := &fakeApplyOptions{}
 			oldAO := applyOptionsFactoryFunc
-			applyOptionsFactoryFunc = func(chan event.Event, common.ServerSideOptions, common.DryRunStrategy, util.Factory) (applyOptions, error) {
+			applyOptionsFactoryFunc = func(chan<- event.Event, common.ServerSideOptions, common.DryRunStrategy, util.Factory) (applyOptions, error) {
 				return ao, nil
 			}
 			defer func() { applyOptionsFactoryFunc = oldAO }()

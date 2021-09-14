@@ -733,7 +733,7 @@ func TestReadAndPrepareObjects(t *testing.T) {
 			}
 			// Create applier with fake inventory client, and call prepareObjects
 			applier := Applier{
-				pruneOptions: &prune.PruneOptions{
+				pruner: &prune.Pruner{
 					InvClient: fakeInvClient,
 					Client:    dynamicfake.NewSimpleDynamicClient(scheme.Scheme, objs...),
 					Mapper: testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme,
@@ -741,7 +741,12 @@ func TestReadAndPrepareObjects(t *testing.T) {
 				},
 				invClient: fakeInvClient,
 			}
-			applyObjs, pruneObjs, err := applier.prepareObjects(tc.inventory, tc.localObjs, Options{})
+			applyObjs, pruneObjs, err := applier.prepareObjects(
+				context.TODO(),
+				tc.inventory,
+				tc.localObjs,
+				Options{},
+			)
 			if tc.isError {
 				assert.Error(t, err)
 				return

@@ -4,6 +4,7 @@
 package task
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -42,7 +43,7 @@ func TestResetRESTMapperTask(t *testing.T) {
 		t.Run(tn, func(t *testing.T) {
 			eventChannel := make(chan event.Event)
 			defer close(eventChannel)
-			taskContext := taskrunner.NewTaskContext(eventChannel)
+			taskContext := taskrunner.NewTaskContext(context.TODO(), eventChannel)
 
 			mapper, discoveryClient := tc.toRESTMapper()
 

@@ -4,6 +4,7 @@
 package filter
 
 import (
+	"context"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
@@ -103,7 +104,8 @@ func TestInventoryPolicyApplyFilter(t *testing.T) {
 				Inv:       inventory.WrapInventoryInfoObj(invObj),
 				InvPolicy: tc.policy,
 			}
-			actual, reason, err := filter.Filter(obj)
+			ctx := context.TODO()
+			actual, reason, err := filter.Filter(ctx, obj)
 			if tc.isError != (err != nil) {
 				t.Fatalf("Expected InventoryPolicyFilter error (%v), got (%v)", tc.isError, (err != nil))
 			}

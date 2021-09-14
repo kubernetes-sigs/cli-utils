@@ -21,8 +21,8 @@ import (
 )
 
 var (
-	pruneOptions = &prune.PruneOptions{}
-	resources    = map[string]string{
+	pruner    = &prune.Pruner{}
+	resources = map[string]string{
 		"pod": `
 kind: Pod
 apiVersion: v1
@@ -352,9 +352,9 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 			applyIds := object.UnstructuredsToObjMetasOrDie(tc.applyObjs)
 			fakeInvClient := inventory.NewFakeInventoryClient(applyIds)
 			tqb := TaskQueueBuilder{
-				PruneOptions: pruneOptions,
-				Mapper:       testutil.NewFakeRESTMapper(),
-				InvClient:    fakeInvClient,
+				Pruner:    pruner,
+				Mapper:    testutil.NewFakeRESTMapper(),
+				InvClient: fakeInvClient,
 			}
 			tq, err := tqb.AppendApplyWaitTasks(tc.applyObjs, []filter.ValidationFilter{}, tc.options).Build()
 			if tc.isError {
@@ -398,7 +398,7 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 	}{
 		"no resources, no tasks": {
 			pruneObjs:     []*unstructured.Unstructured{},
-			options:       Options{Prune: true},
+			options:       Options{},
 			expectedTasks: []taskrunner.Task{},
 			isError:       false,
 		},
@@ -406,7 +406,7 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 			pruneObjs: []*unstructured.Unstructured{
 				testutil.Unstructured(t, resources["default-pod"]),
 			},
-			options: Options{Prune: true},
+			options: Options{},
 			expectedTasks: []taskrunner.Task{
 				&task.PruneTask{
 					TaskName: "prune-0",
@@ -422,7 +422,7 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 				testutil.Unstructured(t, resources["default-pod"]),
 				testutil.Unstructured(t, resources["pod"]),
 			},
-			options: Options{Prune: true},
+			options: Options{},
 			expectedTasks: []taskrunner.Task{
 				&task.PruneTask{
 					TaskName: "prune-0",
@@ -440,7 +440,7 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 					testutil.AddDependsOn(t, testutil.Unstructured(t, resources["secret"]))),
 				testutil.Unstructured(t, resources["secret"]),
 			},
-			options: Options{Prune: true},
+			options: Options{},
 			// Opposite ordering when pruning/deleting
 			expectedTasks: []taskrunner.Task{
 				&task.PruneTask{
@@ -480,7 +480,6 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 			options: Options{
 				ReconcileTimeout: time.Minute,
 				DryRunStrategy:   common.DryRunServer,
-				Prune:            true,
 			},
 			// No wait task, since it is dry run
 			expectedTasks: []taskrunner.Task{
@@ -500,7 +499,7 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 				testutil.Unstructured(t, resources["crd"]),
 				testutil.Unstructured(t, resources["crontab2"]),
 			},
-			options: Options{Prune: true},
+			options: Options{},
 			// Opposite ordering when pruning/deleting.
 			expectedTasks: []taskrunner.Task{
 				&task.PruneTask{
@@ -543,7 +542,6 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 			options: Options{
 				ReconcileTimeout: time.Minute,
 				DryRunStrategy:   common.DryRunClient,
-				Prune:            true,
 			},
 			expectedTasks: []taskrunner.Task{
 				&task.PruneTask{
@@ -568,7 +566,7 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 				testutil.Unstructured(t, resources["pod"]),
 				testutil.Unstructured(t, resources["secret"]),
 			},
-			options: Options{Prune: true},
+			options: Options{},
 			expectedTasks: []taskrunner.Task{
 				&task.PruneTask{
 					TaskName: "prune-0",
@@ -608,7 +606,7 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 				testutil.Unstructured(t, resources["secret"],
 					testutil.AddDependsOn(t, testutil.Unstructured(t, resources["deployment"]))),
 			},
-			options:       Options{Prune: true},
+			options:       Options{},
 			expectedTasks: []taskrunner.Task{},
 			isError:       true,
 		},
@@ -619,9 +617,9 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 			pruneIds := object.UnstructuredsToObjMetasOrDie(tc.pruneObjs)
 			fakeInvClient := inventory.NewFakeInventoryClient(pruneIds)
 			tqb := TaskQueueBuilder{
-				PruneOptions: pruneOptions,
-				Mapper:       testutil.NewFakeRESTMapper(),
-				InvClient:    fakeInvClient,
+				Pruner:    pruner,
+				Mapper:    testutil.NewFakeRESTMapper(),
+				InvClient: fakeInvClient,
 			}
 			emptyPruneFilters := []filter.ValidationFilter{}
 			tq, err := tqb.AppendPruneWaitTasks(tc.pruneObjs, emptyPruneFilters, tc.options).Build()

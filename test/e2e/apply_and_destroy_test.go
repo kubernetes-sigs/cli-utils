@@ -55,9 +55,11 @@ func applyAndDestroyTest(c client.Client, invConfig InventoryConfig, inventoryNa
 	By("Destroy resources")
 	destroyer := invConfig.DestroyerFactoryFunc()
 
+	// TODO: test timeout/cancel behavior
+	ctx := context.TODO()
 	destroyInv := createInventoryInfo(invConfig, inventoryName, namespaceName, inventoryID)
 	options := apply.DestroyerOptions{InventoryPolicy: inventory.AdoptIfNoInventory}
-	destroyerEvents := runCollectNoErr(destroyer.Run(destroyInv, options))
+	destroyerEvents := runCollectNoErr(destroyer.Run(ctx, destroyInv, options))
 	err = testutil.VerifyEvents([]testutil.ExpEvent{
 		{
 			EventType: event.DeleteType,

@@ -4,6 +4,8 @@
 package filter
 
 import (
+	"context"
+
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
@@ -17,5 +19,5 @@ type ValidationFilter interface {
 	// Filter returns true if validation fails. If true a
 	// reason string is included in the return. If an error happens
 	// during filtering it is returned.
-	Filter(obj *unstructured.Unstructured) (bool, string, error)
+	Filter(ctx context.Context, obj *unstructured.Unstructured) (bool, string, error)
 }

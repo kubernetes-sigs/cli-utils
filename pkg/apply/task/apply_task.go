@@ -113,7 +113,7 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 			for _, filter := range a.Filters {
 				klog.V(6).Infof("apply filter %s: %s", filter.Name(), id)
 				var reason string
-				filtered, reason, filterErr = filter.Filter(obj)
+				filtered, reason, filterErr = filter.Filter(taskContext.Context(), obj)
 				if filterErr != nil {
 					if klog.V(5).Enabled() {
 						klog.Errorf("error during %s, (%s): %s", filter.Name(), id, filterErr)
@@ -161,7 +161,7 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 	}()
 }
 
-func newApplyOptions(eventChannel chan event.Event, serverSideOptions common.ServerSideOptions,
+func newApplyOptions(eventChannel chan<- event.Event, serverSideOptions common.ServerSideOptions,
 	strategy common.DryRunStrategy, factory util.Factory) (applyOptions, error) {
 	discovery, err := factory.ToDiscoveryClient()
 	if err != nil {
@@ -207,8 +207,8 @@ func (a *ApplyTask) sendTaskResult(taskContext *taskrunner.TaskContext) {
 	taskContext.TaskChannel() <- taskrunner.TaskResult{}
 }
 
-// ClearTimeout is not supported by the ApplyTask.
-func (a *ApplyTask) ClearTimeout() {}
+// OnStatusEvent is not supported by ApplyTask.
+func (a *ApplyTask) OnStatusEvent(taskContext *taskrunner.TaskContext, e event.StatusEvent) {}
 
 // createApplyEvent is a helper function to package an apply event for a single resource.
 func createApplyEvent(id object.ObjMetadata, operation event.ApplyEventOperation, resource *unstructured.Unstructured) event.Event {
@@ -254,7 +254,7 @@ func isStreamError(err error) bool {
 	return strings.Contains(err.Error(), "stream error: stream ID ")
 }
 
-func clientSideApply(info *resource.Info, eventChannel chan event.Event, strategy common.DryRunStrategy, factory util.Factory) error {
+func clientSideApply(info *resource.Info, eventChannel chan<- event.Event, strategy common.DryRunStrategy, factory util.Factory) error {
 	ao, err := applyOptionsFactoryFunc(eventChannel, common.ServerSideOptions{ServerSideApply: false}, strategy, factory)
 	if err != nil {
 		return err
