@@ -9,8 +9,10 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/format"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
@@ -75,6 +77,9 @@ var _ = Describe("Applier", func() {
 	var c client.Client
 
 	BeforeSuite(func() {
+		// increase from 4000 to handle long event lists
+		format.MaxLength = 10000
+
 		cfg, err := ctrl.GetConfig()
 		Expect(err).NotTo(HaveOccurred())
 
@@ -90,6 +95,10 @@ var _ = Describe("Applier", func() {
 		createInventoryCRD(c)
 	})
 
+	AfterSuite(func() {
+		deleteInventoryCRD(c)
+	})
+
 	for name := range inventoryConfigs {
 		invConfig := inventoryConfigs[name]
 		Context(fmt.Sprintf("Inventory: %s", name), func() {
@@ -103,6 +112,18 @@ var _ = Describe("Applier", func() {
 				})
 
 				AfterEach(func() {
+					// clean up resources created by the tests
+					objs := []*unstructured.Unstructured{
+						manifestToUnstructured(cr),
+						manifestToUnstructured(crd),
+						manifestToUnstructured(pod1),
+						manifestToUnstructured(pod2),
+						manifestToUnstructured(pod3),
+						deploymentManifest(namespace.GetName()),
+					}
+					for _, obj := range objs {
+						deleteUnstructuredIfExists(c, obj)
+					}
 					deleteNamespace(c, namespace)
 				})
 
@@ -199,6 +220,27 @@ func createRandomNamespace(c client.Client) *v1.Namespace {
 	err := c.Create(context.TODO(), namespace)
 	Expect(err).ToNot(HaveOccurred())
 	return namespace
+}
+
+func deleteInventoryCRD(c client.Client) {
+	invCRD := manifestToUnstructured(customprovider.InventoryCRD)
+	err := c.Delete(context.TODO(), invCRD)
+	if err != nil && !apierrors.IsNotFound(err) {
+		Expect(err).ToNot(HaveOccurred())
+	}
+}
+
+func deleteUnstructuredIfExists(c client.Client, obj *unstructured.Unstructured) {
+	err := c.Delete(context.TODO(), obj)
+	if err != nil {
+		Expect(err).To(Or(
+			BeAssignableToTypeOf(&meta.NoKindMatchError{}),
+			BeAssignableToTypeOf(&apierrors.StatusError{}),
+		))
+		if se, ok := err.(*apierrors.StatusError); ok {
+			Expect(se.ErrStatus.Reason).To(Equal(metav1.StatusReasonNotFound))
+		}
+	}
 }
 
 func deleteNamespace(c client.Client, namespace *v1.Namespace) {

@@ -6,6 +6,8 @@ package testutil
 import (
 	"fmt"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
 	"sigs.k8s.io/cli-utils/pkg/object"
@@ -14,6 +16,7 @@ import (
 type ExpEvent struct {
 	EventType event.Type
 
+	InitEvent        *ExpInitEvent
 	ActionGroupEvent *ExpActionGroupEvent
 	ApplyEvent       *ExpApplyEvent
 	StatusEvent      *ExpStatusEvent
@@ -21,9 +24,15 @@ type ExpEvent struct {
 	DeleteEvent      *ExpDeleteEvent
 }
 
+type ExpInitEvent struct {
+	// TODO: enable if we want to more thuroughly test InitEvents
+	// ActionGroups []event.ActionGroup
+}
+
 type ExpActionGroupEvent struct {
 	Name   string
 	Action event.ResourceAction
+	Type   event.ActionGroupEventType
 }
 
 type ExpApplyEvent struct {
@@ -93,6 +102,10 @@ func isMatch(ee ExpEvent, e event.Event) bool {
 		}
 
 		if agee.Action != age.Action {
+			return false
+		}
+
+		if agee.Type != age.Type {
 			return false
 		}
 	case event.ApplyType:
@@ -183,4 +196,89 @@ func isMatch(ee ExpEvent, e event.Event) bool {
 		return de.Error == nil
 	}
 	return true
+}
+
+func EventsToExpEvents(events []event.Event) []ExpEvent {
+	result := make([]ExpEvent, 0, len(events))
+	for _, event := range events {
+		result = append(result, EventToExpEvent(event))
+	}
+	return result
+}
+
+func EventToExpEvent(e event.Event) ExpEvent {
+	switch e.Type {
+	case event.InitType:
+		return ExpEvent{
+			EventType: event.InitType,
+			InitEvent: &ExpInitEvent{
+				// TODO: enable if we want to more thuroughly test InitEvents
+				// ActionGroups: e.InitEvent.ActionGroups,
+			},
+		}
+
+	case event.ActionGroupType:
+		return ExpEvent{
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &ExpActionGroupEvent{
+				Name:   e.ActionGroupEvent.GroupName,
+				Action: e.ActionGroupEvent.Action,
+				Type:   e.ActionGroupEvent.Type,
+			},
+		}
+
+	case event.ApplyType:
+		return ExpEvent{
+			EventType: event.ApplyType,
+			ApplyEvent: &ExpApplyEvent{
+				Identifier: e.ApplyEvent.Identifier,
+				Operation:  e.ApplyEvent.Operation,
+				Error:      e.ApplyEvent.Error,
+			},
+		}
+
+	case event.StatusType:
+		return ExpEvent{
+			EventType: event.StatusType,
+			StatusEvent: &ExpStatusEvent{
+				Identifier: e.StatusEvent.Identifier,
+				Status:     e.StatusEvent.PollResourceInfo.Status,
+				Error:      e.StatusEvent.Error,
+			},
+		}
+
+	case event.PruneType:
+		return ExpEvent{
+			EventType: event.PruneType,
+			PruneEvent: &ExpPruneEvent{
+				Identifier: e.PruneEvent.Identifier,
+				Operation:  e.PruneEvent.Operation,
+				Error:      e.PruneEvent.Error,
+			},
+		}
+
+	case event.DeleteType:
+		return ExpEvent{
+			EventType: event.DeleteType,
+			DeleteEvent: &ExpDeleteEvent{
+				Identifier: e.DeleteEvent.Identifier,
+				Operation:  e.DeleteEvent.Operation,
+				Error:      e.DeleteEvent.Error,
+			},
+		}
+	}
+	return ExpEvent{}
+}
+
+func RemoveEqualEvents(in []ExpEvent, expected ExpEvent) ([]ExpEvent, int) {
+	matches := 0
+	for i := 0; i < len(in); i++ {
+		if cmp.Equal(in[i], expected, cmpopts.EquateErrors()) {
+			// remove event at index i
+			in = append(in[:i], in[i+1:]...)
+			matches++
+			i--
+		}
+	}
+	return in, matches
 }
