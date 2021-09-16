@@ -25,13 +25,13 @@ func applyAndDestroyTest(c client.Client, invConfig InventoryConfig, inventoryNa
 	applier := invConfig.ApplierFactoryFunc()
 	inventoryID := fmt.Sprintf("%s-%s", inventoryName, namespaceName)
 
-	applyInv := createInventoryInfo(invConfig, inventoryName, namespaceName, inventoryID)
+	inventoryInfo := createInventoryInfo(invConfig, inventoryName, namespaceName, inventoryID)
 
 	resources := []*unstructured.Unstructured{
 		deploymentManifest(namespaceName),
 	}
 
-	applyCh := applier.Run(context.TODO(), applyInv, resources, apply.Options{
+	applyCh := applier.Run(context.TODO(), inventoryInfo, resources, apply.Options{
 		ReconcileTimeout: 2 * time.Minute,
 		EmitStatusEvents: true,
 	})
@@ -175,9 +175,8 @@ func applyAndDestroyTest(c client.Client, invConfig InventoryConfig, inventoryNa
 	By("Destroy resources")
 	destroyer := invConfig.DestroyerFactoryFunc()
 
-	destroyInv := createInventoryInfo(invConfig, inventoryName, namespaceName, inventoryID)
 	options := apply.DestroyerOptions{InventoryPolicy: inventory.AdoptIfNoInventory}
-	destroyerEvents := runCollectNoErr(destroyer.Run(destroyInv, options))
+	destroyerEvents := runCollectNoErr(destroyer.Run(inventoryInfo, options))
 
 	expEvents = []testutil.ExpEvent{
 		{
