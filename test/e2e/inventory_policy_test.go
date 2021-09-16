@@ -5,7 +5,7 @@ package e2e
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -16,6 +16,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/apply"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
+	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/testutil"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -55,20 +56,125 @@ func inventoryPolicyMustMatchTest(c client.Client, invConfig InventoryConfig, na
 	}
 
 	By("Verify the events")
-	err := testutil.VerifyEvents([]testutil.ExpEvent{
+	expEvents := []testutil.ExpEvent{
 		{
+			// InitTask
+			EventType: event.InitType,
+			InitEvent: &testutil.ExpInitEvent{},
+		},
+		{
+			// InvAddTask start
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.InventoryAction,
+				Name:   "inventory-add-0",
+				Type:   event.Started,
+			},
+		},
+		{
+			// InvAddTask finished
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.InventoryAction,
+				Name:   "inventory-add-0",
+				Type:   event.Finished,
+			},
+		},
+		{
+			// ApplyTask start
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.ApplyAction,
+				Name:   "apply-0",
+				Type:   event.Started,
+			},
+		},
+		{
+			// ApplyTask error: resource managed by another inventory
 			EventType: event.ApplyType,
 			ApplyEvent: &testutil.ExpApplyEvent{
 				Identifier: object.UnstructuredToObjMetaOrDie(deploymentManifest(namespaceName)),
-				Error:      inventory.NewInventoryOverlapError(fmt.Errorf("test")),
+				Error: testutil.EqualErrorType(
+					inventory.NewInventoryOverlapError(errors.New("test")),
+				),
 			},
 		},
-	}, events)
-	Expect(err).ToNot(HaveOccurred())
+		{
+			// ApplyTask finished
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.ApplyAction,
+				Name:   "apply-0",
+				Type:   event.Finished,
+			},
+		},
+		{
+			// WaitTask start
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.WaitAction,
+				Name:   "wait-0",
+				Type:   event.Started,
+			},
+		},
+		{
+			// WaitTask finished
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.WaitAction,
+				Name:   "wait-0",
+				Type:   event.Finished,
+			},
+		},
+		{
+			// InvSetTask start
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.InventoryAction,
+				Name:   "inventory-set-0",
+				Type:   event.Started,
+			},
+		},
+		{
+			// InvSetTask finished
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.InventoryAction,
+				Name:   "inventory-set-0",
+				Type:   event.Finished,
+			},
+		},
+	}
+	received := testutil.EventsToExpEvents(events)
+
+	// handle optional async InProgress StatusEvents
+	expected := testutil.ExpEvent{
+		EventType: event.StatusType,
+		StatusEvent: &testutil.ExpStatusEvent{
+			Identifier: object.UnstructuredToObjMetaOrDie(deploymentManifest(namespaceName)),
+			Status:     status.InProgressStatus,
+			Error:      nil,
+		},
+	}
+	received, _ = testutil.RemoveEqualEvents(received, expected)
+
+	// handle required async Current StatusEvents
+	expected = testutil.ExpEvent{
+		EventType: event.StatusType,
+		StatusEvent: &testutil.ExpStatusEvent{
+			Identifier: object.UnstructuredToObjMetaOrDie(deploymentManifest(namespaceName)),
+			Status:     status.CurrentStatus,
+			Error:      nil,
+		},
+	}
+	received, matches := testutil.RemoveEqualEvents(received, expected)
+	Expect(matches).To(BeNumerically(">=", 1), "unexpected number of %q status events", status.CurrentStatus)
+
+	Expect(received).To(testutil.Equal(expEvents))
 
 	By("Verify resource wasn't updated")
 	var d appsv1.Deployment
-	err = c.Get(context.TODO(), types.NamespacedName{
+	err := c.Get(context.TODO(), types.NamespacedName{
 		Namespace: namespaceName,
 		Name:      deploymentManifest(namespaceName).GetName(),
 	}, &d)
@@ -104,8 +210,41 @@ func inventoryPolicyAdoptIfNoInventoryTest(c client.Client, invConfig InventoryC
 	}
 
 	By("Verify the events")
-	err = testutil.VerifyEvents([]testutil.ExpEvent{
+	expEvents := []testutil.ExpEvent{
 		{
+			// InitTask
+			EventType: event.InitType,
+			InitEvent: &testutil.ExpInitEvent{},
+		},
+		{
+			// InvAddTask start
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.InventoryAction,
+				Name:   "inventory-add-0",
+				Type:   event.Started,
+			},
+		},
+		{
+			// InvAddTask finished
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.InventoryAction,
+				Name:   "inventory-add-0",
+				Type:   event.Finished,
+			},
+		},
+		{
+			// ApplyTask start
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.ApplyAction,
+				Name:   "apply-0",
+				Type:   event.Started,
+			},
+		},
+		{
+			// Apply deployment
 			EventType: event.ApplyType,
 			ApplyEvent: &testutil.ExpApplyEvent{
 				Operation:  event.Configured,
@@ -113,8 +252,78 @@ func inventoryPolicyAdoptIfNoInventoryTest(c client.Client, invConfig InventoryC
 				Error:      nil,
 			},
 		},
-	}, events)
-	Expect(err).ToNot(HaveOccurred())
+		{
+			// ApplyTask finished
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.ApplyAction,
+				Name:   "apply-0",
+				Type:   event.Finished,
+			},
+		},
+		{
+			// WaitTask start
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.WaitAction,
+				Name:   "wait-0",
+				Type:   event.Started,
+			},
+		},
+		{
+			// WaitTask finished
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.WaitAction,
+				Name:   "wait-0",
+				Type:   event.Finished,
+			},
+		},
+		{
+			// InvSetTask start
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.InventoryAction,
+				Name:   "inventory-set-0",
+				Type:   event.Started,
+			},
+		},
+		{
+			// InvSetTask finished
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.InventoryAction,
+				Name:   "inventory-set-0",
+				Type:   event.Finished,
+			},
+		},
+	}
+
+	// handle optional async InProgress StatusEvents
+	received := testutil.EventsToExpEvents(events)
+	expected := testutil.ExpEvent{
+		EventType: event.StatusType,
+		StatusEvent: &testutil.ExpStatusEvent{
+			Identifier: object.UnstructuredToObjMetaOrDie(deploymentManifest(namespaceName)),
+			Status:     status.InProgressStatus,
+			Error:      nil,
+		},
+	}
+	received, _ = testutil.RemoveEqualEvents(received, expected)
+
+	// handle required async Current StatusEvents
+	expected = testutil.ExpEvent{
+		EventType: event.StatusType,
+		StatusEvent: &testutil.ExpStatusEvent{
+			Identifier: object.UnstructuredToObjMetaOrDie(deploymentManifest(namespaceName)),
+			Status:     status.CurrentStatus,
+			Error:      nil,
+		},
+	}
+	received, matches := testutil.RemoveEqualEvents(received, expected)
+	Expect(matches).To(BeNumerically(">=", 1), "unexpected number of %q status events", status.CurrentStatus)
+
+	Expect(received).To(testutil.Equal(expEvents))
 
 	By("Verify resource was updated and added to inventory")
 	var d appsv1.Deployment
@@ -164,8 +373,41 @@ func inventoryPolicyAdoptAllTest(c client.Client, invConfig InventoryConfig, nam
 	}
 
 	By("Verify the events")
-	err := testutil.VerifyEvents([]testutil.ExpEvent{
+	expEvents := []testutil.ExpEvent{
 		{
+			// InitTask
+			EventType: event.InitType,
+			InitEvent: &testutil.ExpInitEvent{},
+		},
+		{
+			// InvAddTask start
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.InventoryAction,
+				Name:   "inventory-add-0",
+				Type:   event.Started,
+			},
+		},
+		{
+			// InvAddTask finished
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.InventoryAction,
+				Name:   "inventory-add-0",
+				Type:   event.Finished,
+			},
+		},
+		{
+			// ApplyTask start
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.ApplyAction,
+				Name:   "apply-0",
+				Type:   event.Started,
+			},
+		},
+		{
+			// Apply deployment
 			EventType: event.ApplyType,
 			ApplyEvent: &testutil.ExpApplyEvent{
 				Operation:  event.Configured,
@@ -173,12 +415,82 @@ func inventoryPolicyAdoptAllTest(c client.Client, invConfig InventoryConfig, nam
 				Error:      nil,
 			},
 		},
-	}, events)
-	Expect(err).ToNot(HaveOccurred())
+		{
+			// ApplyTask finished
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.ApplyAction,
+				Name:   "apply-0",
+				Type:   event.Finished,
+			},
+		},
+		{
+			// WaitTask start
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.WaitAction,
+				Name:   "wait-0",
+				Type:   event.Started,
+			},
+		},
+		{
+			// WaitTask finished
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.WaitAction,
+				Name:   "wait-0",
+				Type:   event.Finished,
+			},
+		},
+		{
+			// InvSetTask start
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.InventoryAction,
+				Name:   "inventory-set-0",
+				Type:   event.Started,
+			},
+		},
+		{
+			// InvSetTask finished
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.InventoryAction,
+				Name:   "inventory-set-0",
+				Type:   event.Finished,
+			},
+		},
+	}
+
+	// handle optional async InProgress StatusEvents
+	received := testutil.EventsToExpEvents(events)
+	expected := testutil.ExpEvent{
+		EventType: event.StatusType,
+		StatusEvent: &testutil.ExpStatusEvent{
+			Identifier: object.UnstructuredToObjMetaOrDie(deploymentManifest(namespaceName)),
+			Status:     status.InProgressStatus,
+			Error:      nil,
+		},
+	}
+	received, _ = testutil.RemoveEqualEvents(received, expected)
+
+	// handle required async Current StatusEvents
+	expected = testutil.ExpEvent{
+		EventType: event.StatusType,
+		StatusEvent: &testutil.ExpStatusEvent{
+			Identifier: object.UnstructuredToObjMetaOrDie(deploymentManifest(namespaceName)),
+			Status:     status.CurrentStatus,
+			Error:      nil,
+		},
+	}
+	received, matches := testutil.RemoveEqualEvents(received, expected)
+	Expect(matches).To(BeNumerically(">=", 1), "unexpected number of %q status events", status.CurrentStatus)
+
+	Expect(received).To(testutil.Equal(expEvents))
 
 	By("Verify resource was updated and added to inventory")
 	var d appsv1.Deployment
-	err = c.Get(context.TODO(), types.NamespacedName{
+	err := c.Get(context.TODO(), types.NamespacedName{
 		Namespace: namespaceName,
 		Name:      deploymentManifest(namespaceName).GetName(),
 	}, &d)

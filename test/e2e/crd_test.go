@@ -40,10 +40,39 @@ func crdTest(_ client.Client, invConfig InventoryConfig, inventoryName, namespac
 		Expect(e.Type).NotTo(Equal(event.ErrorType))
 		applierEvents = append(applierEvents, e)
 	}
-	err := testutil.VerifyEvents([]testutil.ExpEvent{
+
+	expEvents := []testutil.ExpEvent{
+		{
+			// InitTask
+			EventType: event.InitType,
+			InitEvent: &testutil.ExpInitEvent{},
+		},
+		{
+			// InvAddTask start
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.InventoryAction,
+				Name:   "inventory-add-0",
+				Type:   event.Started,
+			},
+		},
+		{
+			// InvAddTask finished
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.InventoryAction,
+				Name:   "inventory-add-0",
+				Type:   event.Finished,
+			},
+		},
 		{
 			// ApplyTask start
 			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.ApplyAction,
+				Name:   "apply-0",
+				Type:   event.Started,
+			},
 		},
 		{
 			// Apply CRD before custom resource
@@ -57,21 +86,41 @@ func crdTest(_ client.Client, invConfig InventoryConfig, inventoryName, namespac
 		{
 			// ApplyTask finished
 			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.ApplyAction,
+				Name:   "apply-0",
+				Type:   event.Finished,
+			},
 		},
 		{
 			// WaitTask start
 			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.WaitAction,
+				Name:   "wait-0",
+				Type:   event.Started,
+			},
 		},
 		{
 			// WaitTask finished
 			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.WaitAction,
+				Name:   "wait-0",
+				Type:   event.Finished,
+			},
 		},
 		{
 			// ApplyTask start
 			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.ApplyAction,
+				Name:   "apply-1",
+				Type:   event.Started,
+			},
 		},
 		{
-			// Apply custom resource after CRD
+			// Apply CRD before custom resource
 			EventType: event.ApplyType,
 			ApplyEvent: &testutil.ExpApplyEvent{
 				Operation:  event.Created,
@@ -82,22 +131,70 @@ func crdTest(_ client.Client, invConfig InventoryConfig, inventoryName, namespac
 		{
 			// ApplyTask finished
 			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.ApplyAction,
+				Name:   "apply-1",
+				Type:   event.Finished,
+			},
 		},
-	}, applierEvents)
-	Expect(err).ToNot(HaveOccurred())
+		{
+			// WaitTask start
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.WaitAction,
+				Name:   "wait-1",
+				Type:   event.Started,
+			},
+		},
+		{
+			// WaitTask finished
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.WaitAction,
+				Name:   "wait-1",
+				Type:   event.Finished,
+			},
+		},
+		{
+			// InvSetTask start
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.InventoryAction,
+				Name:   "inventory-set-0",
+				Type:   event.Started,
+			},
+		},
+		{
+			// InvSetTask finished
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.InventoryAction,
+				Name:   "inventory-set-0",
+				Type:   event.Finished,
+			},
+		},
+	}
+	Expect(testutil.EventsToExpEvents(applierEvents)).To(testutil.Equal(expEvents))
 
 	By("destroy the resources, including the crd")
 	destroyer := invConfig.DestroyerFactoryFunc()
 	options := apply.DestroyerOptions{InventoryPolicy: inventory.AdoptIfNoInventory}
 	destroyerEvents := runCollectNoErr(destroyer.Run(inv, options))
-	err = testutil.VerifyEvents([]testutil.ExpEvent{
+
+	expEvents = []testutil.ExpEvent{
 		{
-			// Initial event
+			// InitTask
 			EventType: event.InitType,
+			InitEvent: &testutil.ExpInitEvent{},
 		},
 		{
 			// PruneTask start
 			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.DeleteAction,
+				Name:   "prune-0",
+				Type:   event.Started,
+			},
 		},
 		{
 			// Delete custom resource first
@@ -111,18 +208,38 @@ func crdTest(_ client.Client, invConfig InventoryConfig, inventoryName, namespac
 		{
 			// PruneTask finished
 			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.DeleteAction,
+				Name:   "prune-0",
+				Type:   event.Finished,
+			},
 		},
 		{
 			// WaitTask start
 			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.WaitAction,
+				Name:   "wait-0",
+				Type:   event.Started,
+			},
 		},
 		{
 			// WaitTask finished
 			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.WaitAction,
+				Name:   "wait-0",
+				Type:   event.Finished,
+			},
 		},
 		{
 			// PruneTask start
 			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.DeleteAction,
+				Name:   "prune-1",
+				Type:   event.Started,
+			},
 		},
 		{
 			// Delete CRD after custom resource
@@ -136,9 +253,50 @@ func crdTest(_ client.Client, invConfig InventoryConfig, inventoryName, namespac
 		{
 			// PruneTask finished
 			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.DeleteAction,
+				Name:   "prune-1",
+				Type:   event.Finished,
+			},
 		},
-	}, destroyerEvents)
-	Expect(err).ToNot(HaveOccurred())
+		{
+			// WaitTask start
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.WaitAction,
+				Name:   "wait-1",
+				Type:   event.Started,
+			},
+		},
+		{
+			// WaitTask finished
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.WaitAction,
+				Name:   "wait-1",
+				Type:   event.Finished,
+			},
+		},
+		{
+			// DeleteInvTask start
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.InventoryAction,
+				Name:   "delete-inventory-0",
+				Type:   event.Started,
+			},
+		},
+		{
+			// DeleteInvTask finished
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.InventoryAction,
+				Name:   "delete-inventory-0",
+				Type:   event.Finished,
+			},
+		},
+	}
+	Expect(testutil.EventsToExpEvents(destroyerEvents)).To(testutil.Equal(expEvents))
 }
 
 var crd = []byte(strings.TrimSpace(`

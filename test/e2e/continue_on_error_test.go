@@ -5,13 +5,14 @@ package e2e
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"strings"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/cli-utils/pkg/apply"
+	applyerror "sigs.k8s.io/cli-utils/pkg/apply/error"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/testutil"
@@ -35,25 +36,80 @@ func continueOnErrorTest(_ client.Client, invConfig InventoryConfig, inventoryNa
 		Expect(e.Type).NotTo(Equal(event.ErrorType))
 		applierEvents = append(applierEvents, e)
 	}
-	err := testutil.VerifyEvents([]testutil.ExpEvent{
+
+	expEvents := []testutil.ExpEvent{
 		{
-			// ApplyTask started
+			// InitTask
+			EventType: event.InitType,
+			InitEvent: &testutil.ExpInitEvent{},
+		},
+		{
+			// InvAddTask start
 			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.InventoryAction,
+				Name:   "inventory-add-0",
+				Type:   event.Started,
+			},
+		},
+		{
+			// InvAddTask finished
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.InventoryAction,
+				Name:   "inventory-add-0",
+				Type:   event.Finished,
+			},
+		},
+		{
+			// ApplyTask start
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.ApplyAction,
+				Name:   "apply-0",
+				Type:   event.Started,
+			},
 		},
 		{
 			// Apply object which fails
 			EventType: event.ApplyType,
 			ApplyEvent: &testutil.ExpApplyEvent{
 				Identifier: object.UnstructuredToObjMetaOrDie(manifestToUnstructured(invalidCrd)),
-				Error:      fmt.Errorf("failed to apply"),
+				Error: testutil.EqualErrorType(
+					applyerror.NewApplyRunError(errors.New("failed to apply")),
+				),
 			},
 		},
 		{
 			// ApplyTask finished
 			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.ApplyAction,
+				Name:   "apply-0",
+				Type:   event.Finished,
+			},
 		},
-	}, applierEvents)
-	Expect(err).ToNot(HaveOccurred())
+		// Note: No WaitTask when apply fails
+		{
+			// InvSetTask start
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.InventoryAction,
+				Name:   "inventory-set-0",
+				Type:   event.Started,
+			},
+		},
+		{
+			// InvSetTask finished
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.InventoryAction,
+				Name:   "inventory-set-0",
+				Type:   event.Finished,
+			},
+		},
+	}
+	Expect(testutil.EventsToExpEvents(applierEvents)).To(testutil.Equal(expEvents))
 }
 
 var invalidCrd = []byte(strings.TrimSpace(`

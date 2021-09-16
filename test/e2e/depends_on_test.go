@@ -41,87 +41,208 @@ func dependsOnTest(_ client.Client, invConfig InventoryConfig, inventoryName, na
 		Expect(e.Type).NotTo(Equal(event.ErrorType))
 		applierEvents = append(applierEvents, e)
 	}
-	err := testutil.VerifyEvents([]testutil.ExpEvent{
+	expEvents := []testutil.ExpEvent{
 		{
-			// Pod2 is applied first
+			// InitTask
+			EventType: event.InitType,
+			InitEvent: &testutil.ExpInitEvent{},
+		},
+		{
+			// InvAddTask start
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.InventoryAction,
+				Name:   "inventory-add-0",
+				Type:   event.Started,
+			},
+		},
+		{
+			// InvAddTask finished
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.InventoryAction,
+				Name:   "inventory-add-0",
+				Type:   event.Finished,
+			},
+		},
+		{
+			// ApplyTask start
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.ApplyAction,
+				Name:   "apply-0",
+				Type:   event.Started,
+			},
+		},
+		{
+			// Apply Pod2 first
 			EventType: event.ApplyType,
 			ApplyEvent: &testutil.ExpApplyEvent{
+				Operation:  event.Created,
 				Identifier: object.UnstructuredToObjMetaOrDie(manifestToUnstructured(pod2)),
-				Operation:  event.Created,
 				Error:      nil,
 			},
 		},
 		{
 			// ApplyTask finished
 			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.ApplyAction,
+				Name:   "apply-0",
+				Type:   event.Finished,
+			},
 		},
 		{
 			// WaitTask start
 			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.WaitAction,
+				Name:   "wait-0",
+				Type:   event.Started,
+			},
 		},
 		{
 			// WaitTask finished
 			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.WaitAction,
+				Name:   "wait-0",
+				Type:   event.Finished,
+			},
 		},
 		{
 			// ApplyTask start
 			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.ApplyAction,
+				Name:   "apply-1",
+				Type:   event.Started,
+			},
 		},
 		{
-			// Pod3 is applied second
+			// Apply pod3 second
 			EventType: event.ApplyType,
 			ApplyEvent: &testutil.ExpApplyEvent{
+				Operation:  event.Created,
 				Identifier: object.UnstructuredToObjMetaOrDie(manifestToUnstructured(pod3)),
-				Operation:  event.Created,
 				Error:      nil,
 			},
 		},
 		{
 			// ApplyTask finished
 			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.ApplyAction,
+				Name:   "apply-1",
+				Type:   event.Finished,
+			},
 		},
 		{
 			// WaitTask start
 			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.WaitAction,
+				Name:   "wait-1",
+				Type:   event.Started,
+			},
 		},
 		{
 			// WaitTask finished
 			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.WaitAction,
+				Name:   "wait-1",
+				Type:   event.Finished,
+			},
 		},
 		{
 			// ApplyTask start
 			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.ApplyAction,
+				Name:   "apply-2",
+				Type:   event.Started,
+			},
 		},
 		{
-			// Pod1 is applied third
+			// Apply pod1 third
 			EventType: event.ApplyType,
 			ApplyEvent: &testutil.ExpApplyEvent{
-				Identifier: object.UnstructuredToObjMetaOrDie(manifestToUnstructured(pod1)),
 				Operation:  event.Created,
+				Identifier: object.UnstructuredToObjMetaOrDie(manifestToUnstructured(pod1)),
 				Error:      nil,
 			},
 		},
 		{
 			// ApplyTask finished
 			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.ApplyAction,
+				Name:   "apply-2",
+				Type:   event.Finished,
+			},
 		},
-	}, applierEvents)
-	Expect(err).ToNot(HaveOccurred())
+		{
+			// WaitTask start
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.WaitAction,
+				Name:   "wait-2",
+				Type:   event.Started,
+			},
+		},
+		{
+			// WaitTask finished
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.WaitAction,
+				Name:   "wait-2",
+				Type:   event.Finished,
+			},
+		},
+		{
+			// InvSetTask start
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.InventoryAction,
+				Name:   "inventory-set-0",
+				Type:   event.Started,
+			},
+		},
+		{
+			// InvSetTask finished
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.InventoryAction,
+				Name:   "inventory-set-0",
+				Type:   event.Finished,
+			},
+		},
+	}
+	Expect(testutil.EventsToExpEvents(applierEvents)).To(testutil.Equal(expEvents))
 
 	By("destroy resources in opposite order")
 	destroyer := invConfig.DestroyerFactoryFunc()
 	options := apply.DestroyerOptions{InventoryPolicy: inventory.AdoptIfNoInventory}
 	destroyerEvents := runCollectNoErr(destroyer.Run(inv, options))
-	err = testutil.VerifyEvents([]testutil.ExpEvent{
+
+	expEvents = []testutil.ExpEvent{
 		{
-			// Initial event
+			// InitTask
 			EventType: event.InitType,
+			InitEvent: &testutil.ExpInitEvent{},
 		},
 		{
 			// PruneTask start
 			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.DeleteAction,
+				Name:   "prune-0",
+				Type:   event.Started,
+			},
 		},
 		{
+			// Delete pod1 first
 			EventType: event.DeleteType,
 			DeleteEvent: &testutil.ExpDeleteEvent{
 				Operation:  event.Deleted,
@@ -132,21 +253,41 @@ func dependsOnTest(_ client.Client, invConfig InventoryConfig, inventoryName, na
 		{
 			// PruneTask finished
 			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.DeleteAction,
+				Name:   "prune-0",
+				Type:   event.Finished,
+			},
 		},
 		{
 			// WaitTask start
 			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.WaitAction,
+				Name:   "wait-0",
+				Type:   event.Started,
+			},
 		},
 		{
 			// WaitTask finished
 			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.WaitAction,
+				Name:   "wait-0",
+				Type:   event.Finished,
+			},
 		},
 		{
 			// PruneTask start
 			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.DeleteAction,
+				Name:   "prune-1",
+				Type:   event.Started,
+			},
 		},
 		{
-			// Delete CRD after custom resource
+			// Delete pod3 second
 			EventType: event.DeleteType,
 			DeleteEvent: &testutil.ExpDeleteEvent{
 				Operation:  event.Deleted,
@@ -157,9 +298,96 @@ func dependsOnTest(_ client.Client, invConfig InventoryConfig, inventoryName, na
 		{
 			// PruneTask finished
 			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.DeleteAction,
+				Name:   "prune-1",
+				Type:   event.Finished,
+			},
 		},
-	}, destroyerEvents)
-	Expect(err).ToNot(HaveOccurred())
+		{
+			// WaitTask start
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.WaitAction,
+				Name:   "wait-1",
+				Type:   event.Started,
+			},
+		},
+		{
+			// WaitTask finished
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.WaitAction,
+				Name:   "wait-1",
+				Type:   event.Finished,
+			},
+		},
+		{
+			// PruneTask start
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.DeleteAction,
+				Name:   "prune-2",
+				Type:   event.Started,
+			},
+		},
+		{
+			// Delete pod2 third
+			EventType: event.DeleteType,
+			DeleteEvent: &testutil.ExpDeleteEvent{
+				Operation:  event.Deleted,
+				Identifier: object.UnstructuredToObjMetaOrDie(manifestToUnstructured(pod2)),
+				Error:      nil,
+			},
+		},
+		{
+			// PruneTask finished
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.DeleteAction,
+				Name:   "prune-2",
+				Type:   event.Finished,
+			},
+		},
+		{
+			// WaitTask start
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.WaitAction,
+				Name:   "wait-2",
+				Type:   event.Started,
+			},
+		},
+		{
+			// WaitTask finished
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.WaitAction,
+				Name:   "wait-2",
+				Type:   event.Finished,
+			},
+		},
+		{
+			// DeleteInvTask start
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.InventoryAction,
+				Name:   "delete-inventory-0",
+				Type:   event.Started,
+			},
+		},
+		{
+			// DeleteInvTask finished
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action: event.InventoryAction,
+				Name:   "delete-inventory-0",
+				Type:   event.Finished,
+			},
+		},
+	}
+
+	Expect(testutil.EventsToExpEvents(destroyerEvents)).To(testutil.Equal(expEvents))
 }
 
 var pod1 = []byte(strings.TrimSpace(`
