@@ -4,6 +4,8 @@
 package task
 
 import (
+	"context"
+	"fmt"
 	"io/ioutil"
 	"strings"
 
@@ -20,6 +22,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/filter"
 	"sigs.k8s.io/cli-utils/pkg/apply/info"
+	"sigs.k8s.io/cli-utils/pkg/apply/mutator"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/object"
@@ -48,6 +51,7 @@ type ApplyTask struct {
 	Mapper            meta.RESTMapper
 	Objects           []*unstructured.Unstructured
 	Filters           []filter.ValidationFilter
+	Mutators          []mutator.Interface
 	DryRunStrategy    common.DryRunStrategy
 	ServerSideOptions common.ServerSideOptions
 }
@@ -78,6 +82,8 @@ func (a *ApplyTask) Identifiers() []object.ObjMetadata {
 // the desired state of a resource is changed.
 func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 	go func() {
+		// TODO: pipe Context through TaskContext
+		ctx := context.TODO()
 		objects := a.Objects
 		klog.V(2).Infof("apply task starting (%d objects)", len(objects))
 		// Create a new instance of the applyOptions interface and use it
@@ -107,6 +113,7 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 				taskContext.CaptureResourceFailure(id)
 				continue
 			}
+
 			// Check filters to see if we're prevented from applying.
 			var filtered bool
 			var filterErr error
@@ -132,6 +139,19 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 			if filtered || filterErr != nil {
 				continue
 			}
+
+			// Execute mutators, if any apply
+			err = a.mutate(ctx, obj)
+			if err != nil {
+				if klog.V(5).Enabled() {
+					klog.Errorf("error mutating: %w", err)
+				}
+				taskContext.EventChannel() <- createApplyFailedEvent(id, err)
+				taskContext.CaptureResourceFailure(id)
+				continue
+			}
+
+			// Apply the object
 			ao.SetObjects([]*resource.Info{info})
 			klog.V(5).Infof("applying %s/%s...", info.Namespace, info.Name)
 			err = ao.Run()
@@ -209,6 +229,22 @@ func (a *ApplyTask) sendTaskResult(taskContext *taskrunner.TaskContext) {
 
 // ClearTimeout is not supported by the ApplyTask.
 func (a *ApplyTask) ClearTimeout() {}
+
+// mutate loops through the mutator list and executes them on the object.
+func (a *ApplyTask) mutate(ctx context.Context, obj *unstructured.Unstructured) error {
+	id := object.UnstructuredToObjMetaOrDie(obj)
+	for _, mutator := range a.Mutators {
+		klog.V(6).Infof("apply mutator %s: %s", mutator.Name(), id)
+		mutated, reason, err := mutator.Mutate(ctx, obj)
+		if err != nil {
+			return fmt.Errorf("failed to mutate %q with %q: %w", id, mutator.Name(), err)
+		}
+		if mutated {
+			klog.V(4).Infof("resource mutated by %s because (%s): %s", mutator.Name(), reason, id)
+		}
+	}
+	return nil
+}
 
 // createApplyEvent is a helper function to package an apply event for a single resource.
 func createApplyEvent(id object.ObjMetadata, operation event.ApplyEventOperation, resource *unstructured.Unstructured) event.Event {

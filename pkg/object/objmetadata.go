@@ -150,7 +150,7 @@ func (o *ObjMetadata) Equals(other *ObjMetadata) bool {
 // String create a string version of the ObjMetadata struct. For RBAC resources,
 // the "name" field transcodes ":" into double underscore for valid storing
 // as the label of a ConfigMap.
-func (o *ObjMetadata) String() string {
+func (o ObjMetadata) String() string {
 	name := o.Name
 	if _, exists := RBACGroupKind[o.GroupKind]; exists {
 		name = strings.ReplaceAll(name, ":", colonTranscoded)

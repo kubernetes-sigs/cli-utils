@@ -12,7 +12,7 @@ import (
 // When testing equality, order is not importent.
 type DependencySet []object.ObjMetadata
 
-// Equal returns true if the ObjMetadata sets are eqivelent, ignoring order.
+// Equal returns true if the ObjMetadata sets are equivalent, ignoring order.
 // Fulfills Equal interface from github.com/google/go-cmp
 func (a DependencySet) Equal(b DependencySet) bool {
 	return object.SetEquals(a, b)
