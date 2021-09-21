@@ -26,6 +26,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/filter"
 	"sigs.k8s.io/cli-utils/pkg/apply/info"
+	"sigs.k8s.io/cli-utils/pkg/apply/mutator"
 	"sigs.k8s.io/cli-utils/pkg/apply/prune"
 	"sigs.k8s.io/cli-utils/pkg/apply/task"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
@@ -157,12 +158,13 @@ func (t *TaskQueueBuilder) AppendDeleteInvTask(inv inventory.InventoryInfo, dryR
 // AppendInvAddTask appends a task to the task queue to apply the passed objects
 // to the cluster. Returns a pointer to the Builder to chain function calls.
 func (t *TaskQueueBuilder) AppendApplyTask(applyObjs []*unstructured.Unstructured,
-	applyFilters []filter.ValidationFilter, o Options) *TaskQueueBuilder {
+	applyFilters []filter.ValidationFilter, applyMutators []mutator.Interface, o Options) *TaskQueueBuilder {
 	klog.V(2).Infof("adding apply task (%d objects)", len(applyObjs))
 	t.tasks = append(t.tasks, &task.ApplyTask{
 		TaskName:          fmt.Sprintf("apply-%d", t.applyCounter),
 		Objects:           applyObjs,
 		Filters:           applyFilters,
+		Mutators:          applyMutators,
 		ServerSideOptions: o.ServerSideOptions,
 		DryRunStrategy:    o.DryRunStrategy,
 		InfoHelper:        t.InfoHelper,
@@ -213,7 +215,7 @@ func (t *TaskQueueBuilder) AppendPruneTask(pruneObjs []*unstructured.Unstructure
 // depending on build variables (like dry-run) and resource types
 // (like CRD's). Returns a pointer to the Builder to chain function calls.
 func (t *TaskQueueBuilder) AppendApplyWaitTasks(applyObjs []*unstructured.Unstructured,
-	applyFilters []filter.ValidationFilter, o Options) *TaskQueueBuilder {
+	applyFilters []filter.ValidationFilter, applyMutators []mutator.Interface, o Options) *TaskQueueBuilder {
 	// Use the "depends-on" annotation to create a graph, ands sort the
 	// objects to apply into sets using a topological sort.
 	applySets, err := graph.SortObjs(applyObjs)
@@ -223,7 +225,7 @@ func (t *TaskQueueBuilder) AppendApplyWaitTasks(applyObjs []*unstructured.Unstru
 	addWaitTask, waitTimeout := waitTaskTimeout(o.DryRunStrategy.ClientOrServerDryRun(),
 		len(applySets), o.ReconcileTimeout)
 	for _, applySet := range applySets {
-		t.AppendApplyTask(applySet, applyFilters, o)
+		t.AppendApplyTask(applySet, applyFilters, applyMutators, o)
 		if addWaitTask {
 			applyIds := object.UnstructuredsToObjMetasOrDie(applySet)
 			t.AppendWaitTask(applyIds, taskrunner.AllCurrent, waitTimeout)

@@ -15,9 +15,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"sigs.k8s.io/cli-utils/pkg/apply/cache"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/filter"
 	"sigs.k8s.io/cli-utils/pkg/apply/info"
+	"sigs.k8s.io/cli-utils/pkg/apply/mutator"
 	"sigs.k8s.io/cli-utils/pkg/apply/poller"
 	"sigs.k8s.io/cli-utils/pkg/apply/prune"
 	"sigs.k8s.io/cli-utils/pkg/apply/solver"
@@ -190,10 +192,18 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.InventoryInfo, obje
 				LocalNamespaces: localNamespaces(invInfo, object.UnstructuredsToObjMetasOrDie(objects)),
 			},
 		}
+		// Build list of apply mutators.
+		applyMutators := []mutator.Interface{
+			&mutator.ApplyTimeMutator{
+				Client:        client,
+				Mapper:        mapper,
+				ResourceCache: cache.NewResourceCacheMap(),
+			},
+		}
 		// Build the task queue by appending tasks in the proper order.
 		taskQueue, err := taskBuilder.
 			AppendInvAddTask(invInfo, applyObjs, options.DryRunStrategy).
-			AppendApplyWaitTasks(applyObjs, applyFilters, opts).
+			AppendApplyWaitTasks(applyObjs, applyFilters, applyMutators, opts).
 			AppendPruneWaitTasks(pruneObjs, pruneFilters, opts).
 			AppendInvSetTask(invInfo, options.DryRunStrategy).
 			Build()

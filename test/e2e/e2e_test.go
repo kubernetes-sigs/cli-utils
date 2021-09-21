@@ -142,9 +142,15 @@ var _ = Describe("Applier", func() {
 				It("Server-Side Apply", func() {
 					serversideApplyTest(c, invConfig, inventoryName, namespace.GetName())
 				})
+
 				It("Implements depends-on apply ordering", func() {
 					dependsOnTest(c, invConfig, inventoryName, namespace.GetName())
 				})
+
+				It("Implements apply-time-mutation", func() {
+					mutationTest(c, invConfig, inventoryName, namespace.GetName())
+				})
+
 				It("Prune retrieval error correctly handled", func() {
 					pruneRetrieveErrorTest(c, invConfig, inventoryName, namespace.GetName())
 				})

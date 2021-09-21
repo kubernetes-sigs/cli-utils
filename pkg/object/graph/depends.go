@@ -11,6 +11,7 @@ import (
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/object/dependson"
+	"sigs.k8s.io/cli-utils/pkg/object/mutation"
 )
 
 // SortObjs returns a slice of the sets of objects to apply (in order).
@@ -29,7 +30,8 @@ func SortObjs(objs []*unstructured.Unstructured) ([][]*unstructured.Unstructured
 		objToUnstructured[id] = obj
 	}
 	// Add object vertices and dependency edges to graph.
-	addExplicitEdges(g, objs)
+	addApplyTimeMutationEdges(g, objs)
+	addDependsOnEdges(g, objs)
 	addNamespaceEdges(g, objs)
 	addCRDEdges(g, objs)
 	// Run topological sort on the graph.
@@ -67,19 +69,47 @@ func ReverseSortObjs(objs []*unstructured.Unstructured) ([][]*unstructured.Unstr
 	return s, nil
 }
 
-// addExplicitEdges updates the graph with edges from objects
+// addApplyTimeMutationEdges updates the graph with edges from objects
+// with an explicit "apply-time-mutation" annotation.
+func addApplyTimeMutationEdges(g *Graph, objs []*unstructured.Unstructured) {
+	for _, obj := range objs {
+		id := object.UnstructuredToObjMetaOrDie(obj)
+		klog.V(3).Infof("adding vertex: %s", id)
+		g.AddVertex(id)
+		if mutation.HasAnnotation(obj) {
+			subs, err := mutation.ReadAnnotation(obj)
+			if err != nil {
+				// TODO: fail task if parse errors?
+				klog.V(3).Infof("failed to add edges from: %s: %s", id, err)
+				return
+			}
+			for _, sub := range subs {
+				// TODO: fail task if it's not in the inventory?
+				dep := sub.SourceRef.ObjMetadata()
+				klog.V(3).Infof("adding edge from: %s, to: %s", id, dep)
+				g.AddEdge(id, dep)
+			}
+		}
+	}
+}
+
+// addDependsOnEdges updates the graph with edges from objects
 // with an explicit "depends-on" annotation.
-func addExplicitEdges(g *Graph, objs []*unstructured.Unstructured) {
+func addDependsOnEdges(g *Graph, objs []*unstructured.Unstructured) {
 	for _, obj := range objs {
 		id := object.UnstructuredToObjMetaOrDie(obj)
 		klog.V(3).Infof("adding vertex: %s", id)
 		g.AddVertex(id)
 		deps, err := dependson.ReadAnnotation(obj)
-		if err == nil {
-			for _, dep := range deps {
-				klog.V(3).Infof("adding edge from: %s, to: %s", id, dep)
-				g.AddEdge(id, dep)
-			}
+		if err != nil {
+			// TODO: fail if annotation fails to parse?
+			klog.V(3).Infof("failed to add edges from: %s: %s", id, err)
+			continue
+		}
+		for _, dep := range deps {
+			// TODO: fail if depe is not in the inventory?
+			klog.V(3).Infof("adding edge from: %s, to: %s", id, dep)
+			g.AddEdge(id, dep)
 		}
 	}
 }

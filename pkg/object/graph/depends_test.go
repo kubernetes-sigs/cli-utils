@@ -9,6 +9,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/cli-utils/pkg/object"
+	"sigs.k8s.io/cli-utils/pkg/object/mutation"
+	mutationutil "sigs.k8s.io/cli-utils/pkg/object/mutation/testutil"
 	"sigs.k8s.io/cli-utils/pkg/testutil"
 )
 
@@ -130,7 +132,7 @@ func TestSortObjs(t *testing.T) {
 		"one object depends on the other; two single object sets": {
 			objs: []*unstructured.Unstructured{
 				testutil.Unstructured(t, resources["deployment"],
-					testutil.AddDependsOn(t, testutil.Unstructured(t, resources["secret"]))),
+					testutil.AddDependsOn(t, testutil.ToIdentifier(t, resources["secret"]))),
 				testutil.Unstructured(t, resources["secret"]),
 			},
 			expected: [][]*unstructured.Unstructured{
@@ -146,9 +148,9 @@ func TestSortObjs(t *testing.T) {
 		"three objects depend on another; three single object sets": {
 			objs: []*unstructured.Unstructured{
 				testutil.Unstructured(t, resources["deployment"],
-					testutil.AddDependsOn(t, testutil.Unstructured(t, resources["secret"]))),
+					testutil.AddDependsOn(t, testutil.ToIdentifier(t, resources["secret"]))),
 				testutil.Unstructured(t, resources["secret"],
-					testutil.AddDependsOn(t, testutil.Unstructured(t, resources["pod"]))),
+					testutil.AddDependsOn(t, testutil.ToIdentifier(t, resources["pod"]))),
 				testutil.Unstructured(t, resources["pod"]),
 			},
 			expected: [][]*unstructured.Unstructured{
@@ -167,9 +169,9 @@ func TestSortObjs(t *testing.T) {
 		"Two objects depend on secret; two object sets": {
 			objs: []*unstructured.Unstructured{
 				testutil.Unstructured(t, resources["deployment"],
-					testutil.AddDependsOn(t, testutil.Unstructured(t, resources["secret"]))),
+					testutil.AddDependsOn(t, testutil.ToIdentifier(t, resources["secret"]))),
 				testutil.Unstructured(t, resources["pod"],
-					testutil.AddDependsOn(t, testutil.Unstructured(t, resources["secret"]))),
+					testutil.AddDependsOn(t, testutil.ToIdentifier(t, resources["secret"]))),
 				testutil.Unstructured(t, resources["secret"]),
 			},
 			expected: [][]*unstructured.Unstructured{
@@ -239,9 +241,9 @@ func TestSortObjs(t *testing.T) {
 		"two objects depends on each other is cyclic dependency": {
 			objs: []*unstructured.Unstructured{
 				testutil.Unstructured(t, resources["deployment"],
-					testutil.AddDependsOn(t, testutil.Unstructured(t, resources["secret"]))),
+					testutil.AddDependsOn(t, testutil.ToIdentifier(t, resources["secret"]))),
 				testutil.Unstructured(t, resources["secret"],
-					testutil.AddDependsOn(t, testutil.Unstructured(t, resources["deployment"]))),
+					testutil.AddDependsOn(t, testutil.ToIdentifier(t, resources["deployment"]))),
 			},
 			expected: [][]*unstructured.Unstructured{},
 			isError:  true,
@@ -249,11 +251,11 @@ func TestSortObjs(t *testing.T) {
 		"three objects in cyclic dependency": {
 			objs: []*unstructured.Unstructured{
 				testutil.Unstructured(t, resources["deployment"],
-					testutil.AddDependsOn(t, testutil.Unstructured(t, resources["secret"]))),
+					testutil.AddDependsOn(t, testutil.ToIdentifier(t, resources["secret"]))),
 				testutil.Unstructured(t, resources["secret"],
-					testutil.AddDependsOn(t, testutil.Unstructured(t, resources["pod"]))),
+					testutil.AddDependsOn(t, testutil.ToIdentifier(t, resources["pod"]))),
 				testutil.Unstructured(t, resources["pod"],
-					testutil.AddDependsOn(t, testutil.Unstructured(t, resources["deployment"]))),
+					testutil.AddDependsOn(t, testutil.ToIdentifier(t, resources["deployment"]))),
 			},
 			expected: [][]*unstructured.Unstructured{},
 			isError:  true,
@@ -298,9 +300,9 @@ func TestReverseSortObjs(t *testing.T) {
 		"three objects depend on another; three single object sets in opposite order": {
 			objs: []*unstructured.Unstructured{
 				testutil.Unstructured(t, resources["deployment"],
-					testutil.AddDependsOn(t, testutil.Unstructured(t, resources["secret"]))),
+					testutil.AddDependsOn(t, testutil.ToIdentifier(t, resources["secret"]))),
 				testutil.Unstructured(t, resources["secret"],
-					testutil.AddDependsOn(t, testutil.Unstructured(t, resources["pod"]))),
+					testutil.AddDependsOn(t, testutil.ToIdentifier(t, resources["pod"]))),
 				testutil.Unstructured(t, resources["pod"]),
 			},
 			expected: [][]*unstructured.Unstructured{
@@ -367,7 +369,137 @@ func TestReverseSortObjs(t *testing.T) {
 	}
 }
 
-func TestAddExplicitEdges(t *testing.T) {
+func TestApplyTimeMutationEdges(t *testing.T) {
+	testCases := map[string]struct {
+		objs     []*unstructured.Unstructured
+		expected []Edge
+	}{
+		"no objects adds no graph edges": {
+			objs:     []*unstructured.Unstructured{},
+			expected: []Edge{},
+		},
+		"no depends-on annotations adds no graph edges": {
+			objs: []*unstructured.Unstructured{
+				testutil.Unstructured(t, resources["deployment"]),
+			},
+			expected: []Edge{},
+		},
+		"no depends-on annotations, two objects, adds no graph edges": {
+			objs: []*unstructured.Unstructured{
+				testutil.Unstructured(t, resources["deployment"]),
+				testutil.Unstructured(t, resources["secret"]),
+			},
+			expected: []Edge{},
+		},
+		"two dependent objects, adds one edge": {
+			objs: []*unstructured.Unstructured{
+				testutil.Unstructured(
+					t,
+					resources["deployment"],
+					mutationutil.AddApplyTimeMutation(t, &mutation.ApplyTimeMutation{
+						{
+							SourceRef:  mutation.NewResourceReference(testutil.Unstructured(t, resources["secret"])),
+							SourcePath: "unused",
+							TargetPath: "unused",
+							Token:      "unused",
+						},
+					}),
+				),
+				testutil.Unstructured(t, resources["secret"]),
+			},
+			expected: []Edge{
+				{
+					From: testutil.ToIdentifier(t, resources["deployment"]),
+					To:   testutil.ToIdentifier(t, resources["secret"]),
+				},
+			},
+		},
+		"three dependent objects, adds two edges": {
+			objs: []*unstructured.Unstructured{
+				testutil.Unstructured(
+					t,
+					resources["deployment"],
+					mutationutil.AddApplyTimeMutation(t, &mutation.ApplyTimeMutation{
+						{
+							SourceRef:  mutation.NewResourceReference(testutil.Unstructured(t, resources["secret"])),
+							SourcePath: "unused",
+							TargetPath: "unused",
+							Token:      "unused",
+						},
+					}),
+				),
+				testutil.Unstructured(
+					t,
+					resources["pod"],
+					mutationutil.AddApplyTimeMutation(t, &mutation.ApplyTimeMutation{
+						{
+							SourceRef:  mutation.NewResourceReference(testutil.Unstructured(t, resources["secret"])),
+							SourcePath: "unused",
+							TargetPath: "unused",
+							Token:      "unused",
+						},
+					}),
+				),
+				testutil.Unstructured(t, resources["secret"]),
+			},
+			expected: []Edge{
+				{
+					From: testutil.ToIdentifier(t, resources["deployment"]),
+					To:   testutil.ToIdentifier(t, resources["secret"]),
+				},
+				{
+					From: testutil.ToIdentifier(t, resources["pod"]),
+					To:   testutil.ToIdentifier(t, resources["secret"]),
+				},
+			},
+		},
+		"pod has two dependencies, adds two edges": {
+			objs: []*unstructured.Unstructured{
+				testutil.Unstructured(
+					t,
+					resources["pod"],
+					mutationutil.AddApplyTimeMutation(t, &mutation.ApplyTimeMutation{
+						{
+							SourceRef:  mutation.NewResourceReference(testutil.Unstructured(t, resources["secret"])),
+							SourcePath: "unused",
+							TargetPath: "unused",
+							Token:      "unused",
+						},
+						{
+							SourceRef:  mutation.NewResourceReference(testutil.Unstructured(t, resources["deployment"])),
+							SourcePath: "unused",
+							TargetPath: "unused",
+							Token:      "unused",
+						},
+					}),
+				),
+				testutil.Unstructured(t, resources["deployment"]),
+				testutil.Unstructured(t, resources["secret"]),
+			},
+			expected: []Edge{
+				{
+					From: testutil.ToIdentifier(t, resources["pod"]),
+					To:   testutil.ToIdentifier(t, resources["secret"]),
+				},
+				{
+					From: testutil.ToIdentifier(t, resources["pod"]),
+					To:   testutil.ToIdentifier(t, resources["deployment"]),
+				},
+			},
+		},
+	}
+
+	for tn, tc := range testCases {
+		t.Run(tn, func(t *testing.T) {
+			g := New()
+			addApplyTimeMutationEdges(g, tc.objs)
+			actual := g.GetEdges()
+			verifyEdges(t, tc.expected, actual)
+		})
+	}
+}
+
+func TestAddDependsOnEdges(t *testing.T) {
 	testCases := map[string]struct {
 		objs     []*unstructured.Unstructured
 		expected []Edge
@@ -392,7 +524,7 @@ func TestAddExplicitEdges(t *testing.T) {
 		"two dependent objects, adds one edge": {
 			objs: []*unstructured.Unstructured{
 				testutil.Unstructured(t, resources["deployment"],
-					testutil.AddDependsOn(t, testutil.Unstructured(t, resources["secret"]))),
+					testutil.AddDependsOn(t, testutil.ToIdentifier(t, resources["secret"]))),
 				testutil.Unstructured(t, resources["secret"]),
 			},
 			expected: []Edge{
@@ -405,9 +537,9 @@ func TestAddExplicitEdges(t *testing.T) {
 		"three dependent objects, adds two edges": {
 			objs: []*unstructured.Unstructured{
 				testutil.Unstructured(t, resources["deployment"],
-					testutil.AddDependsOn(t, testutil.Unstructured(t, resources["secret"]))),
+					testutil.AddDependsOn(t, testutil.ToIdentifier(t, resources["secret"]))),
 				testutil.Unstructured(t, resources["pod"],
-					testutil.AddDependsOn(t, testutil.Unstructured(t, resources["secret"]))),
+					testutil.AddDependsOn(t, testutil.ToIdentifier(t, resources["secret"]))),
 				testutil.Unstructured(t, resources["secret"]),
 			},
 			expected: []Edge{
@@ -425,8 +557,8 @@ func TestAddExplicitEdges(t *testing.T) {
 			objs: []*unstructured.Unstructured{
 				testutil.Unstructured(t, resources["pod"],
 					testutil.AddDependsOn(t,
-						testutil.Unstructured(t, resources["secret"]),
-						testutil.Unstructured(t, resources["deployment"]),
+						testutil.ToIdentifier(t, resources["secret"]),
+						testutil.ToIdentifier(t, resources["deployment"]),
 					),
 				),
 				testutil.Unstructured(t, resources["deployment"]),
@@ -448,7 +580,7 @@ func TestAddExplicitEdges(t *testing.T) {
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
 			g := New()
-			addExplicitEdges(g, tc.objs)
+			addDependsOnEdges(g, tc.objs)
 			actual := g.GetEdges()
 			verifyEdges(t, tc.expected, actual)
 		})
