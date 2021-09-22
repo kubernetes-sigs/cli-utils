@@ -4,15 +4,16 @@
 package status_test
 
 import (
-	"fmt"
-	"log"
+	"strings"
+	"testing"
 
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	. "sigs.k8s.io/cli-utils/pkg/kstatus/status"
+	"github.com/stretchr/testify/assert"
+	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/testutil"
+	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
 	"sigs.k8s.io/yaml"
 )
 
-func ExampleCompute() {
+func TestExampleCompute(t *testing.T) {
 	deploymentManifest := `
 apiVersion: apps/v1
 kind: Deployment
@@ -27,24 +28,21 @@ status:
    availableReplicas: 1
    replicas: 1
    conditions:
-    - type: Progressing 
+    - type: Progressing
       status: "True"
       reason: NewReplicaSetAvailable
-    - type: Available 
+    - type: Available
       status: "True"
 `
-	deployment := yamlManifestToUnstructured(deploymentManifest)
+	deployment := testutil.YamlToUnstructured(t, deploymentManifest)
 
-	res, err := Compute(deployment)
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Println(res.Status)
-	// Output:
-	// Current
+	res, err := status.Compute(deployment)
+	assert.NoError(t, err)
+
+	assert.Equal(t, status.Status("Current"), res.Status)
 }
 
-func ExampleAugment() {
+func TestExampleAugment(t *testing.T) {
 	deploymentManifest := `
 apiVersion: apps/v1
 kind: Deployment
@@ -59,52 +57,41 @@ status:
    availableReplicas: 1
    replicas: 1
    conditions:
-    - type: Progressing 
+    - type: Progressing
       status: "True"
       reason: NewReplicaSetAvailable
-    - type: Available 
+    - type: Available
       status: "True"
 `
-	deployment := yamlManifestToUnstructured(deploymentManifest)
+	deployment := testutil.YamlToUnstructured(t, deploymentManifest)
 
-	err := Augment(deployment)
-	if err != nil {
-		log.Fatal(err)
-	}
+	err := status.Augment(deployment)
+	assert.NoError(t, err)
+
 	b, err := yaml.Marshal(deployment.Object)
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Println(string(b))
-	// Output:
-	// apiVersion: apps/v1
-	// kind: Deployment
-	// metadata:
-	//   generation: 1
-	//   name: test
-	//   namespace: qual
-	// status:
-	//   availableReplicas: 1
-	//   conditions:
-	//   - reason: NewReplicaSetAvailable
-	//     status: "True"
-	//     type: Progressing
-	//   - status: "True"
-	//     type: Available
-	//   observedGeneration: 1
-	//   readyReplicas: 1
-	//   replicas: 1
-	//   updatedReplicas: 1
-}
+	assert.NoError(t, err)
 
-func yamlManifestToUnstructured(manifest string) *unstructured.Unstructured {
-	jsonManifest, err := yaml.YAMLToJSON([]byte(manifest))
-	if err != nil {
-		log.Fatal(err)
-	}
-	resource, _, err := unstructured.UnstructuredJSONScheme.Decode(jsonManifest, nil, nil)
-	if err != nil {
-		log.Fatal(err)
-	}
-	return resource.(*unstructured.Unstructured)
+	receivedManifest := strings.TrimSpace(string(b))
+	expectedManifest := strings.TrimSpace(`
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  generation: 1
+  name: test
+  namespace: qual
+status:
+  availableReplicas: 1
+  conditions:
+  - reason: NewReplicaSetAvailable
+    status: "True"
+    type: Progressing
+  - status: "True"
+    type: Available
+  observedGeneration: 1
+  readyReplicas: 1
+  replicas: 1
+  updatedReplicas: 1
+`)
+
+	assert.Equal(t, expectedManifest, receivedManifest)
 }

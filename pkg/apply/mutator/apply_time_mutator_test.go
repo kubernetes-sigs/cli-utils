@@ -409,7 +409,7 @@ func TestMutate(t *testing.T) {
 			mutated: false,
 			reason:  "",
 			// exact error message isn't very important. Feel free to update if the error text changes.
-			errMsg: `failed to read jsonpath field in target resource (v1/namespaces/map-namespace/ConfigMap/map3-name): ` +
+			errMsg: `failed to read annotation in resource (v1/namespaces/map-namespace/ConfigMap/map3-name): ` +
 				`failed to parse apply-time-mutation annotation: "not a valid substitution list": ` +
 				`error unmarshaling JSON: ` +
 				`while decoding JSON: ` +

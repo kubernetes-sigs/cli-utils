@@ -17,8 +17,8 @@ import (
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/cli-utils/pkg/apply/cache"
 	"sigs.k8s.io/cli-utils/pkg/jsonpath"
+	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/object/mutation"
-	"sigs.k8s.io/yaml"
 )
 
 // ApplyTimeMutator mutates a resource by injecting values specified by the
@@ -52,10 +52,10 @@ func (atm *ApplyTimeMutator) Mutate(ctx context.Context, obj *unstructured.Unstr
 
 	subs, err := mutation.ReadAnnotation(obj)
 	if err != nil {
-		return mutated, reason, fmt.Errorf("failed to read jsonpath field in target resource (%s): %w", targetRef, err)
+		return mutated, reason, fmt.Errorf("failed to read annotation in resource (%s): %w", targetRef, err)
 	}
 
-	klog.V(4).Infof("target resource (%v):\n%s", targetRef, yamlStringer{obj})
+	klog.V(4).Infof("target resource (%s):\n%s", targetRef, object.YamlStringer{O: obj})
 
 	// validate no self-references
 	// Early validation to avoid GETs, but won't catch sources with implicit namespace.
@@ -91,7 +91,7 @@ func (atm *ApplyTimeMutator) Mutate(ctx context.Context, obj *unstructured.Unstr
 			return mutated, reason, fmt.Errorf("failed to get source resource (%s): %w", sourceRef, err)
 		}
 
-		klog.V(4).Infof("source resource (%s):\n%s", targetRef, yamlStringer{sourceObj})
+		klog.V(4).Infof("source resource (%s):\n%s", sourceRef, object.YamlStringer{O: sourceObj})
 
 		// lookup target field in target resource
 		targetValue, _, err := readFieldValue(obj, sub.TargetPath)
@@ -129,8 +129,8 @@ func (atm *ApplyTimeMutator) Mutate(ctx context.Context, obj *unstructured.Unstr
 			newValue = strings.ReplaceAll(targetValueString, sub.Token, sourceValueString)
 		}
 
-		klog.V(5).Infof("substitution on (%v): source=(%s), token=(%s), old=(%s), new=(%s)",
-			targetRef, sourceValue, sub.Token, targetValue, newValue)
+		klog.V(5).Infof("substitution: targetRef=(%s), sourceRef=(%s): sourceValue=(%v), token=(%s), oldTargetValue=(%v), newTargetValue=(%v)",
+			targetRef, sourceRef, sourceValue, sub.Token, targetValue, newValue)
 
 		// update target field in target resource
 		err = writeFieldValue(obj, sub.TargetPath, newValue)
@@ -143,7 +143,7 @@ func (atm *ApplyTimeMutator) Mutate(ctx context.Context, obj *unstructured.Unstr
 	}
 
 	if mutated {
-		klog.V(4).Infof("mutated target resource (%s):\n%s", targetRef, yamlStringer{obj})
+		klog.V(4).Infof("mutated target resource (%s):\n%s", targetRef, object.YamlStringer{O: obj})
 	}
 
 	return mutated, reason, nil
@@ -244,20 +244,4 @@ func valueToString(value interface{}) (string, error) {
 		valueString = string(jsonBytes)
 	}
 	return valueString, nil
-}
-
-// yamlStringer delays YAML marshalling for logging until String() is called.
-type yamlStringer struct {
-	obj *unstructured.Unstructured
-}
-
-// String marshals the wrapped object to a YAML string. If serializing errors,
-// the error string will be returned instead. This is primarily for use with
-// verbose multi-line logging.
-func (ys yamlStringer) String() string {
-	yamlBytes, err := yaml.Marshal(ys.obj.Object)
-	if err != nil {
-		return fmt.Sprintf("failed to serialize as yaml: %s", err)
-	}
-	return string(yamlBytes)
 }
