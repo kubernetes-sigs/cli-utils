@@ -58,7 +58,7 @@ func GetApplyRunner(factory cmdutil.Factory, invFactory inventory.InventoryClien
 		"Timeout threshold for waiting for all pruned resources to be deleted")
 	cmd.Flags().StringVar(&r.inventoryPolicy, flagutils.InventoryPolicyFlag, flagutils.InventoryPolicyStrict,
 		"It determines the behavior when the resources don't belong to current inventory. Available options "+
-			fmt.Sprintf("%q and %q.", flagutils.InventoryPolicyStrict, flagutils.InventoryPolicyAdopt))
+			fmt.Sprintf("%q, %q and %q.", flagutils.InventoryPolicyStrict, flagutils.InventoryPolicyAdopt, flagutils.InventoryPolicyForceAdopt))
 
 	r.Command = cmd
 	return r

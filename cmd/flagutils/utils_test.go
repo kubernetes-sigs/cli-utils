@@ -25,6 +25,10 @@ func TestConvertInventoryPolicy(t *testing.T) {
 			policy: inventory.AdoptIfNoInventory,
 		},
 		{
+			value:  "force-adopt",
+			policy: inventory.AdoptAll,
+		},
+		{
 			value: "random",
 			err:   fmt.Errorf("inventory policy must be one of strict, adopt"),
 		},

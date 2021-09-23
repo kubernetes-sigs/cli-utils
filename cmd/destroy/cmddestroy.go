@@ -41,7 +41,7 @@ func GetDestroyRunner(factory cmdutil.Factory, invFactory inventory.InventoryCli
 		fmt.Sprintf("Output format, must be one of %s", strings.Join(printers.SupportedPrinters(), ",")))
 	cmd.Flags().StringVar(&r.inventoryPolicy, flagutils.InventoryPolicyFlag, flagutils.InventoryPolicyStrict,
 		"It determines the behavior when the resources don't belong to current inventory. Available options "+
-			fmt.Sprintf("%q and %q.", flagutils.InventoryPolicyStrict, flagutils.InventoryPolicyAdopt))
+			fmt.Sprintf("%q, %q and %q.", flagutils.InventoryPolicyStrict, flagutils.InventoryPolicyAdopt, flagutils.InventoryPolicyForceAdopt))
 	cmd.Flags().DurationVar(&r.deleteTimeout, "delete-timeout", time.Duration(0),
 		"Timeout threshold for waiting for all deleted resources to complete deletion")
 	cmd.Flags().StringVar(&r.deletePropagationPolicy, "delete-propagation-policy",
