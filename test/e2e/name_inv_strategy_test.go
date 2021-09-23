@@ -23,7 +23,7 @@ func applyWithExistingInvTest(c client.Client, invConfig InventoryConfig, invent
 	orgApplyInv := invConfig.InvWrapperFunc(invConfig.InventoryFactoryFunc(inventoryName, namespaceName, orgInventoryID))
 
 	resources := []*unstructured.Unstructured{
-		deploymentManifest(namespaceName),
+		withNamespace(manifestToUnstructured(deployment1), namespaceName),
 	}
 
 	runWithNoErr(applier.Run(context.TODO(), orgApplyInv, resources, apply.Options{

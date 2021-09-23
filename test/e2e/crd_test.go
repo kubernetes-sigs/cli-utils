@@ -37,7 +37,6 @@ func crdTest(_ client.Client, invConfig InventoryConfig, inventoryName, namespac
 
 	var applierEvents []event.Event
 	for e := range ch {
-		Expect(e.Type).NotTo(Equal(event.ErrorType))
 		applierEvents = append(applierEvents, e)
 	}
 
@@ -179,7 +178,7 @@ func crdTest(_ client.Client, invConfig InventoryConfig, inventoryName, namespac
 	By("destroy the resources, including the crd")
 	destroyer := invConfig.DestroyerFactoryFunc()
 	options := apply.DestroyerOptions{InventoryPolicy: inventory.AdoptIfNoInventory}
-	destroyerEvents := runCollectNoErr(destroyer.Run(inv, options))
+	destroyerEvents := runCollect(destroyer.Run(inv, options))
 
 	expEvents = []testutil.ExpEvent{
 		{

@@ -114,13 +114,26 @@ func (r ResourceReference) GroupVersionKind() schema.GroupVersionKind {
 	return schema.FromAPIVersionAndKind(r.APIVersion, r.Kind)
 }
 
-// ObjMetadata returns the name, namespace, group, and kind of the ResourceReference
+// ObjMetadata returns the name, namespace, group, and kind of the
+// ResourceReference, wrapped in a new ObjMetadata object.
 func (r ResourceReference) ObjMetadata() object.ObjMetadata {
 	return object.ObjMetadata{
 		Name:      r.Name,
 		Namespace: r.Namespace,
 		GroupKind: r.GroupVersionKind().GroupKind(),
 	}
+}
+
+// Unstructured returns the name, namespace, group, version, and kind of the
+// ResourceReference, wrapped in a new Unstructured object.
+// This is useful for performing operations with
+// sigs.k8s.io/controller-runtime/pkg/client's unstructured Client.
+func (r ResourceReference) Unstructured() *unstructured.Unstructured {
+	obj := &unstructured.Unstructured{}
+	obj.SetName(r.Name)
+	obj.SetNamespace(r.Namespace)
+	obj.SetGroupVersionKind(r.GroupVersionKind())
+	return obj
 }
 
 // String returns the format GROUP[/VERSION][/namespaces/NAMESPACE]/KIND/NAME

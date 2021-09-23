@@ -17,6 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
 	"sigs.k8s.io/cli-utils/pkg/apply"
@@ -72,6 +73,15 @@ var inventoryConfigs = map[string]InventoryConfig{
 	},
 }
 
+// Parse optional logging flags
+// Ex: ginkgo ./test/e2e/... -- -v=5
+// Allow init for e2e test (not imported by external code)
+// nolint:gochecknoinits
+func init() {
+	klog.InitFlags(nil)
+	klog.SetOutput(GinkgoWriter)
+}
+
 var _ = Describe("Applier", func() {
 
 	var c client.Client
@@ -116,10 +126,13 @@ var _ = Describe("Applier", func() {
 					objs := []*unstructured.Unstructured{
 						manifestToUnstructured(cr),
 						manifestToUnstructured(crd),
-						manifestToUnstructured(pod1),
-						manifestToUnstructured(pod2),
-						manifestToUnstructured(pod3),
-						deploymentManifest(namespace.GetName()),
+						withNamespace(manifestToUnstructured(pod1), namespace.GetName()),
+						withNamespace(manifestToUnstructured(pod2), namespace.GetName()),
+						withNamespace(manifestToUnstructured(pod3), namespace.GetName()),
+						withNamespace(manifestToUnstructured(podA), namespace.GetName()),
+						withNamespace(manifestToUnstructured(podB), namespace.GetName()),
+						withNamespace(manifestToUnstructured(deployment1), namespace.GetName()),
+						manifestToUnstructured(apiservice1),
 					}
 					for _, obj := range objs {
 						deleteUnstructuredIfExists(c, obj)
@@ -353,10 +366,4 @@ func newDestroyerFromInvFactory(invFactory inventory.InventoryClientFactory) *ap
 	d, err := apply.NewDestroyer(f, invClient, statusPoller)
 	Expect(err).NotTo(HaveOccurred())
 	return d
-}
-
-// Delete the passed object from the cluster using the passed client.
-func deleteObj(c client.Client, obj *unstructured.Unstructured) {
-	err := c.Delete(context.TODO(), obj)
-	Expect(err).NotTo(HaveOccurred())
 }
