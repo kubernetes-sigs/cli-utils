@@ -11,9 +11,10 @@ import (
 )
 
 const (
-	InventoryPolicyFlag   = "inventory-policy"
-	InventoryPolicyStrict = "strict"
-	InventoryPolicyAdopt  = "adopt"
+	InventoryPolicyFlag       = "inventory-policy"
+	InventoryPolicyStrict     = "strict"
+	InventoryPolicyAdopt      = "adopt"
+	InventoryPolicyForceAdopt = "force-adopt"
 )
 
 // ConvertPropagationPolicy converts a propagationPolicy described as a
@@ -38,6 +39,8 @@ func ConvertInventoryPolicy(policy string) (inventory.InventoryPolicy, error) {
 		return inventory.InventoryPolicyMustMatch, nil
 	case InventoryPolicyAdopt:
 		return inventory.AdoptIfNoInventory, nil
+	case InventoryPolicyForceAdopt:
+		return inventory.AdoptAll, nil
 	default:
 		return inventory.InventoryPolicyMustMatch, fmt.Errorf(
 			"inventory policy must be one of strict, adopt")

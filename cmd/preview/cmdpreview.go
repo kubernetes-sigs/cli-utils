@@ -56,7 +56,7 @@ func GetPreviewRunner(factory cmdutil.Factory, invFactory inventory.InventoryCli
 		fmt.Sprintf("Output format, must be one of %s", strings.Join(printers.SupportedPrinters(), ",")))
 	cmd.Flags().StringVar(&r.inventoryPolicy, flagutils.InventoryPolicyFlag, flagutils.InventoryPolicyStrict,
 		"It determines the behavior when the resources don't belong to current inventory. Available options "+
-			fmt.Sprintf("%q and %q.", flagutils.InventoryPolicyStrict, flagutils.InventoryPolicyAdopt))
+			fmt.Sprintf("%q, %q and %q.", flagutils.InventoryPolicyStrict, flagutils.InventoryPolicyAdopt, flagutils.InventoryPolicyForceAdopt))
 
 	r.Command = cmd
 	return r
