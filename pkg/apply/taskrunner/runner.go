@@ -6,6 +6,7 @@ package taskrunner
 import (
 	"context"
 	"fmt"
+	"sort"
 	"time"
 
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
@@ -345,8 +346,13 @@ type TimedOutResource struct {
 }
 
 func (te TimeoutError) Error() string {
-	return fmt.Sprintf("timeout after %.0f seconds waiting for %d resources to reach condition %s",
-		te.Timeout.Seconds(), len(te.Identifiers), te.Condition)
+	ids := []string{}
+	for _, id := range te.Identifiers {
+		ids = append(ids, id.String())
+	}
+	sort.Strings(ids)
+	return fmt.Sprintf("timeout after %.0f seconds waiting for %d resources (%v) to reach condition %s",
+		te.Timeout.Seconds(), len(te.Identifiers), ids, te.Condition)
 }
 
 // IsTimeoutError checks whether a given error is
