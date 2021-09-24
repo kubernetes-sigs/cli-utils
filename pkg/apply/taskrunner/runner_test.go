@@ -47,6 +47,7 @@ func TestBaseRunner(t *testing.T) {
 		expectedEventTypes        []event.Type
 		expectedError             error
 		expectedTimedOutResources []TimedOutResource
+		expectedErrorMsg          string
 	}{
 		"wait task runs until condition is met": {
 			identifiers: []object.ObjMetadata{depID, cmID},
@@ -122,6 +123,7 @@ func TestBaseRunner(t *testing.T) {
 					Status:     status.UnknownStatus,
 				},
 			},
+			expectedErrorMsg: "timeout after 2 seconds waiting for 2 resources ([default_cm__ConfigMap default_dep_apps_Deployment]) to reach condition AllCurrent",
 		},
 		"tasks run in order": {
 			identifiers: []object.ObjMetadata{},
@@ -215,6 +217,7 @@ func TestBaseRunner(t *testing.T) {
 				if timeoutError, ok := err.(*TimeoutError); ok {
 					assert.ElementsMatch(t, tc.expectedTimedOutResources,
 						timeoutError.TimedOutResources)
+					assert.Equal(t, timeoutError.Error(), tc.expectedErrorMsg)
 				}
 				return
 			} else if err != nil {
