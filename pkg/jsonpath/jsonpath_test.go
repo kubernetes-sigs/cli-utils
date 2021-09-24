@@ -36,7 +36,7 @@ entries:
 - name: a
   value: x
 - name: b
-  value: y
+  value: "y"
 - name: c
   value: z
 `
@@ -65,7 +65,7 @@ entries:
 - name: a
   value: x
 - name: b
-  value: y
+  value: "y"
 - name: c
   value: z
 `
