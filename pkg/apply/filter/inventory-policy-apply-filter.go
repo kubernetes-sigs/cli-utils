@@ -52,7 +52,7 @@ func (ipaf InventoryPolicyApplyFilter) Filter(obj *unstructured.Unstructured) (b
 	canApply, err := inventory.CanApply(ipaf.Inv, clusterObj, ipaf.InvPolicy)
 	if !canApply {
 		invMatch := inventory.InventoryIDMatch(ipaf.Inv, clusterObj)
-		reason := fmt.Sprintf("object removal prevented; inventory match %v : inventory policy: %v",
+		reason := fmt.Sprintf("inventory policy prevented apply (inventoryIDMatchStatus: %q, inventoryPolicy: %q)",
 			invMatch, ipaf.InvPolicy)
 		return true, reason, err
 	}

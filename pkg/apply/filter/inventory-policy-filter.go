@@ -31,7 +31,7 @@ func (ipf InventoryPolicyFilter) Filter(obj *unstructured.Unstructured) (bool, s
 	// if an object should be pruned (deleted).
 	if !inventory.CanPrune(ipf.Inv, obj, ipf.InvPolicy) {
 		invMatch := inventory.InventoryIDMatch(ipf.Inv, obj)
-		reason := fmt.Sprintf("object removal prevented; inventory match %v : inventory policy: %v",
+		reason := fmt.Sprintf("inventory policy prevented deletion (inventoryIDMatchStatus: %q, inventoryPolicy: %q)",
 			invMatch, ipf.InvPolicy)
 		return true, reason, nil
 	}

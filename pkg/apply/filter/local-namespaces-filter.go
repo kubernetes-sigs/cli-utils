@@ -31,7 +31,7 @@ func (lnf LocalNamespacesFilter) Filter(obj *unstructured.Unstructured) (bool, s
 	id := object.UnstructuredToObjMetaOrDie(obj)
 	if id.GroupKind == object.CoreV1Namespace.GroupKind() &&
 		lnf.LocalNamespaces.Has(id.Name) {
-		reason := fmt.Sprintf("namespace removal prevented; still in use: %s", id.Name)
+		reason := fmt.Sprintf("namespace still in use (namespace: %q)", id.Name)
 		return true, reason, nil
 	}
 	return false, "", nil
