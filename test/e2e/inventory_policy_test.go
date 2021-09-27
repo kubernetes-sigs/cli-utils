@@ -10,9 +10,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/cli-utils/pkg/apply"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
@@ -29,7 +27,7 @@ func inventoryPolicyMustMatchTest(c client.Client, invConfig InventoryConfig, na
 	firstInvName := randomString("first-inv-")
 	firstInv := invConfig.InvWrapperFunc(invConfig.InventoryFactoryFunc(firstInvName, namespaceName, firstInvName))
 	firstResources := []*unstructured.Unstructured{
-		deploymentManifest(namespaceName),
+		withNamespace(manifestToUnstructured(deployment1), namespaceName),
 	}
 
 	runWithNoErr(applier.Run(context.TODO(), firstInv, firstResources, apply.Options{
@@ -41,7 +39,7 @@ func inventoryPolicyMustMatchTest(c client.Client, invConfig InventoryConfig, na
 	secondInvName := randomString("second-inv-")
 	secondInv := invConfig.InvWrapperFunc(invConfig.InventoryFactoryFunc(secondInvName, namespaceName, secondInvName))
 	secondResources := []*unstructured.Unstructured{
-		updateReplicas(deploymentManifest(namespaceName), 6),
+		withReplicas(withNamespace(manifestToUnstructured(deployment1), namespaceName), 6),
 	}
 
 	ch := applier.Run(context.TODO(), secondInv, secondResources, apply.Options{
@@ -93,7 +91,7 @@ func inventoryPolicyMustMatchTest(c client.Client, invConfig InventoryConfig, na
 			// ApplyTask error: resource managed by another inventory
 			EventType: event.ApplyType,
 			ApplyEvent: &testutil.ExpApplyEvent{
-				Identifier: object.UnstructuredToObjMetaOrDie(deploymentManifest(namespaceName)),
+				Identifier: object.UnstructuredToObjMetaOrDie(withNamespace(manifestToUnstructured(deployment1), namespaceName)),
 				Error: testutil.EqualErrorType(
 					inventory.NewInventoryOverlapError(errors.New("test")),
 				),
@@ -151,7 +149,7 @@ func inventoryPolicyMustMatchTest(c client.Client, invConfig InventoryConfig, na
 	expected := testutil.ExpEvent{
 		EventType: event.StatusType,
 		StatusEvent: &testutil.ExpStatusEvent{
-			Identifier: object.UnstructuredToObjMetaOrDie(deploymentManifest(namespaceName)),
+			Identifier: object.UnstructuredToObjMetaOrDie(withNamespace(manifestToUnstructured(deployment1), namespaceName)),
 			Status:     status.InProgressStatus,
 			Error:      nil,
 		},
@@ -162,7 +160,7 @@ func inventoryPolicyMustMatchTest(c client.Client, invConfig InventoryConfig, na
 	expected = testutil.ExpEvent{
 		EventType: event.StatusType,
 		StatusEvent: &testutil.ExpStatusEvent{
-			Identifier: object.UnstructuredToObjMetaOrDie(deploymentManifest(namespaceName)),
+			Identifier: object.UnstructuredToObjMetaOrDie(withNamespace(manifestToUnstructured(deployment1), namespaceName)),
 			Status:     status.CurrentStatus,
 			Error:      nil,
 		},
@@ -173,20 +171,18 @@ func inventoryPolicyMustMatchTest(c client.Client, invConfig InventoryConfig, na
 	Expect(received).To(testutil.Equal(expEvents))
 
 	By("Verify resource wasn't updated")
-	var d appsv1.Deployment
-	err := c.Get(context.TODO(), types.NamespacedName{
-		Namespace: namespaceName,
-		Name:      deploymentManifest(namespaceName).GetName(),
-	}, &d)
+	result := assertUnstructuredExists(c, withNamespace(manifestToUnstructured(deployment1), namespaceName))
+	replicas, found, err := testutil.NestedField(result.Object, "spec", "replicas")
 	Expect(err).NotTo(HaveOccurred())
-	Expect(d.Spec.Replicas).To(Equal(func(i int32) *int32 { return &i }(4)))
+	Expect(found).To(BeTrue())
+	Expect(replicas).To(Equal(int64(4)))
 
 	invConfig.InvCountVerifyFunc(c, namespaceName, 2)
 }
 
 func inventoryPolicyAdoptIfNoInventoryTest(c client.Client, invConfig InventoryConfig, namespaceName string) {
 	By("Create unmanaged resource")
-	err := c.Create(context.TODO(), deploymentManifest(namespaceName))
+	err := c.Create(context.TODO(), withNamespace(manifestToUnstructured(deployment1), namespaceName))
 	Expect(err).NotTo(HaveOccurred())
 
 	By("Apply resources")
@@ -195,7 +191,7 @@ func inventoryPolicyAdoptIfNoInventoryTest(c client.Client, invConfig InventoryC
 	invName := randomString("test-inv-")
 	inv := invConfig.InvWrapperFunc(invConfig.InventoryFactoryFunc(invName, namespaceName, invName))
 	resources := []*unstructured.Unstructured{
-		updateReplicas(deploymentManifest(namespaceName), 6),
+		withReplicas(withNamespace(manifestToUnstructured(deployment1), namespaceName), 6),
 	}
 
 	ch := applier.Run(context.TODO(), inv, resources, apply.Options{
@@ -248,7 +244,7 @@ func inventoryPolicyAdoptIfNoInventoryTest(c client.Client, invConfig InventoryC
 			EventType: event.ApplyType,
 			ApplyEvent: &testutil.ExpApplyEvent{
 				Operation:  event.Configured,
-				Identifier: object.UnstructuredToObjMetaOrDie(deploymentManifest(namespaceName)),
+				Identifier: object.UnstructuredToObjMetaOrDie(withNamespace(manifestToUnstructured(deployment1), namespaceName)),
 				Error:      nil,
 			},
 		},
@@ -304,7 +300,7 @@ func inventoryPolicyAdoptIfNoInventoryTest(c client.Client, invConfig InventoryC
 	expected := testutil.ExpEvent{
 		EventType: event.StatusType,
 		StatusEvent: &testutil.ExpStatusEvent{
-			Identifier: object.UnstructuredToObjMetaOrDie(deploymentManifest(namespaceName)),
+			Identifier: object.UnstructuredToObjMetaOrDie(withNamespace(manifestToUnstructured(deployment1), namespaceName)),
 			Status:     status.InProgressStatus,
 			Error:      nil,
 		},
@@ -315,7 +311,7 @@ func inventoryPolicyAdoptIfNoInventoryTest(c client.Client, invConfig InventoryC
 	expected = testutil.ExpEvent{
 		EventType: event.StatusType,
 		StatusEvent: &testutil.ExpStatusEvent{
-			Identifier: object.UnstructuredToObjMetaOrDie(deploymentManifest(namespaceName)),
+			Identifier: object.UnstructuredToObjMetaOrDie(withNamespace(manifestToUnstructured(deployment1), namespaceName)),
 			Status:     status.CurrentStatus,
 			Error:      nil,
 		},
@@ -326,14 +322,17 @@ func inventoryPolicyAdoptIfNoInventoryTest(c client.Client, invConfig InventoryC
 	Expect(received).To(testutil.Equal(expEvents))
 
 	By("Verify resource was updated and added to inventory")
-	var d appsv1.Deployment
-	err = c.Get(context.TODO(), types.NamespacedName{
-		Namespace: namespaceName,
-		Name:      deploymentManifest(namespaceName).GetName(),
-	}, &d)
+	result := assertUnstructuredExists(c, withNamespace(manifestToUnstructured(deployment1), namespaceName))
+
+	replicas, found, err := testutil.NestedField(result.Object, "spec", "replicas")
 	Expect(err).NotTo(HaveOccurred())
-	Expect(d.Spec.Replicas).To(Equal(func(i int32) *int32 { return &i }(6)))
-	Expect(d.ObjectMeta.Annotations["config.k8s.io/owning-inventory"]).To(Equal(invName))
+	Expect(found).To(BeTrue())
+	Expect(replicas).To(Equal(int64(6)))
+
+	value, found, err := testutil.NestedField(result.Object, "metadata", "annotations", "config.k8s.io/owning-inventory")
+	Expect(err).NotTo(HaveOccurred())
+	Expect(found).To(BeTrue())
+	Expect(value).To(Equal(invName))
 
 	invConfig.InvCountVerifyFunc(c, namespaceName, 1)
 	invConfig.InvSizeVerifyFunc(c, invName, namespaceName, invName, 1)
@@ -346,7 +345,7 @@ func inventoryPolicyAdoptAllTest(c client.Client, invConfig InventoryConfig, nam
 	firstInvName := randomString("first-inv-")
 	firstInv := invConfig.InvWrapperFunc(invConfig.InventoryFactoryFunc(firstInvName, namespaceName, firstInvName))
 	firstResources := []*unstructured.Unstructured{
-		deploymentManifest(namespaceName),
+		withNamespace(manifestToUnstructured(deployment1), namespaceName),
 	}
 
 	runWithNoErr(applier.Run(context.TODO(), firstInv, firstResources, apply.Options{
@@ -358,7 +357,7 @@ func inventoryPolicyAdoptAllTest(c client.Client, invConfig InventoryConfig, nam
 	secondInvName := randomString("test-inv-")
 	secondInv := invConfig.InvWrapperFunc(invConfig.InventoryFactoryFunc(secondInvName, namespaceName, secondInvName))
 	secondResources := []*unstructured.Unstructured{
-		updateReplicas(deploymentManifest(namespaceName), 6),
+		withReplicas(withNamespace(manifestToUnstructured(deployment1), namespaceName), 6),
 	}
 
 	ch := applier.Run(context.TODO(), secondInv, secondResources, apply.Options{
@@ -411,7 +410,7 @@ func inventoryPolicyAdoptAllTest(c client.Client, invConfig InventoryConfig, nam
 			EventType: event.ApplyType,
 			ApplyEvent: &testutil.ExpApplyEvent{
 				Operation:  event.Configured,
-				Identifier: object.UnstructuredToObjMetaOrDie(deploymentManifest(namespaceName)),
+				Identifier: object.UnstructuredToObjMetaOrDie(withNamespace(manifestToUnstructured(deployment1), namespaceName)),
 				Error:      nil,
 			},
 		},
@@ -467,7 +466,7 @@ func inventoryPolicyAdoptAllTest(c client.Client, invConfig InventoryConfig, nam
 	expected := testutil.ExpEvent{
 		EventType: event.StatusType,
 		StatusEvent: &testutil.ExpStatusEvent{
-			Identifier: object.UnstructuredToObjMetaOrDie(deploymentManifest(namespaceName)),
+			Identifier: object.UnstructuredToObjMetaOrDie(withNamespace(manifestToUnstructured(deployment1), namespaceName)),
 			Status:     status.InProgressStatus,
 			Error:      nil,
 		},
@@ -478,7 +477,7 @@ func inventoryPolicyAdoptAllTest(c client.Client, invConfig InventoryConfig, nam
 	expected = testutil.ExpEvent{
 		EventType: event.StatusType,
 		StatusEvent: &testutil.ExpStatusEvent{
-			Identifier: object.UnstructuredToObjMetaOrDie(deploymentManifest(namespaceName)),
+			Identifier: object.UnstructuredToObjMetaOrDie(withNamespace(manifestToUnstructured(deployment1), namespaceName)),
 			Status:     status.CurrentStatus,
 			Error:      nil,
 		},
@@ -489,14 +488,17 @@ func inventoryPolicyAdoptAllTest(c client.Client, invConfig InventoryConfig, nam
 	Expect(received).To(testutil.Equal(expEvents))
 
 	By("Verify resource was updated and added to inventory")
-	var d appsv1.Deployment
-	err := c.Get(context.TODO(), types.NamespacedName{
-		Namespace: namespaceName,
-		Name:      deploymentManifest(namespaceName).GetName(),
-	}, &d)
+	result := assertUnstructuredExists(c, withNamespace(manifestToUnstructured(deployment1), namespaceName))
+
+	replicas, found, err := testutil.NestedField(result.Object, "spec", "replicas")
 	Expect(err).NotTo(HaveOccurred())
-	Expect(d.Spec.Replicas).To(Equal(func(i int32) *int32 { return &i }(6)))
-	Expect(d.ObjectMeta.Annotations["config.k8s.io/owning-inventory"]).To(Equal(secondInvName))
+	Expect(found).To(BeTrue())
+	Expect(replicas).To(Equal(int64(6)))
+
+	value, found, err := testutil.NestedField(result.Object, "metadata", "annotations", "config.k8s.io/owning-inventory")
+	Expect(err).NotTo(HaveOccurred())
+	Expect(found).To(BeTrue())
+	Expect(value).To(Equal(secondInvName))
 
 	invConfig.InvCountVerifyFunc(c, namespaceName, 2)
 }

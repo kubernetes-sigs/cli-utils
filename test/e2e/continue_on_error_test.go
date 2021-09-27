@@ -6,7 +6,6 @@ package e2e
 import (
 	"context"
 	"errors"
-	"strings"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -19,7 +18,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func continueOnErrorTest(_ client.Client, invConfig InventoryConfig, inventoryName, namespaceName string) {
+func continueOnErrorTest(c client.Client, invConfig InventoryConfig, inventoryName, namespaceName string) {
 	By("apply an invalid CRD")
 	applier := invConfig.ApplierFactoryFunc()
 
@@ -27,13 +26,13 @@ func continueOnErrorTest(_ client.Client, invConfig InventoryConfig, inventoryNa
 
 	resources := []*unstructured.Unstructured{
 		manifestToUnstructured(invalidCrd),
+		withNamespace(manifestToUnstructured(pod1), namespaceName),
 	}
 
 	ch := applier.Run(context.TODO(), inv, resources, apply.Options{})
 
 	var applierEvents []event.Event
 	for e := range ch {
-		Expect(e.Type).NotTo(Equal(event.ErrorType))
 		applierEvents = append(applierEvents, e)
 	}
 
@@ -71,13 +70,22 @@ func continueOnErrorTest(_ client.Client, invConfig InventoryConfig, inventoryNa
 			},
 		},
 		{
-			// Apply object which fails
+			// Apply invalidCrd fails
 			EventType: event.ApplyType,
 			ApplyEvent: &testutil.ExpApplyEvent{
 				Identifier: object.UnstructuredToObjMetaOrDie(manifestToUnstructured(invalidCrd)),
 				Error: testutil.EqualErrorType(
 					applyerror.NewApplyRunError(errors.New("failed to apply")),
 				),
+			},
+		},
+		{
+			// Create pod1
+			EventType: event.ApplyType,
+			ApplyEvent: &testutil.ExpApplyEvent{
+				Operation:  event.Created,
+				Identifier: object.UnstructuredToObjMetaOrDie(withNamespace(manifestToUnstructured(pod1), namespaceName)),
+				Error:      nil,
 			},
 		},
 		{
@@ -90,6 +98,25 @@ func continueOnErrorTest(_ client.Client, invConfig InventoryConfig, inventoryNa
 			},
 		},
 		// Note: No WaitTask when apply fails
+		// TODO: why no wait after create tho?
+		// {
+		// 	// WaitTask start
+		// 	EventType: event.ActionGroupType,
+		// 	ActionGroupEvent: &testutil.ExpActionGroupEvent{
+		// 		Action: event.WaitAction,
+		// 		Name:   "wait-0",
+		// 		Type:   event.Started,
+		// 	},
+		// },
+		// {
+		// 	// WaitTask finished
+		// 	EventType: event.ActionGroupType,
+		// 	ActionGroupEvent: &testutil.ExpActionGroupEvent{
+		// 		Action: event.WaitAction,
+		// 		Name:   "wait-0",
+		// 		Type:   event.Finished,
+		// 	},
+		// },
 		{
 			// InvSetTask start
 			EventType: event.ActionGroupType,
@@ -110,21 +137,10 @@ func continueOnErrorTest(_ client.Client, invConfig InventoryConfig, inventoryNa
 		},
 	}
 	Expect(testutil.EventsToExpEvents(applierEvents)).To(testutil.Equal(expEvents))
-}
 
-var invalidCrd = []byte(strings.TrimSpace(`
-apiVersion: apiextensions.k8s.io/v1
-kind: CustomResourceDefinition
-metadata:
-  name: invalidexamples.cli-utils.example.io
-spec:
-  conversion:
-    strategy: None
-  group: cli-utils.example.io
-  names:
-    kind: InvalidExample
-    listKind: InvalidExampleList
-    plural: invalidexamples
-    singular: invalidexample
-  scope: Cluster
-`))
+	By("Verify pod1 created")
+	assertUnstructuredExists(c, withNamespace(manifestToUnstructured(pod1), namespaceName))
+
+	By("Verify CRD not created")
+	assertUnstructuredDoesNotExist(c, manifestToUnstructured(invalidCrd))
+}

@@ -28,7 +28,7 @@ func applyAndDestroyTest(c client.Client, invConfig InventoryConfig, inventoryNa
 	inventoryInfo := createInventoryInfo(invConfig, inventoryName, namespaceName, inventoryID)
 
 	resources := []*unstructured.Unstructured{
-		deploymentManifest(namespaceName),
+		withNamespace(manifestToUnstructured(deployment1), namespaceName),
 	}
 
 	applyCh := applier.Run(context.TODO(), inventoryInfo, resources, apply.Options{
@@ -38,7 +38,6 @@ func applyAndDestroyTest(c client.Client, invConfig InventoryConfig, inventoryNa
 
 	var applierEvents []event.Event
 	for e := range applyCh {
-		Expect(e.Type).NotTo(Equal(event.ErrorType))
 		applierEvents = append(applierEvents, e)
 	}
 
@@ -80,7 +79,7 @@ func applyAndDestroyTest(c client.Client, invConfig InventoryConfig, inventoryNa
 			EventType: event.ApplyType,
 			ApplyEvent: &testutil.ExpApplyEvent{
 				Operation:  event.Created,
-				Identifier: object.UnstructuredToObjMetaOrDie(deploymentManifest(namespaceName)),
+				Identifier: object.UnstructuredToObjMetaOrDie(withNamespace(manifestToUnstructured(deployment1), namespaceName)),
 				Error:      nil,
 			},
 		},
@@ -136,7 +135,7 @@ func applyAndDestroyTest(c client.Client, invConfig InventoryConfig, inventoryNa
 	expected := testutil.ExpEvent{
 		EventType: event.StatusType,
 		StatusEvent: &testutil.ExpStatusEvent{
-			Identifier: object.UnstructuredToObjMetaOrDie(deploymentManifest(namespaceName)),
+			Identifier: object.UnstructuredToObjMetaOrDie(withNamespace(manifestToUnstructured(deployment1), namespaceName)),
 			Status:     status.NotFoundStatus,
 			Error:      nil,
 		},
@@ -148,7 +147,7 @@ func applyAndDestroyTest(c client.Client, invConfig InventoryConfig, inventoryNa
 	expected = testutil.ExpEvent{
 		EventType: event.StatusType,
 		StatusEvent: &testutil.ExpStatusEvent{
-			Identifier: object.UnstructuredToObjMetaOrDie(deploymentManifest(namespaceName)),
+			Identifier: object.UnstructuredToObjMetaOrDie(withNamespace(manifestToUnstructured(deployment1), namespaceName)),
 			Status:     status.InProgressStatus,
 			Error:      nil,
 		},
@@ -159,7 +158,7 @@ func applyAndDestroyTest(c client.Client, invConfig InventoryConfig, inventoryNa
 	expected = testutil.ExpEvent{
 		EventType: event.StatusType,
 		StatusEvent: &testutil.ExpStatusEvent{
-			Identifier: object.UnstructuredToObjMetaOrDie(deploymentManifest(namespaceName)),
+			Identifier: object.UnstructuredToObjMetaOrDie(withNamespace(manifestToUnstructured(deployment1), namespaceName)),
 			Status:     status.CurrentStatus,
 			Error:      nil,
 		},
@@ -169,6 +168,9 @@ func applyAndDestroyTest(c client.Client, invConfig InventoryConfig, inventoryNa
 
 	Expect(received).To(testutil.Equal(expEvents))
 
+	By("Verify deployment created")
+	assertUnstructuredExists(c, withNamespace(manifestToUnstructured(deployment1), namespaceName))
+
 	By("Verify inventory")
 	invConfig.InvSizeVerifyFunc(c, inventoryName, namespaceName, inventoryID, 1)
 
@@ -176,7 +178,7 @@ func applyAndDestroyTest(c client.Client, invConfig InventoryConfig, inventoryNa
 	destroyer := invConfig.DestroyerFactoryFunc()
 
 	options := apply.DestroyerOptions{InventoryPolicy: inventory.AdoptIfNoInventory}
-	destroyerEvents := runCollectNoErr(destroyer.Run(inventoryInfo, options))
+	destroyerEvents := runCollect(destroyer.Run(inventoryInfo, options))
 
 	expEvents = []testutil.ExpEvent{
 		{
@@ -198,7 +200,7 @@ func applyAndDestroyTest(c client.Client, invConfig InventoryConfig, inventoryNa
 			EventType: event.DeleteType,
 			DeleteEvent: &testutil.ExpDeleteEvent{
 				Operation:  event.Deleted,
-				Identifier: object.UnstructuredToObjMetaOrDie(deploymentManifest(namespaceName)),
+				Identifier: object.UnstructuredToObjMetaOrDie(withNamespace(manifestToUnstructured(deployment1), namespaceName)),
 				Error:      nil,
 			},
 		},
@@ -251,6 +253,9 @@ func applyAndDestroyTest(c client.Client, invConfig InventoryConfig, inventoryNa
 	}
 
 	Expect(testutil.EventsToExpEvents(destroyerEvents)).To(testutil.Equal(expEvents))
+
+	By("Verify deployment deleted")
+	assertUnstructuredDoesNotExist(c, withNamespace(manifestToUnstructured(deployment1), namespaceName))
 }
 
 func createInventoryInfo(invConfig InventoryConfig, inventoryName, namespaceName, inventoryID string) inventory.InventoryInfo {

@@ -5,7 +5,7 @@ package e2e
 
 import (
 	"context"
-	"strings"
+	"fmt"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -18,7 +18,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func dependsOnTest(_ client.Client, invConfig InventoryConfig, inventoryName, namespaceName string) {
+func dependsOnTest(c client.Client, invConfig InventoryConfig, inventoryName, namespaceName string) {
 	By("apply resources in order based on depends-on annotation")
 	applier := invConfig.ApplierFactoryFunc()
 
@@ -27,9 +27,9 @@ func dependsOnTest(_ client.Client, invConfig InventoryConfig, inventoryName, na
 	// Dependency order: pod1 -> pod3 -> pod2
 	// Apply order: pod2, pod3, pod1
 	resources := []*unstructured.Unstructured{
-		manifestToUnstructured(pod1),
-		manifestToUnstructured(pod2),
-		manifestToUnstructured(pod3),
+		withDependsOn(withNamespace(manifestToUnstructured(pod1), namespaceName), fmt.Sprintf("/namespaces/%s/Pod/pod3", namespaceName)),
+		withNamespace(manifestToUnstructured(pod2), namespaceName),
+		withDependsOn(withNamespace(manifestToUnstructured(pod3), namespaceName), fmt.Sprintf("/namespaces/%s/Pod/pod2", namespaceName)),
 	}
 
 	ch := applier.Run(context.TODO(), inv, resources, apply.Options{
@@ -38,7 +38,6 @@ func dependsOnTest(_ client.Client, invConfig InventoryConfig, inventoryName, na
 
 	var applierEvents []event.Event
 	for e := range ch {
-		Expect(e.Type).NotTo(Equal(event.ErrorType))
 		applierEvents = append(applierEvents, e)
 	}
 	expEvents := []testutil.ExpEvent{
@@ -79,7 +78,7 @@ func dependsOnTest(_ client.Client, invConfig InventoryConfig, inventoryName, na
 			EventType: event.ApplyType,
 			ApplyEvent: &testutil.ExpApplyEvent{
 				Operation:  event.Created,
-				Identifier: object.UnstructuredToObjMetaOrDie(manifestToUnstructured(pod2)),
+				Identifier: object.UnstructuredToObjMetaOrDie(withNamespace(manifestToUnstructured(pod2), namespaceName)),
 				Error:      nil,
 			},
 		},
@@ -124,7 +123,7 @@ func dependsOnTest(_ client.Client, invConfig InventoryConfig, inventoryName, na
 			EventType: event.ApplyType,
 			ApplyEvent: &testutil.ExpApplyEvent{
 				Operation:  event.Created,
-				Identifier: object.UnstructuredToObjMetaOrDie(manifestToUnstructured(pod3)),
+				Identifier: object.UnstructuredToObjMetaOrDie(withNamespace(manifestToUnstructured(pod3), namespaceName)),
 				Error:      nil,
 			},
 		},
@@ -169,7 +168,7 @@ func dependsOnTest(_ client.Client, invConfig InventoryConfig, inventoryName, na
 			EventType: event.ApplyType,
 			ApplyEvent: &testutil.ExpApplyEvent{
 				Operation:  event.Created,
-				Identifier: object.UnstructuredToObjMetaOrDie(manifestToUnstructured(pod1)),
+				Identifier: object.UnstructuredToObjMetaOrDie(withNamespace(manifestToUnstructured(pod1), namespaceName)),
 				Error:      nil,
 			},
 		},
@@ -221,10 +220,31 @@ func dependsOnTest(_ client.Client, invConfig InventoryConfig, inventoryName, na
 	}
 	Expect(testutil.EventsToExpEvents(applierEvents)).To(testutil.Equal(expEvents))
 
+	By("verify pod1 created and ready")
+	result := assertUnstructuredExists(c, withNamespace(manifestToUnstructured(pod1), namespaceName))
+	podIP, found, err := testutil.NestedField(result.Object, "status", "podIP")
+	Expect(err).NotTo(HaveOccurred())
+	Expect(found).To(BeTrue())
+	Expect(podIP).NotTo(BeEmpty()) // use podIP as proxy for readiness
+
+	By("verify pod2 created and ready")
+	result = assertUnstructuredExists(c, withNamespace(manifestToUnstructured(pod2), namespaceName))
+	podIP, found, err = testutil.NestedField(result.Object, "status", "podIP")
+	Expect(err).NotTo(HaveOccurred())
+	Expect(found).To(BeTrue())
+	Expect(podIP).NotTo(BeEmpty()) // use podIP as proxy for readiness
+
+	By("verify pod3 created and ready")
+	result = assertUnstructuredExists(c, withNamespace(manifestToUnstructured(pod3), namespaceName))
+	podIP, found, err = testutil.NestedField(result.Object, "status", "podIP")
+	Expect(err).NotTo(HaveOccurred())
+	Expect(found).To(BeTrue())
+	Expect(podIP).NotTo(BeEmpty()) // use podIP as proxy for readiness
+
 	By("destroy resources in opposite order")
 	destroyer := invConfig.DestroyerFactoryFunc()
 	options := apply.DestroyerOptions{InventoryPolicy: inventory.AdoptIfNoInventory}
-	destroyerEvents := runCollectNoErr(destroyer.Run(inv, options))
+	destroyerEvents := runCollect(destroyer.Run(inv, options))
 
 	expEvents = []testutil.ExpEvent{
 		{
@@ -246,7 +266,7 @@ func dependsOnTest(_ client.Client, invConfig InventoryConfig, inventoryName, na
 			EventType: event.DeleteType,
 			DeleteEvent: &testutil.ExpDeleteEvent{
 				Operation:  event.Deleted,
-				Identifier: object.UnstructuredToObjMetaOrDie(manifestToUnstructured(pod1)),
+				Identifier: object.UnstructuredToObjMetaOrDie(withNamespace(manifestToUnstructured(pod1), namespaceName)),
 				Error:      nil,
 			},
 		},
@@ -291,7 +311,7 @@ func dependsOnTest(_ client.Client, invConfig InventoryConfig, inventoryName, na
 			EventType: event.DeleteType,
 			DeleteEvent: &testutil.ExpDeleteEvent{
 				Operation:  event.Deleted,
-				Identifier: object.UnstructuredToObjMetaOrDie(manifestToUnstructured(pod3)),
+				Identifier: object.UnstructuredToObjMetaOrDie(withNamespace(manifestToUnstructured(pod3), namespaceName)),
 				Error:      nil,
 			},
 		},
@@ -336,7 +356,7 @@ func dependsOnTest(_ client.Client, invConfig InventoryConfig, inventoryName, na
 			EventType: event.DeleteType,
 			DeleteEvent: &testutil.ExpDeleteEvent{
 				Operation:  event.Deleted,
-				Identifier: object.UnstructuredToObjMetaOrDie(manifestToUnstructured(pod2)),
+				Identifier: object.UnstructuredToObjMetaOrDie(withNamespace(manifestToUnstructured(pod2), namespaceName)),
 				Error:      nil,
 			},
 		},
@@ -386,46 +406,14 @@ func dependsOnTest(_ client.Client, invConfig InventoryConfig, inventoryName, na
 			},
 		},
 	}
-
 	Expect(testutil.EventsToExpEvents(destroyerEvents)).To(testutil.Equal(expEvents))
+
+	By("verify pod1 deleted")
+	assertUnstructuredDoesNotExist(c, withNamespace(manifestToUnstructured(pod1), namespaceName))
+
+	By("verify pod2 deleted")
+	assertUnstructuredDoesNotExist(c, withNamespace(manifestToUnstructured(pod2), namespaceName))
+
+	By("verify pod3 deleted")
+	assertUnstructuredDoesNotExist(c, withNamespace(manifestToUnstructured(pod3), namespaceName))
 }
-
-var pod1 = []byte(strings.TrimSpace(`
-kind: Pod
-apiVersion: v1
-metadata:
-  name: pod1
-  namespace: default
-  annotations:
-    config.kubernetes.io/depends-on: /namespaces/default/Pod/pod3
-spec:
-  containers:
-  - name: kubernetes-pause
-    image: k8s.gcr.io/pause:2.0
-`))
-
-var pod2 = []byte(strings.TrimSpace(`
-kind: Pod
-apiVersion: v1
-metadata:
-  name: pod2
-  namespace: default
-spec:
-  containers:
-  - name: kubernetes-pause
-    image: k8s.gcr.io/pause:2.0
-`))
-
-var pod3 = []byte(strings.TrimSpace(`
-kind: Pod
-apiVersion: v1
-metadata:
-  name: pod3
-  namespace: default
-  annotations:
-    config.kubernetes.io/depends-on: /namespaces/default/Pod/pod2
-spec:
-  containers:
-  - name: kubernetes-pause
-    image: k8s.gcr.io/pause:2.0
-`))
