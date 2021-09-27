@@ -130,7 +130,7 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 					break
 				}
 				if filtered {
-					klog.V(4).Infof("apply filtered by %s because (%s): %s", filter.Name(), reason, id)
+					klog.V(4).Infof("apply filtered (filter: %q, resource: %q, reason: %q)", filter.Name(), id, reason)
 					taskContext.EventChannel() <- createApplyEvent(id, event.Unchanged, obj)
 					taskContext.CaptureResourceFailure(id)
 					break
@@ -240,7 +240,7 @@ func (a *ApplyTask) mutate(ctx context.Context, obj *unstructured.Unstructured) 
 			return fmt.Errorf("failed to mutate %q with %q: %w", id, mutator.Name(), err)
 		}
 		if mutated {
-			klog.V(4).Infof("resource mutated by %s because (%s): %s", mutator.Name(), reason, id)
+			klog.V(4).Infof("resource mutated (mutator: %q, resource: %q, reason: %q)", mutator.Name(), id, reason)
 		}
 	}
 	return nil

@@ -23,13 +23,11 @@ func (cuf CurrentUIDFilter) Name() string {
 }
 
 // Filter returns true if the passed object should NOT be pruned (deleted)
-// because the it is a namespace that objects still reside in; otherwise
-// returns false. This filter should not be added to the list of filters
-// for "destroying", since every object is being deletet. Never returns an error.
+// because it has recently been applied.
 func (cuf CurrentUIDFilter) Filter(obj *unstructured.Unstructured) (bool, string, error) {
 	uid := string(obj.GetUID())
 	if cuf.CurrentUIDs.Has(uid) {
-		reason := fmt.Sprintf("object removal prevented; UID just applied: %s", uid)
+		reason := fmt.Sprintf("resource just applied (UID: %q)", uid)
 		return true, reason, nil
 	}
 	return false, "", nil

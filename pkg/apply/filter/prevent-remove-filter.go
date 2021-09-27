@@ -27,7 +27,7 @@ func (prf PreventRemoveFilter) Name() string {
 func (prf PreventRemoveFilter) Filter(obj *unstructured.Unstructured) (bool, string, error) {
 	for annotation, value := range obj.GetAnnotations() {
 		if common.NoDeletion(annotation, value) {
-			reason := fmt.Sprintf("object removal prevented; delete annotation: %s/%s", annotation, value)
+			reason := fmt.Sprintf("annotation prevents deletion (annotation: %q, value: %q)", annotation, value)
 			return true, reason, nil
 		}
 	}

@@ -112,7 +112,7 @@ func (po *PruneOptions) Prune(pruneObjs []*unstructured.Unstructured,
 				break
 			}
 			if filtered {
-				klog.V(4).Infof("prune filtered by %s: %s", filter.Name(), pruneID)
+				klog.V(4).Infof("prune filtered (filter: %q, resource: %q, reason: %q)", filter.Name(), pruneID, reason)
 				taskContext.EventChannel() <- eventFactory.CreateSkippedEvent(pruneObj, reason)
 				taskContext.CapturePruneFailure(pruneID)
 				break
