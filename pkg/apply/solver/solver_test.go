@@ -478,15 +478,41 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 			},
 			isError: false,
 		},
+		"single resource with prune timeout has wait task": {
+			pruneObjs: []*unstructured.Unstructured{
+				testutil.Unstructured(t, resources["pod"]),
+			},
+			options: Options{
+				Prune:        true,
+				PruneTimeout: 3 * time.Minute,
+			},
+			expectedTasks: []taskrunner.Task{
+				&task.PruneTask{
+					TaskName: "prune-0",
+					Objects: []*unstructured.Unstructured{
+						testutil.Unstructured(t, resources["pod"]),
+					},
+				},
+				taskrunner.NewWaitTask(
+					"wait-0",
+					[]object.ObjMetadata{
+						testutil.ToIdentifier(t, resources["pod"]),
+					},
+					taskrunner.AllCurrent,
+					3*time.Minute,
+					testutil.NewFakeRESTMapper()),
+			},
+			isError: false,
+		},
 		"multiple resources with prune timeout and server-dryrun": {
 			pruneObjs: []*unstructured.Unstructured{
 				testutil.Unstructured(t, resources["pod"]),
 				testutil.Unstructured(t, resources["default-pod"]),
 			},
 			options: Options{
-				ReconcileTimeout: time.Minute,
-				DryRunStrategy:   common.DryRunServer,
-				Prune:            true,
+				PruneTimeout:   time.Minute,
+				DryRunStrategy: common.DryRunServer,
+				Prune:          true,
 			},
 			// No wait task, since it is dry run
 			expectedTasks: []taskrunner.Task{
@@ -655,6 +681,12 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 							expTsk.Ids, actWaitTask.Ids)
 					}
 					assert.Equal(t, taskrunner.AllNotFound, actWaitTask.Condition)
+					// Validate the prune wait timeout.
+					expectedTimeout := defaultWaitTimeout
+					if tc.options.PruneTimeout != time.Duration(0) {
+						expectedTimeout = tc.options.PruneTimeout
+					}
+					assert.Equal(t, expectedTimeout, actualTask.(*taskrunner.WaitTask).Timeout)
 				}
 			}
 		})

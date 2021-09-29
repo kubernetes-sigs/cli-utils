@@ -247,7 +247,7 @@ func (t *TaskQueueBuilder) AppendPruneWaitTasks(pruneObjs []*unstructured.Unstru
 			t.err = err
 		}
 		addWaitTask, waitTimeout := waitTaskTimeout(o.DryRunStrategy.ClientOrServerDryRun(),
-			len(pruneSets), o.ReconcileTimeout)
+			len(pruneSets), o.PruneTimeout)
 		for _, pruneSet := range pruneSets {
 			t.AppendPruneTask(pruneSet, pruneFilters, o)
 			if addWaitTask {
@@ -261,13 +261,13 @@ func (t *TaskQueueBuilder) AppendPruneWaitTasks(pruneObjs []*unstructured.Unstru
 
 // waitTaskTimeout returns true if the wait task should be added to the task queue;
 // false otherwise. If true, also returns the duration within wait task before timeout.
-func waitTaskTimeout(dryRun bool, numObjSets int, reconcileTimeout time.Duration) (bool, time.Duration) {
+func waitTaskTimeout(dryRun bool, numObjSets int, waitTimeout time.Duration) (bool, time.Duration) {
 	var zeroTimeout = time.Duration(0)
 	if dryRun {
 		return false, zeroTimeout
 	}
-	if reconcileTimeout != zeroTimeout {
-		return true, reconcileTimeout
+	if waitTimeout != zeroTimeout {
+		return true, waitTimeout
 	}
 	if numObjSets > 1 {
 		return true, defaultWaitTimeout
