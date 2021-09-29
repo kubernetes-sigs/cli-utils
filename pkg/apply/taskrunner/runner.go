@@ -201,7 +201,7 @@ func (b *baseRunner) run(ctx context.Context, taskQueue chan Task,
 
 			// Update the cache to track the latest resource spec & status.
 			// Status is computed from the resource on-demand.
-			// Warning: Resource may be nil!
+			// Resource may be nil.
 			taskContext.ResourceCache().Put(
 				statusEvent.Resource.Identifier,
 				cache.ResourceStatus{

@@ -179,7 +179,7 @@ func (t *TaskQueueBuilder) AppendApplyTask(applyObjs []*unstructured.Unstructure
 // Returns a pointer to the Builder to chain function calls.
 func (t *TaskQueueBuilder) AppendWaitTask(waitIds []object.ObjMetadata, condition taskrunner.Condition,
 	waitTimeout time.Duration) *TaskQueueBuilder {
-	klog.V(2).Infoln("adding wait task")
+	klog.V(2).Infof("adding wait task (%d objects)", len(waitIds))
 	t.tasks = append(t.tasks, taskrunner.NewWaitTask(
 		fmt.Sprintf("wait-%d", t.waitCounter),
 		waitIds,
@@ -218,17 +218,28 @@ func (t *TaskQueueBuilder) AppendApplyWaitTasks(applyObjs []*unstructured.Unstru
 	applyFilters []filter.ValidationFilter, applyMutators []mutator.Interface, o Options) *TaskQueueBuilder {
 	// Use the "depends-on" annotation to create a graph, ands sort the
 	// objects to apply into sets using a topological sort.
-	applySets, err := graph.SortObjs(applyObjs)
+	applySets, externalSets, err := graph.SortObjs(applyObjs)
 	if err != nil {
 		t.err = err
 	}
 	addWaitTask, waitTimeout := waitTaskTimeout(o.DryRunStrategy.ClientOrServerDryRun(),
 		len(applySets), o.ReconcileTimeout)
-	for _, applySet := range applySets {
-		t.AppendApplyTask(applySet, applyFilters, applyMutators, o)
+	for i, applySet := range applySets {
+		if len(applySet) > 0 {
+			t.AppendApplyTask(applySet, applyFilters, applyMutators, o)
+		}
 		if addWaitTask {
-			applyIds := object.UnstructuredsToObjMetasOrDie(applySet)
-			t.AppendWaitTask(applyIds, taskrunner.AllCurrent, waitTimeout)
+			waitIds := []object.ObjMetadata(nil)
+			if len(applySet) > 0 {
+				waitIds = append(waitIds, object.UnstructuredsToObjMetasOrDie(applySet)...)
+			}
+			externalSet := externalSets[i]
+			if len(externalSet) > 0 {
+				waitIds = append(waitIds, externalSet...)
+			}
+			if len(waitIds) > 0 {
+				t.AppendWaitTask(waitIds, taskrunner.AllCurrent, waitTimeout)
+			}
 		}
 	}
 	return t
@@ -242,17 +253,22 @@ func (t *TaskQueueBuilder) AppendPruneWaitTasks(pruneObjs []*unstructured.Unstru
 	if o.Prune {
 		// Use the "depends-on" annotation to create a graph, ands sort the
 		// objects to prune into sets using a (reverse) topological sort.
-		pruneSets, err := graph.ReverseSortObjs(pruneObjs)
+		// Ignore external dependencies when pruning. They are not required to be deleted.
+		pruneSets, _, err := graph.ReverseSortObjs(pruneObjs)
 		if err != nil {
 			t.err = err
 		}
 		addWaitTask, waitTimeout := waitTaskTimeout(o.DryRunStrategy.ClientOrServerDryRun(),
 			len(pruneSets), o.PruneTimeout)
 		for _, pruneSet := range pruneSets {
-			t.AppendPruneTask(pruneSet, pruneFilters, o)
+			if len(pruneSet) > 0 {
+				t.AppendPruneTask(pruneSet, pruneFilters, o)
+			}
 			if addWaitTask {
-				pruneIds := object.UnstructuredsToObjMetasOrDie(pruneSet)
-				t.AppendWaitTask(pruneIds, taskrunner.AllNotFound, waitTimeout)
+				waitIds := object.UnstructuredsToObjMetasOrDie(pruneSet)
+				if len(waitIds) > 0 {
+					t.AppendWaitTask(waitIds, taskrunner.AllNotFound, waitTimeout)
+				}
 			}
 		}
 	}

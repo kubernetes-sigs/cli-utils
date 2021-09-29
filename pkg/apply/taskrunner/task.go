@@ -15,6 +15,7 @@ import (
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/object"
+	"sigs.k8s.io/cli-utils/pkg/object/mutation"
 )
 
 // Task is the interface that must be implemented by
@@ -35,12 +36,12 @@ func NewWaitTask(name string, ids []object.ObjMetadata, cond Condition, timeout 
 	tokenChannel <- struct{}{}
 
 	return &WaitTask{
-		name:      name,
+		TaskName:  name,
 		Ids:       ids,
 		Condition: cond,
 		Timeout:   timeout,
 
-		mapper: mapper,
+		Mapper: mapper,
 		token:  tokenChannel,
 	}
 }
@@ -53,8 +54,8 @@ func NewWaitTask(name string, ids []object.ObjMetadata, cond Condition, timeout 
 // is handled in a special way to the taskrunner and is a part of the core
 // package.
 type WaitTask struct {
-	// name allows providing a name for the task.
-	name string
+	// TaskName allows providing a name for the task.
+	TaskName string
 	// Ids is the list of resources that we are waiting for.
 	Ids []object.ObjMetadata
 	// Condition defines the status we want all resources to reach
@@ -63,7 +64,7 @@ type WaitTask struct {
 	// to be met.
 	Timeout time.Duration
 
-	mapper meta.RESTMapper
+	Mapper meta.RESTMapper
 
 	// cancelFunc is a function that will cancel the timeout timer
 	// on the task.
@@ -78,8 +79,16 @@ type WaitTask struct {
 	token chan struct{}
 }
 
+// Equals retursn true if the WaitTasks are equivelent (for testing purposes)
+func (w *WaitTask) Equal(b *WaitTask) bool {
+	return w.TaskName == b.TaskName &&
+		w.Condition == b.Condition &&
+		w.Timeout == b.Timeout &&
+		object.SetEquals(w.Ids, b.Ids)
+}
+
 func (w *WaitTask) Name() string {
-	return w.name
+	return w.TaskName
 }
 
 func (w *WaitTask) Action() event.ResourceAction {
@@ -94,6 +103,11 @@ func (w *WaitTask) Identifiers() []object.ObjMetadata {
 // setting up the timeout timer.
 func (w *WaitTask) Start(taskContext *TaskContext) {
 	klog.V(2).Infof("starting wait task (%d objects)", len(w.Ids))
+	if klog.V(3).Enabled() {
+		for _, id := range w.Ids {
+			klog.Infof("waiting for resource (%s)", mutation.ResourceReferenceFromObjMetadata(id))
+		}
+	}
 	w.setTimer(taskContext)
 }
 
@@ -166,7 +180,7 @@ func (w *WaitTask) complete(taskContext *TaskContext) {
 		if (obj.GroupKind.Group == v1.SchemeGroupVersion.Group ||
 			obj.GroupKind.Group == v1beta1.SchemeGroupVersion.Group) &&
 			obj.GroupKind.Kind == "CustomResourceDefinition" {
-			ddRESTMapper, err := extractDeferredDiscoveryRESTMapper(w.mapper)
+			ddRESTMapper, err := extractDeferredDiscoveryRESTMapper(w.Mapper)
 			if err == nil {
 				ddRESTMapper.Reset()
 				// We only need to reset once.

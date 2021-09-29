@@ -9,6 +9,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/klog/v2"
+	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/yaml"
 )
 
@@ -66,4 +67,22 @@ func WriteAnnotation(obj *unstructured.Unstructured, mutation ApplyTimeMutation)
 	a[Annotation] = string(yamlBytes)
 	obj.SetAnnotations(a)
 	return nil
+}
+
+func GetDependencies(objs []*unstructured.Unstructured) (object.ObjMetadataSet, error) {
+	depSet := map[ResourceReference]struct{}{}
+	for _, obj := range objs {
+		mutation, err := ReadAnnotation(obj)
+		if err != nil {
+			return nil, err
+		}
+		for _, sub := range mutation {
+			depSet[sub.SourceRef] = struct{}{}
+		}
+	}
+	depList := make(object.ObjMetadataSet, 0, len(depSet))
+	for dep := range depSet {
+		depList = append(depList, dep.ObjMetadata())
+	}
+	return depList, nil
 }

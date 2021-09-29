@@ -91,43 +91,81 @@ metadata:
   name: cron-tab-02
   namespace: test-namespace
 `,
+		"configmap1": `
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: map1-name
+  namespace: test-namespace
+  annotations:
+    config.kubernetes.io/depends-on: apps/namespaces/test-namespace/Deployment/foo
+    config.kubernetes.io/apply-time-mutation: |
+      - sourceRef:
+          kind: Pod
+          name: test-pod
+          namespace: test-namespace
+        sourcePath: $.unused
+        targetPath: $.unused
+data: {}
+`,
+		"configmap2": `
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: map2-name
+  namespace: test-namespace
+  annotations:
+    config.kubernetes.io/apply-time-mutation: |
+      - sourceRef:
+          group: apps
+          kind: Deployment
+          name: foo
+          namespace: test-namespace
+        sourcePath: $.unused
+        targetPath: $.unused
+data: {}
+`,
 	}
 )
 
 func TestSortObjs(t *testing.T) {
 	testCases := map[string]struct {
-		objs     []*unstructured.Unstructured
-		expected [][]*unstructured.Unstructured
-		isError  bool
+		objs            []*unstructured.Unstructured
+		expectedObjSets []object.UnstructuredSet
+		expectedDepSets []object.ObjMetadataSet
+		isError         bool
 	}{
 		"no objects returns no object sets": {
-			objs:     []*unstructured.Unstructured{},
-			expected: [][]*unstructured.Unstructured{},
-			isError:  false,
+			objs:            []*unstructured.Unstructured{},
+			expectedObjSets: nil,
+			expectedDepSets: nil,
+			isError:         false,
 		},
 		"one object returns single object set": {
 			objs: []*unstructured.Unstructured{
 				testutil.Unstructured(t, resources["deployment"]),
 			},
-			expected: [][]*unstructured.Unstructured{
+			expectedObjSets: []object.UnstructuredSet{
 				{
 					testutil.Unstructured(t, resources["deployment"]),
 				},
 			},
-			isError: false,
+			expectedDepSets: []object.ObjMetadataSet{{}},
+			isError:         false,
 		},
 		"two unrelated objects returns single object set with two objs": {
 			objs: []*unstructured.Unstructured{
 				testutil.Unstructured(t, resources["deployment"]),
 				testutil.Unstructured(t, resources["secret"]),
 			},
-			expected: [][]*unstructured.Unstructured{
+			expectedObjSets: []object.UnstructuredSet{
 				{
 					testutil.Unstructured(t, resources["deployment"]),
 					testutil.Unstructured(t, resources["secret"]),
 				},
 			},
-			isError: false,
+			expectedDepSets: []object.ObjMetadataSet{{}},
+			isError:         false,
 		},
 		"one object depends on the other; two single object sets": {
 			objs: []*unstructured.Unstructured{
@@ -135,15 +173,17 @@ func TestSortObjs(t *testing.T) {
 					testutil.AddDependsOn(t, testutil.ToIdentifier(t, resources["secret"]))),
 				testutil.Unstructured(t, resources["secret"]),
 			},
-			expected: [][]*unstructured.Unstructured{
+			expectedObjSets: []object.UnstructuredSet{
 				{
 					testutil.Unstructured(t, resources["secret"]),
 				},
 				{
-					testutil.Unstructured(t, resources["deployment"]),
+					testutil.Unstructured(t, resources["deployment"],
+						testutil.AddDependsOn(t, testutil.ToIdentifier(t, resources["secret"]))),
 				},
 			},
-			isError: false,
+			expectedDepSets: []object.ObjMetadataSet{{}, {}},
+			isError:         false,
 		},
 		"three objects depend on another; three single object sets": {
 			objs: []*unstructured.Unstructured{
@@ -153,18 +193,21 @@ func TestSortObjs(t *testing.T) {
 					testutil.AddDependsOn(t, testutil.ToIdentifier(t, resources["pod"]))),
 				testutil.Unstructured(t, resources["pod"]),
 			},
-			expected: [][]*unstructured.Unstructured{
+			expectedObjSets: []object.UnstructuredSet{
 				{
 					testutil.Unstructured(t, resources["pod"]),
 				},
 				{
-					testutil.Unstructured(t, resources["secret"]),
+					testutil.Unstructured(t, resources["secret"],
+						testutil.AddDependsOn(t, testutil.ToIdentifier(t, resources["pod"]))),
 				},
 				{
-					testutil.Unstructured(t, resources["deployment"]),
+					testutil.Unstructured(t, resources["deployment"],
+						testutil.AddDependsOn(t, testutil.ToIdentifier(t, resources["secret"]))),
 				},
 			},
-			isError: false,
+			expectedDepSets: []object.ObjMetadataSet{{}, {}, {}},
+			isError:         false,
 		},
 		"Two objects depend on secret; two object sets": {
 			objs: []*unstructured.Unstructured{
@@ -174,16 +217,19 @@ func TestSortObjs(t *testing.T) {
 					testutil.AddDependsOn(t, testutil.ToIdentifier(t, resources["secret"]))),
 				testutil.Unstructured(t, resources["secret"]),
 			},
-			expected: [][]*unstructured.Unstructured{
+			expectedObjSets: []object.UnstructuredSet{
 				{
 					testutil.Unstructured(t, resources["secret"]),
 				},
 				{
-					testutil.Unstructured(t, resources["pod"]),
-					testutil.Unstructured(t, resources["deployment"]),
+					testutil.Unstructured(t, resources["pod"],
+						testutil.AddDependsOn(t, testutil.ToIdentifier(t, resources["secret"]))),
+					testutil.Unstructured(t, resources["deployment"],
+						testutil.AddDependsOn(t, testutil.ToIdentifier(t, resources["secret"]))),
 				},
 			},
-			isError: false,
+			expectedDepSets: []object.ObjMetadataSet{{}, {}},
+			isError:         false,
 		},
 		"two objects applied with their namespace; two object sets": {
 			objs: []*unstructured.Unstructured{
@@ -191,7 +237,7 @@ func TestSortObjs(t *testing.T) {
 				testutil.Unstructured(t, resources["namespace"]),
 				testutil.Unstructured(t, resources["secret"]),
 			},
-			expected: [][]*unstructured.Unstructured{
+			expectedObjSets: []object.UnstructuredSet{
 				{
 					testutil.Unstructured(t, resources["namespace"]),
 				},
@@ -200,7 +246,8 @@ func TestSortObjs(t *testing.T) {
 					testutil.Unstructured(t, resources["deployment"]),
 				},
 			},
-			isError: false,
+			expectedDepSets: []object.ObjMetadataSet{{}, {}},
+			isError:         false,
 		},
 		"two custom resources applied with their CRD; two object sets": {
 			objs: []*unstructured.Unstructured{
@@ -208,7 +255,7 @@ func TestSortObjs(t *testing.T) {
 				testutil.Unstructured(t, resources["crontab2"]),
 				testutil.Unstructured(t, resources["crd"]),
 			},
-			expected: [][]*unstructured.Unstructured{
+			expectedObjSets: []object.UnstructuredSet{
 				{
 					testutil.Unstructured(t, resources["crd"]),
 				},
@@ -217,7 +264,8 @@ func TestSortObjs(t *testing.T) {
 					testutil.Unstructured(t, resources["crontab2"]),
 				},
 			},
-			isError: false,
+			expectedDepSets: []object.ObjMetadataSet{{}, {}},
+			isError:         false,
 		},
 		"two custom resources wit CRD and namespace; two object sets": {
 			objs: []*unstructured.Unstructured{
@@ -226,7 +274,7 @@ func TestSortObjs(t *testing.T) {
 				testutil.Unstructured(t, resources["namespace"]),
 				testutil.Unstructured(t, resources["crd"]),
 			},
-			expected: [][]*unstructured.Unstructured{
+			expectedObjSets: []object.UnstructuredSet{
 				{
 					testutil.Unstructured(t, resources["crd"]),
 					testutil.Unstructured(t, resources["namespace"]),
@@ -235,6 +283,28 @@ func TestSortObjs(t *testing.T) {
 					testutil.Unstructured(t, resources["crontab1"]),
 					testutil.Unstructured(t, resources["crontab2"]),
 				},
+			},
+			expectedDepSets: []object.ObjMetadataSet{{}, {}},
+			isError:         false,
+		},
+		"two resources with overlapping external dependencies": {
+			objs: []*unstructured.Unstructured{
+				testutil.Unstructured(t, resources["configmap1"]),
+				testutil.Unstructured(t, resources["configmap2"]),
+			},
+			expectedObjSets: []object.UnstructuredSet{
+				{},
+				{
+					testutil.Unstructured(t, resources["configmap1"]),
+					testutil.Unstructured(t, resources["configmap2"]),
+				},
+			},
+			expectedDepSets: []object.ObjMetadataSet{
+				{
+					testutil.ToIdentifier(t, resources["pod"]),
+					testutil.ToIdentifier(t, resources["deployment"]), // deduped
+				},
+				{},
 			},
 			isError: false,
 		},
@@ -245,8 +315,9 @@ func TestSortObjs(t *testing.T) {
 				testutil.Unstructured(t, resources["secret"],
 					testutil.AddDependsOn(t, testutil.ToIdentifier(t, resources["deployment"]))),
 			},
-			expected: [][]*unstructured.Unstructured{},
-			isError:  true,
+			expectedObjSets: nil,
+			expectedDepSets: nil,
+			isError:         true,
 		},
 		"three objects in cyclic dependency": {
 			objs: []*unstructured.Unstructured{
@@ -257,45 +328,50 @@ func TestSortObjs(t *testing.T) {
 				testutil.Unstructured(t, resources["pod"],
 					testutil.AddDependsOn(t, testutil.ToIdentifier(t, resources["deployment"]))),
 			},
-			expected: [][]*unstructured.Unstructured{},
-			isError:  true,
+			expectedObjSets: nil,
+			expectedDepSets: nil,
+			isError:         true,
 		},
 	}
 
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
-			actual, err := SortObjs(tc.objs)
+			receivedObjSets, receivedDepSets, err := SortObjs(tc.objs)
 			if tc.isError {
 				assert.NotNil(t, err, "expected error, but received none")
 				return
 			}
 			assert.Nil(t, err, "unexpected error received")
-			verifyObjSets(t, tc.expected, actual)
+			testutil.AssertEqual(t, receivedObjSets, tc.expectedObjSets)
+			testutil.AssertEqual(t, receivedDepSets, tc.expectedDepSets)
 		})
 	}
 }
 
 func TestReverseSortObjs(t *testing.T) {
 	testCases := map[string]struct {
-		objs     []*unstructured.Unstructured
-		expected [][]*unstructured.Unstructured
-		isError  bool
+		objs            []*unstructured.Unstructured
+		expectedObjSets []object.UnstructuredSet
+		expectedDepSets []object.ObjMetadataSet
+		isError         bool
 	}{
 		"no objects returns no object sets": {
-			objs:     []*unstructured.Unstructured{},
-			expected: [][]*unstructured.Unstructured{},
-			isError:  false,
+			objs:            []*unstructured.Unstructured{},
+			expectedObjSets: nil,
+			expectedDepSets: nil,
+			isError:         false,
 		},
 		"one object returns single object set": {
 			objs: []*unstructured.Unstructured{
 				testutil.Unstructured(t, resources["deployment"]),
 			},
-			expected: [][]*unstructured.Unstructured{
+			expectedObjSets: []object.UnstructuredSet{
 				{
 					testutil.Unstructured(t, resources["deployment"]),
 				},
 			},
-			isError: false,
+			expectedDepSets: []object.ObjMetadataSet{{}},
+			isError:         false,
 		},
 		"three objects depend on another; three single object sets in opposite order": {
 			objs: []*unstructured.Unstructured{
@@ -305,18 +381,21 @@ func TestReverseSortObjs(t *testing.T) {
 					testutil.AddDependsOn(t, testutil.ToIdentifier(t, resources["pod"]))),
 				testutil.Unstructured(t, resources["pod"]),
 			},
-			expected: [][]*unstructured.Unstructured{
+			expectedObjSets: []object.UnstructuredSet{
 				{
-					testutil.Unstructured(t, resources["deployment"]),
+					testutil.Unstructured(t, resources["deployment"],
+						testutil.AddDependsOn(t, testutil.ToIdentifier(t, resources["secret"]))),
 				},
 				{
-					testutil.Unstructured(t, resources["secret"]),
+					testutil.Unstructured(t, resources["secret"],
+						testutil.AddDependsOn(t, testutil.ToIdentifier(t, resources["pod"]))),
 				},
 				{
 					testutil.Unstructured(t, resources["pod"]),
 				},
 			},
-			isError: false,
+			expectedDepSets: []object.ObjMetadataSet{{}, {}, {}},
+			isError:         false,
 		},
 		"two objects applied with their namespace; two sets in opposite order": {
 			objs: []*unstructured.Unstructured{
@@ -324,7 +403,7 @@ func TestReverseSortObjs(t *testing.T) {
 				testutil.Unstructured(t, resources["namespace"]),
 				testutil.Unstructured(t, resources["secret"]),
 			},
-			expected: [][]*unstructured.Unstructured{
+			expectedObjSets: []object.UnstructuredSet{
 				{
 					testutil.Unstructured(t, resources["secret"]),
 					testutil.Unstructured(t, resources["deployment"]),
@@ -333,16 +412,17 @@ func TestReverseSortObjs(t *testing.T) {
 					testutil.Unstructured(t, resources["namespace"]),
 				},
 			},
-			isError: false,
+			expectedDepSets: []object.ObjMetadataSet{{}, {}},
+			isError:         false,
 		},
-		"two custom resources wit CRD and namespace; two object sets in opposite order": {
+		"two custom resources with CRD and namespace; two object sets in opposite order": {
 			objs: []*unstructured.Unstructured{
 				testutil.Unstructured(t, resources["crontab1"]),
 				testutil.Unstructured(t, resources["crontab2"]),
 				testutil.Unstructured(t, resources["namespace"]),
 				testutil.Unstructured(t, resources["crd"]),
 			},
-			expected: [][]*unstructured.Unstructured{
+			expectedObjSets: []object.UnstructuredSet{
 				{
 					testutil.Unstructured(t, resources["crontab1"]),
 					testutil.Unstructured(t, resources["crontab2"]),
@@ -352,19 +432,42 @@ func TestReverseSortObjs(t *testing.T) {
 					testutil.Unstructured(t, resources["namespace"]),
 				},
 			},
+			expectedDepSets: []object.ObjMetadataSet{{}, {}},
+			isError:         false,
+		},
+		"two resources with overlapping external dependencies; two object sets in opposite order": {
+			objs: []*unstructured.Unstructured{
+				testutil.Unstructured(t, resources["configmap1"]),
+				testutil.Unstructured(t, resources["configmap2"]),
+			},
+			expectedObjSets: []object.UnstructuredSet{
+				{
+					testutil.Unstructured(t, resources["configmap1"]),
+					testutil.Unstructured(t, resources["configmap2"]),
+				},
+				{},
+			},
+			expectedDepSets: []object.ObjMetadataSet{
+				{},
+				{
+					testutil.ToIdentifier(t, resources["pod"]),
+					testutil.ToIdentifier(t, resources["deployment"]), // deduped
+				},
+			},
 			isError: false,
 		},
 	}
 
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
-			actual, err := ReverseSortObjs(tc.objs)
+			receivedObjSets, receivedDepSets, err := ReverseSortObjs(tc.objs)
 			if tc.isError {
 				assert.NotNil(t, err, "expected error, but received none")
 				return
 			}
 			assert.Nil(t, err, "unexpected error received")
-			verifyObjSets(t, tc.expected, actual)
+			testutil.AssertEqual(t, receivedObjSets, tc.expectedObjSets)
+			testutil.AssertEqual(t, receivedDepSets, tc.expectedDepSets)
 		})
 	}
 }
@@ -714,35 +817,22 @@ func TestAddCRDEdges(t *testing.T) {
 	}
 }
 
-// verifyObjSets ensures the expected and actual slice of object sets are the same,
-// and the sets are in order.
-func verifyObjSets(t *testing.T, expected [][]*unstructured.Unstructured, actual [][]*unstructured.Unstructured) {
-	if len(expected) != len(actual) {
-		t.Fatalf("expected (%d) object sets, got (%d)", len(expected), len(actual))
-		return
-	}
-	// Order matters
-	for i := range expected {
-		expectedSet := expected[i]
-		actualSet := actual[i]
-		if len(expectedSet) != len(actualSet) {
-			t.Fatalf("set %d: expected object size (%d), got (%d)", i, len(expectedSet), len(actualSet))
-			return
-		}
-		for _, actualObj := range actualSet {
-			if !containsObjs(expectedSet, actualObj) {
-				t.Fatalf("set #%d: actual object (%v) not found in set of expected objects", i, actualObj)
-				return
-			}
+// containsUnstructured returns true if the passed object is within the passed
+// slice of objects; false otherwise. Order is not important.
+func containsObj(objs []*unstructured.Unstructured, obj *unstructured.Unstructured) bool {
+	ids := object.UnstructuredsToObjMetasOrDie(objs)
+	id := object.UnstructuredToObjMetaOrDie(obj)
+	for _, i := range ids {
+		if i == id {
+			return true
 		}
 	}
+	return false
 }
 
 // containsUnstructured returns true if the passed object is within the passed
 // slice of objects; false otherwise. Order is not important.
-func containsObjs(objs []*unstructured.Unstructured, obj *unstructured.Unstructured) bool {
-	ids := object.UnstructuredsToObjMetasOrDie(objs)
-	id := object.UnstructuredToObjMetaOrDie(obj)
+func containsObjMeta(ids []object.ObjMetadata, id object.ObjMetadata) bool {
 	for _, i := range ids {
 		if i == id {
 			return true

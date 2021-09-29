@@ -27,6 +27,8 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/object"
+	"sigs.k8s.io/cli-utils/pkg/object/dependson"
+	"sigs.k8s.io/cli-utils/pkg/object/mutation"
 	"sigs.k8s.io/cli-utils/pkg/ordering"
 )
 
@@ -151,7 +153,28 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.InventoryInfo, obje
 			handleError(eventChannel, err)
 			return
 		}
-		klog.V(4).Infof("calculated %d apply objs; %d prune objs", len(applyObjs), len(pruneObjs))
+		klog.V(4).Infof("calculated operations (apply: %d, prune: %d)", len(applyObjs), len(pruneObjs))
+
+		// Share a thread-safe cache with the status poller.
+		resourceCache := cache.NewResourceCacheMap()
+		atm := &mutator.ApplyTimeMutator{
+			Client:        client,
+			Mapper:        mapper,
+			ResourceCache: resourceCache,
+		}
+		// Set default namespace for SourceRefs in apply-time-mutation annotations
+		atm.ApplyDefaults(applyObjs)
+
+		deps, err := getDependencies(applyObjs)
+		if err != nil {
+			handleError(eventChannel, err)
+			return
+		}
+		pollIds := object.UnstructuredsToObjMetasOrDie(append(applyObjs, pruneObjs...))
+		externalIds := object.SetDiff(deps, pollIds)
+		pollIds = append(pollIds, externalIds...)
+		klog.V(4).Infof("calculated dependencies (total: %d, external: %d)", len(deps), len(externalIds))
+		klog.V(6).Infof("external dependencies: %#v)", externalIds)
 
 		// Fetch the queue (channel) of tasks that should be executed.
 		klog.V(4).Infoln("applier building task queue...")
@@ -193,15 +216,7 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.InventoryInfo, obje
 			},
 		}
 		// Build list of apply mutators.
-		// Share a thread-safe cache with the status poller.
-		resourceCache := cache.NewResourceCacheMap()
-		applyMutators := []mutator.Interface{
-			&mutator.ApplyTimeMutator{
-				Client:        client,
-				Mapper:        mapper,
-				ResourceCache: resourceCache,
-			},
-		}
+		applyMutators := []mutator.Interface{atm}
 		// Build the task queue by appending tasks in the proper order.
 		taskQueue, err := taskBuilder.
 			AppendInvAddTask(invInfo, applyObjs, options.DryRunStrategy).
@@ -222,8 +237,7 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.InventoryInfo, obje
 		}
 		// Create a new TaskStatusRunner to execute the taskQueue.
 		klog.V(4).Infoln("applier building TaskStatusRunner...")
-		allIds := object.UnstructuredsToObjMetasOrDie(append(applyObjs, pruneObjs...))
-		runner := taskrunner.NewTaskStatusRunner(allIds, a.statusPoller, resourceCache)
+		runner := taskrunner.NewTaskStatusRunner(pollIds, a.statusPoller, resourceCache)
 		klog.V(4).Infoln("applier running TaskStatusRunner...")
 		err = runner.Run(ctx, taskQueue.ToChannel(), eventChannel, taskrunner.Options{
 			PollInterval:     options.PollInterval,
@@ -313,4 +327,18 @@ func localNamespaces(localInv inventory.InventoryInfo, localObjs []object.ObjMet
 		namespaces.Insert(invNamespace)
 	}
 	return namespaces
+}
+
+func getDependencies(objs []*unstructured.Unstructured) (object.ObjMetadataSet, error) {
+	mutationDeps, err := mutation.GetDependencies(objs)
+	if err != nil {
+		return nil, err
+	}
+
+	dependsonDeps, err := dependson.GetDependencies(objs)
+	if err != nil {
+		return nil, err
+	}
+
+	return object.Union(mutationDeps, dependsonDeps), nil
 }

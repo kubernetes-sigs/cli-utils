@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"strings"
 
+	"github.com/google/go-cmp/cmp"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -54,6 +55,15 @@ type ApplyTask struct {
 	Mutators          []mutator.Interface
 	DryRunStrategy    common.DryRunStrategy
 	ServerSideOptions common.ServerSideOptions
+}
+
+// Equals retursn true if the ApplyTasks are equivelent (for testing purposes)
+func (a *ApplyTask) Equal(b *ApplyTask) bool {
+	return a.TaskName == b.TaskName &&
+		a.DryRunStrategy == b.DryRunStrategy &&
+		cmp.Equal(a.Filters, b.Filters) &&
+		cmp.Equal(a.Mutators, b.Mutators) &&
+		object.UnstructuredSetEquals(a.Objects, b.Objects)
 }
 
 // applyOptionsFactoryFunc is a factory function for creating a new

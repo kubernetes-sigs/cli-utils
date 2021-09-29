@@ -160,8 +160,16 @@ var _ = Describe("Applier", func() {
 					dependsOnTest(c, invConfig, inventoryName, namespace.GetName())
 				})
 
+				It("Implements depends-on with external dependency", func() {
+					dependsOnWithExternalDependencyTest(c, invConfig, inventoryName, namespace.GetName())
+				})
+
 				It("Implements apply-time-mutation", func() {
 					mutationTest(c, invConfig, inventoryName, namespace.GetName())
+				})
+
+				It("Implements apply-time-mutation with external dependency", func() {
+					mutationWithExternalDependencyTest(c, invConfig, inventoryName, namespace.GetName())
 				})
 
 				It("Prune retrieval error correctly handled", func() {

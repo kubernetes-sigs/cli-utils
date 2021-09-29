@@ -95,13 +95,23 @@ type ResourceReference struct {
 	Namespace string `json:"namespace,omitempty"`
 }
 
-// NewResourceReference returns the object as a ResourceReference
+// NewResourceReference converts an Unstructured to a ResourceReference
 func NewResourceReference(obj *unstructured.Unstructured) ResourceReference {
 	return ResourceReference{
 		Name:       obj.GetName(),
 		Namespace:  obj.GetNamespace(),
 		Kind:       obj.GetKind(),
 		APIVersion: obj.GetAPIVersion(),
+	}
+}
+
+// ResourceReferenceFromObjMetadata converts an ObjMetadata to a ResourceReference
+func ResourceReferenceFromObjMetadata(id object.ObjMetadata) ResourceReference {
+	return ResourceReference{
+		Name:      id.Name,
+		Namespace: id.Namespace,
+		Kind:      id.GroupKind.Kind,
+		Group:     id.GroupKind.Group,
 	}
 }
 
@@ -154,11 +164,4 @@ func (r ResourceReference) Equal(b ResourceReference) bool {
 	return r.GroupVersionKind().GroupKind() == b.GroupVersionKind().GroupKind() &&
 		r.Name == b.Name &&
 		r.Namespace == b.Namespace
-}
-
-// ResourceReferenceToObjMeta extracts the identifying information from a
-// ResourceReference and returns it as Objmetadata. If the values don't
-// pass validation, an error will be returned.
-func ResourceReferenceToObjMeta(ref ResourceReference) (object.ObjMetadata, error) {
-	return object.CreateObjMetadata(ref.Namespace, ref.Name, ref.GroupVersionKind().GroupKind())
 }

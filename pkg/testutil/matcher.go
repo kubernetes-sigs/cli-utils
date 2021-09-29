@@ -9,11 +9,16 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/onsi/gomega/format"
 )
+
+var EqualOptions = []cmp.Option{
+	cmpopts.EquateErrors(),
+}
 
 // Equal returns a matcher for use with Gomega that uses go-cmp's cmp.Equal to
 // compare and cmp.Diff to show the difference, if there is one.
@@ -30,9 +35,9 @@ type cmpMatcher struct {
 }
 
 func (cm *cmpMatcher) Match(actual interface{}) (bool, error) {
-	match := cmp.Equal(actual, cm.expected, cmpopts.EquateErrors())
+	match := cmp.Equal(actual, cm.expected, EqualOptions...)
 	if !match {
-		cm.explanation = errors.New(cmp.Diff(actual, cm.expected, cmpopts.EquateErrors()))
+		cm.explanation = errors.New(cmp.Diff(actual, cm.expected, EqualOptions...))
 	}
 	return match, nil
 }
@@ -106,4 +111,30 @@ func (e equalErrorString) Is(err error) bool {
 		return false
 	}
 	return e.err == err.Error()
+}
+
+// AssertEqual fails the test if the actual value does not deeply equal the
+// expected value. Prints a diff on failure.
+func AssertEqual(t *testing.T, actual, expected interface{}) {
+	matcher := Equal(expected)
+	match, err := matcher.Match(actual)
+	if err != nil {
+		t.Errorf("errored testing equality: %s", err)
+	}
+	if !match {
+		t.Error(matcher.FailureMessage(actual))
+	}
+}
+
+// AssertNotEqual fails the test if the actual value deeply equals the
+// expected value. Prints a diff on failure.
+func AssertNotEqual(t *testing.T, actual, expected interface{}) {
+	matcher := Equal(expected)
+	match, err := matcher.Match(actual)
+	if err != nil {
+		t.Errorf("errored testing equality: %s", err)
+	}
+	if match {
+		t.Error(matcher.NegatedFailureMessage(actual))
+	}
 }

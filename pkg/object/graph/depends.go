@@ -14,13 +14,22 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/object/mutation"
 )
 
-// SortObjs returns a slice of the sets of objects to apply (in order).
-// Each of the objects in an apply set is applied together. The order of
-// the returned applied sets is a topological ordering of the sets to apply.
-// Returns an single empty apply set if there are no objects to apply.
-func SortObjs(objs []*unstructured.Unstructured) ([][]*unstructured.Unstructured, error) {
+// SortObjs returns two topologically ordered lists of sets of objects:
+// - objects to apply
+// - objects to wait on for reconciliation
+//
+// The objects in each set are independent of other objects in the same set.
+//
+// Returns nil if no objects are supplied.
+func SortObjs(objs []*unstructured.Unstructured) (
+	[]object.UnstructuredSet,
+	[]object.ObjMetadataSet,
+	error,
+) {
+	objSets := []object.UnstructuredSet(nil)
+	externalDepSets := []object.ObjMetadataSet(nil)
 	if len(objs) == 0 {
-		return [][]*unstructured.Unstructured{}, nil
+		return objSets, externalDepSets, nil
 	}
 	// Create the graph, and build a map of object metadata to the object (Unstructured).
 	g := New()
@@ -35,38 +44,51 @@ func SortObjs(objs []*unstructured.Unstructured) ([][]*unstructured.Unstructured
 	addNamespaceEdges(g, objs)
 	addCRDEdges(g, objs)
 	// Run topological sort on the graph.
-	objSets := [][]*unstructured.Unstructured{}
 	sortedObjSets, err := g.Sort()
 	if err != nil {
-		return [][]*unstructured.Unstructured{}, err
+		return objSets, externalDepSets, err
 	}
 	// Map the object metadata back to the sorted sets of unstructured objects.
 	for _, objSet := range sortedObjSets {
-		currentSet := []*unstructured.Unstructured{}
+		currentObjSet := object.UnstructuredSet{}
+		currentDepSet := object.ObjMetadataSet{}
 		for _, id := range objSet {
-			var found bool
-			var obj *unstructured.Unstructured
-			if obj, found = objToUnstructured[id]; found {
-				currentSet = append(currentSet, obj)
+			obj, found := objToUnstructured[id]
+			if found {
+				currentObjSet = append(currentObjSet, obj)
+			} else {
+				currentDepSet = append(currentDepSet, id)
 			}
 		}
-		objSets = append(objSets, currentSet)
+		objSets = append(objSets, currentObjSet)
+		externalDepSets = append(externalDepSets, currentDepSet)
 	}
-	return objSets, nil
+	return objSets, externalDepSets, nil
 }
 
-// ReverseSortObjs is the same as SortObjs but using reverse ordering.
-func ReverseSortObjs(objs []*unstructured.Unstructured) ([][]*unstructured.Unstructured, error) {
+// ReverseSortObjs returns two topologically ordered lists of sets of objects:
+// - objects to delete
+// - objects to wait on for deletion
+//
+// The objects in each set are independent of other objects in the same set.
+//
+// Returns nil if no objects are supplied.
+func ReverseSortObjs(objs []*unstructured.Unstructured) (
+	[]object.UnstructuredSet,
+	[]object.ObjMetadataSet,
+	error,
+) {
 	// Sorted objects using normal ordering.
-	s, err := SortObjs(objs)
+	s, d, err := SortObjs(objs)
 	if err != nil {
-		return [][]*unstructured.Unstructured{}, err
+		return nil, nil, err
 	}
 	// Reverse the ordering of the object sets using swaps.
 	for i, j := 0, len(s)-1; i < j; i, j = i+1, j-1 {
 		s[i], s[j] = s[j], s[i]
+		d[i], d[j] = d[j], d[i]
 	}
-	return s, nil
+	return s, d, nil
 }
 
 // addApplyTimeMutationEdges updates the graph with edges from objects
@@ -84,8 +106,13 @@ func addApplyTimeMutationEdges(g *Graph, objs []*unstructured.Unstructured) {
 				return
 			}
 			for _, sub := range subs {
-				// TODO: fail task if it's not in the inventory?
 				dep := sub.SourceRef.ObjMetadata()
+				// TODO: only set default namespace if resource is namespaced (look up mapping)
+				if dep.Namespace == "" {
+					dep.Namespace = obj.GetNamespace()
+				}
+				klog.V(3).Infof("adding vertex: %s", dep)
+				g.AddVertex(dep)
 				klog.V(3).Infof("adding edge from: %s, to: %s", id, dep)
 				g.AddEdge(id, dep)
 			}
@@ -107,7 +134,8 @@ func addDependsOnEdges(g *Graph, objs []*unstructured.Unstructured) {
 			continue
 		}
 		for _, dep := range deps {
-			// TODO: fail if depe is not in the inventory?
+			klog.V(3).Infof("adding vertex: %s", dep)
+			g.AddVertex(dep)
 			klog.V(3).Infof("adding edge from: %s, to: %s", id, dep)
 			g.AddEdge(id, dep)
 		}

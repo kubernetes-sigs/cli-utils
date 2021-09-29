@@ -10,6 +10,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/klog/v2"
+	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
 const (
@@ -71,4 +72,22 @@ func WriteAnnotation(obj *unstructured.Unstructured, depSet DependencySet) error
 	a[Annotation] = depSetStr
 	obj.SetAnnotations(a)
 	return nil
+}
+
+func GetDependencies(objs []*unstructured.Unstructured) (object.ObjMetadataSet, error) {
+	depSuperSet := map[object.ObjMetadata]struct{}{}
+	for _, obj := range objs {
+		depSet, err := ReadAnnotation(obj)
+		if err != nil {
+			return nil, err
+		}
+		for _, dep := range depSet {
+			depSuperSet[dep] = struct{}{}
+		}
+	}
+	depList := make(object.ObjMetadataSet, 0, len(depSuperSet))
+	for dep := range depSuperSet {
+		depList = append(depList, dep)
+	}
+	return depList, nil
 }

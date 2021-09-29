@@ -227,7 +227,7 @@ func TestBaseRunner(t *testing.T) {
 			go func() {
 				defer wg.Done()
 
-				<-time.NewTimer(tc.statusEventsDelay).C
+				time.Sleep(tc.statusEventsDelay)
 				for _, se := range tc.statusEvents {
 					statusChannel <- se
 				}

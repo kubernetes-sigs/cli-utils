@@ -12,14 +12,18 @@ import (
 
 // YamlStringer delays YAML marshalling for logging until String() is called.
 type YamlStringer struct {
-	O *unstructured.Unstructured
+	O interface{}
 }
 
 // String marshals the wrapped object to a YAML string. If serializing errors,
 // the error string will be returned instead. This is primarily for use with
 // verbose logging.
 func (ys YamlStringer) String() string {
-	yamlBytes, err := yaml.Marshal(ys.O)
+	v := ys.O
+	if obj, ok := v.(*unstructured.Unstructured); ok {
+		v = obj.UnstructuredContent()
+	}
+	yamlBytes, err := yaml.Marshal(v)
 	if err != nil {
 		return fmt.Sprintf("<<failed to serialize as yaml: %s>>", err)
 	}
