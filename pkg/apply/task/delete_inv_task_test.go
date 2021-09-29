@@ -8,6 +8,7 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"sigs.k8s.io/cli-utils/pkg/apply/cache"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
 	"sigs.k8s.io/cli-utils/pkg/common"
@@ -39,7 +40,9 @@ func TestDeleteInvTask(t *testing.T) {
 			client := inventory.NewFakeInventoryClient([]object.ObjMetadata{})
 			client.Err = tc.err
 			eventChannel := make(chan event.Event)
-			context := taskrunner.NewTaskContext(eventChannel)
+			resourceCache := cache.NewResourceCacheMap()
+			context := taskrunner.NewTaskContext(eventChannel, resourceCache)
+
 			task := DeleteInvTask{
 				TaskName:  taskName,
 				InvClient: client,

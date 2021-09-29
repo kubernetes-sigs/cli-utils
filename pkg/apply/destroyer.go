@@ -12,6 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"sigs.k8s.io/cli-utils/pkg/apply/cache"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/filter"
 	"sigs.k8s.io/cli-utils/pkg/apply/poller"
@@ -149,7 +150,8 @@ func (d *Destroyer) Run(inv inventory.InventoryInfo, options DestroyerOptions) <
 		// Create a new TaskStatusRunner to execute the taskQueue.
 		klog.V(4).Infoln("destroyer building TaskStatusRunner...")
 		deleteIds := object.UnstructuredsToObjMetasOrDie(deleteObjs)
-		runner := taskrunner.NewTaskStatusRunner(deleteIds, d.statusPoller)
+		resourceCache := cache.NewResourceCacheMap()
+		runner := taskrunner.NewTaskStatusRunner(deleteIds, d.statusPoller, resourceCache)
 		klog.V(4).Infoln("destroyer running TaskStatusRunner...")
 		// TODO(seans): Make the poll interval configurable like the applier.
 		err = runner.Run(context.Background(), taskQueue.ToChannel(), eventChannel, taskrunner.Options{

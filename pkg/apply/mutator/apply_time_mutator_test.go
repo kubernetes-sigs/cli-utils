@@ -428,7 +428,7 @@ func TestMutate(t *testing.T) {
 			reason:  "",
 			// exact error message isn't very important. Feel free to update if the error text changes.
 			errMsg: `failed to get source resource (networking.k8s.io/namespaces/ingress-namespace/Ingress/ingress1-name): ` +
-				`failed to retrieve resource from cluster: ` +
+				`resource not found: ` +
 				`ingresses.networking.k8s.io "ingress1-name" not found`,
 		},
 		"pod env var string from ingress port int": {

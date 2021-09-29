@@ -6,6 +6,7 @@ package task
 import (
 	"testing"
 
+	"sigs.k8s.io/cli-utils/pkg/apply/cache"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
 	"sigs.k8s.io/cli-utils/pkg/common"
@@ -105,7 +106,9 @@ func TestInvSetTask(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			client := inventory.NewFakeInventoryClient([]object.ObjMetadata{})
 			eventChannel := make(chan event.Event)
-			context := taskrunner.NewTaskContext(eventChannel)
+			resourceCache := cache.NewResourceCacheMap()
+			context := taskrunner.NewTaskContext(eventChannel, resourceCache)
+
 			prevInventory := make(map[object.ObjMetadata]bool, len(tc.prevInventory))
 			for _, prevInvID := range tc.prevInventory {
 				prevInventory[prevInvID] = true

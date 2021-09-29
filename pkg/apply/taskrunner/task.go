@@ -14,7 +14,6 @@ import (
 	"k8s.io/client-go/restmapper"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
-	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
@@ -129,33 +128,24 @@ func (w *WaitTask) setTimer(taskContext *TaskContext) {
 }
 
 // checkCondition checks whether the condition set in the task
-// is currently met given the status of resources in the collector.
-func (w *WaitTask) checkCondition(taskContext *TaskContext, coll *resourceStatusCollector) bool {
-	rwd := w.computeResourceWaitData(taskContext)
-	return coll.conditionMet(rwd, w.Condition)
+// is currently met given the status of resources in the cache.
+func (w *WaitTask) checkCondition(taskContext *TaskContext) bool {
+	return conditionMet(taskContext, w.pending(taskContext), w.Condition)
 }
 
-// computeResourceWaitData creates a slice of resourceWaitData for
-// the resources that is relevant to this wait task. The objective is
-// to match each resource with the generation seen after the resource
-// was applied.
-func (w *WaitTask) computeResourceWaitData(taskContext *TaskContext) []resourceWaitData {
-	var rwd []resourceWaitData
+// pending returns the set of resources being waited on excluding
+// apply/delete failures. This includes resources which are skipped because of
+// filtering.
+func (w *WaitTask) pending(taskContext *TaskContext) []object.ObjMetadata {
+	var ids []object.ObjMetadata
 	for _, id := range w.Ids {
-		// Skip checking condition for resources which have failed
-		// to apply or failed to prune/delete (depending on wait condition).
-		// This includes resources which are skipped because of filtering.
 		if (w.Condition == AllCurrent && taskContext.ResourceFailed(id)) ||
 			(w.Condition == AllNotFound && taskContext.PruneFailed(id)) {
 			continue
 		}
-		gen, _ := taskContext.ResourceGeneration(id)
-		rwd = append(rwd, resourceWaitData{
-			identifier: id,
-			generation: gen,
-		})
+		ids = append(ids, id)
 	}
-	return rwd
+	return ids
 }
 
 // startAndComplete is invoked when the condition is already
@@ -201,39 +191,6 @@ func (w *WaitTask) complete(taskContext *TaskContext) {
 // ClearTimeout cancels the timeout for the wait task.
 func (w *WaitTask) ClearTimeout() {
 	w.cancelFunc()
-}
-
-type resourceWaitData struct {
-	identifier object.ObjMetadata
-	generation int64
-}
-
-// Condition is a type that defines the types of conditions
-// which a WaitTask can use.
-type Condition string
-
-const (
-	// AllCurrent Condition means all the provided resources
-	// has reached (and remains in) the Current status.
-	AllCurrent Condition = "AllCurrent"
-
-	// AllNotFound Condition means all the provided resources
-	// has reached the NotFound status, i.e. they are all deleted
-	// from the cluster.
-	AllNotFound Condition = "AllNotFound"
-)
-
-// Meets returns true if the provided status meets the condition and
-// false if it does not.
-func (c Condition) Meets(s status.Status) bool {
-	switch c {
-	case AllCurrent:
-		return s == status.CurrentStatus
-	case AllNotFound:
-		return s == status.NotFoundStatus
-	default:
-		return false
-	}
 }
 
 // extractDeferredDiscoveryRESTMapper unwraps the provided RESTMapper
