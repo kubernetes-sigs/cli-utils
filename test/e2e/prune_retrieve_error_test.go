@@ -30,14 +30,10 @@ func pruneRetrieveErrorTest(c client.Client, invConfig InventoryConfig, inventor
 		withNamespace(manifestToUnstructured(pod1), namespaceName),
 	}
 
-	ch := applier.Run(context.TODO(), inv, resource1, apply.Options{
+	applierEvents := runCollect(applier.Run(context.TODO(), inv, resource1, apply.Options{
 		EmitStatusEvents: false,
-	})
+	}))
 
-	var applierEvents []event.Event
-	for e := range ch {
-		applierEvents = append(applierEvents, e)
-	}
 	expEvents := []testutil.ExpEvent{
 		{
 			// InitTask
@@ -145,14 +141,10 @@ func pruneRetrieveErrorTest(c client.Client, invConfig InventoryConfig, inventor
 		withNamespace(manifestToUnstructured(pod2), namespaceName),
 	}
 
-	ch = applier.Run(context.TODO(), inv, resource2, apply.Options{
+	applierEvents2 := runCollect(applier.Run(context.TODO(), inv, resource2, apply.Options{
 		EmitStatusEvents: false,
-	})
+	}))
 
-	var applierEvents2 []event.Event
-	for e := range ch {
-		applierEvents2 = append(applierEvents2, e)
-	}
 	expEvents2 := []testutil.ExpEvent{
 		{
 			// InitTask

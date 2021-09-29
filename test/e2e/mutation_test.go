@@ -44,14 +44,10 @@ func mutationTest(c client.Client, invConfig InventoryConfig, inventoryName, nam
 		withNamespace(manifestToUnstructured(podB), namespaceName),
 	}
 
-	ch := applier.Run(context.TODO(), inv, resources, apply.Options{
+	applierEvents := runCollect(applier.Run(context.TODO(), inv, resources, apply.Options{
 		EmitStatusEvents: false,
-	})
+	}))
 
-	var applierEvents []event.Event
-	for e := range ch {
-		applierEvents = append(applierEvents, e)
-	}
 	expEvents := []testutil.ExpEvent{
 		{
 			// InitTask

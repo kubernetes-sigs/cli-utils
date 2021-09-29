@@ -31,15 +31,10 @@ func applyAndDestroyTest(c client.Client, invConfig InventoryConfig, inventoryNa
 		withNamespace(manifestToUnstructured(deployment1), namespaceName),
 	}
 
-	applyCh := applier.Run(context.TODO(), inventoryInfo, resources, apply.Options{
+	applierEvents := runCollect(applier.Run(context.TODO(), inventoryInfo, resources, apply.Options{
 		ReconcileTimeout: 2 * time.Minute,
 		EmitStatusEvents: true,
-	})
-
-	var applierEvents []event.Event
-	for e := range applyCh {
-		applierEvents = append(applierEvents, e)
-	}
+	}))
 
 	expEvents := []testutil.ExpEvent{
 		{

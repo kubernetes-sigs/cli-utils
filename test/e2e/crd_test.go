@@ -30,15 +30,10 @@ func crdTest(_ client.Client, invConfig InventoryConfig, inventoryName, namespac
 		manifestToUnstructured(crd),
 	}
 
-	ch := applier.Run(context.TODO(), inv, resources, apply.Options{
+	applierEvents := runCollect(applier.Run(context.TODO(), inv, resources, apply.Options{
 		ReconcileTimeout: 2 * time.Minute,
 		EmitStatusEvents: false,
-	})
-
-	var applierEvents []event.Event
-	for e := range ch {
-		applierEvents = append(applierEvents, e)
-	}
+	}))
 
 	expEvents := []testutil.ExpEvent{
 		{

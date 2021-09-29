@@ -42,16 +42,11 @@ func inventoryPolicyMustMatchTest(c client.Client, invConfig InventoryConfig, na
 		withReplicas(withNamespace(manifestToUnstructured(deployment1), namespaceName), 6),
 	}
 
-	ch := applier.Run(context.TODO(), secondInv, secondResources, apply.Options{
+	applierEvents := runCollect(applier.Run(context.TODO(), secondInv, secondResources, apply.Options{
 		ReconcileTimeout: 2 * time.Minute,
 		EmitStatusEvents: true,
 		InventoryPolicy:  inventory.InventoryPolicyMustMatch,
-	})
-
-	var events []event.Event
-	for e := range ch {
-		events = append(events, e)
-	}
+	}))
 
 	By("Verify the events")
 	expEvents := []testutil.ExpEvent{
@@ -143,7 +138,7 @@ func inventoryPolicyMustMatchTest(c client.Client, invConfig InventoryConfig, na
 			},
 		},
 	}
-	received := testutil.EventsToExpEvents(events)
+	received := testutil.EventsToExpEvents(applierEvents)
 
 	// handle optional async InProgress StatusEvents
 	expected := testutil.ExpEvent{
@@ -194,16 +189,11 @@ func inventoryPolicyAdoptIfNoInventoryTest(c client.Client, invConfig InventoryC
 		withReplicas(withNamespace(manifestToUnstructured(deployment1), namespaceName), 6),
 	}
 
-	ch := applier.Run(context.TODO(), inv, resources, apply.Options{
+	applierEvents := runCollect(applier.Run(context.TODO(), inv, resources, apply.Options{
 		ReconcileTimeout: 2 * time.Minute,
 		EmitStatusEvents: true,
 		InventoryPolicy:  inventory.AdoptIfNoInventory,
-	})
-
-	var events []event.Event
-	for e := range ch {
-		events = append(events, e)
-	}
+	}))
 
 	By("Verify the events")
 	expEvents := []testutil.ExpEvent{
@@ -296,7 +286,7 @@ func inventoryPolicyAdoptIfNoInventoryTest(c client.Client, invConfig InventoryC
 	}
 
 	// handle optional async InProgress StatusEvents
-	received := testutil.EventsToExpEvents(events)
+	received := testutil.EventsToExpEvents(applierEvents)
 	expected := testutil.ExpEvent{
 		EventType: event.StatusType,
 		StatusEvent: &testutil.ExpStatusEvent{
@@ -360,16 +350,11 @@ func inventoryPolicyAdoptAllTest(c client.Client, invConfig InventoryConfig, nam
 		withReplicas(withNamespace(manifestToUnstructured(deployment1), namespaceName), 6),
 	}
 
-	ch := applier.Run(context.TODO(), secondInv, secondResources, apply.Options{
+	applierEvents := runCollect(applier.Run(context.TODO(), secondInv, secondResources, apply.Options{
 		ReconcileTimeout: 2 * time.Minute,
 		EmitStatusEvents: true,
 		InventoryPolicy:  inventory.AdoptAll,
-	})
-
-	var events []event.Event
-	for e := range ch {
-		events = append(events, e)
-	}
+	}))
 
 	By("Verify the events")
 	expEvents := []testutil.ExpEvent{
@@ -462,7 +447,7 @@ func inventoryPolicyAdoptAllTest(c client.Client, invConfig InventoryConfig, nam
 	}
 
 	// handle optional async InProgress StatusEvents
-	received := testutil.EventsToExpEvents(events)
+	received := testutil.EventsToExpEvents(applierEvents)
 	expected := testutil.ExpEvent{
 		EventType: event.StatusType,
 		StatusEvent: &testutil.ExpStatusEvent{

@@ -32,14 +32,10 @@ func dependsOnTest(c client.Client, invConfig InventoryConfig, inventoryName, na
 		withDependsOn(withNamespace(manifestToUnstructured(pod3), namespaceName), fmt.Sprintf("/namespaces/%s/Pod/pod2", namespaceName)),
 	}
 
-	ch := applier.Run(context.TODO(), inv, resources, apply.Options{
+	applierEvents := runCollect(applier.Run(context.TODO(), inv, resources, apply.Options{
 		EmitStatusEvents: false,
-	})
+	}))
 
-	var applierEvents []event.Event
-	for e := range ch {
-		applierEvents = append(applierEvents, e)
-	}
 	expEvents := []testutil.ExpEvent{
 		{
 			// InitTask
