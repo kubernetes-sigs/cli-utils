@@ -6,15 +6,18 @@ package taskrunner
 import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/klog/v2"
+	"sigs.k8s.io/cli-utils/pkg/apply/cache"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
 // NewTaskContext returns a new TaskContext
-func NewTaskContext(eventChannel chan event.Event) *TaskContext {
+func NewTaskContext(eventChannel chan event.Event, resourceCache cache.ResourceCache) *TaskContext {
 	return &TaskContext{
 		taskChannel:      make(chan TaskResult),
 		eventChannel:     eventChannel,
+		resourceCache:    resourceCache,
 		appliedResources: make(map[object.ObjMetadata]applyInfo),
 		failedResources:  make(map[object.ObjMetadata]struct{}),
 		pruneFailures:    make(map[object.ObjMetadata]struct{}),
@@ -27,6 +30,8 @@ type TaskContext struct {
 	taskChannel chan TaskResult
 
 	eventChannel chan event.Event
+
+	resourceCache cache.ResourceCache
 
 	appliedResources map[object.ObjMetadata]applyInfo
 
@@ -45,6 +50,10 @@ func (tc *TaskContext) EventChannel() chan event.Event {
 	return tc.eventChannel
 }
 
+func (tc *TaskContext) ResourceCache() cache.ResourceCache {
+	return tc.resourceCache
+}
+
 // ResourceApplied updates the context with information about the
 // resource identified by the provided id. Currently, we keep information
 // about the generation of the resource after the apply operation completed.
@@ -58,6 +67,13 @@ func (tc *TaskContext) ResourceApplied(id object.ObjMetadata, uid types.UID, gen
 // ResourceUID looks up the UID of the given resource
 func (tc *TaskContext) ResourceUID(id object.ObjMetadata) (types.UID, bool) {
 	ai, found := tc.appliedResources[id]
+	if klog.V(4).Enabled() {
+		if found {
+			klog.Infof("resource applied UID cache hit (%s): %d", id, ai.uid)
+		} else {
+			klog.Infof("resource applied UID cache miss: (%s): %d", id, ai.uid)
+		}
+	}
 	if !found {
 		return "", false
 	}
@@ -87,10 +103,17 @@ func (tc *TaskContext) AppliedResourceUIDs() sets.String {
 	return uids
 }
 
-// ResourceGeneration looks up the generation of the given resource
+// AppliedGeneration looks up the generation of the given resource
 // after it was applied.
-func (tc *TaskContext) ResourceGeneration(id object.ObjMetadata) (int64, bool) {
+func (tc *TaskContext) AppliedGeneration(id object.ObjMetadata) (int64, bool) {
 	ai, found := tc.appliedResources[id]
+	if klog.V(4).Enabled() {
+		if found {
+			klog.Infof("resource applied generation cache hit (%s): %d", id, ai.generation)
+		} else {
+			klog.Infof("resource applied generation cache miss: (%s): %d", id, ai.generation)
+		}
+	}
 	if !found {
 		return 0, false
 	}

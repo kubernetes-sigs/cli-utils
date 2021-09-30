@@ -12,6 +12,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"sigs.k8s.io/cli-utils/pkg/apply/cache"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	pollevent "sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
@@ -97,7 +98,7 @@ func TestBaseRunner(t *testing.T) {
 				event.ActionGroupType,
 			},
 		},
-		"wait task times out eventually": {
+		"wait task times out eventually (Unknown)": {
 			identifiers: []object.ObjMetadata{depID, cmID},
 			tasks: []Task{
 				NewWaitTask("wait", []object.ObjMetadata{depID, cmID}, AllCurrent,
@@ -121,6 +122,42 @@ func TestBaseRunner(t *testing.T) {
 				{
 					Identifier: depID,
 					Status:     status.UnknownStatus,
+					Message:    "resource not cached",
+				},
+			},
+			expectedErrorMsg: "timeout after 2 seconds waiting for 2 resources ([default_cm__ConfigMap default_dep_apps_Deployment]) to reach condition AllCurrent",
+		},
+		"wait task times out eventually (InProgress)": {
+			identifiers: []object.ObjMetadata{depID, cmID},
+			tasks: []Task{
+				NewWaitTask("wait", []object.ObjMetadata{depID, cmID}, AllCurrent,
+					2*time.Second, testutil.NewFakeRESTMapper()),
+			},
+			statusEventsDelay: time.Second,
+			statusEvents: []pollevent.Event{
+				{
+					EventType: pollevent.ResourceUpdateEvent,
+					Resource: &pollevent.ResourceStatus{
+						Identifier: cmID,
+						Status:     status.CurrentStatus,
+					},
+				},
+				{
+					EventType: pollevent.ResourceUpdateEvent,
+					Resource: &pollevent.ResourceStatus{
+						Identifier: depID,
+						Status:     status.InProgressStatus,
+					},
+				},
+			},
+			expectedEventTypes: []event.Type{
+				event.StatusType,
+			},
+			expectedError: &TimeoutError{},
+			expectedTimedOutResources: []TimedOutResource{
+				{
+					Identifier: depID,
+					Status:     status.InProgressStatus,
 				},
 			},
 			expectedErrorMsg: "timeout after 2 seconds waiting for 2 resources ([default_cm__ConfigMap default_dep_apps_Deployment]) to reach condition AllCurrent",
@@ -174,7 +211,7 @@ func TestBaseRunner(t *testing.T) {
 
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
-			runner := newBaseRunner(newResourceStatusCollector(tc.identifiers))
+			runner := newBaseRunner(cache.NewResourceCacheMap())
 			eventChannel := make(chan event.Event)
 			taskQueue := make(chan Task, len(tc.tasks))
 			for _, tsk := range tc.tasks {
@@ -346,7 +383,7 @@ func TestBaseRunnerCancellation(t *testing.T) {
 
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
-			runner := newBaseRunner(newResourceStatusCollector(tc.identifiers))
+			runner := newBaseRunner(cache.NewResourceCacheMap())
 			eventChannel := make(chan event.Event)
 
 			taskQueue := make(chan Task, len(tc.tasks))

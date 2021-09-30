@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"strings"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -17,6 +18,7 @@ import (
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/cli-utils/pkg/apply/cache"
 	"sigs.k8s.io/cli-utils/pkg/jsonpath"
+	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/object/mutation"
 )
@@ -168,33 +170,75 @@ func (atm *ApplyTimeMutator) getMapping(ref mutation.ResourceReference) (*meta.R
 // getObject returns a cached resource, if cached and cache exists, otherwise
 // the resource is retrieved from the cluster.
 func (atm *ApplyTimeMutator) getObject(ctx context.Context, mapping *meta.RESTMapping, ref mutation.ResourceReference) (*unstructured.Unstructured, error) {
-	// validate resource reference
-	id, err := mutation.ResourceReferenceToObjMeta(ref)
-	if err != nil {
-		return nil, fmt.Errorf("failed to validate resource reference: %w", err)
+	// validate source reference
+	if ref.Name == "" {
+		return nil, fmt.Errorf("invalid source reference: empty name")
 	}
+	if ref.Kind == "" {
+		return nil, fmt.Errorf("invalid source reference: empty kind")
+	}
+	id := ref.ObjMetadata()
 
 	// get resource from cache
 	if atm.ResourceCache != nil {
-		obj, found := atm.ResourceCache.Get(id)
-		if found && obj != nil {
-			return obj, nil
+		result := atm.ResourceCache.Get(id)
+		// Use the cached version, if current/reconciled.
+		// Otherwise, get it from the cluster.
+		if result.Resource != nil && result.Status == status.CurrentStatus {
+			return result.Resource, nil
 		}
 	}
 
 	// get resource from cluster
 	namespacedClient := atm.Client.Resource(mapping.Resource).Namespace(ref.Namespace)
 	obj, err := namespacedClient.Get(ctx, ref.Name, metav1.GetOptions{})
-	if err != nil {
+	if err != nil && !apierrors.IsNotFound(err) {
+		// Skip NotFound so the cache gets updated.
 		return nil, fmt.Errorf("failed to retrieve resource from cluster: %w", err)
 	}
 
 	// add resource to cache
 	if atm.ResourceCache != nil {
-		atm.ResourceCache.Set(id, obj)
+		// If it's not cached or not current, update the cache.
+		// This will add external resources to the cache,
+		// but the user won't get status events for them.
+		atm.ResourceCache.Put(id, computeStatus(obj))
+	}
+
+	if err != nil {
+		// NotFound
+		return nil, fmt.Errorf("resource not found: %w", err)
 	}
 
 	return obj, nil
+}
+
+// computeStatus compares the spec to the status and returns the result.
+func computeStatus(obj *unstructured.Unstructured) cache.ResourceStatus {
+	if obj == nil {
+		return cache.ResourceStatus{
+			Resource:      obj,
+			Status:        status.NotFoundStatus,
+			StatusMessage: "Resource not found",
+		}
+	}
+	result, err := status.Compute(obj)
+	if err != nil {
+		if klog.V(3).Enabled() {
+			ref := mutation.NewResourceReference(obj)
+			klog.Info("failed to compute resource status (%s): %d", ref, err)
+		}
+		return cache.ResourceStatus{
+			Resource: obj,
+			Status:   status.UnknownStatus,
+			//StatusMessage: fmt.Sprintf("Failed to compute status: %s", err),
+		}
+	}
+	return cache.ResourceStatus{
+		Resource:      obj,
+		Status:        result.Status,
+		StatusMessage: result.Message,
+	}
 }
 
 func readFieldValue(obj *unstructured.Unstructured, path string) (interface{}, bool, error) {

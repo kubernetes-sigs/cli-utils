@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"sigs.k8s.io/cli-utils/pkg/apply/cache"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/testutil"
@@ -18,7 +19,8 @@ func TestWaitTask_TimeoutTriggered(t *testing.T) {
 		2*time.Second, testutil.NewFakeRESTMapper())
 
 	eventChannel := make(chan event.Event)
-	taskContext := NewTaskContext(eventChannel)
+	resourceCache := cache.NewResourceCacheMap()
+	taskContext := NewTaskContext(eventChannel, resourceCache)
 	defer close(eventChannel)
 
 	task.Start(taskContext)
@@ -41,7 +43,8 @@ func TestWaitTask_TimeoutCancelled(t *testing.T) {
 		2*time.Second, testutil.NewFakeRESTMapper())
 
 	eventChannel := make(chan event.Event)
-	taskContext := NewTaskContext(eventChannel)
+	resourceCache := cache.NewResourceCacheMap()
+	taskContext := NewTaskContext(eventChannel, resourceCache)
 	defer close(eventChannel)
 
 	task.Start(taskContext)
@@ -61,7 +64,8 @@ func TestWaitTask_SingleTaskResult(t *testing.T) {
 		2*time.Second, testutil.NewFakeRESTMapper())
 
 	eventChannel := make(chan event.Event)
-	taskContext := NewTaskContext(eventChannel)
+	resourceCache := cache.NewResourceCacheMap()
+	taskContext := NewTaskContext(eventChannel, resourceCache)
 	taskContext.taskChannel = make(chan TaskResult, 10)
 	defer close(eventChannel)
 

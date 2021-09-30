@@ -193,11 +193,13 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.InventoryInfo, obje
 			},
 		}
 		// Build list of apply mutators.
+		// Share a thread-safe cache with the status poller.
+		resourceCache := cache.NewResourceCacheMap()
 		applyMutators := []mutator.Interface{
 			&mutator.ApplyTimeMutator{
 				Client:        client,
 				Mapper:        mapper,
-				ResourceCache: cache.NewResourceCacheMap(),
+				ResourceCache: resourceCache,
 			},
 		}
 		// Build the task queue by appending tasks in the proper order.
@@ -221,7 +223,7 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.InventoryInfo, obje
 		// Create a new TaskStatusRunner to execute the taskQueue.
 		klog.V(4).Infoln("applier building TaskStatusRunner...")
 		allIds := object.UnstructuredsToObjMetasOrDie(append(applyObjs, pruneObjs...))
-		runner := taskrunner.NewTaskStatusRunner(allIds, a.statusPoller)
+		runner := taskrunner.NewTaskStatusRunner(allIds, a.statusPoller, resourceCache)
 		klog.V(4).Infoln("applier running TaskStatusRunner...")
 		err = runner.Run(ctx, taskQueue.ToChannel(), eventChannel, taskrunner.Options{
 			PollInterval:     options.PollInterval,

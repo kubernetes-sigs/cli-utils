@@ -20,6 +20,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/dynamic/fake"
 	"k8s.io/kubectl/pkg/scheme"
+	"sigs.k8s.io/cli-utils/pkg/apply/cache"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/filter"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
@@ -395,7 +396,8 @@ func TestPrune(t *testing.T) {
 			// The event channel can not block; make sure its bigger than all
 			// the events that can be put on it.
 			eventChannel := make(chan event.Event, len(tc.pruneObjs)+1)
-			taskContext := taskrunner.NewTaskContext(eventChannel)
+			resourceCache := cache.NewResourceCacheMap()
+			taskContext := taskrunner.NewTaskContext(eventChannel, resourceCache)
 			err = func() error {
 				defer close(eventChannel)
 				// Run the prune and validate.
@@ -485,7 +487,8 @@ func TestPruneWithErrors(t *testing.T) {
 			// The event channel can not block; make sure its bigger than all
 			// the events that can be put on it.
 			eventChannel := make(chan event.Event, len(tc.pruneObjs))
-			taskContext := taskrunner.NewTaskContext(eventChannel)
+			resourceCache := cache.NewResourceCacheMap()
+			taskContext := taskrunner.NewTaskContext(eventChannel, resourceCache)
 			err = func() error {
 				defer close(eventChannel)
 				var opts Options
@@ -621,7 +624,8 @@ func TestPrune_PropagationPolicy(t *testing.T) {
 			}
 
 			eventChannel := make(chan event.Event, 1)
-			taskContext := taskrunner.NewTaskContext(eventChannel)
+			resourceCache := cache.NewResourceCacheMap()
+			taskContext := taskrunner.NewTaskContext(eventChannel, resourceCache)
 			err := po.Prune([]*unstructured.Unstructured{pdb}, []filter.ValidationFilter{}, taskContext, Options{
 				PropagationPolicy: tc.propagationPolicy,
 			})

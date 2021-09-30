@@ -16,6 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/kubectl/pkg/cmd/util"
+	"sigs.k8s.io/cli-utils/pkg/apply/cache"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
 	"sigs.k8s.io/cli-utils/pkg/common"
@@ -79,7 +80,8 @@ func TestApplyTask_BasicAppliedObjects(t *testing.T) {
 		t.Run(tn, func(t *testing.T) {
 			eventChannel := make(chan event.Event)
 			defer close(eventChannel)
-			taskContext := taskrunner.NewTaskContext(eventChannel)
+			resourceCache := cache.NewResourceCacheMap()
+			taskContext := taskrunner.NewTaskContext(eventChannel, resourceCache)
 
 			objs := toUnstructureds(tc.applied)
 
@@ -164,7 +166,8 @@ func TestApplyTask_FetchGeneration(t *testing.T) {
 		t.Run(tn, func(t *testing.T) {
 			eventChannel := make(chan event.Event)
 			defer close(eventChannel)
-			taskContext := taskrunner.NewTaskContext(eventChannel)
+			resourceCache := cache.NewResourceCacheMap()
+			taskContext := taskrunner.NewTaskContext(eventChannel, resourceCache)
 
 			objs := toUnstructureds(tc.rss)
 
@@ -193,7 +196,7 @@ func TestApplyTask_FetchGeneration(t *testing.T) {
 				uid, _ := taskContext.ResourceUID(id)
 				assert.Equal(t, info.uid, uid)
 
-				gen, _ := taskContext.ResourceGeneration(id)
+				gen, _ := taskContext.AppliedGeneration(id)
 				assert.Equal(t, info.generation, gen)
 			}
 		})
@@ -275,7 +278,8 @@ func TestApplyTask_DryRun(t *testing.T) {
 			drs := common.Strategies[i]
 			t.Run(tn, func(t *testing.T) {
 				eventChannel := make(chan event.Event)
-				taskContext := taskrunner.NewTaskContext(eventChannel)
+				resourceCache := cache.NewResourceCacheMap()
+				taskContext := taskrunner.NewTaskContext(eventChannel, resourceCache)
 
 				restMapper := testutil.NewFakeRESTMapper(schema.GroupVersionKind{
 					Group:   "apps",
@@ -409,7 +413,8 @@ func TestApplyTaskWithError(t *testing.T) {
 		drs := common.DryRunNone
 		t.Run(tn, func(t *testing.T) {
 			eventChannel := make(chan event.Event)
-			taskContext := taskrunner.NewTaskContext(eventChannel)
+			resourceCache := cache.NewResourceCacheMap()
+			taskContext := taskrunner.NewTaskContext(eventChannel, resourceCache)
 
 			restMapper := testutil.NewFakeRESTMapper(schema.GroupVersionKind{
 				Group:   "apps",

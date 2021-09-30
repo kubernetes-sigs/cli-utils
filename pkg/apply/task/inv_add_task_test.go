@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"sigs.k8s.io/cli-utils/pkg/apply/cache"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
 	"sigs.k8s.io/cli-utils/pkg/common"
@@ -109,7 +110,9 @@ func TestInvAddTask(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			client := inventory.NewFakeInventoryClient(tc.initialObjs)
 			eventChannel := make(chan event.Event)
-			context := taskrunner.NewTaskContext(eventChannel)
+			resourceCache := cache.NewResourceCacheMap()
+			context := taskrunner.NewTaskContext(eventChannel, resourceCache)
+
 			task := InvAddTask{
 				TaskName:  taskName,
 				InvClient: client,

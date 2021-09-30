@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/restmapper"
+	"sigs.k8s.io/cli-utils/pkg/apply/cache"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
 	"sigs.k8s.io/cli-utils/pkg/testutil"
@@ -42,7 +43,8 @@ func TestResetRESTMapperTask(t *testing.T) {
 		t.Run(tn, func(t *testing.T) {
 			eventChannel := make(chan event.Event)
 			defer close(eventChannel)
-			taskContext := taskrunner.NewTaskContext(eventChannel)
+			resourceCache := cache.NewResourceCacheMap()
+			taskContext := taskrunner.NewTaskContext(eventChannel, resourceCache)
 
 			mapper, discoveryClient := tc.toRESTMapper()
 

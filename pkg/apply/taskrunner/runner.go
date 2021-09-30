@@ -9,6 +9,7 @@ import (
 	"sort"
 	"time"
 
+	"sigs.k8s.io/cli-utils/pkg/apply/cache"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/poller"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling"
@@ -18,12 +19,11 @@ import (
 )
 
 // NewTaskStatusRunner returns a new TaskStatusRunner.
-func NewTaskStatusRunner(identifiers []object.ObjMetadata, statusPoller poller.Poller) *taskStatusRunner {
+func NewTaskStatusRunner(identifiers []object.ObjMetadata, statusPoller poller.Poller, cache cache.ResourceCache) *taskStatusRunner {
 	return &taskStatusRunner{
 		identifiers:  identifiers,
 		statusPoller: statusPoller,
-
-		baseRunner: newBaseRunner(newResourceStatusCollector(identifiers)),
+		baseRunner:   newBaseRunner(cache),
 	}
 }
 
@@ -71,10 +71,10 @@ func (tsr *taskStatusRunner) Run(ctx context.Context, taskQueue chan Task,
 
 // NewTaskRunner returns a new taskRunner. It can process taskqueues
 // that does not contain any wait tasks.
+// TODO: Do we need this abstraction layer now that baseRunner doesn't need a collector?
 func NewTaskRunner() *taskRunner {
-	collector := newResourceStatusCollector([]object.ObjMetadata{})
 	return &taskRunner{
-		baseRunner: newBaseRunner(collector),
+		baseRunner: newBaseRunner(cache.NewResourceCacheMap()),
 	}
 }
 
@@ -99,37 +99,44 @@ func (tr *taskRunner) Run(ctx context.Context, taskQueue chan Task,
 	return tr.baseRunner.run(ctx, taskQueue, nilStatusChannel, eventChannel, o)
 }
 
-// newBaseRunner returns a new baseRunner using the given collector.
-func newBaseRunner(collector *resourceStatusCollector) *baseRunner {
+// newBaseRunner returns a new baseRunner using the provided cache.
+func newBaseRunner(cache cache.ResourceCache) *baseRunner {
 	return &baseRunner{
-		collector: collector,
+		cache: cache,
 	}
 }
 
-// baseRunner provides the basic task runner functionality. It needs
-// a channel that provides resource status updates in order to support
-// wait tasks, but it can also be used with a nil statusChannel for
-// cases where polling and waiting for status is not needed.
-// This is not meant to be used directly. It is used by the
-// taskRunner and the taskStatusRunner.
+// baseRunner provides the basic task runner functionality.
+//
+// The cache can be used by tasks to retrieve the last known resource state.
+//
+// This is not meant to be used directly. It is used by the taskRunner and
+// taskStatusRunner.
 type baseRunner struct {
-	collector *resourceStatusCollector
+	cache cache.ResourceCache
 }
 
 type baseOptions struct {
+	// emitStatusEvents enables emitting events on the eventChannel
 	emitStatusEvents bool
 }
 
-// run is the main function that implements the processing of
-// tasks in the taskqueue. It sets up a loop where a single goroutine
-// will process events from three different channels.
+// run executes the tasks in the taskqueue.
+//
+// The tasks run in a loop where a single goroutine will process events from
+// three different channels.
+// - taskQueue is read to allow updating the task queue at runtime.
+// - statusChannel is read to allow updates to the resource cache and triggering
+//   validation of wait conditions.
+// - eventChannel is written to with events based on status updates, if
+//   emitStatusEvents is true.
 func (b *baseRunner) run(ctx context.Context, taskQueue chan Task,
 	statusChannel <-chan pollevent.Event, eventChannel chan event.Event,
 	o baseOptions) error {
 	// taskContext is passed into all tasks when they are started. It
 	// provides access to the eventChannel and the taskChannel, and
 	// also provides a way to pass data between tasks.
-	taskContext := NewTaskContext(eventChannel)
+	taskContext := NewTaskContext(eventChannel, b.cache)
 
 	// Find and start the first task in the queue.
 	currentTask, done := b.nextTask(taskQueue, taskContext)
@@ -192,14 +199,22 @@ func (b *baseRunner) run(ctx context.Context, taskQueue chan Task,
 				}
 			}
 
-			// The collector needs to keep track of the latest status
-			// for all resources so we can check whether wait task conditions
-			// has been met.
-			b.collector.resourceStatus(statusEvent.Resource)
+			// Update the cache to track the latest resource spec & status.
+			// Status is computed from the resource on-demand.
+			// Warning: Resource may be nil!
+			taskContext.ResourceCache().Put(
+				statusEvent.Resource.Identifier,
+				cache.ResourceStatus{
+					Resource:      statusEvent.Resource.Resource,
+					Status:        statusEvent.Resource.Status,
+					StatusMessage: statusEvent.Resource.Message,
+				},
+			)
+
 			// If the current task is a wait task, we check whether
 			// the condition has been met. If so, we complete the task.
 			if wt, ok := currentTask.(*WaitTask); ok {
-				if wt.checkCondition(taskContext, b.collector) {
+				if wt.checkCondition(taskContext) {
 					completeIfWaitTask(currentTask, taskContext)
 				}
 			}
@@ -220,7 +235,7 @@ func (b *baseRunner) run(ctx context.Context, taskQueue chan Task,
 				},
 			}
 			if msg.Err != nil {
-				b.amendTimeoutError(msg.Err)
+				b.amendTimeoutError(taskContext, msg.Err)
 				return msg.Err
 			}
 			if abort {
@@ -243,21 +258,18 @@ func (b *baseRunner) run(ctx context.Context, taskQueue chan Task,
 	}
 }
 
-func (b *baseRunner) amendTimeoutError(err error) {
+func (b *baseRunner) amendTimeoutError(taskContext *TaskContext, err error) {
 	if timeoutErr, ok := err.(*TimeoutError); ok {
 		var timedOutResources []TimedOutResource
 		for _, id := range timeoutErr.Identifiers {
-			ls, found := b.collector.resourceMap[id]
-			if !found {
-				continue
-			}
-			if timeoutErr.Condition.Meets(ls.CurrentStatus) {
+			result := taskContext.ResourceCache().Get(id)
+			if timeoutErr.Condition.Meets(result.Status) {
 				continue
 			}
 			timedOutResources = append(timedOutResources, TimedOutResource{
 				Identifier: id,
-				Status:     ls.CurrentStatus,
-				Message:    ls.Message,
+				Status:     result.Status,
+				Message:    result.StatusMessage,
 			})
 		}
 		timeoutErr.TimedOutResources = timedOutResources
@@ -303,7 +315,7 @@ func (b *baseRunner) nextTask(taskQueue chan Task,
 		// starting a new wait task, we check if the condition is already
 		// met. Without this check, a task might end up waiting for
 		// status events when the condition is in fact already met.
-		if st.checkCondition(taskContext, b.collector) {
+		if st.checkCondition(taskContext) {
 			st.startAndComplete(taskContext)
 		} else {
 			st.Start(taskContext)
