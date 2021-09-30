@@ -29,12 +29,7 @@ func continueOnErrorTest(c client.Client, invConfig InventoryConfig, inventoryNa
 		withNamespace(manifestToUnstructured(pod1), namespaceName),
 	}
 
-	ch := applier.Run(context.TODO(), inv, resources, apply.Options{})
-
-	var applierEvents []event.Event
-	for e := range ch {
-		applierEvents = append(applierEvents, e)
-	}
+	applierEvents := runCollect(applier.Run(context.TODO(), inv, resources, apply.Options{}))
 
 	expEvents := []testutil.ExpEvent{
 		{
