@@ -166,14 +166,17 @@ func (po *PruneOptions) GetPruneObjs(inv inventory.InventoryInfo,
 	for _, pruneID := range pruneIds {
 		pruneObj, err := po.GetObject(pruneID)
 		if err != nil {
-			// If prune object is not in cluster, no need to prune it--skip.
-			if apierrors.IsNotFound(err) {
-				klog.V(4).Infof("prune obj not in cluster--skip (%s/%s)",
+			if meta.IsNoMatchError(err) {
+				klog.V(4).Infof("skip pruning obj %s/%s: the resource type is unrecognized by the cluster (kind: %s, group %s)",
+					pruneID.Namespace, pruneID.Name, pruneID.GroupKind.Kind, pruneID.GroupKind.Group)
+				continue
+			} else if apierrors.IsNotFound(err) {
+				// If prune object is not in cluster, no need to prune it--skip.
+				klog.V(4).Infof("skip pruning obj %s/%s: not found in the cluster",
 					pruneID.Namespace, pruneID.Name)
 				continue
-			} else {
-				return nil, err
 			}
+			return nil, err
 		}
 		pruneObjs = append(pruneObjs, pruneObj)
 	}
