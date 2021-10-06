@@ -55,7 +55,7 @@ func TestTextForError(t *testing.T) {
 		"timeout error": {
 			err: &taskrunner.TimeoutError{
 				Timeout: 2 * time.Second,
-				Identifiers: []object.ObjMetadata{
+				Identifiers: object.ObjMetadataSet{
 					{
 						GroupKind: schema.GroupKind{
 							Kind:  "Deployment",

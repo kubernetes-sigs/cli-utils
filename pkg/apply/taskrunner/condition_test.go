@@ -64,7 +64,7 @@ func TestCollector_ConditionMet(t *testing.T) {
 	testCases := map[string]struct {
 		cacheContents  []cache.ResourceStatus
 		appliedGen     map[object.ObjMetadata]int64
-		ids            []object.ObjMetadata
+		ids            object.ObjMetadataSet
 		condition      Condition
 		expectedResult bool
 	}{
@@ -78,7 +78,7 @@ func TestCollector_ConditionMet(t *testing.T) {
 			appliedGen: map[object.ObjMetadata]int64{
 				deployment1Meta: 42,
 			},
-			ids: []object.ObjMetadata{
+			ids: object.ObjMetadataSet{
 				deployment1Meta,
 			},
 			condition:      AllCurrent,
@@ -94,7 +94,7 @@ func TestCollector_ConditionMet(t *testing.T) {
 			appliedGen: map[object.ObjMetadata]int64{
 				deployment1Meta: 42,
 			},
-			ids: []object.ObjMetadata{
+			ids: object.ObjMetadataSet{
 				deployment1Meta,
 			},
 			condition:      AllCurrent,
@@ -115,7 +115,7 @@ func TestCollector_ConditionMet(t *testing.T) {
 				deployment1Meta: 42,
 				custom1Meta:     0,
 			},
-			ids: []object.ObjMetadata{
+			ids: object.ObjMetadataSet{
 				deployment1Meta,
 				custom1Meta,
 			},
@@ -137,7 +137,7 @@ func TestCollector_ConditionMet(t *testing.T) {
 				deployment1Meta: 42,
 				custom1Meta:     5,
 			},
-			ids: []object.ObjMetadata{
+			ids: object.ObjMetadataSet{
 				deployment1Meta,
 				custom1Meta,
 			},

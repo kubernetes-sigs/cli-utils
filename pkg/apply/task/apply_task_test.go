@@ -116,7 +116,7 @@ func TestApplyTask_BasicAppliedObjects(t *testing.T) {
 			require.NoError(t, err)
 
 			actual := taskContext.AppliedResources()
-			if !object.SetEquals(expected, actual) {
+			if !actual.Equal(expected) {
 				t.Errorf("expected (%s) inventory resources, got (%s)", expected, actual)
 			}
 		})

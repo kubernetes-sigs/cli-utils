@@ -18,7 +18,7 @@ import (
 // vertices).
 type Graph struct {
 	// map "from" vertex -> list of "to" vertices
-	edges map[object.ObjMetadata][]object.ObjMetadata
+	edges map[object.ObjMetadata]object.ObjMetadataSet
 }
 
 // Edge encapsulates a pair of vertices describing a
@@ -31,7 +31,7 @@ type Edge struct {
 // New returns a pointer to an empty Graph data structure.
 func New() *Graph {
 	g := &Graph{}
-	g.edges = make(map[object.ObjMetadata][]object.ObjMetadata)
+	g.edges = make(map[object.ObjMetadata]object.ObjMetadataSet)
 	return g
 }
 
@@ -39,7 +39,7 @@ func New() *Graph {
 // an initial empty set of edges from added vertex.
 func (g *Graph) AddVertex(v object.ObjMetadata) {
 	if _, exists := g.edges[v]; !exists {
-		g.edges[v] = []object.ObjMetadata{}
+		g.edges[v] = object.ObjMetadataSet{}
 	}
 }
 
@@ -48,11 +48,11 @@ func (g *Graph) AddVertex(v object.ObjMetadata) {
 func (g *Graph) AddEdge(from object.ObjMetadata, to object.ObjMetadata) {
 	// Add "from" vertex if it doesn't already exist.
 	if _, exists := g.edges[from]; !exists {
-		g.edges[from] = []object.ObjMetadata{}
+		g.edges[from] = object.ObjMetadataSet{}
 	}
 	// Add "to" vertex if it doesn't already exist.
 	if _, exists := g.edges[to]; !exists {
-		g.edges[to] = []object.ObjMetadata{}
+		g.edges[to] = object.ObjMetadataSet{}
 	}
 	// Add edge "from" -> "to" if it doesn't already exist
 	// into the adjacency list.
@@ -100,31 +100,19 @@ func (g *Graph) Size() int {
 func (g *Graph) removeVertex(r object.ObjMetadata) {
 	// First, remove the object from all adjacency lists.
 	for v, adj := range g.edges {
-		for i, a := range adj {
-			if a == r {
-				g.edges[v] = removeObj(adj, i)
-				break
-			}
-		}
+		g.edges[v] = adj.Remove(r)
 	}
 	// Finally, remove the vertex
 	delete(g.edges, r)
 }
 
-// removeObj removes the object at index "i" from the passed
-// list of vertices, returning the new list.
-func removeObj(adj []object.ObjMetadata, i int) []object.ObjMetadata {
-	adj[len(adj)-1], adj[i] = adj[i], adj[len(adj)-1]
-	return adj[:len(adj)-1]
-}
-
 // Sort returns the ordered set of vertices after
 // a topological sort.
-func (g *Graph) Sort() ([][]object.ObjMetadata, error) {
-	sorted := [][]object.ObjMetadata{}
+func (g *Graph) Sort() ([]object.ObjMetadataSet, error) {
+	sorted := []object.ObjMetadataSet{}
 	for g.Size() > 0 {
 		// Identify all the leaf vertices.
-		leafVertices := []object.ObjMetadata{}
+		leafVertices := object.ObjMetadataSet{}
 		for v, adj := range g.edges {
 			if len(adj) == 0 {
 				leafVertices = append(leafVertices, v)
@@ -133,7 +121,7 @@ func (g *Graph) Sort() ([][]object.ObjMetadata, error) {
 		// No leaf vertices means cycle in the directed graph,
 		// where remaining edges define the cycle.
 		if len(leafVertices) == 0 {
-			return [][]object.ObjMetadata{}, CyclicDependencyError{
+			return []object.ObjMetadataSet{}, CyclicDependencyError{
 				Edges: g.GetEdges(),
 			}
 		}

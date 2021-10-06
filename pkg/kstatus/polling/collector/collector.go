@@ -12,7 +12,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
-func NewResourceStatusCollector(identifiers []object.ObjMetadata) *ResourceStatusCollector {
+func NewResourceStatusCollector(identifiers object.ObjMetadataSet) *ResourceStatusCollector {
 	resourceStatuses := make(map[object.ObjMetadata]*event.ResourceStatus)
 	for _, id := range identifiers {
 		resourceStatuses[id] = &event.ResourceStatus{

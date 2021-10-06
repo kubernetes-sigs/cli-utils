@@ -43,7 +43,7 @@ func InvInfoToConfigMap(inv InventoryInfo) *unstructured.Unstructured {
 // object metadata (inventory) to and from the wrapped ConfigMap.
 type InventoryConfigMap struct {
 	inv      *unstructured.Unstructured
-	objMetas []object.ObjMetadata
+	objMetas object.ObjMetadataSet
 }
 
 var _ InventoryInfo = &InventoryConfigMap{}
@@ -72,8 +72,8 @@ func (icm *InventoryConfigMap) UnstructuredInventory() *unstructured.Unstructure
 
 // Load is an Inventory interface function returning the set of
 // object metadata from the wrapped ConfigMap, or an error.
-func (icm *InventoryConfigMap) Load() ([]object.ObjMetadata, error) {
-	objs := []object.ObjMetadata{}
+func (icm *InventoryConfigMap) Load() (object.ObjMetadataSet, error) {
+	objs := object.ObjMetadataSet{}
 	objMap, exists, err := unstructured.NestedStringMap(icm.inv.Object, "data")
 	if err != nil {
 		err := fmt.Errorf("error retrieving object metadata from inventory object")
@@ -94,7 +94,7 @@ func (icm *InventoryConfigMap) Load() ([]object.ObjMetadata, error) {
 // Store is an Inventory interface function implemented to store
 // the object metadata in the wrapped ConfigMap. Actual storing
 // happens in "GetObject".
-func (icm *InventoryConfigMap) Store(objMetas []object.ObjMetadata) error {
+func (icm *InventoryConfigMap) Store(objMetas object.ObjMetadataSet) error {
 	icm.objMetas = objMetas
 	return nil
 }
@@ -115,7 +115,7 @@ func (icm *InventoryConfigMap) GetObject() (*unstructured.Unstructured, error) {
 	return invCopy, nil
 }
 
-func buildObjMap(objMetas []object.ObjMetadata) map[string]string {
+func buildObjMap(objMetas object.ObjMetadataSet) map[string]string {
 	objMap := map[string]string{}
 	for _, objMetadata := range objMetas {
 		objMap[objMetadata.String()] = ""

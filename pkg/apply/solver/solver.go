@@ -177,7 +177,7 @@ func (t *TaskQueueBuilder) AppendApplyTask(applyObjs []*unstructured.Unstructure
 
 // AppendInvAddTask appends a task to wait on the passed objects to the task queue.
 // Returns a pointer to the Builder to chain function calls.
-func (t *TaskQueueBuilder) AppendWaitTask(waitIds []object.ObjMetadata, condition taskrunner.Condition,
+func (t *TaskQueueBuilder) AppendWaitTask(waitIds object.ObjMetadataSet, condition taskrunner.Condition,
 	waitTimeout time.Duration) *TaskQueueBuilder {
 	klog.V(2).Infoln("adding wait task")
 	t.tasks = append(t.tasks, taskrunner.NewWaitTask(

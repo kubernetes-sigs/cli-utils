@@ -146,7 +146,7 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 				},
 				taskrunner.NewWaitTask(
 					"wait-0",
-					[]object.ObjMetadata{
+					object.ObjMetadataSet{
 						testutil.ToIdentifier(t, resources["deployment"]),
 						testutil.ToIdentifier(t, resources["secret"]),
 					},
@@ -212,7 +212,7 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 				},
 				taskrunner.NewWaitTask(
 					"wait-0",
-					[]object.ObjMetadata{
+					object.ObjMetadataSet{
 						testutil.ToIdentifier(t, resources["crd"]),
 					},
 					taskrunner.AllCurrent, 1*time.Second,
@@ -226,7 +226,7 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 				},
 				taskrunner.NewWaitTask(
 					"wait-1",
-					[]object.ObjMetadata{
+					object.ObjMetadataSet{
 						testutil.ToIdentifier(t, resources["crontab1"]),
 						testutil.ToIdentifier(t, resources["crontab2"]),
 					},
@@ -277,7 +277,7 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 				},
 				taskrunner.NewWaitTask(
 					"wait-0",
-					[]object.ObjMetadata{
+					object.ObjMetadataSet{
 						testutil.ToIdentifier(t, resources["namespace"]),
 					},
 					taskrunner.AllCurrent, 1*time.Second,
@@ -291,7 +291,7 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 				},
 				taskrunner.NewWaitTask(
 					"wait-1",
-					[]object.ObjMetadata{
+					object.ObjMetadataSet{
 						testutil.ToIdentifier(t, resources["pod"]),
 						testutil.ToIdentifier(t, resources["secret"]),
 					},
@@ -315,7 +315,7 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 				},
 				taskrunner.NewWaitTask(
 					"wait-0",
-					[]object.ObjMetadata{
+					object.ObjMetadataSet{
 						testutil.ToIdentifier(t, resources["secret"]),
 					},
 					taskrunner.AllCurrent, 1*time.Second,
@@ -328,7 +328,7 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 				},
 				taskrunner.NewWaitTask(
 					"wait-1",
-					[]object.ObjMetadata{
+					object.ObjMetadataSet{
 						testutil.ToIdentifier(t, resources["deployment"]),
 					},
 					taskrunner.AllCurrent, 1*time.Second,
@@ -384,7 +384,7 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 					actWaitTask := toWaitTask(t, actualTask)
 					assert.Equal(t, len(expTsk.Ids), len(actWaitTask.Ids))
 					// Order is NOT important for ids stored within task.
-					if !object.SetEquals(expTsk.Ids, actWaitTask.Ids) {
+					if !expTsk.Ids.Equal(actWaitTask.Ids) {
 						t.Errorf("expected wait ids (%v), got (%v)",
 							expTsk.Ids, actWaitTask.Ids)
 					}
@@ -457,7 +457,7 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 				},
 				taskrunner.NewWaitTask(
 					"wait-0",
-					[]object.ObjMetadata{
+					object.ObjMetadataSet{
 						testutil.ToIdentifier(t, resources["pod"]),
 					},
 					taskrunner.AllCurrent, 1*time.Second,
@@ -470,7 +470,7 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 				},
 				taskrunner.NewWaitTask(
 					"wait-1",
-					[]object.ObjMetadata{
+					object.ObjMetadataSet{
 						testutil.ToIdentifier(t, resources["secret"]),
 					},
 					taskrunner.AllCurrent, 1*time.Second,
@@ -495,7 +495,7 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 				},
 				taskrunner.NewWaitTask(
 					"wait-0",
-					[]object.ObjMetadata{
+					object.ObjMetadataSet{
 						testutil.ToIdentifier(t, resources["pod"]),
 					},
 					taskrunner.AllCurrent,
@@ -544,7 +544,7 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 				},
 				taskrunner.NewWaitTask(
 					"wait-0",
-					[]object.ObjMetadata{
+					object.ObjMetadataSet{
 						testutil.ToIdentifier(t, resources["crontab1"]),
 						testutil.ToIdentifier(t, resources["crontab2"]),
 					},
@@ -558,7 +558,7 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 				},
 				taskrunner.NewWaitTask(
 					"wait-1",
-					[]object.ObjMetadata{
+					object.ObjMetadataSet{
 						testutil.ToIdentifier(t, resources["crd"]),
 					},
 					taskrunner.AllCurrent, 1*time.Second,
@@ -611,7 +611,7 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 				},
 				taskrunner.NewWaitTask(
 					"wait-0",
-					[]object.ObjMetadata{
+					object.ObjMetadataSet{
 						testutil.ToIdentifier(t, resources["pod"]),
 						testutil.ToIdentifier(t, resources["secret"]),
 					},
@@ -625,7 +625,7 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 				},
 				taskrunner.NewWaitTask(
 					"wait-1",
-					[]object.ObjMetadata{
+					object.ObjMetadataSet{
 						testutil.ToIdentifier(t, resources["namespace"]),
 					},
 					taskrunner.AllCurrent, 1*time.Second,
@@ -676,7 +676,7 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 				case *taskrunner.WaitTask:
 					actWaitTask := toWaitTask(t, actualTask)
 					assert.Equal(t, len(expTsk.Ids), len(actWaitTask.Ids))
-					if !object.SetEquals(expTsk.Ids, actWaitTask.Ids) {
+					if !expTsk.Ids.Equal(actWaitTask.Ids) {
 						t.Errorf("expected wait ids (%v), got (%v)",
 							expTsk.Ids, actWaitTask.Ids)
 					}

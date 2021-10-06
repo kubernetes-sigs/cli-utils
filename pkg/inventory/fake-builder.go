@@ -32,13 +32,13 @@ var (
 // FakeBuilder encapsulates a resource Builder which will hard-code the return
 // of an inventory object with the encoded past invObjs.
 type FakeBuilder struct {
-	invObjs []object.ObjMetadata
+	invObjs object.ObjMetadataSet
 }
 
 // SetInventoryObjs sets the objects which will be encoded in
 // an inventory object to be returned when queried for the cluster
 // inventory object.
-func (fb *FakeBuilder) SetInventoryObjs(objs []object.ObjMetadata) {
+func (fb *FakeBuilder) SetInventoryObjs(objs object.ObjMetadataSet) {
 	fb.invObjs = objs
 }
 
@@ -59,7 +59,7 @@ func (fb *FakeBuilder) GetBuilder() func() *resource.Builder {
 
 // fakeClient hard codes the return of an inventory object that encodes the passed
 // objects into the inventory object when a GET of configmaps is called.
-func fakeClient(objs []object.ObjMetadata) resource.FakeClientFunc {
+func fakeClient(objs object.ObjMetadataSet) resource.FakeClientFunc {
 	return func(version schema.GroupVersion) (resource.RESTClient, error) {
 		return &fake.RESTClient{
 			NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
@@ -94,7 +94,7 @@ func fakeClient(objs []object.ObjMetadata) resource.FakeClientFunc {
 							Name:      "inventory",
 							Namespace: "test-namespace",
 						},
-						Data: objMap(objs),
+						Data: objs.ToStringMap(),
 					}
 					cmList.Items = append(cmList.Items, cm)
 					bodyRC := ioutil.NopCloser(bytes.NewReader(toJSONBytes(&cmList)))
@@ -109,13 +109,4 @@ func fakeClient(objs []object.ObjMetadata) resource.FakeClientFunc {
 func toJSONBytes(obj runtime.Object) []byte {
 	objBytes, _ := runtime.Encode(unstructured.NewJSONFallbackEncoder(codec), obj)
 	return objBytes
-}
-
-func objMap(objs []object.ObjMetadata) map[string]string {
-	objMap := map[string]string{}
-	for _, obj := range objs {
-		objStr := obj.String()
-		objMap[objStr] = ""
-	}
-	return objMap
 }

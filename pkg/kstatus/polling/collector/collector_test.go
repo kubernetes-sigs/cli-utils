@@ -17,7 +17,7 @@ import (
 )
 
 func TestCollectorStopsWhenEventChannelIsClosed(t *testing.T) {
-	var identifiers []object.ObjMetadata
+	var identifiers object.ObjMetadataSet
 
 	collector := NewResourceStatusCollector(identifiers)
 
@@ -39,7 +39,7 @@ func TestCollectorStopsWhenEventChannelIsClosed(t *testing.T) {
 }
 
 func TestCollectorWithFatalError(t *testing.T) {
-	var identifiers []object.ObjMetadata
+	var identifiers object.ObjMetadataSet
 
 	collector := NewResourceStatusCollector(identifiers)
 
@@ -91,12 +91,12 @@ var (
 
 func TestCollectorEventProcessing(t *testing.T) {
 	testCases := map[string]struct {
-		identifiers []object.ObjMetadata
+		identifiers object.ObjMetadataSet
 		events      []event.Event
 	}{
 		"no resources and no events": {},
 		"single resource and single event": {
-			identifiers: []object.ObjMetadata{
+			identifiers: object.ObjMetadataSet{
 				resourceIdentifiers["deployment"],
 			},
 			events: []event.Event{
@@ -109,7 +109,7 @@ func TestCollectorEventProcessing(t *testing.T) {
 			},
 		},
 		"multiple resources and multiple events": {
-			identifiers: []object.ObjMetadata{
+			identifiers: object.ObjMetadataSet{
 				resourceIdentifiers["deployment"],
 				resourceIdentifiers["statefulSet"],
 			},

@@ -68,7 +68,7 @@ func (a *ApplyTask) Action() event.ResourceAction {
 	return event.ApplyAction
 }
 
-func (a *ApplyTask) Identifiers() []object.ObjMetadata {
+func (a *ApplyTask) Identifiers() object.ObjMetadataSet {
 	return object.UnstructuredsToObjMetasOrDie(a.Objects)
 }
 

@@ -59,7 +59,7 @@ func TestStatusCommand(t *testing.T) {
 		printer        string
 		timeout        time.Duration
 		input          string
-		inventory      []object.ObjMetadata
+		inventory      object.ObjMetadataSet
 		events         []pollevent.Event
 		expectedErrMsg string
 		expectedOutput string
@@ -76,7 +76,7 @@ func TestStatusCommand(t *testing.T) {
 			pollUntil: "known",
 			printer:   "events",
 			input:     inventoryTemplate,
-			inventory: []object.ObjMetadata{
+			inventory: object.ObjMetadataSet{
 				depObject,
 				stsObject,
 			},
@@ -107,7 +107,7 @@ statefulset.apps/bar is Current: current
 			pollUntil: "current",
 			printer:   "events",
 			input:     inventoryTemplate,
-			inventory: []object.ObjMetadata{
+			inventory: object.ObjMetadataSet{
 				depObject,
 				stsObject,
 			},
@@ -156,7 +156,7 @@ deployment.apps/foo is Current: current
 			pollUntil: "deleted",
 			printer:   "events",
 			input:     inventoryTemplate,
-			inventory: []object.ObjMetadata{
+			inventory: object.ObjMetadataSet{
 				depObject,
 				stsObject,
 			},
@@ -188,7 +188,7 @@ deployment.apps/foo is NotFound: notFound
 			printer:   "events",
 			timeout:   2 * time.Second,
 			input:     inventoryTemplate,
-			inventory: []object.ObjMetadata{
+			inventory: object.ObjMetadataSet{
 				depObject,
 				stsObject,
 			},
@@ -261,7 +261,7 @@ type fakePoller struct {
 	events []pollevent.Event
 }
 
-func (f *fakePoller) Poll(ctx context.Context, _ []object.ObjMetadata,
+func (f *fakePoller) Poll(ctx context.Context, _ object.ObjMetadataSet,
 	_ polling.Options) <-chan pollevent.Event {
 	eventChannel := make(chan pollevent.Event)
 	go func() {

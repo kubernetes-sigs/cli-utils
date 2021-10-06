@@ -418,7 +418,7 @@ func copyInventory() InventoryInfo {
 	return WrapInventoryInfoObj(u)
 }
 
-func storeObjsInInventory(info InventoryInfo, objs []object.ObjMetadata) *unstructured.Unstructured {
+func storeObjsInInventory(info InventoryInfo, objs object.ObjMetadataSet) *unstructured.Unstructured {
 	wrapped := WrapInventoryObj(InvInfoToConfigMap(info))
 	_ = wrapped.Store(objs)
 	inv, _ := wrapped.GetObject()

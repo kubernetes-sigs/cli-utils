@@ -45,11 +45,11 @@ var genGroupKinds = map[schema.GroupKind][]schema.GroupKind{
 
 // NewCachingClusterReader returns a new instance of the ClusterReader. The
 // ClusterReader needs will use the clusterreader to fetch resources from the cluster,
-// while the mapper is used to resolve the version for GroupKinds. The list of
+// while the mapper is used to resolve the version for GroupKinds. The set of
 // identifiers is needed so the ClusterReader can figure out which GroupKind
 // and namespace combinations it needs to cache when the Sync function is called.
 // We only want to fetch the resources that are actually needed.
-func NewCachingClusterReader(reader client.Reader, mapper meta.RESTMapper, identifiers []object.ObjMetadata) (*CachingClusterReader, error) {
+func NewCachingClusterReader(reader client.Reader, mapper meta.RESTMapper, identifiers object.ObjMetadataSet) (*CachingClusterReader, error) {
 	gvkNamespaceSet := newGnSet()
 	for _, id := range identifiers {
 		// For every identifier, add the GroupVersionKind and namespace combination to the gvkNamespaceSet and

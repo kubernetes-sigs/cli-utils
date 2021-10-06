@@ -33,63 +33,63 @@ var (
 
 func TestObjectGraphSort(t *testing.T) {
 	testCases := map[string]struct {
-		vertices []object.ObjMetadata
+		vertices object.ObjMetadataSet
 		edges    []Edge
-		expected [][]object.ObjMetadata
+		expected []object.ObjMetadataSet
 		isError  bool
 	}{
 		"one edge": {
-			vertices: []object.ObjMetadata{o1, o2},
+			vertices: object.ObjMetadataSet{o1, o2},
 			edges:    []Edge{e1},
-			expected: [][]object.ObjMetadata{{o2}, {o1}},
+			expected: []object.ObjMetadataSet{{o2}, {o1}},
 			isError:  false,
 		},
 		"two edges": {
-			vertices: []object.ObjMetadata{o1, o2, o3},
+			vertices: object.ObjMetadataSet{o1, o2, o3},
 			edges:    []Edge{e1, e2},
-			expected: [][]object.ObjMetadata{{o3}, {o2}, {o1}},
+			expected: []object.ObjMetadataSet{{o3}, {o2}, {o1}},
 			isError:  false,
 		},
 		"three edges": {
-			vertices: []object.ObjMetadata{o1, o2, o3},
+			vertices: object.ObjMetadataSet{o1, o2, o3},
 			edges:    []Edge{e1, e3, e2},
-			expected: [][]object.ObjMetadata{{o3}, {o2}, {o1}},
+			expected: []object.ObjMetadataSet{{o3}, {o2}, {o1}},
 			isError:  false,
 		},
 		"four edges": {
-			vertices: []object.ObjMetadata{o1, o2, o3, o4},
+			vertices: object.ObjMetadataSet{o1, o2, o3, o4},
 			edges:    []Edge{e1, e2, e4, e5},
-			expected: [][]object.ObjMetadata{{o4}, {o3}, {o2}, {o1}},
+			expected: []object.ObjMetadataSet{{o4}, {o3}, {o2}, {o1}},
 			isError:  false,
 		},
 		"five edges": {
-			vertices: []object.ObjMetadata{o1, o2, o3, o4},
+			vertices: object.ObjMetadataSet{o1, o2, o3, o4},
 			edges:    []Edge{e5, e1, e3, e2, e4},
-			expected: [][]object.ObjMetadata{{o4}, {o3}, {o2}, {o1}},
+			expected: []object.ObjMetadataSet{{o4}, {o3}, {o2}, {o1}},
 			isError:  false,
 		},
 		"no edges means all in the same first set": {
-			vertices: []object.ObjMetadata{o1, o2, o3, o4},
+			vertices: object.ObjMetadataSet{o1, o2, o3, o4},
 			edges:    []Edge{},
-			expected: [][]object.ObjMetadata{{o4, o3, o2, o1}},
+			expected: []object.ObjMetadataSet{{o4, o3, o2, o1}},
 			isError:  false,
 		},
 		"multiple objects in first set": {
-			vertices: []object.ObjMetadata{o1, o2, o3, o4, o5},
+			vertices: object.ObjMetadataSet{o1, o2, o3, o4, o5},
 			edges:    []Edge{e1, e2, e5, e8},
-			expected: [][]object.ObjMetadata{{o5, o3}, {o4}, {o2}, {o1}},
+			expected: []object.ObjMetadataSet{{o5, o3}, {o4}, {o2}, {o1}},
 			isError:  false,
 		},
 		"simple cycle in graph is an error": {
-			vertices: []object.ObjMetadata{o1, o2},
+			vertices: object.ObjMetadataSet{o1, o2},
 			edges:    []Edge{e1, e6},
-			expected: [][]object.ObjMetadata{},
+			expected: []object.ObjMetadataSet{},
 			isError:  true,
 		},
 		"multi-edge cycle in graph is an error": {
-			vertices: []object.ObjMetadata{o1, o2, o3},
+			vertices: object.ObjMetadataSet{o1, o2, o3},
 			edges:    []Edge{e1, e2, e7},
-			expected: [][]object.ObjMetadata{},
+			expected: []object.ObjMetadataSet{},
 			isError:  true,
 		},
 	}
@@ -116,7 +116,7 @@ func TestObjectGraphSort(t *testing.T) {
 				}
 				for i, actualSet := range actual {
 					expectedSet := tc.expected[i]
-					if !object.SetEquals(expectedSet, actualSet) {
+					if !expectedSet.Equal(actualSet) {
 						t.Errorf("expected sorted objects (%s), got (%s)", tc.expected, actual)
 					}
 				}

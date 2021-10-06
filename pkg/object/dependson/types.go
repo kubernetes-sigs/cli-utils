@@ -10,10 +10,10 @@ import (
 
 // DependencySet is a set of object references.
 // When testing equality, order is not importent.
-type DependencySet []object.ObjMetadata
+type DependencySet object.ObjMetadataSet
 
 // Equal returns true if the ObjMetadata sets are equivalent, ignoring order.
 // Fulfills Equal interface from github.com/google/go-cmp
 func (a DependencySet) Equal(b DependencySet) bool {
-	return object.SetEquals(a, b)
+	return object.ObjMetadataSet(a).Equal(object.ObjMetadataSet(b))
 }

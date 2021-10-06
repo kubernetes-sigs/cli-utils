@@ -19,7 +19,7 @@ import (
 )
 
 // NewTaskStatusRunner returns a new TaskStatusRunner.
-func NewTaskStatusRunner(identifiers []object.ObjMetadata, statusPoller poller.Poller, cache cache.ResourceCache) *taskStatusRunner {
+func NewTaskStatusRunner(identifiers object.ObjMetadataSet, statusPoller poller.Poller, cache cache.ResourceCache) *taskStatusRunner {
 	return &taskStatusRunner{
 		identifiers:  identifiers,
 		statusPoller: statusPoller,
@@ -31,7 +31,7 @@ func NewTaskStatusRunner(identifiers []object.ObjMetadata, statusPoller poller.P
 // tasks while at the same time uses the statusPoller to
 // keep track of the status of the resources.
 type taskStatusRunner struct {
-	identifiers  []object.ObjMetadata
+	identifiers  object.ObjMetadataSet
 	statusPoller poller.Poller
 
 	baseRunner *baseRunner
@@ -338,7 +338,7 @@ type TaskResult struct {
 type TimeoutError struct {
 	// Identifiers contains the identifiers of all resources that the
 	// WaitTask was waiting for.
-	Identifiers []object.ObjMetadata
+	Identifiers object.ObjMetadataSet
 
 	// Timeout is the amount of time it took before it timed out.
 	Timeout time.Duration

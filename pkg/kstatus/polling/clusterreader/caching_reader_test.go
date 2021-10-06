@@ -30,14 +30,14 @@ var (
 
 func TestSync(t *testing.T) {
 	testCases := map[string]struct {
-		identifiers    []object.ObjMetadata
+		identifiers    object.ObjMetadataSet
 		expectedSynced []gkNamespace
 	}{
 		"no identifiers": {
-			identifiers: []object.ObjMetadata{},
+			identifiers: object.ObjMetadataSet{},
 		},
 		"same GVK in multiple namespaces": {
-			identifiers: []object.ObjMetadata{
+			identifiers: object.ObjMetadataSet{
 				{
 					GroupKind: deploymentGVK.GroupKind(),
 					Name:      "deployment",
@@ -152,7 +152,7 @@ func TestSync_Errors(t *testing.T) {
 
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
-			identifiers := []object.ObjMetadata{
+			identifiers := object.ObjMetadataSet{
 				{
 					Name: "my-crd",
 					GroupKind: schema.GroupKind{

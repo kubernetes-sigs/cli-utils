@@ -29,9 +29,9 @@ const legacyInvName = "inventory"
 // operations.
 type Inventory interface {
 	// Load retrieves the set of object metadata from the inventory object
-	Load() ([]object.ObjMetadata, error)
+	Load() (object.ObjMetadataSet, error)
 	// Store the set of object metadata in the inventory object
-	Store(objs []object.ObjMetadata) error
+	Store(objs object.ObjMetadataSet) error
 	// GetObject returns the object that stores the inventory
 	GetObject() (*unstructured.Unstructured, error)
 }

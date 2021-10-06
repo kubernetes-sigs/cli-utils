@@ -22,14 +22,14 @@ import (
 type Task interface {
 	Name() string
 	Action() event.ResourceAction
-	Identifiers() []object.ObjMetadata
+	Identifiers() object.ObjMetadataSet
 	Start(taskContext *TaskContext)
 	ClearTimeout()
 }
 
 // NewWaitTask creates a new wait task where we will wait until
 // the resources specifies by ids all meet the specified condition.
-func NewWaitTask(name string, ids []object.ObjMetadata, cond Condition, timeout time.Duration, mapper meta.RESTMapper) *WaitTask {
+func NewWaitTask(name string, ids object.ObjMetadataSet, cond Condition, timeout time.Duration, mapper meta.RESTMapper) *WaitTask {
 	// Create the token channel and only add one item.
 	tokenChannel := make(chan struct{}, 1)
 	tokenChannel <- struct{}{}
@@ -56,7 +56,7 @@ type WaitTask struct {
 	// name allows providing a name for the task.
 	name string
 	// Ids is the list of resources that we are waiting for.
-	Ids []object.ObjMetadata
+	Ids object.ObjMetadataSet
 	// Condition defines the status we want all resources to reach
 	Condition Condition
 	// Timeout defines how long we are willing to wait for the condition
@@ -86,7 +86,7 @@ func (w *WaitTask) Action() event.ResourceAction {
 	return event.WaitAction
 }
 
-func (w *WaitTask) Identifiers() []object.ObjMetadata {
+func (w *WaitTask) Identifiers() object.ObjMetadataSet {
 	return w.Ids
 }
 
@@ -136,8 +136,8 @@ func (w *WaitTask) checkCondition(taskContext *TaskContext) bool {
 // pending returns the set of resources being waited on excluding
 // apply/delete failures. This includes resources which are skipped because of
 // filtering.
-func (w *WaitTask) pending(taskContext *TaskContext) []object.ObjMetadata {
-	var ids []object.ObjMetadata
+func (w *WaitTask) pending(taskContext *TaskContext) object.ObjMetadataSet {
+	var ids object.ObjMetadataSet
 	for _, id := range w.Ids {
 		if (w.Condition == AllCurrent && taskContext.ResourceFailed(id)) ||
 			(w.Condition == AllNotFound && taskContext.PruneFailed(id)) {

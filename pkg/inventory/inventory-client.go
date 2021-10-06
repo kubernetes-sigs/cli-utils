@@ -27,15 +27,15 @@ type InventoryClient interface {
 	// GetCluster returns the set of previously applied objects as ObjMetadata,
 	// or an error if one occurred. This set of previously applied object references
 	// is stored in the inventory objects living in the cluster.
-	GetClusterObjs(inv InventoryInfo, dryRun common.DryRunStrategy) ([]object.ObjMetadata, error)
+	GetClusterObjs(inv InventoryInfo, dryRun common.DryRunStrategy) (object.ObjMetadataSet, error)
 	// Merge applies the union of the passed objects with the currently
-	// stored objects in the inventory object. Returns the slice of
-	// objects which are a set diff (objects to be pruned). Otherwise,
-	// returns an error if one happened.
-	Merge(inv InventoryInfo, objs []object.ObjMetadata, dryRun common.DryRunStrategy) ([]object.ObjMetadata, error)
+	// stored objects in the inventory object. Returns the set of
+	// objects which are not in the passed objects (objects to be pruned).
+	// Otherwise, returns an error if one happened.
+	Merge(inv InventoryInfo, objs object.ObjMetadataSet, dryRun common.DryRunStrategy) (object.ObjMetadataSet, error)
 	// Replace replaces the set of objects stored in the inventory
 	// object with the passed set of objects, or an error if one occurs.
-	Replace(inv InventoryInfo, objs []object.ObjMetadata, dryRun common.DryRunStrategy) error
+	Replace(inv InventoryInfo, objs object.ObjMetadataSet, dryRun common.DryRunStrategy) error
 	// DeleteInventoryObj deletes the passed inventory object from the APIServer.
 	DeleteInventoryObj(inv InventoryInfo, dryRun common.DryRunStrategy) error
 	// ApplyInventoryNamespace applies the Namespace that the inventory object should be in.
@@ -94,8 +94,8 @@ func NewInventoryClient(factory cmdutil.Factory,
 // to prune. Creates the initial cluster inventory object storing the passed
 // objects if an inventory object does not exist. Returns an error if one
 // occurred.
-func (cic *ClusterInventoryClient) Merge(localInv InventoryInfo, objs []object.ObjMetadata, dryRun common.DryRunStrategy) ([]object.ObjMetadata, error) {
-	pruneIds := []object.ObjMetadata{}
+func (cic *ClusterInventoryClient) Merge(localInv InventoryInfo, objs object.ObjMetadataSet, dryRun common.DryRunStrategy) (object.ObjMetadataSet, error) {
+	pruneIds := object.ObjMetadataSet{}
 	invObj := cic.invToUnstructuredFunc(localInv)
 	clusterInv, err := cic.GetClusterInventoryInfo(localInv, dryRun)
 	if err != nil {
@@ -121,12 +121,12 @@ func (cic *ClusterInventoryClient) Merge(localInv InventoryInfo, objs []object.O
 		if err != nil {
 			return pruneIds, err
 		}
-		if object.SetEquals(objs, clusterObjs) {
+		if objs.Equal(clusterObjs) {
 			klog.V(4).Infof("applied objects same as cluster inventory: do nothing")
 			return pruneIds, nil
 		}
-		pruneIds = object.SetDiff(clusterObjs, objs)
-		unionObjs := object.Union(clusterObjs, objs)
+		pruneIds = clusterObjs.Diff(objs)
+		unionObjs := clusterObjs.Union(objs)
 		klog.V(4).Infof("num objects to prune: %d", len(pruneIds))
 		klog.V(4).Infof("num merged objects to store in inventory: %d", len(unionObjs))
 		wrappedInv := cic.InventoryFactoryFunc(clusterInv)
@@ -150,7 +150,7 @@ func (cic *ClusterInventoryClient) Merge(localInv InventoryInfo, objs []object.O
 
 // Replace stores the passed objects in the cluster inventory object, or
 // an error if one occurred.
-func (cic *ClusterInventoryClient) Replace(localInv InventoryInfo, objs []object.ObjMetadata, dryRun common.DryRunStrategy) error {
+func (cic *ClusterInventoryClient) Replace(localInv InventoryInfo, objs object.ObjMetadataSet, dryRun common.DryRunStrategy) error {
 	// Skip entire function for dry-run.
 	if dryRun.ClientOrServerDryRun() {
 		klog.V(4).Infoln("dry-run replace inventory object: not applied")
@@ -160,7 +160,7 @@ func (cic *ClusterInventoryClient) Replace(localInv InventoryInfo, objs []object
 	if err != nil {
 		return err
 	}
-	if object.SetEquals(objs, clusterObjs) {
+	if objs.Equal(clusterObjs) {
 		klog.V(4).Infof("applied objects same as cluster inventory: do nothing")
 		return nil
 	}
@@ -181,7 +181,7 @@ func (cic *ClusterInventoryClient) Replace(localInv InventoryInfo, objs []object
 }
 
 // replaceInventory stores the passed objects into the passed inventory object.
-func (cic *ClusterInventoryClient) replaceInventory(inv *unstructured.Unstructured, objs []object.ObjMetadata) (*unstructured.Unstructured, error) {
+func (cic *ClusterInventoryClient) replaceInventory(inv *unstructured.Unstructured, objs object.ObjMetadataSet) (*unstructured.Unstructured, error) {
 	wrappedInv := cic.InventoryFactoryFunc(inv)
 	if err := wrappedInv.Store(objs); err != nil {
 		return nil, err
@@ -223,8 +223,8 @@ func (cic *ClusterInventoryClient) deleteInventoryObjsByLabel(inv InventoryInfo,
 
 // GetClusterObjs returns the objects stored in the cluster inventory object, or
 // an error if one occurred.
-func (cic *ClusterInventoryClient) GetClusterObjs(localInv InventoryInfo, dryRun common.DryRunStrategy) ([]object.ObjMetadata, error) {
-	var objs []object.ObjMetadata
+func (cic *ClusterInventoryClient) GetClusterObjs(localInv InventoryInfo, dryRun common.DryRunStrategy) (object.ObjMetadataSet, error) {
+	var objs object.ObjMetadataSet
 	clusterInv, err := cic.GetClusterInventoryInfo(localInv, dryRun)
 	if err != nil {
 		return objs, err
@@ -378,7 +378,7 @@ func (cic *ClusterInventoryClient) mergeClusterInventory(invObjs []*unstructured
 		if err != nil {
 			return nil, err
 		}
-		retainedObjs = object.Union(retainedObjs, mergeObjs)
+		retainedObjs = retainedObjs.Union(mergeObjs)
 	}
 	if err := wrapRetained.Store(retainedObjs); err != nil {
 		return nil, err

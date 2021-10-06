@@ -15,7 +15,7 @@ import (
 )
 
 func TestWaitTask_TimeoutTriggered(t *testing.T) {
-	task := NewWaitTask("wait", []object.ObjMetadata{}, AllCurrent,
+	task := NewWaitTask("wait", object.ObjMetadataSet{}, AllCurrent,
 		2*time.Second, testutil.NewFakeRESTMapper())
 
 	eventChannel := make(chan event.Event)
@@ -39,7 +39,7 @@ func TestWaitTask_TimeoutTriggered(t *testing.T) {
 }
 
 func TestWaitTask_TimeoutCancelled(t *testing.T) {
-	task := NewWaitTask("wait", []object.ObjMetadata{}, AllCurrent,
+	task := NewWaitTask("wait", object.ObjMetadataSet{}, AllCurrent,
 		2*time.Second, testutil.NewFakeRESTMapper())
 
 	eventChannel := make(chan event.Event)
@@ -60,7 +60,7 @@ func TestWaitTask_TimeoutCancelled(t *testing.T) {
 }
 
 func TestWaitTask_SingleTaskResult(t *testing.T) {
-	task := NewWaitTask("wait", []object.ObjMetadata{}, AllCurrent,
+	task := NewWaitTask("wait", object.ObjMetadataSet{}, AllCurrent,
 		2*time.Second, testutil.NewFakeRESTMapper())
 
 	eventChannel := make(chan event.Event)
