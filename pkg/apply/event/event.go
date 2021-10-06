@@ -111,6 +111,7 @@ const (
 )
 
 type ApplyEvent struct {
+	GroupName  string
 	Identifier object.ObjMetadata
 	Operation  ApplyEventOperation
 	Resource   *unstructured.Unstructured
@@ -134,6 +135,7 @@ const (
 )
 
 type PruneEvent struct {
+	GroupName  string
 	Identifier object.ObjMetadata
 	Operation  PruneEventOperation
 	Object     *unstructured.Unstructured
@@ -152,6 +154,7 @@ const (
 )
 
 type DeleteEvent struct {
+	GroupName  string
 	Identifier object.ObjMetadata
 	Operation  DeleteEventOperation
 	Object     *unstructured.Unstructured

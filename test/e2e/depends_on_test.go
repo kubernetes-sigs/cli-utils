@@ -46,33 +46,34 @@ func dependsOnTest(c client.Client, invConfig InventoryConfig, inventoryName, na
 			// InvAddTask start
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.InventoryAction,
-				Name:   "inventory-add-0",
-				Type:   event.Started,
+				Action:    event.InventoryAction,
+				GroupName: "inventory-add-0",
+				Type:      event.Started,
 			},
 		},
 		{
 			// InvAddTask finished
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.InventoryAction,
-				Name:   "inventory-add-0",
-				Type:   event.Finished,
+				Action:    event.InventoryAction,
+				GroupName: "inventory-add-0",
+				Type:      event.Finished,
 			},
 		},
 		{
 			// ApplyTask start
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.ApplyAction,
-				Name:   "apply-0",
-				Type:   event.Started,
+				Action:    event.ApplyAction,
+				GroupName: "apply-0",
+				Type:      event.Started,
 			},
 		},
 		{
 			// Apply Pod2 first
 			EventType: event.ApplyType,
 			ApplyEvent: &testutil.ExpApplyEvent{
+				GroupName:  "apply-0",
 				Operation:  event.Created,
 				Identifier: object.UnstructuredToObjMetaOrDie(withNamespace(manifestToUnstructured(pod2), namespaceName)),
 				Error:      nil,
@@ -82,42 +83,43 @@ func dependsOnTest(c client.Client, invConfig InventoryConfig, inventoryName, na
 			// ApplyTask finished
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.ApplyAction,
-				Name:   "apply-0",
-				Type:   event.Finished,
+				Action:    event.ApplyAction,
+				GroupName: "apply-0",
+				Type:      event.Finished,
 			},
 		},
 		{
 			// WaitTask start
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.WaitAction,
-				Name:   "wait-0",
-				Type:   event.Started,
+				Action:    event.WaitAction,
+				GroupName: "wait-0",
+				Type:      event.Started,
 			},
 		},
 		{
 			// WaitTask finished
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.WaitAction,
-				Name:   "wait-0",
-				Type:   event.Finished,
+				Action:    event.WaitAction,
+				GroupName: "wait-0",
+				Type:      event.Finished,
 			},
 		},
 		{
 			// ApplyTask start
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.ApplyAction,
-				Name:   "apply-1",
-				Type:   event.Started,
+				Action:    event.ApplyAction,
+				GroupName: "apply-1",
+				Type:      event.Started,
 			},
 		},
 		{
 			// Apply pod3 second
 			EventType: event.ApplyType,
 			ApplyEvent: &testutil.ExpApplyEvent{
+				GroupName:  "apply-1",
 				Operation:  event.Created,
 				Identifier: object.UnstructuredToObjMetaOrDie(withNamespace(manifestToUnstructured(pod3), namespaceName)),
 				Error:      nil,
@@ -127,42 +129,43 @@ func dependsOnTest(c client.Client, invConfig InventoryConfig, inventoryName, na
 			// ApplyTask finished
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.ApplyAction,
-				Name:   "apply-1",
-				Type:   event.Finished,
+				Action:    event.ApplyAction,
+				GroupName: "apply-1",
+				Type:      event.Finished,
 			},
 		},
 		{
 			// WaitTask start
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.WaitAction,
-				Name:   "wait-1",
-				Type:   event.Started,
+				Action:    event.WaitAction,
+				GroupName: "wait-1",
+				Type:      event.Started,
 			},
 		},
 		{
 			// WaitTask finished
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.WaitAction,
-				Name:   "wait-1",
-				Type:   event.Finished,
+				Action:    event.WaitAction,
+				GroupName: "wait-1",
+				Type:      event.Finished,
 			},
 		},
 		{
 			// ApplyTask start
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.ApplyAction,
-				Name:   "apply-2",
-				Type:   event.Started,
+				Action:    event.ApplyAction,
+				GroupName: "apply-2",
+				Type:      event.Started,
 			},
 		},
 		{
 			// Apply pod1 third
 			EventType: event.ApplyType,
 			ApplyEvent: &testutil.ExpApplyEvent{
+				GroupName:  "apply-2",
 				Operation:  event.Created,
 				Identifier: object.UnstructuredToObjMetaOrDie(withNamespace(manifestToUnstructured(pod1), namespaceName)),
 				Error:      nil,
@@ -172,45 +175,45 @@ func dependsOnTest(c client.Client, invConfig InventoryConfig, inventoryName, na
 			// ApplyTask finished
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.ApplyAction,
-				Name:   "apply-2",
-				Type:   event.Finished,
+				Action:    event.ApplyAction,
+				GroupName: "apply-2",
+				Type:      event.Finished,
 			},
 		},
 		{
 			// WaitTask start
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.WaitAction,
-				Name:   "wait-2",
-				Type:   event.Started,
+				Action:    event.WaitAction,
+				GroupName: "wait-2",
+				Type:      event.Started,
 			},
 		},
 		{
 			// WaitTask finished
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.WaitAction,
-				Name:   "wait-2",
-				Type:   event.Finished,
+				Action:    event.WaitAction,
+				GroupName: "wait-2",
+				Type:      event.Finished,
 			},
 		},
 		{
 			// InvSetTask start
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.InventoryAction,
-				Name:   "inventory-set-0",
-				Type:   event.Started,
+				Action:    event.InventoryAction,
+				GroupName: "inventory-set-0",
+				Type:      event.Started,
 			},
 		},
 		{
 			// InvSetTask finished
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.InventoryAction,
-				Name:   "inventory-set-0",
-				Type:   event.Finished,
+				Action:    event.InventoryAction,
+				GroupName: "inventory-set-0",
+				Type:      event.Finished,
 			},
 		},
 	}
@@ -252,15 +255,16 @@ func dependsOnTest(c client.Client, invConfig InventoryConfig, inventoryName, na
 			// PruneTask start
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.DeleteAction,
-				Name:   "prune-0",
-				Type:   event.Started,
+				Action:    event.DeleteAction,
+				GroupName: "prune-0",
+				Type:      event.Started,
 			},
 		},
 		{
 			// Delete pod1 first
 			EventType: event.DeleteType,
 			DeleteEvent: &testutil.ExpDeleteEvent{
+				GroupName:  "prune-0",
 				Operation:  event.Deleted,
 				Identifier: object.UnstructuredToObjMetaOrDie(withNamespace(manifestToUnstructured(pod1), namespaceName)),
 				Error:      nil,
@@ -270,42 +274,43 @@ func dependsOnTest(c client.Client, invConfig InventoryConfig, inventoryName, na
 			// PruneTask finished
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.DeleteAction,
-				Name:   "prune-0",
-				Type:   event.Finished,
+				Action:    event.DeleteAction,
+				GroupName: "prune-0",
+				Type:      event.Finished,
 			},
 		},
 		{
 			// WaitTask start
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.WaitAction,
-				Name:   "wait-0",
-				Type:   event.Started,
+				Action:    event.WaitAction,
+				GroupName: "wait-0",
+				Type:      event.Started,
 			},
 		},
 		{
 			// WaitTask finished
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.WaitAction,
-				Name:   "wait-0",
-				Type:   event.Finished,
+				Action:    event.WaitAction,
+				GroupName: "wait-0",
+				Type:      event.Finished,
 			},
 		},
 		{
 			// PruneTask start
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.DeleteAction,
-				Name:   "prune-1",
-				Type:   event.Started,
+				Action:    event.DeleteAction,
+				GroupName: "prune-1",
+				Type:      event.Started,
 			},
 		},
 		{
 			// Delete pod3 second
 			EventType: event.DeleteType,
 			DeleteEvent: &testutil.ExpDeleteEvent{
+				GroupName:  "prune-1",
 				Operation:  event.Deleted,
 				Identifier: object.UnstructuredToObjMetaOrDie(withNamespace(manifestToUnstructured(pod3), namespaceName)),
 				Error:      nil,
@@ -315,42 +320,43 @@ func dependsOnTest(c client.Client, invConfig InventoryConfig, inventoryName, na
 			// PruneTask finished
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.DeleteAction,
-				Name:   "prune-1",
-				Type:   event.Finished,
+				Action:    event.DeleteAction,
+				GroupName: "prune-1",
+				Type:      event.Finished,
 			},
 		},
 		{
 			// WaitTask start
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.WaitAction,
-				Name:   "wait-1",
-				Type:   event.Started,
+				Action:    event.WaitAction,
+				GroupName: "wait-1",
+				Type:      event.Started,
 			},
 		},
 		{
 			// WaitTask finished
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.WaitAction,
-				Name:   "wait-1",
-				Type:   event.Finished,
+				Action:    event.WaitAction,
+				GroupName: "wait-1",
+				Type:      event.Finished,
 			},
 		},
 		{
 			// PruneTask start
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.DeleteAction,
-				Name:   "prune-2",
-				Type:   event.Started,
+				Action:    event.DeleteAction,
+				GroupName: "prune-2",
+				Type:      event.Started,
 			},
 		},
 		{
 			// Delete pod2 third
 			EventType: event.DeleteType,
 			DeleteEvent: &testutil.ExpDeleteEvent{
+				GroupName:  "prune-2",
 				Operation:  event.Deleted,
 				Identifier: object.UnstructuredToObjMetaOrDie(withNamespace(manifestToUnstructured(pod2), namespaceName)),
 				Error:      nil,
@@ -360,45 +366,45 @@ func dependsOnTest(c client.Client, invConfig InventoryConfig, inventoryName, na
 			// PruneTask finished
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.DeleteAction,
-				Name:   "prune-2",
-				Type:   event.Finished,
+				Action:    event.DeleteAction,
+				GroupName: "prune-2",
+				Type:      event.Finished,
 			},
 		},
 		{
 			// WaitTask start
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.WaitAction,
-				Name:   "wait-2",
-				Type:   event.Started,
+				Action:    event.WaitAction,
+				GroupName: "wait-2",
+				Type:      event.Started,
 			},
 		},
 		{
 			// WaitTask finished
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.WaitAction,
-				Name:   "wait-2",
-				Type:   event.Finished,
+				Action:    event.WaitAction,
+				GroupName: "wait-2",
+				Type:      event.Finished,
 			},
 		},
 		{
 			// DeleteInvTask start
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.InventoryAction,
-				Name:   "delete-inventory-0",
-				Type:   event.Started,
+				Action:    event.InventoryAction,
+				GroupName: "delete-inventory-0",
+				Type:      event.Started,
 			},
 		},
 		{
 			// DeleteInvTask finished
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.InventoryAction,
-				Name:   "delete-inventory-0",
-				Type:   event.Finished,
+				Action:    event.InventoryAction,
+				GroupName: "delete-inventory-0",
+				Type:      event.Finished,
 			},
 		},
 	}

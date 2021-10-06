@@ -30,12 +30,13 @@ type ExpInitEvent struct {
 }
 
 type ExpActionGroupEvent struct {
-	Name   string
-	Action event.ResourceAction
-	Type   event.ActionGroupEventType
+	GroupName string
+	Action    event.ResourceAction
+	Type      event.ActionGroupEventType
 }
 
 type ExpApplyEvent struct {
+	GroupName  string
 	Operation  event.ApplyEventOperation
 	Identifier object.ObjMetadata
 	Error      error
@@ -48,12 +49,14 @@ type ExpStatusEvent struct {
 }
 
 type ExpPruneEvent struct {
+	GroupName  string
 	Operation  event.PruneEventOperation
 	Identifier object.ObjMetadata
 	Error      error
 }
 
 type ExpDeleteEvent struct {
+	GroupName  string
 	Operation  event.DeleteEventOperation
 	Identifier object.ObjMetadata
 	Error      error
@@ -97,7 +100,7 @@ func isMatch(ee ExpEvent, e event.Event) bool {
 
 		age := e.ActionGroupEvent
 
-		if agee.Name != age.GroupName {
+		if agee.GroupName != age.GroupName {
 			return false
 		}
 
@@ -118,6 +121,12 @@ func isMatch(ee ExpEvent, e event.Event) bool {
 
 		if aee.Identifier != object.NilObjMetadata {
 			if aee.Identifier != ae.Identifier {
+				return false
+			}
+		}
+
+		if aee.GroupName != "" {
+			if aee.GroupName != ae.GroupName {
 				return false
 			}
 		}
@@ -164,6 +173,12 @@ func isMatch(ee ExpEvent, e event.Event) bool {
 			}
 		}
 
+		if pee.GroupName != "" {
+			if pee.GroupName != pe.GroupName {
+				return false
+			}
+		}
+
 		if pee.Operation != pe.Operation {
 			return false
 		}
@@ -182,6 +197,12 @@ func isMatch(ee ExpEvent, e event.Event) bool {
 
 		if dee.Identifier != object.NilObjMetadata {
 			if dee.Identifier != de.Identifier {
+				return false
+			}
+		}
+
+		if dee.GroupName != "" {
+			if dee.GroupName != de.GroupName {
 				return false
 			}
 		}
@@ -221,9 +242,9 @@ func EventToExpEvent(e event.Event) ExpEvent {
 		return ExpEvent{
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &ExpActionGroupEvent{
-				Name:   e.ActionGroupEvent.GroupName,
-				Action: e.ActionGroupEvent.Action,
-				Type:   e.ActionGroupEvent.Type,
+				GroupName: e.ActionGroupEvent.GroupName,
+				Action:    e.ActionGroupEvent.Action,
+				Type:      e.ActionGroupEvent.Type,
 			},
 		}
 
@@ -231,6 +252,7 @@ func EventToExpEvent(e event.Event) ExpEvent {
 		return ExpEvent{
 			EventType: event.ApplyType,
 			ApplyEvent: &ExpApplyEvent{
+				GroupName:  e.ApplyEvent.GroupName,
 				Identifier: e.ApplyEvent.Identifier,
 				Operation:  e.ApplyEvent.Operation,
 				Error:      e.ApplyEvent.Error,
@@ -251,6 +273,7 @@ func EventToExpEvent(e event.Event) ExpEvent {
 		return ExpEvent{
 			EventType: event.PruneType,
 			PruneEvent: &ExpPruneEvent{
+				GroupName:  e.PruneEvent.GroupName,
 				Identifier: e.PruneEvent.Identifier,
 				Operation:  e.PruneEvent.Operation,
 				Error:      e.PruneEvent.Error,
@@ -261,6 +284,7 @@ func EventToExpEvent(e event.Event) ExpEvent {
 		return ExpEvent{
 			EventType: event.DeleteType,
 			DeleteEvent: &ExpDeleteEvent{
+				GroupName:  e.DeleteEvent.GroupName,
 				Identifier: e.DeleteEvent.Identifier,
 				Operation:  e.DeleteEvent.Operation,
 				Error:      e.DeleteEvent.Error,
@@ -281,4 +305,45 @@ func RemoveEqualEvents(in []ExpEvent, expected ExpEvent) ([]ExpEvent, int) {
 		}
 	}
 	return in, matches
+}
+
+// GroupedEventsByID implements sort.Interface for []ExpEvent based on
+// the serialized ObjMetadata of Apply, Prune, and Delete events within the same
+// task group.
+// This makes testing events easier, because apply/prune/delete order is
+// non-deterministic within each task group.
+// This is only needed if you expect to have multiple apply/prune/delete events
+// in the same task group.
+type GroupedEventsByID []ExpEvent
+
+func (ape GroupedEventsByID) Len() int      { return len(ape) }
+func (ape GroupedEventsByID) Swap(i, j int) { ape[i], ape[j] = ape[j], ape[i] }
+func (ape GroupedEventsByID) Less(i, j int) bool {
+	if ape[i].EventType != ape[j].EventType {
+		// don't change order if not the same type
+		return false
+	}
+	switch ape[i].EventType {
+	case event.ApplyType:
+		if ape[i].ApplyEvent.GroupName != ape[j].ApplyEvent.GroupName {
+			// don't change order if not the same task group
+			return false
+		}
+		return ape[i].ApplyEvent.Identifier.String() < ape[j].ApplyEvent.Identifier.String()
+	case event.PruneType:
+		if ape[i].PruneEvent.GroupName != ape[j].PruneEvent.GroupName {
+			// don't change order if not the same task group
+			return false
+		}
+		return ape[i].PruneEvent.Identifier.String() < ape[j].PruneEvent.Identifier.String()
+	case event.DeleteType:
+		if ape[i].DeleteEvent.GroupName != ape[j].DeleteEvent.GroupName {
+			// don't change order if not the same task group
+			return false
+		}
+		return ape[i].DeleteEvent.Identifier.String() < ape[j].DeleteEvent.Identifier.String()
+	default:
+		// don't change order if not ApplyType, PruneType, or DeleteType
+		return false
+	}
 }

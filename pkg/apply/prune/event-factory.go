@@ -20,21 +20,28 @@ type EventFactory interface {
 
 // CreateEventFactory returns the correct concrete version of
 // an EventFactory based on the passed boolean.
-func CreateEventFactory(isDelete bool) EventFactory {
+func CreateEventFactory(isDelete bool, groupName string) EventFactory {
 	if isDelete {
-		return DeleteEventFactory{}
+		return DeleteEventFactory{
+			groupName: groupName,
+		}
 	}
-	return PruneEventFactory{}
+	return PruneEventFactory{
+		groupName: groupName,
+	}
 }
 
 // PruneEventFactory implements EventFactory interface as a concrete
 // representation of for prune events.
-type PruneEventFactory struct{}
+type PruneEventFactory struct {
+	groupName string
+}
 
 func (pef PruneEventFactory) CreateSuccessEvent(obj *unstructured.Unstructured) event.Event {
 	return event.Event{
 		Type: event.PruneType,
 		PruneEvent: event.PruneEvent{
+			GroupName:  pef.groupName,
 			Operation:  event.Pruned,
 			Object:     obj,
 			Identifier: object.UnstructuredToObjMetaOrDie(obj),
@@ -46,6 +53,7 @@ func (pef PruneEventFactory) CreateSkippedEvent(obj *unstructured.Unstructured, 
 	return event.Event{
 		Type: event.PruneType,
 		PruneEvent: event.PruneEvent{
+			GroupName:  pef.groupName,
 			Operation:  event.PruneSkipped,
 			Object:     obj,
 			Identifier: object.UnstructuredToObjMetaOrDie(obj),
@@ -58,6 +66,7 @@ func (pef PruneEventFactory) CreateFailedEvent(id object.ObjMetadata, err error)
 	return event.Event{
 		Type: event.PruneType,
 		PruneEvent: event.PruneEvent{
+			GroupName:  pef.groupName,
 			Identifier: id,
 			Error:      err,
 		},
@@ -66,12 +75,15 @@ func (pef PruneEventFactory) CreateFailedEvent(id object.ObjMetadata, err error)
 
 // DeleteEventFactory implements EventFactory interface as a concrete
 // representation of for delete events.
-type DeleteEventFactory struct{}
+type DeleteEventFactory struct {
+	groupName string
+}
 
 func (def DeleteEventFactory) CreateSuccessEvent(obj *unstructured.Unstructured) event.Event {
 	return event.Event{
 		Type: event.DeleteType,
 		DeleteEvent: event.DeleteEvent{
+			GroupName:  def.groupName,
 			Operation:  event.Deleted,
 			Object:     obj,
 			Identifier: object.UnstructuredToObjMetaOrDie(obj),
@@ -83,6 +95,7 @@ func (def DeleteEventFactory) CreateSkippedEvent(obj *unstructured.Unstructured,
 	return event.Event{
 		Type: event.DeleteType,
 		DeleteEvent: event.DeleteEvent{
+			GroupName:  def.groupName,
 			Operation:  event.DeleteSkipped,
 			Object:     obj,
 			Identifier: object.UnstructuredToObjMetaOrDie(obj),
@@ -95,6 +108,7 @@ func (def DeleteEventFactory) CreateFailedEvent(id object.ObjMetadata, err error
 	return event.Event{
 		Type: event.DeleteType,
 		DeleteEvent: event.DeleteEvent{
+			GroupName:  def.groupName,
 			Identifier: id,
 			Error:      err,
 		},

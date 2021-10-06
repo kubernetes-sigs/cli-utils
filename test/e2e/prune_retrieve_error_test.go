@@ -44,33 +44,34 @@ func pruneRetrieveErrorTest(c client.Client, invConfig InventoryConfig, inventor
 			// InvAddTask start
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.InventoryAction,
-				Name:   "inventory-add-0",
-				Type:   event.Started,
+				Action:    event.InventoryAction,
+				GroupName: "inventory-add-0",
+				Type:      event.Started,
 			},
 		},
 		{
 			// InvAddTask finished
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.InventoryAction,
-				Name:   "inventory-add-0",
-				Type:   event.Finished,
+				Action:    event.InventoryAction,
+				GroupName: "inventory-add-0",
+				Type:      event.Finished,
 			},
 		},
 		{
 			// ApplyTask start
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.ApplyAction,
-				Name:   "apply-0",
-				Type:   event.Started,
+				Action:    event.ApplyAction,
+				GroupName: "apply-0",
+				Type:      event.Started,
 			},
 		},
 		{
 			// Create deployment
 			EventType: event.ApplyType,
 			ApplyEvent: &testutil.ExpApplyEvent{
+				GroupName:  "apply-0",
 				Operation:  event.Created,
 				Identifier: object.UnstructuredToObjMetaOrDie(withNamespace(manifestToUnstructured(pod1), namespaceName)),
 				Error:      nil,
@@ -80,9 +81,9 @@ func pruneRetrieveErrorTest(c client.Client, invConfig InventoryConfig, inventor
 			// ApplyTask finished
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.ApplyAction,
-				Name:   "apply-0",
-				Type:   event.Finished,
+				Action:    event.ApplyAction,
+				GroupName: "apply-0",
+				Type:      event.Finished,
 			},
 		},
 		// TODO: Why no waiting???
@@ -108,18 +109,18 @@ func pruneRetrieveErrorTest(c client.Client, invConfig InventoryConfig, inventor
 			// InvSetTask start
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.InventoryAction,
-				Name:   "inventory-set-0",
-				Type:   event.Started,
+				Action:    event.InventoryAction,
+				GroupName: "inventory-set-0",
+				Type:      event.Started,
 			},
 		},
 		{
 			// InvSetTask finished
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.InventoryAction,
-				Name:   "inventory-set-0",
-				Type:   event.Finished,
+				Action:    event.InventoryAction,
+				GroupName: "inventory-set-0",
+				Type:      event.Finished,
 			},
 		},
 	}
@@ -155,33 +156,34 @@ func pruneRetrieveErrorTest(c client.Client, invConfig InventoryConfig, inventor
 			// InvAddTask start
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.InventoryAction,
-				Name:   "inventory-add-0",
-				Type:   event.Started,
+				Action:    event.InventoryAction,
+				GroupName: "inventory-add-0",
+				Type:      event.Started,
 			},
 		},
 		{
 			// InvAddTask finished
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.InventoryAction,
-				Name:   "inventory-add-0",
-				Type:   event.Finished,
+				Action:    event.InventoryAction,
+				GroupName: "inventory-add-0",
+				Type:      event.Finished,
 			},
 		},
 		{
 			// ApplyTask start
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.ApplyAction,
-				Name:   "apply-0",
-				Type:   event.Started,
+				Action:    event.ApplyAction,
+				GroupName: "apply-0",
+				Type:      event.Started,
 			},
 		},
 		{
 			// Create pod2
 			EventType: event.ApplyType,
 			ApplyEvent: &testutil.ExpApplyEvent{
+				GroupName:  "apply-0",
 				Operation:  event.Created,
 				Identifier: object.UnstructuredToObjMetaOrDie(withNamespace(manifestToUnstructured(pod2), namespaceName)),
 				Error:      nil,
@@ -191,9 +193,9 @@ func pruneRetrieveErrorTest(c client.Client, invConfig InventoryConfig, inventor
 			// ApplyTask finished
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.ApplyAction,
-				Name:   "apply-0",
-				Type:   event.Finished,
+				Action:    event.ApplyAction,
+				GroupName: "apply-0",
+				Type:      event.Finished,
 			},
 		},
 		// Don't prune pod1, it should already be deleted.
@@ -220,18 +222,18 @@ func pruneRetrieveErrorTest(c client.Client, invConfig InventoryConfig, inventor
 			// InvSetTask start
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.InventoryAction,
-				Name:   "inventory-set-0",
-				Type:   event.Started,
+				Action:    event.InventoryAction,
+				GroupName: "inventory-set-0",
+				Type:      event.Started,
 			},
 		},
 		{
 			// InvSetTask finished
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.InventoryAction,
-				Name:   "inventory-set-0",
-				Type:   event.Finished,
+				Action:    event.InventoryAction,
+				GroupName: "inventory-set-0",
+				Type:      event.Finished,
 			},
 		},
 	}
@@ -264,16 +266,16 @@ func pruneRetrieveErrorTest(c client.Client, invConfig InventoryConfig, inventor
 			// PruneTask start
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.DeleteAction,
-				Name:   "prune-0",
-				Type:   event.Started,
+				Action:    event.DeleteAction,
+				GroupName: "prune-0",
+				Type:      event.Started,
 			},
 		},
 		{
 			// Delete pod2
 			EventType: event.DeleteType,
 			DeleteEvent: &testutil.ExpDeleteEvent{
-				// TODO: this delete is flakey (sometimes skipped), because there's no WaitTask after creation
+				GroupName:  "prune-0",
 				Operation:  event.Deleted,
 				Identifier: object.UnstructuredToObjMetaOrDie(withNamespace(manifestToUnstructured(pod2), namespaceName)),
 				Error:      nil,
@@ -283,9 +285,9 @@ func pruneRetrieveErrorTest(c client.Client, invConfig InventoryConfig, inventor
 			// PruneTask finished
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.DeleteAction,
-				Name:   "prune-0",
-				Type:   event.Finished,
+				Action:    event.DeleteAction,
+				GroupName: "prune-0",
+				Type:      event.Finished,
 			},
 		},
 		// TODO: Why is waiting skipped on destroy?
@@ -311,18 +313,18 @@ func pruneRetrieveErrorTest(c client.Client, invConfig InventoryConfig, inventor
 			// DeleteInvTask start
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.InventoryAction,
-				Name:   "delete-inventory-0",
-				Type:   event.Started,
+				Action:    event.InventoryAction,
+				GroupName: "delete-inventory-0",
+				Type:      event.Started,
 			},
 		},
 		{
 			// DeleteInvTask finished
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.InventoryAction,
-				Name:   "delete-inventory-0",
-				Type:   event.Finished,
+				Action:    event.InventoryAction,
+				GroupName: "delete-inventory-0",
+				Type:      event.Finished,
 			},
 		},
 	}
