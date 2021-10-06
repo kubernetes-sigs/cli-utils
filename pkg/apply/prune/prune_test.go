@@ -11,6 +11,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -109,6 +111,14 @@ var pdbDeleteFailure = &unstructured.Unstructured{
 		},
 	},
 }
+
+var crontabCRManifest = `
+apiVersion: "stable.example.com/v1"
+kind: CronTab
+metadata:
+  name: cron-tab-01
+  namespace: test-namespace
+`
 
 // Returns a inventory object with the inventory set from
 // the passed "children".
@@ -549,6 +559,11 @@ func TestGetPruneObjs(t *testing.T) {
 			prevInventory: []*unstructured.Unstructured{pod, pdb, namespace},
 			expectedObjs:  []*unstructured.Unstructured{pod, namespace},
 		},
+		"skip pruning objects whose resource types are unrecognized by the cluster": {
+			localObjs:     []*unstructured.Unstructured{pdb},
+			prevInventory: []*unstructured.Unstructured{testutil.Unstructured(t, crontabCRManifest), pdb, namespace},
+			expectedObjs:  []*unstructured.Unstructured{namespace},
+		},
 		"local objs, inventory disjoint means inventory is pruned": {
 			localObjs:     []*unstructured.Unstructured{pdb},
 			prevInventory: []*unstructured.Unstructured{pod, namespace},
@@ -585,6 +600,40 @@ func TestGetPruneObjs(t *testing.T) {
 				t.Errorf("expected prune objects (%v), got (%v)", expectedIds, actualIds)
 			}
 		})
+	}
+}
+
+func TestGetObject_NoMatchError(t *testing.T) {
+	po := PruneOptions{
+		Client: fake.NewSimpleDynamicClient(scheme.Scheme, pod, namespace),
+		Mapper: testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme,
+			scheme.Scheme.PrioritizedVersionsAllGroups()...),
+	}
+	_, err := po.GetObject(testutil.ToIdentifier(t, crontabCRManifest))
+	if err == nil {
+		t.Fatalf("expected GetObject() to return a NoKindMatchError, got nil")
+	}
+	if !meta.IsNoMatchError(err) {
+		t.Fatalf("expected GetObject() to return a NoKindMatchError, got %v", err)
+	}
+}
+
+func TestGetObject_NotFoundError(t *testing.T) {
+	po := PruneOptions{
+		Client: fake.NewSimpleDynamicClient(scheme.Scheme, pod, namespace),
+		Mapper: testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme,
+			scheme.Scheme.PrioritizedVersionsAllGroups()...),
+	}
+	objMeta, err := object.UnstructuredToObjMeta(pdb)
+	if err != nil {
+		t.Fatalf("unexpected error %s returned", err)
+	}
+	_, err = po.GetObject(objMeta)
+	if err == nil {
+		t.Fatalf("expected GetObject() to return a NotFound error, got nil")
+	}
+	if !apierrors.IsNotFound(err) {
+		t.Fatalf("expected GetObject() to return a NotFound error, got %v", err)
 	}
 }
 
