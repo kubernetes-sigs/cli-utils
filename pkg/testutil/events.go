@@ -306,3 +306,44 @@ func RemoveEqualEvents(in []ExpEvent, expected ExpEvent) ([]ExpEvent, int) {
 	}
 	return in, matches
 }
+
+// GroupedEventsByID implements sort.Interface for []ExpEvent based on
+// the serialized ObjMetadata of Apply, Prune, and Delete events within the same
+// task group.
+// This makes testing events easier, because apply/prune/delete order is
+// non-deterministic within each task group.
+// This is only needed if you expect to have multiple apply/prune/delete events
+// in the same task group.
+type GroupedEventsByID []ExpEvent
+
+func (ape GroupedEventsByID) Len() int      { return len(ape) }
+func (ape GroupedEventsByID) Swap(i, j int) { ape[i], ape[j] = ape[j], ape[i] }
+func (ape GroupedEventsByID) Less(i, j int) bool {
+	if ape[i].EventType != ape[j].EventType {
+		// don't change order if not the same type
+		return false
+	}
+	switch ape[i].EventType {
+	case event.ApplyType:
+		if ape[i].ApplyEvent.GroupName != ape[j].ApplyEvent.GroupName {
+			// don't change order if not the same task group
+			return false
+		}
+		return ape[i].ApplyEvent.Identifier.String() < ape[j].ApplyEvent.Identifier.String()
+	case event.PruneType:
+		if ape[i].PruneEvent.GroupName != ape[j].PruneEvent.GroupName {
+			// don't change order if not the same task group
+			return false
+		}
+		return ape[i].PruneEvent.Identifier.String() < ape[j].PruneEvent.Identifier.String()
+	case event.DeleteType:
+		if ape[i].DeleteEvent.GroupName != ape[j].DeleteEvent.GroupName {
+			// don't change order if not the same task group
+			return false
+		}
+		return ape[i].DeleteEvent.Identifier.String() < ape[j].DeleteEvent.Identifier.String()
+	default:
+		// don't change order if not ApplyType, PruneType, or DeleteType
+		return false
+	}
+}

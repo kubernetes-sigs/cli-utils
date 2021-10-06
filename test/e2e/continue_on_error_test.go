@@ -6,6 +6,7 @@ package e2e
 import (
 	"context"
 	"errors"
+	"sort"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -133,7 +134,10 @@ func continueOnErrorTest(c client.Client, invConfig InventoryConfig, inventoryNa
 			},
 		},
 	}
-	Expect(testutil.EventsToExpEvents(applierEvents)).To(testutil.Equal(expEvents))
+	receivedEvents := testutil.EventsToExpEvents(applierEvents)
+	// sort to allow comparison of multiple ApplyTasks in the same task group
+	sort.Sort(testutil.GroupedEventsByID(receivedEvents))
+	Expect(receivedEvents).To(testutil.Equal(expEvents))
 
 	By("Verify pod1 created")
 	assertUnstructuredExists(c, withNamespace(manifestToUnstructured(pod1), namespaceName))
