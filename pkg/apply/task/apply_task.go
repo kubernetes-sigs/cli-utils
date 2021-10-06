@@ -85,16 +85,16 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 		// TODO: pipe Context through TaskContext
 		ctx := context.TODO()
 		objects := a.Objects
-		klog.V(2).Infof("apply task starting (%d objects)", len(objects))
+		klog.V(2).Infof("apply task starting (objects: %d, name: %q)", len(objects), a.Name())
 		// Create a new instance of the applyOptions interface and use it
 		// to apply the objects.
-		ao, err := applyOptionsFactoryFunc(taskContext.EventChannel(),
+		ao, err := applyOptionsFactoryFunc(a.Name(), taskContext.EventChannel(),
 			a.ServerSideOptions, a.DryRunStrategy, a.Factory)
 		if err != nil {
 			if klog.V(4).Enabled() {
 				klog.Errorf("error creating ApplyOptions (%s)--returning", err)
 			}
-			sendBatchApplyEvents(taskContext, objects, err)
+			a.sendBatchApplyEvents(taskContext, objects, err)
 			a.sendTaskResult(taskContext)
 			return
 		}
@@ -108,8 +108,10 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 					klog.Errorf("unable to convert obj to info for %s/%s (%s)--continue",
 						obj.GetNamespace(), obj.GetName(), err)
 				}
-				taskContext.EventChannel() <- createApplyFailedEvent(id,
-					applyerror.NewUnknownTypeError(err))
+				taskContext.EventChannel() <- a.createApplyFailedEvent(
+					id,
+					applyerror.NewUnknownTypeError(err),
+				)
 				taskContext.CaptureResourceFailure(id)
 				continue
 			}
@@ -125,13 +127,13 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 					if klog.V(5).Enabled() {
 						klog.Errorf("error during %s, (%s): %s", filter.Name(), id, filterErr)
 					}
-					taskContext.EventChannel() <- createApplyFailedEvent(id, filterErr)
+					taskContext.EventChannel() <- a.createApplyFailedEvent(id, filterErr)
 					taskContext.CaptureResourceFailure(id)
 					break
 				}
 				if filtered {
 					klog.V(4).Infof("apply filtered (filter: %q, resource: %q, reason: %q)", filter.Name(), id, reason)
-					taskContext.EventChannel() <- createApplyEvent(id, event.Unchanged, obj)
+					taskContext.EventChannel() <- a.createApplyEvent(id, event.Unchanged, obj)
 					taskContext.CaptureResourceFailure(id)
 					break
 				}
@@ -146,7 +148,7 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 				if klog.V(5).Enabled() {
 					klog.Errorf("error mutating: %w", err)
 				}
-				taskContext.EventChannel() <- createApplyFailedEvent(id, err)
+				taskContext.EventChannel() <- a.createApplyFailedEvent(id, err)
 				taskContext.CaptureResourceFailure(id)
 				continue
 			}
@@ -159,14 +161,16 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 				// Server-side Apply doesn't work with APIService before k8s 1.21
 				// https://github.com/kubernetes/kubernetes/issues/89264
 				// Thus APIService is handled specially using client-side apply.
-				err = clientSideApply(info, taskContext.EventChannel(), a.DryRunStrategy, a.Factory)
+				err = a.clientSideApply(info, taskContext.EventChannel())
 			}
 			if err != nil {
 				if klog.V(4).Enabled() {
 					klog.Errorf("error applying (%s/%s) %s", info.Namespace, info.Name, err)
 				}
-				taskContext.EventChannel() <- createApplyFailedEvent(id,
-					applyerror.NewApplyRunError(err))
+				taskContext.EventChannel() <- a.createApplyFailedEvent(
+					id,
+					applyerror.NewApplyRunError(err),
+				)
 				taskContext.CaptureResourceFailure(id)
 			} else if info.Object != nil {
 				acc, err := meta.Accessor(info.Object)
@@ -181,7 +185,7 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 	}()
 }
 
-func newApplyOptions(eventChannel chan event.Event, serverSideOptions common.ServerSideOptions,
+func newApplyOptions(taskName string, eventChannel chan event.Event, serverSideOptions common.ServerSideOptions,
 	strategy common.DryRunStrategy, factory util.Factory) (applyOptions, error) {
 	discovery, err := factory.ToDiscoveryClient()
 	if err != nil {
@@ -216,7 +220,8 @@ func newApplyOptions(eventChannel chan event.Event, serverSideOptions common.Ser
 		FieldManager:    serverSideOptions.FieldManager,
 		DryRunStrategy:  strategy.Strategy(),
 		ToPrinter: (&KubectlPrinterAdapter{
-			ch: eventChannel,
+			ch:        eventChannel,
+			groupName: taskName,
 		}).toPrinterFunc(),
 		DynamicClient:  dynamic,
 		DryRunVerifier: resource.NewDryRunVerifier(dynamic, discovery),
@@ -247,10 +252,11 @@ func (a *ApplyTask) mutate(ctx context.Context, obj *unstructured.Unstructured) 
 }
 
 // createApplyEvent is a helper function to package an apply event for a single resource.
-func createApplyEvent(id object.ObjMetadata, operation event.ApplyEventOperation, resource *unstructured.Unstructured) event.Event {
+func (a *ApplyTask) createApplyEvent(id object.ObjMetadata, operation event.ApplyEventOperation, resource *unstructured.Unstructured) event.Event {
 	return event.Event{
 		Type: event.ApplyType,
 		ApplyEvent: event.ApplyEvent{
+			GroupName:  a.Name(),
 			Identifier: id,
 			Operation:  operation,
 			Resource:   resource,
@@ -258,10 +264,11 @@ func createApplyEvent(id object.ObjMetadata, operation event.ApplyEventOperation
 	}
 }
 
-func createApplyFailedEvent(id object.ObjMetadata, err error) event.Event {
+func (a *ApplyTask) createApplyFailedEvent(id object.ObjMetadata, err error) event.Event {
 	return event.Event{
 		Type: event.ApplyType,
 		ApplyEvent: event.ApplyEvent{
+			GroupName:  a.Name(),
 			Identifier: id,
 			Error:      err,
 		},
@@ -270,11 +277,17 @@ func createApplyFailedEvent(id object.ObjMetadata, err error) event.Event {
 
 // sendBatchApplyEvents is a helper function to send out multiple apply events for
 // a list of resources when failed to initialize the apply process.
-func sendBatchApplyEvents(taskContext *taskrunner.TaskContext, objects []*unstructured.Unstructured, err error) {
+func (a *ApplyTask) sendBatchApplyEvents(
+	taskContext *taskrunner.TaskContext,
+	objects []*unstructured.Unstructured,
+	err error,
+) {
 	for _, obj := range objects {
 		id := object.UnstructuredToObjMetaOrDie(obj)
-		taskContext.EventChannel() <- createApplyFailedEvent(id,
-			applyerror.NewInitializeApplyOptionError(err))
+		taskContext.EventChannel() <- a.createApplyFailedEvent(
+			id,
+			applyerror.NewInitializeApplyOptionError(err),
+		)
 		taskContext.CaptureResourceFailure(id)
 	}
 }
@@ -290,8 +303,8 @@ func isStreamError(err error) bool {
 	return strings.Contains(err.Error(), "stream error: stream ID ")
 }
 
-func clientSideApply(info *resource.Info, eventChannel chan event.Event, strategy common.DryRunStrategy, factory util.Factory) error {
-	ao, err := applyOptionsFactoryFunc(eventChannel, common.ServerSideOptions{ServerSideApply: false}, strategy, factory)
+func (a *ApplyTask) clientSideApply(info *resource.Info, eventChannel chan event.Event) error {
+	ao, err := applyOptionsFactoryFunc(a.Name(), eventChannel, common.ServerSideOptions{ServerSideApply: false}, a.DryRunStrategy, a.Factory)
 	if err != nil {
 		return err
 	}

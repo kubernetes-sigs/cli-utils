@@ -19,7 +19,8 @@ func TestKubectlPrinterAdapter(t *testing.T) {
 	operation := "serverside-applied"
 
 	adapter := KubectlPrinterAdapter{
-		ch: ch,
+		ch:        ch,
+		groupName: "test-0",
 	}
 
 	toPrinterFunc := adapter.toPrinterFunc()

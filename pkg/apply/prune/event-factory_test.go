@@ -34,7 +34,7 @@ func TestEventFactory(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			id, err := object.UnstructuredToObjMeta(tc.obj)
 			require.NoError(t, err)
-			eventFactory := CreateEventFactory(tc.destroy)
+			eventFactory := CreateEventFactory(tc.destroy, "task-0")
 			// Validate the "success" event"
 			actualEvent := eventFactory.CreateSuccessEvent(tc.obj)
 			if tc.expectedType != actualEvent.Type {

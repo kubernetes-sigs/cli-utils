@@ -41,33 +41,34 @@ func continueOnErrorTest(c client.Client, invConfig InventoryConfig, inventoryNa
 			// InvAddTask start
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.InventoryAction,
-				Name:   "inventory-add-0",
-				Type:   event.Started,
+				Action:    event.InventoryAction,
+				GroupName: "inventory-add-0",
+				Type:      event.Started,
 			},
 		},
 		{
 			// InvAddTask finished
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.InventoryAction,
-				Name:   "inventory-add-0",
-				Type:   event.Finished,
+				Action:    event.InventoryAction,
+				GroupName: "inventory-add-0",
+				Type:      event.Finished,
 			},
 		},
 		{
 			// ApplyTask start
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.ApplyAction,
-				Name:   "apply-0",
-				Type:   event.Started,
+				Action:    event.ApplyAction,
+				GroupName: "apply-0",
+				Type:      event.Started,
 			},
 		},
 		{
 			// Apply invalidCrd fails
 			EventType: event.ApplyType,
 			ApplyEvent: &testutil.ExpApplyEvent{
+				GroupName:  "apply-0",
 				Identifier: object.UnstructuredToObjMetaOrDie(manifestToUnstructured(invalidCrd)),
 				Error: testutil.EqualErrorType(
 					applyerror.NewApplyRunError(errors.New("failed to apply")),
@@ -78,6 +79,7 @@ func continueOnErrorTest(c client.Client, invConfig InventoryConfig, inventoryNa
 			// Create pod1
 			EventType: event.ApplyType,
 			ApplyEvent: &testutil.ExpApplyEvent{
+				GroupName:  "apply-0",
 				Operation:  event.Created,
 				Identifier: object.UnstructuredToObjMetaOrDie(withNamespace(manifestToUnstructured(pod1), namespaceName)),
 				Error:      nil,
@@ -87,9 +89,9 @@ func continueOnErrorTest(c client.Client, invConfig InventoryConfig, inventoryNa
 			// ApplyTask finished
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.ApplyAction,
-				Name:   "apply-0",
-				Type:   event.Finished,
+				Action:    event.ApplyAction,
+				GroupName: "apply-0",
+				Type:      event.Finished,
 			},
 		},
 		// Note: No WaitTask when apply fails
@@ -116,18 +118,18 @@ func continueOnErrorTest(c client.Client, invConfig InventoryConfig, inventoryNa
 			// InvSetTask start
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.InventoryAction,
-				Name:   "inventory-set-0",
-				Type:   event.Started,
+				Action:    event.InventoryAction,
+				GroupName: "inventory-set-0",
+				Type:      event.Started,
 			},
 		},
 		{
 			// InvSetTask finished
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.InventoryAction,
-				Name:   "inventory-set-0",
-				Type:   event.Finished,
+				Action:    event.InventoryAction,
+				GroupName: "inventory-set-0",
+				Type:      event.Finished,
 			},
 		},
 	}

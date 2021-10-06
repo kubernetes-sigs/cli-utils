@@ -20,7 +20,8 @@ import (
 // plugs into ApplyOptions as a ToPrinter function, but instead of
 // printing the info, it emits it as an event on the provided channel.
 type KubectlPrinterAdapter struct {
-	ch chan<- event.Event
+	ch        chan<- event.Event
+	groupName string
 }
 
 // resourcePrinterImpl implements the ResourcePrinter interface. But
@@ -28,6 +29,7 @@ type KubectlPrinterAdapter struct {
 type resourcePrinterImpl struct {
 	applyOperation event.ApplyEventOperation
 	ch             chan<- event.Event
+	groupName      string
 }
 
 // PrintObj takes the provided object and operation and emits
@@ -40,6 +42,7 @@ func (r *resourcePrinterImpl) PrintObj(obj runtime.Object, _ io.Writer) error {
 	r.ch <- event.Event{
 		Type: event.ApplyType,
 		ApplyEvent: event.ApplyEvent{
+			GroupName:  r.groupName,
 			Identifier: id,
 			Operation:  r.applyOperation,
 			Resource:   obj.(*unstructured.Unstructured),
@@ -58,6 +61,7 @@ func (p *KubectlPrinterAdapter) toPrinterFunc() toPrinterFunc {
 		return &resourcePrinterImpl{
 			ch:             p.ch,
 			applyOperation: applyOperation,
+			groupName:      p.groupName,
 		}, err
 	}
 }

@@ -401,7 +401,7 @@ func TestPrune(t *testing.T) {
 			err = func() error {
 				defer close(eventChannel)
 				// Run the prune and validate.
-				return po.Prune(tc.pruneObjs, tc.pruneFilters, taskContext, tc.options)
+				return po.Prune(tc.pruneObjs, tc.pruneFilters, taskContext, "test-0", tc.options)
 			}()
 
 			if err != nil {
@@ -498,7 +498,7 @@ func TestPruneWithErrors(t *testing.T) {
 					opts = defaultOptions
 				}
 				// Run the prune and validate.
-				return po.Prune(tc.pruneObjs, []filter.ValidationFilter{}, taskContext, opts)
+				return po.Prune(tc.pruneObjs, []filter.ValidationFilter{}, taskContext, "test-0", opts)
 			}()
 			if err != nil {
 				t.Fatalf("Unexpected error during Prune(): %#v", err)
@@ -626,7 +626,7 @@ func TestPrune_PropagationPolicy(t *testing.T) {
 			eventChannel := make(chan event.Event, 1)
 			resourceCache := cache.NewResourceCacheMap()
 			taskContext := taskrunner.NewTaskContext(eventChannel, resourceCache)
-			err := po.Prune([]*unstructured.Unstructured{pdb}, []filter.ValidationFilter{}, taskContext, Options{
+			err := po.Prune([]*unstructured.Unstructured{pdb}, []filter.ValidationFilter{}, taskContext, "test-0", Options{
 				PropagationPolicy: tc.propagationPolicy,
 			})
 			assert.NoError(t, err)

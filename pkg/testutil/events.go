@@ -30,12 +30,13 @@ type ExpInitEvent struct {
 }
 
 type ExpActionGroupEvent struct {
-	Name   string
-	Action event.ResourceAction
-	Type   event.ActionGroupEventType
+	GroupName string
+	Action    event.ResourceAction
+	Type      event.ActionGroupEventType
 }
 
 type ExpApplyEvent struct {
+	GroupName  string
 	Operation  event.ApplyEventOperation
 	Identifier object.ObjMetadata
 	Error      error
@@ -48,12 +49,14 @@ type ExpStatusEvent struct {
 }
 
 type ExpPruneEvent struct {
+	GroupName  string
 	Operation  event.PruneEventOperation
 	Identifier object.ObjMetadata
 	Error      error
 }
 
 type ExpDeleteEvent struct {
+	GroupName  string
 	Operation  event.DeleteEventOperation
 	Identifier object.ObjMetadata
 	Error      error
@@ -97,7 +100,7 @@ func isMatch(ee ExpEvent, e event.Event) bool {
 
 		age := e.ActionGroupEvent
 
-		if agee.Name != age.GroupName {
+		if agee.GroupName != age.GroupName {
 			return false
 		}
 
@@ -118,6 +121,12 @@ func isMatch(ee ExpEvent, e event.Event) bool {
 
 		if aee.Identifier != object.NilObjMetadata {
 			if aee.Identifier != ae.Identifier {
+				return false
+			}
+		}
+
+		if aee.GroupName != "" {
+			if aee.GroupName != ae.GroupName {
 				return false
 			}
 		}
@@ -164,6 +173,12 @@ func isMatch(ee ExpEvent, e event.Event) bool {
 			}
 		}
 
+		if pee.GroupName != "" {
+			if pee.GroupName != pe.GroupName {
+				return false
+			}
+		}
+
 		if pee.Operation != pe.Operation {
 			return false
 		}
@@ -182,6 +197,12 @@ func isMatch(ee ExpEvent, e event.Event) bool {
 
 		if dee.Identifier != object.NilObjMetadata {
 			if dee.Identifier != de.Identifier {
+				return false
+			}
+		}
+
+		if dee.GroupName != "" {
+			if dee.GroupName != de.GroupName {
 				return false
 			}
 		}
@@ -221,9 +242,9 @@ func EventToExpEvent(e event.Event) ExpEvent {
 		return ExpEvent{
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &ExpActionGroupEvent{
-				Name:   e.ActionGroupEvent.GroupName,
-				Action: e.ActionGroupEvent.Action,
-				Type:   e.ActionGroupEvent.Type,
+				GroupName: e.ActionGroupEvent.GroupName,
+				Action:    e.ActionGroupEvent.Action,
+				Type:      e.ActionGroupEvent.Type,
 			},
 		}
 
@@ -231,6 +252,7 @@ func EventToExpEvent(e event.Event) ExpEvent {
 		return ExpEvent{
 			EventType: event.ApplyType,
 			ApplyEvent: &ExpApplyEvent{
+				GroupName:  e.ApplyEvent.GroupName,
 				Identifier: e.ApplyEvent.Identifier,
 				Operation:  e.ApplyEvent.Operation,
 				Error:      e.ApplyEvent.Error,
@@ -251,6 +273,7 @@ func EventToExpEvent(e event.Event) ExpEvent {
 		return ExpEvent{
 			EventType: event.PruneType,
 			PruneEvent: &ExpPruneEvent{
+				GroupName:  e.PruneEvent.GroupName,
 				Identifier: e.PruneEvent.Identifier,
 				Operation:  e.PruneEvent.Operation,
 				Error:      e.PruneEvent.Error,
@@ -261,6 +284,7 @@ func EventToExpEvent(e event.Event) ExpEvent {
 		return ExpEvent{
 			EventType: event.DeleteType,
 			DeleteEvent: &ExpDeleteEvent{
+				GroupName:  e.DeleteEvent.GroupName,
 				Identifier: e.DeleteEvent.Identifier,
 				Operation:  e.DeleteEvent.Operation,
 				Error:      e.DeleteEvent.Error,

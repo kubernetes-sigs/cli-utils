@@ -59,33 +59,34 @@ func inventoryPolicyMustMatchTest(c client.Client, invConfig InventoryConfig, na
 			// InvAddTask start
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.InventoryAction,
-				Name:   "inventory-add-0",
-				Type:   event.Started,
+				Action:    event.InventoryAction,
+				GroupName: "inventory-add-0",
+				Type:      event.Started,
 			},
 		},
 		{
 			// InvAddTask finished
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.InventoryAction,
-				Name:   "inventory-add-0",
-				Type:   event.Finished,
+				Action:    event.InventoryAction,
+				GroupName: "inventory-add-0",
+				Type:      event.Finished,
 			},
 		},
 		{
 			// ApplyTask start
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.ApplyAction,
-				Name:   "apply-0",
-				Type:   event.Started,
+				Action:    event.ApplyAction,
+				GroupName: "apply-0",
+				Type:      event.Started,
 			},
 		},
 		{
 			// ApplyTask error: resource managed by another inventory
 			EventType: event.ApplyType,
 			ApplyEvent: &testutil.ExpApplyEvent{
+				GroupName:  "apply-0",
 				Identifier: object.UnstructuredToObjMetaOrDie(withNamespace(manifestToUnstructured(deployment1), namespaceName)),
 				Error: testutil.EqualErrorType(
 					inventory.NewInventoryOverlapError(errors.New("test")),
@@ -96,45 +97,45 @@ func inventoryPolicyMustMatchTest(c client.Client, invConfig InventoryConfig, na
 			// ApplyTask finished
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.ApplyAction,
-				Name:   "apply-0",
-				Type:   event.Finished,
+				Action:    event.ApplyAction,
+				GroupName: "apply-0",
+				Type:      event.Finished,
 			},
 		},
 		{
 			// WaitTask start
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.WaitAction,
-				Name:   "wait-0",
-				Type:   event.Started,
+				Action:    event.WaitAction,
+				GroupName: "wait-0",
+				Type:      event.Started,
 			},
 		},
 		{
 			// WaitTask finished
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.WaitAction,
-				Name:   "wait-0",
-				Type:   event.Finished,
+				Action:    event.WaitAction,
+				GroupName: "wait-0",
+				Type:      event.Finished,
 			},
 		},
 		{
 			// InvSetTask start
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.InventoryAction,
-				Name:   "inventory-set-0",
-				Type:   event.Started,
+				Action:    event.InventoryAction,
+				GroupName: "inventory-set-0",
+				Type:      event.Started,
 			},
 		},
 		{
 			// InvSetTask finished
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.InventoryAction,
-				Name:   "inventory-set-0",
-				Type:   event.Finished,
+				Action:    event.InventoryAction,
+				GroupName: "inventory-set-0",
+				Type:      event.Finished,
 			},
 		},
 	}
@@ -206,33 +207,34 @@ func inventoryPolicyAdoptIfNoInventoryTest(c client.Client, invConfig InventoryC
 			// InvAddTask start
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.InventoryAction,
-				Name:   "inventory-add-0",
-				Type:   event.Started,
+				Action:    event.InventoryAction,
+				GroupName: "inventory-add-0",
+				Type:      event.Started,
 			},
 		},
 		{
 			// InvAddTask finished
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.InventoryAction,
-				Name:   "inventory-add-0",
-				Type:   event.Finished,
+				Action:    event.InventoryAction,
+				GroupName: "inventory-add-0",
+				Type:      event.Finished,
 			},
 		},
 		{
 			// ApplyTask start
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.ApplyAction,
-				Name:   "apply-0",
-				Type:   event.Started,
+				Action:    event.ApplyAction,
+				GroupName: "apply-0",
+				Type:      event.Started,
 			},
 		},
 		{
 			// Apply deployment
 			EventType: event.ApplyType,
 			ApplyEvent: &testutil.ExpApplyEvent{
+				GroupName:  "apply-0",
 				Operation:  event.Configured,
 				Identifier: object.UnstructuredToObjMetaOrDie(withNamespace(manifestToUnstructured(deployment1), namespaceName)),
 				Error:      nil,
@@ -242,45 +244,45 @@ func inventoryPolicyAdoptIfNoInventoryTest(c client.Client, invConfig InventoryC
 			// ApplyTask finished
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.ApplyAction,
-				Name:   "apply-0",
-				Type:   event.Finished,
+				Action:    event.ApplyAction,
+				GroupName: "apply-0",
+				Type:      event.Finished,
 			},
 		},
 		{
 			// WaitTask start
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.WaitAction,
-				Name:   "wait-0",
-				Type:   event.Started,
+				Action:    event.WaitAction,
+				GroupName: "wait-0",
+				Type:      event.Started,
 			},
 		},
 		{
 			// WaitTask finished
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.WaitAction,
-				Name:   "wait-0",
-				Type:   event.Finished,
+				Action:    event.WaitAction,
+				GroupName: "wait-0",
+				Type:      event.Finished,
 			},
 		},
 		{
 			// InvSetTask start
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.InventoryAction,
-				Name:   "inventory-set-0",
-				Type:   event.Started,
+				Action:    event.InventoryAction,
+				GroupName: "inventory-set-0",
+				Type:      event.Started,
 			},
 		},
 		{
 			// InvSetTask finished
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.InventoryAction,
-				Name:   "inventory-set-0",
-				Type:   event.Finished,
+				Action:    event.InventoryAction,
+				GroupName: "inventory-set-0",
+				Type:      event.Finished,
 			},
 		},
 	}
@@ -367,33 +369,34 @@ func inventoryPolicyAdoptAllTest(c client.Client, invConfig InventoryConfig, nam
 			// InvAddTask start
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.InventoryAction,
-				Name:   "inventory-add-0",
-				Type:   event.Started,
+				Action:    event.InventoryAction,
+				GroupName: "inventory-add-0",
+				Type:      event.Started,
 			},
 		},
 		{
 			// InvAddTask finished
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.InventoryAction,
-				Name:   "inventory-add-0",
-				Type:   event.Finished,
+				Action:    event.InventoryAction,
+				GroupName: "inventory-add-0",
+				Type:      event.Finished,
 			},
 		},
 		{
 			// ApplyTask start
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.ApplyAction,
-				Name:   "apply-0",
-				Type:   event.Started,
+				Action:    event.ApplyAction,
+				GroupName: "apply-0",
+				Type:      event.Started,
 			},
 		},
 		{
 			// Apply deployment
 			EventType: event.ApplyType,
 			ApplyEvent: &testutil.ExpApplyEvent{
+				GroupName:  "apply-0",
 				Operation:  event.Configured,
 				Identifier: object.UnstructuredToObjMetaOrDie(withNamespace(manifestToUnstructured(deployment1), namespaceName)),
 				Error:      nil,
@@ -403,45 +406,45 @@ func inventoryPolicyAdoptAllTest(c client.Client, invConfig InventoryConfig, nam
 			// ApplyTask finished
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.ApplyAction,
-				Name:   "apply-0",
-				Type:   event.Finished,
+				Action:    event.ApplyAction,
+				GroupName: "apply-0",
+				Type:      event.Finished,
 			},
 		},
 		{
 			// WaitTask start
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.WaitAction,
-				Name:   "wait-0",
-				Type:   event.Started,
+				Action:    event.WaitAction,
+				GroupName: "wait-0",
+				Type:      event.Started,
 			},
 		},
 		{
 			// WaitTask finished
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.WaitAction,
-				Name:   "wait-0",
-				Type:   event.Finished,
+				Action:    event.WaitAction,
+				GroupName: "wait-0",
+				Type:      event.Finished,
 			},
 		},
 		{
 			// InvSetTask start
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.InventoryAction,
-				Name:   "inventory-set-0",
-				Type:   event.Started,
+				Action:    event.InventoryAction,
+				GroupName: "inventory-set-0",
+				Type:      event.Started,
 			},
 		},
 		{
 			// InvSetTask finished
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.InventoryAction,
-				Name:   "inventory-set-0",
-				Type:   event.Finished,
+				Action:    event.InventoryAction,
+				GroupName: "inventory-set-0",
+				Type:      event.Finished,
 			},
 		},
 	}

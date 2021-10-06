@@ -85,12 +85,15 @@ type Options struct {
 //   pruneObjs - objects to prune (delete)
 //   pruneFilters - list of filters for deletion permission
 //   taskContext - task for apply/prune
+//   taskName - name of the parent task group, for events
 //   o - options for dry-run
 func (po *PruneOptions) Prune(pruneObjs []*unstructured.Unstructured,
 	pruneFilters []filter.ValidationFilter,
 	taskContext *taskrunner.TaskContext,
-	o Options) error {
-	eventFactory := CreateEventFactory(o.Destroy)
+	taskName string,
+	o Options,
+) error {
+	eventFactory := CreateEventFactory(o.Destroy, taskName)
 	// Iterate through objects to prune (delete). If an object is not pruned
 	// and we need to keep it in the inventory, we must capture the prune failure.
 	for _, pruneObj := range pruneObjs {
