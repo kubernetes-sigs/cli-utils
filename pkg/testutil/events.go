@@ -17,6 +17,7 @@ type ExpEvent struct {
 	EventType event.Type
 
 	InitEvent        *ExpInitEvent
+	ErrorEvent       *ExpErrorEvent
 	ActionGroupEvent *ExpActionGroupEvent
 	ApplyEvent       *ExpApplyEvent
 	StatusEvent      *ExpStatusEvent
@@ -27,6 +28,10 @@ type ExpEvent struct {
 type ExpInitEvent struct {
 	// TODO: enable if we want to more thuroughly test InitEvents
 	// ActionGroups []event.ActionGroup
+}
+
+type ExpErrorEvent struct {
+	Err error
 }
 
 type ExpActionGroupEvent struct {
@@ -91,6 +96,20 @@ func isMatch(ee ExpEvent, e event.Event) bool {
 
 	// nolint:gocritic
 	switch e.Type {
+	case event.ErrorType:
+		a := ee.ErrorEvent
+
+		if a == nil {
+			return true
+		}
+
+		b := e.ErrorEvent
+
+		if a.Err != nil {
+			if !cmp.Equal(a.Err, b.Err, cmpopts.EquateErrors()) {
+				return false
+			}
+		}
 	case event.ActionGroupType:
 		agee := ee.ActionGroupEvent
 
@@ -235,6 +254,14 @@ func EventToExpEvent(e event.Event) ExpEvent {
 			InitEvent: &ExpInitEvent{
 				// TODO: enable if we want to more thuroughly test InitEvents
 				// ActionGroups: e.InitEvent.ActionGroups,
+			},
+		}
+
+	case event.ErrorType:
+		return ExpEvent{
+			EventType: event.ErrorType,
+			ErrorEvent: &ExpErrorEvent{
+				Err: e.ErrorEvent.Err,
 			},
 		}
 
