@@ -5,7 +5,6 @@ package task
 
 import (
 	"context"
-	"fmt"
 	"io/ioutil"
 	"strings"
 
@@ -78,7 +77,7 @@ func (a *ApplyTask) Action() event.ResourceAction {
 	return event.ApplyAction
 }
 
-func (a *ApplyTask) Identifiers() []object.ObjMetadata {
+func (a *ApplyTask) Identifiers() object.ObjMetadataSet {
 	return object.UnstructuredsToObjMetasOrDie(a.Objects)
 }
 
@@ -153,7 +152,7 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 			}
 
 			// Execute mutators, if any apply
-			err = a.mutate(ctx, obj)
+			err = mutator.Mutate(ctx, obj, a.Mutators)
 			if err != nil {
 				if klog.V(5).Enabled() {
 					klog.Errorf("error mutating: %w", err)
@@ -244,22 +243,6 @@ func (a *ApplyTask) sendTaskResult(taskContext *taskrunner.TaskContext) {
 
 // ClearTimeout is not supported by the ApplyTask.
 func (a *ApplyTask) ClearTimeout() {}
-
-// mutate loops through the mutator list and executes them on the object.
-func (a *ApplyTask) mutate(ctx context.Context, obj *unstructured.Unstructured) error {
-	id := object.UnstructuredToObjMetaOrDie(obj)
-	for _, mutator := range a.Mutators {
-		klog.V(6).Infof("apply mutator %s: %s", mutator.Name(), id)
-		mutated, reason, err := mutator.Mutate(ctx, obj)
-		if err != nil {
-			return fmt.Errorf("failed to mutate %q with %q: %w", id, mutator.Name(), err)
-		}
-		if mutated {
-			klog.V(4).Infof("resource mutated (mutator: %q, resource: %q, reason: %q)", mutator.Name(), id, reason)
-		}
-	}
-	return nil
-}
 
 // createApplyEvent is a helper function to package an apply event for a single resource.
 func (a *ApplyTask) createApplyEvent(id object.ObjMetadata, operation event.ApplyEventOperation, resource *unstructured.Unstructured) event.Event {

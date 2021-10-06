@@ -817,30 +817,6 @@ func TestAddCRDEdges(t *testing.T) {
 	}
 }
 
-// containsUnstructured returns true if the passed object is within the passed
-// slice of objects; false otherwise. Order is not important.
-func containsObj(objs []*unstructured.Unstructured, obj *unstructured.Unstructured) bool {
-	ids := object.UnstructuredsToObjMetasOrDie(objs)
-	id := object.UnstructuredToObjMetaOrDie(obj)
-	for _, i := range ids {
-		if i == id {
-			return true
-		}
-	}
-	return false
-}
-
-// containsUnstructured returns true if the passed object is within the passed
-// slice of objects; false otherwise. Order is not important.
-func containsObjMeta(ids []object.ObjMetadata, id object.ObjMetadata) bool {
-	for _, i := range ids {
-		if i == id {
-			return true
-		}
-	}
-	return false
-}
-
 // verifyEdges ensures the slices of directed Edges contain the same elements.
 // Order is not important.
 func verifyEdges(t *testing.T, expected []Edge, actual []Edge) {

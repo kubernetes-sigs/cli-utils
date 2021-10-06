@@ -451,45 +451,45 @@ func dependsOnWithExternalDependencyTest(c client.Client, invConfig InventoryCon
 			// InvAddTask start
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.InventoryAction,
-				Name:   "inventory-add-0",
-				Type:   event.Started,
+				Action:    event.InventoryAction,
+				GroupName: "inventory-add-0",
+				Type:      event.Started,
 			},
 		},
 		{
 			// InvAddTask finished
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.InventoryAction,
-				Name:   "inventory-add-0",
-				Type:   event.Finished,
+				Action:    event.InventoryAction,
+				GroupName: "inventory-add-0",
+				Type:      event.Finished,
 			},
 		},
 		{
 			// WaitTask start
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.WaitAction,
-				Name:   "wait-0",
-				Type:   event.Started,
+				Action:    event.WaitAction,
+				GroupName: "wait-0",
+				Type:      event.Started,
 			},
 		},
 		{
 			// WaitTask finished
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.WaitAction,
-				Name:   "wait-0",
-				Type:   event.Finished,
+				Action:    event.WaitAction,
+				GroupName: "wait-0",
+				Type:      event.Finished,
 			},
 		},
 		{
 			// ApplyTask start
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.ApplyAction,
-				Name:   "apply-0",
-				Type:   event.Started,
+				Action:    event.ApplyAction,
+				GroupName: "apply-0",
+				Type:      event.Started,
 			},
 		},
 		{
@@ -505,45 +505,45 @@ func dependsOnWithExternalDependencyTest(c client.Client, invConfig InventoryCon
 			// ApplyTask finished
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.ApplyAction,
-				Name:   "apply-0",
-				Type:   event.Finished,
+				Action:    event.ApplyAction,
+				GroupName: "apply-0",
+				Type:      event.Finished,
 			},
 		},
 		{
 			// WaitTask start
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.WaitAction,
-				Name:   "wait-1",
-				Type:   event.Started,
+				Action:    event.WaitAction,
+				GroupName: "wait-1",
+				Type:      event.Started,
 			},
 		},
 		{
 			// WaitTask finished
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.WaitAction,
-				Name:   "wait-1",
-				Type:   event.Finished,
+				Action:    event.WaitAction,
+				GroupName: "wait-1",
+				Type:      event.Finished,
 			},
 		},
 		{
 			// InvSetTask start
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.InventoryAction,
-				Name:   "inventory-set-0",
-				Type:   event.Started,
+				Action:    event.InventoryAction,
+				GroupName: "inventory-set-0",
+				Type:      event.Started,
 			},
 		},
 		{
 			// InvSetTask finished
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.InventoryAction,
-				Name:   "inventory-set-0",
-				Type:   event.Finished,
+				Action:    event.InventoryAction,
+				GroupName: "inventory-set-0",
+				Type:      event.Finished,
 			},
 		},
 	}
@@ -578,9 +578,9 @@ func dependsOnWithExternalDependencyTest(c client.Client, invConfig InventoryCon
 			// PruneTask start
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.DeleteAction,
-				Name:   "prune-0",
-				Type:   event.Started,
+				Action:    event.DeleteAction,
+				GroupName: "prune-0",
+				Type:      event.Started,
 			},
 		},
 		{
@@ -596,45 +596,45 @@ func dependsOnWithExternalDependencyTest(c client.Client, invConfig InventoryCon
 			// PruneTask finished
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.DeleteAction,
-				Name:   "prune-0",
-				Type:   event.Finished,
+				Action:    event.DeleteAction,
+				GroupName: "prune-0",
+				Type:      event.Finished,
 			},
 		},
 		{
 			// WaitTask start
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.WaitAction,
-				Name:   "wait-0",
-				Type:   event.Started,
+				Action:    event.WaitAction,
+				GroupName: "wait-0",
+				Type:      event.Started,
 			},
 		},
 		{
 			// WaitTask finished
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.WaitAction,
-				Name:   "wait-0",
-				Type:   event.Finished,
+				Action:    event.WaitAction,
+				GroupName: "wait-0",
+				Type:      event.Finished,
 			},
 		},
 		{
 			// DeleteInvTask start
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.InventoryAction,
-				Name:   "delete-inventory-0",
-				Type:   event.Started,
+				Action:    event.InventoryAction,
+				GroupName: "delete-inventory-0",
+				Type:      event.Started,
 			},
 		},
 		{
 			// DeleteInvTask finished
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
-				Action: event.InventoryAction,
-				Name:   "delete-inventory-0",
-				Type:   event.Finished,
+				Action:    event.InventoryAction,
+				GroupName: "delete-inventory-0",
+				Type:      event.Finished,
 			},
 		},
 	}

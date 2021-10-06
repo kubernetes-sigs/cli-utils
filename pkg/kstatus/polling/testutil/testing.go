@@ -14,6 +14,7 @@ import (
 )
 
 func YamlToUnstructured(t *testing.T, yml string) *unstructured.Unstructured {
+	t.Helper() // print the caller's file:line, instead of this func, on failure
 	m := make(map[string]interface{})
 	err := yaml.Unmarshal([]byte(yml), &m)
 	if err != nil {

@@ -41,7 +41,7 @@ var (
 
 func TestBaseRunner(t *testing.T) {
 	testCases := map[string]struct {
-		identifiers               []object.ObjMetadata
+		identifiers               object.ObjMetadataSet
 		tasks                     []Task
 		statusEventsDelay         time.Duration
 		statusEvents              []pollevent.Event
@@ -51,7 +51,7 @@ func TestBaseRunner(t *testing.T) {
 		expectedErrorMsg          string
 	}{
 		"wait task runs until condition is met": {
-			identifiers: []object.ObjMetadata{depID, cmID},
+			identifiers: object.ObjMetadataSet{depID, cmID},
 			tasks: []Task{
 				&fakeApplyTask{
 					resultEvent: event.Event{
@@ -59,7 +59,7 @@ func TestBaseRunner(t *testing.T) {
 					},
 					duration: 3 * time.Second,
 				},
-				NewWaitTask("wait", []object.ObjMetadata{depID, cmID}, AllCurrent,
+				NewWaitTask("wait", object.ObjMetadataSet{depID, cmID}, AllCurrent,
 					1*time.Minute, testutil.NewFakeRESTMapper()),
 				&fakeApplyTask{
 					resultEvent: event.Event{
@@ -99,9 +99,9 @@ func TestBaseRunner(t *testing.T) {
 			},
 		},
 		"wait task times out eventually (Unknown)": {
-			identifiers: []object.ObjMetadata{depID, cmID},
+			identifiers: object.ObjMetadataSet{depID, cmID},
 			tasks: []Task{
-				NewWaitTask("wait", []object.ObjMetadata{depID, cmID}, AllCurrent,
+				NewWaitTask("wait", object.ObjMetadataSet{depID, cmID}, AllCurrent,
 					2*time.Second, testutil.NewFakeRESTMapper()),
 			},
 			statusEventsDelay: time.Second,
@@ -128,9 +128,9 @@ func TestBaseRunner(t *testing.T) {
 			expectedErrorMsg: "timeout after 2 seconds waiting for 2 resources ([default_cm__ConfigMap default_dep_apps_Deployment]) to reach condition AllCurrent",
 		},
 		"wait task times out eventually (InProgress)": {
-			identifiers: []object.ObjMetadata{depID, cmID},
+			identifiers: object.ObjMetadataSet{depID, cmID},
 			tasks: []Task{
-				NewWaitTask("wait", []object.ObjMetadata{depID, cmID}, AllCurrent,
+				NewWaitTask("wait", object.ObjMetadataSet{depID, cmID}, AllCurrent,
 					2*time.Second, testutil.NewFakeRESTMapper()),
 			},
 			statusEventsDelay: time.Second,
@@ -163,7 +163,7 @@ func TestBaseRunner(t *testing.T) {
 			expectedErrorMsg: "timeout after 2 seconds waiting for 2 resources ([default_cm__ConfigMap default_dep_apps_Deployment]) to reach condition AllCurrent",
 		},
 		"tasks run in order": {
-			identifiers: []object.ObjMetadata{},
+			identifiers: object.ObjMetadataSet{},
 			tasks: []Task{
 				&fakeApplyTask{
 					resultEvent: event.Event{
@@ -279,7 +279,7 @@ func TestBaseRunnerCancellation(t *testing.T) {
 	testError := fmt.Errorf("this is a test error")
 
 	testCases := map[string]struct {
-		identifiers        []object.ObjMetadata
+		identifiers        object.ObjMetadataSet
 		tasks              []Task
 		statusEventsDelay  time.Duration
 		statusEvents       []pollevent.Event
@@ -288,7 +288,7 @@ func TestBaseRunnerCancellation(t *testing.T) {
 		expectedEventTypes []event.Type
 	}{
 		"cancellation while custom task is running": {
-			identifiers: []object.ObjMetadata{depID},
+			identifiers: object.ObjMetadataSet{depID},
 			tasks: []Task{
 				&fakeApplyTask{
 					resultEvent: event.Event{
@@ -311,9 +311,9 @@ func TestBaseRunnerCancellation(t *testing.T) {
 			},
 		},
 		"cancellation while wait task is running": {
-			identifiers: []object.ObjMetadata{depID},
+			identifiers: object.ObjMetadataSet{depID},
 			tasks: []Task{
-				NewWaitTask("wait", []object.ObjMetadata{depID}, AllCurrent,
+				NewWaitTask("wait", object.ObjMetadataSet{depID}, AllCurrent,
 					20*time.Second, testutil.NewFakeRESTMapper()),
 				&fakeApplyTask{
 					resultEvent: event.Event{
@@ -329,7 +329,7 @@ func TestBaseRunnerCancellation(t *testing.T) {
 			},
 		},
 		"error while custom task is running": {
-			identifiers: []object.ObjMetadata{depID},
+			identifiers: object.ObjMetadataSet{depID},
 			tasks: []Task{
 				&fakeApplyTask{
 					resultEvent: event.Event{
@@ -354,9 +354,9 @@ func TestBaseRunnerCancellation(t *testing.T) {
 			},
 		},
 		"error from status poller while wait task is running": {
-			identifiers: []object.ObjMetadata{depID},
+			identifiers: object.ObjMetadataSet{depID},
 			tasks: []Task{
-				NewWaitTask("wait", []object.ObjMetadata{depID}, AllCurrent,
+				NewWaitTask("wait", object.ObjMetadataSet{depID}, AllCurrent,
 					20*time.Second, testutil.NewFakeRESTMapper()),
 				&fakeApplyTask{
 					resultEvent: event.Event{
@@ -461,8 +461,8 @@ func (f *fakeApplyTask) Action() event.ResourceAction {
 	return event.ApplyAction
 }
 
-func (f *fakeApplyTask) Identifiers() []object.ObjMetadata {
-	return []object.ObjMetadata{}
+func (f *fakeApplyTask) Identifiers() object.ObjMetadataSet {
+	return object.ObjMetadataSet{}
 }
 
 func (f *fakeApplyTask) Start(taskContext *TaskContext) {

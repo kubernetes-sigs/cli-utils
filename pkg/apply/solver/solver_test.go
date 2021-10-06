@@ -122,7 +122,7 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 			expectedTasks: []taskrunner.Task{
 				&task.ApplyTask{
 					TaskName: "apply-0",
-					Objects: []*unstructured.Unstructured{
+					Objects: object.UnstructuredSet{
 						testutil.Unstructured(t, resources["deployment"]),
 					},
 					Mapper:         mapper,
@@ -142,7 +142,7 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 			expectedTasks: []taskrunner.Task{
 				&task.ApplyTask{
 					TaskName: "apply-0",
-					Objects: []*unstructured.Unstructured{
+					Objects: object.UnstructuredSet{
 						testutil.Unstructured(t, resources["deployment"]),
 						testutil.Unstructured(t, resources["secret"]),
 					},
@@ -151,7 +151,7 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 				},
 				taskrunner.NewWaitTask(
 					"wait-0",
-					[]object.ObjMetadata{
+					object.ObjMetadataSet{
 						testutil.ToIdentifier(t, resources["deployment"]),
 						testutil.ToIdentifier(t, resources["secret"]),
 					},
@@ -174,7 +174,7 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 			expectedTasks: []taskrunner.Task{
 				&task.ApplyTask{
 					TaskName: "apply-0",
-					Objects: []*unstructured.Unstructured{
+					Objects: object.UnstructuredSet{
 						testutil.Unstructured(t, resources["deployment"]),
 						testutil.Unstructured(t, resources["secret"]),
 					},
@@ -197,7 +197,7 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 			expectedTasks: []taskrunner.Task{
 				&task.ApplyTask{
 					TaskName: "apply-0",
-					Objects: []*unstructured.Unstructured{
+					Objects: object.UnstructuredSet{
 						testutil.Unstructured(t, resources["pod"]),
 						testutil.Unstructured(t, resources["default-pod"]),
 					},
@@ -216,7 +216,7 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 			expectedTasks: []taskrunner.Task{
 				&task.ApplyTask{
 					TaskName: "apply-0",
-					Objects: []*unstructured.Unstructured{
+					Objects: object.UnstructuredSet{
 						testutil.Unstructured(t, resources["crd"]),
 					},
 					Mapper:         mapper,
@@ -224,7 +224,7 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 				},
 				taskrunner.NewWaitTask(
 					"wait-0",
-					[]object.ObjMetadata{
+					object.ObjMetadataSet{
 						testutil.ToIdentifier(t, resources["crd"]),
 					},
 					taskrunner.AllCurrent,
@@ -232,7 +232,7 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 					testutil.NewFakeRESTMapper()),
 				&task.ApplyTask{
 					TaskName: "apply-1",
-					Objects: []*unstructured.Unstructured{
+					Objects: object.UnstructuredSet{
 						testutil.Unstructured(t, resources["crontab1"]),
 						testutil.Unstructured(t, resources["crontab2"]),
 					},
@@ -241,7 +241,7 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 				},
 				taskrunner.NewWaitTask(
 					"wait-1",
-					[]object.ObjMetadata{
+					object.ObjMetadataSet{
 						testutil.ToIdentifier(t, resources["crontab1"]),
 						testutil.ToIdentifier(t, resources["crontab2"]),
 					},
@@ -264,7 +264,7 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 			expectedTasks: []taskrunner.Task{
 				&task.ApplyTask{
 					TaskName: "apply-0",
-					Objects: []*unstructured.Unstructured{
+					Objects: object.UnstructuredSet{
 						testutil.Unstructured(t, resources["crd"]),
 					},
 					Mapper:         mapper,
@@ -272,7 +272,7 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 				},
 				&task.ApplyTask{
 					TaskName: "apply-1",
-					Objects: []*unstructured.Unstructured{
+					Objects: object.UnstructuredSet{
 						testutil.Unstructured(t, resources["crontab1"]),
 						testutil.Unstructured(t, resources["crontab2"]),
 					},
@@ -291,7 +291,7 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 			expectedTasks: []taskrunner.Task{
 				&task.ApplyTask{
 					TaskName: "apply-0",
-					Objects: []*unstructured.Unstructured{
+					Objects: object.UnstructuredSet{
 						testutil.Unstructured(t, resources["namespace"]),
 					},
 					Mapper:         mapper,
@@ -299,7 +299,7 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 				},
 				taskrunner.NewWaitTask(
 					"wait-0",
-					[]object.ObjMetadata{
+					object.ObjMetadataSet{
 						testutil.ToIdentifier(t, resources["namespace"]),
 					},
 					taskrunner.AllCurrent,
@@ -307,7 +307,7 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 					testutil.NewFakeRESTMapper()),
 				&task.ApplyTask{
 					TaskName: "apply-1",
-					Objects: []*unstructured.Unstructured{
+					Objects: object.UnstructuredSet{
 						testutil.Unstructured(t, resources["pod"]),
 						testutil.Unstructured(t, resources["secret"]),
 					},
@@ -316,7 +316,7 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 				},
 				taskrunner.NewWaitTask(
 					"wait-1",
-					[]object.ObjMetadata{
+					object.ObjMetadataSet{
 						testutil.ToIdentifier(t, resources["pod"]),
 						testutil.ToIdentifier(t, resources["secret"]),
 					},
@@ -335,7 +335,7 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 			expectedTasks: []taskrunner.Task{
 				&task.ApplyTask{
 					TaskName: "apply-0",
-					Objects: []*unstructured.Unstructured{
+					Objects: object.UnstructuredSet{
 						testutil.Unstructured(t, resources["secret"]),
 					},
 					Mapper:         mapper,
@@ -343,7 +343,7 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 				},
 				taskrunner.NewWaitTask(
 					"wait-0",
-					[]object.ObjMetadata{
+					object.ObjMetadataSet{
 						testutil.ToIdentifier(t, resources["secret"]),
 					},
 					taskrunner.AllCurrent,
@@ -351,7 +351,7 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 					testutil.NewFakeRESTMapper()),
 				&task.ApplyTask{
 					TaskName: "apply-1",
-					Objects: []*unstructured.Unstructured{
+					Objects: object.UnstructuredSet{
 						testutil.Unstructured(t, resources["deployment"],
 							testutil.AddDependsOn(t, testutil.ToIdentifier(t, resources["secret"]))),
 					},
@@ -360,7 +360,7 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 				},
 				taskrunner.NewWaitTask(
 					"wait-1",
-					[]object.ObjMetadata{
+					object.ObjMetadataSet{
 						testutil.ToIdentifier(t, resources["deployment"]),
 					},
 					taskrunner.AllCurrent,
@@ -377,7 +377,7 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 			expectedTasks: []taskrunner.Task{
 				taskrunner.NewWaitTask(
 					"wait-0",
-					[]object.ObjMetadata{
+					object.ObjMetadataSet{
 						testutil.ToIdentifier(t, resources["secret"]),
 					},
 					taskrunner.AllCurrent,
@@ -385,7 +385,7 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 					testutil.NewFakeRESTMapper()),
 				&task.ApplyTask{
 					TaskName: "apply-0",
-					Objects: []*unstructured.Unstructured{
+					Objects: object.UnstructuredSet{
 						testutil.Unstructured(t, resources["deployment"],
 							testutil.AddDependsOn(t, testutil.ToIdentifier(t, resources["secret"]))),
 					},
@@ -394,7 +394,7 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 				},
 				taskrunner.NewWaitTask(
 					"wait-1",
-					[]object.ObjMetadata{
+					object.ObjMetadataSet{
 						testutil.ToIdentifier(t, resources["deployment"]),
 					},
 					taskrunner.AllCurrent,
@@ -458,7 +458,7 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 			expectedTasks: []taskrunner.Task{
 				&task.PruneTask{
 					TaskName: "prune-0",
-					Objects: []*unstructured.Unstructured{
+					Objects: object.UnstructuredSet{
 						testutil.Unstructured(t, resources["default-pod"]),
 					},
 					PruneOptions:   &prune.PruneOptions{},
@@ -476,7 +476,7 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 			expectedTasks: []taskrunner.Task{
 				&task.PruneTask{
 					TaskName: "prune-0",
-					Objects: []*unstructured.Unstructured{
+					Objects: object.UnstructuredSet{
 						testutil.Unstructured(t, resources["default-pod"]),
 						testutil.Unstructured(t, resources["pod"]),
 					},
@@ -497,7 +497,7 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 			expectedTasks: []taskrunner.Task{
 				&task.PruneTask{
 					TaskName: "prune-0",
-					Objects: []*unstructured.Unstructured{
+					Objects: object.UnstructuredSet{
 						testutil.Unstructured(t, resources["pod"],
 							testutil.AddDependsOn(t, testutil.ToIdentifier(t, resources["secret"]))),
 					},
@@ -506,7 +506,7 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 				},
 				taskrunner.NewWaitTask(
 					"wait-0",
-					[]object.ObjMetadata{
+					object.ObjMetadataSet{
 						testutil.ToIdentifier(t, resources["pod"]),
 					},
 					taskrunner.AllNotFound,
@@ -514,7 +514,7 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 					testutil.NewFakeRESTMapper()),
 				&task.PruneTask{
 					TaskName: "prune-1",
-					Objects: []*unstructured.Unstructured{
+					Objects: object.UnstructuredSet{
 						testutil.Unstructured(t, resources["secret"]),
 					},
 					PruneOptions:   &prune.PruneOptions{},
@@ -522,7 +522,7 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 				},
 				taskrunner.NewWaitTask(
 					"wait-1",
-					[]object.ObjMetadata{
+					object.ObjMetadataSet{
 						testutil.ToIdentifier(t, resources["secret"]),
 					},
 					taskrunner.AllNotFound,
@@ -542,14 +542,14 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 			expectedTasks: []taskrunner.Task{
 				&task.PruneTask{
 					TaskName: "prune-0",
-					Objects: []*unstructured.Unstructured{
+					Objects: object.UnstructuredSet{
 						testutil.Unstructured(t, resources["pod"]),
 					},
 					PruneOptions: &prune.PruneOptions{},
 				},
 				taskrunner.NewWaitTask(
 					"wait-0",
-					[]object.ObjMetadata{
+					object.ObjMetadataSet{
 						testutil.ToIdentifier(t, resources["pod"]),
 					},
 					taskrunner.AllNotFound,
@@ -572,7 +572,7 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 			expectedTasks: []taskrunner.Task{
 				&task.PruneTask{
 					TaskName: "prune-0",
-					Objects: []*unstructured.Unstructured{
+					Objects: object.UnstructuredSet{
 						testutil.Unstructured(t, resources["pod"]),
 						testutil.Unstructured(t, resources["default-pod"]),
 					},
@@ -593,7 +593,7 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 			expectedTasks: []taskrunner.Task{
 				&task.PruneTask{
 					TaskName: "prune-0",
-					Objects: []*unstructured.Unstructured{
+					Objects: object.UnstructuredSet{
 						testutil.Unstructured(t, resources["crontab2"]),
 						testutil.Unstructured(t, resources["crontab1"]),
 					},
@@ -602,7 +602,7 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 				},
 				taskrunner.NewWaitTask(
 					"wait-0",
-					[]object.ObjMetadata{
+					object.ObjMetadataSet{
 						testutil.ToIdentifier(t, resources["crontab1"]),
 						testutil.ToIdentifier(t, resources["crontab2"]),
 					},
@@ -611,7 +611,7 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 					testutil.NewFakeRESTMapper()),
 				&task.PruneTask{
 					TaskName: "prune-1",
-					Objects: []*unstructured.Unstructured{
+					Objects: object.UnstructuredSet{
 						testutil.Unstructured(t, resources["crd"]),
 					},
 					PruneOptions:   &prune.PruneOptions{},
@@ -619,7 +619,7 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 				},
 				taskrunner.NewWaitTask(
 					"wait-1",
-					[]object.ObjMetadata{
+					object.ObjMetadataSet{
 						testutil.ToIdentifier(t, resources["crd"]),
 					},
 					taskrunner.AllNotFound,
@@ -642,7 +642,7 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 			expectedTasks: []taskrunner.Task{
 				&task.PruneTask{
 					TaskName: "prune-0",
-					Objects: []*unstructured.Unstructured{
+					Objects: object.UnstructuredSet{
 						testutil.Unstructured(t, resources["crontab1"]),
 						testutil.Unstructured(t, resources["crontab2"]),
 					},
@@ -651,7 +651,7 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 				},
 				&task.PruneTask{
 					TaskName: "prune-1",
-					Objects: []*unstructured.Unstructured{
+					Objects: object.UnstructuredSet{
 						testutil.Unstructured(t, resources["crd"]),
 					},
 					PruneOptions:   &prune.PruneOptions{},
@@ -670,7 +670,7 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 			expectedTasks: []taskrunner.Task{
 				&task.PruneTask{
 					TaskName: "prune-0",
-					Objects: []*unstructured.Unstructured{
+					Objects: object.UnstructuredSet{
 						testutil.Unstructured(t, resources["pod"]),
 						testutil.Unstructured(t, resources["secret"]),
 					},
@@ -679,7 +679,7 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 				},
 				taskrunner.NewWaitTask(
 					"wait-0",
-					[]object.ObjMetadata{
+					object.ObjMetadataSet{
 						testutil.ToIdentifier(t, resources["pod"]),
 						testutil.ToIdentifier(t, resources["secret"]),
 					},
@@ -688,7 +688,7 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 					testutil.NewFakeRESTMapper()),
 				&task.PruneTask{
 					TaskName: "prune-1",
-					Objects: []*unstructured.Unstructured{
+					Objects: object.UnstructuredSet{
 						testutil.Unstructured(t, resources["namespace"]),
 					},
 					PruneOptions:   &prune.PruneOptions{},
@@ -696,7 +696,7 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 				},
 				taskrunner.NewWaitTask(
 					"wait-1",
-					[]object.ObjMetadata{
+					object.ObjMetadataSet{
 						testutil.ToIdentifier(t, resources["namespace"]),
 					},
 					taskrunner.AllNotFound,

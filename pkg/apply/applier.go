@@ -155,15 +155,19 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.InventoryInfo, obje
 		}
 		klog.V(4).Infof("calculated operations (apply: %d, prune: %d)", len(applyObjs), len(pruneObjs))
 
-		// Share a thread-safe cache with the status poller.
-		resourceCache := cache.NewResourceCacheMap()
-		atm := &mutator.ApplyTimeMutator{
-			Client:        client,
-			Mapper:        mapper,
-			ResourceCache: resourceCache,
+		// Build list of early mutators to execute before starting the task queue.
+		earlyMutators := []mutator.Interface{
+			// Set default namespace for SourceRefs in apply-time-mutation annotations
+			&mutator.Defaulter{
+				Mapper: mapper,
+			},
 		}
-		// Set default namespace for SourceRefs in apply-time-mutation annotations
-		atm.ApplyDefaults(applyObjs)
+		// Exec early mutators
+		err = mutator.MutateAll(ctx, applyObjs, earlyMutators)
+		if err != nil {
+			handleError(eventChannel, err)
+			return
+		}
 
 		deps, err := getDependencies(applyObjs)
 		if err != nil {
@@ -215,8 +219,16 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.InventoryInfo, obje
 				LocalNamespaces: localNamespaces(invInfo, object.UnstructuredsToObjMetasOrDie(objects)),
 			},
 		}
+		// Share a thread-safe cache with the status poller.
+		resourceCache := cache.NewResourceCacheMap()
 		// Build list of apply mutators.
-		applyMutators := []mutator.Interface{atm}
+		applyMutators := []mutator.Interface{
+			&mutator.ApplyTimeMutator{
+				Client:        client,
+				Mapper:        mapper,
+				ResourceCache: resourceCache,
+			},
+		}
 		// Build the task queue by appending tasks in the proper order.
 		taskQueue, err := taskBuilder.
 			AppendInvAddTask(invInfo, applyObjs, options.DryRunStrategy).
