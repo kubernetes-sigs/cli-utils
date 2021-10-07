@@ -164,7 +164,7 @@ func (po *PruneOptions) GetPruneObjs(inv inventory.InventoryInfo,
 	if err != nil {
 		return nil, err
 	}
-	pruneIds := object.SetDiff(prevInvIds, localIds)
+	pruneIds := prevInvIds.Diff(localIds)
 	pruneObjs := []*unstructured.Unstructured{}
 	for _, pruneID := range pruneIds {
 		pruneObj, err := po.GetObject(pruneID)

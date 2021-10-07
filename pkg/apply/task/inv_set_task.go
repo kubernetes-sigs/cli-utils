@@ -30,8 +30,8 @@ func (i *InvSetTask) Action() event.ResourceAction {
 	return event.InventoryAction
 }
 
-func (i *InvSetTask) Identifiers() []object.ObjMetadata {
-	return []object.ObjMetadata{}
+func (i *InvSetTask) Identifiers() object.ObjMetadataSet {
+	return object.ObjMetadataSet{}
 }
 
 // Start sets the inventory using the resources applied and the
@@ -46,7 +46,7 @@ func (i *InvSetTask) Start(taskContext *taskrunner.TaskContext) {
 		// the inventory, then keep it in the inventory so we don't lose
 		// track of it for next apply/prune. An object not found in the cluster
 		// is NOT stored as an apply failure (so it is properly removed from the inventory).
-		applyFailures := []object.ObjMetadata{}
+		applyFailures := object.ObjMetadataSet{}
 		for _, failure := range taskContext.ResourceFailures() {
 			if _, exists := i.PrevInventory[failure]; exists {
 				applyFailures = append(applyFailures, failure)
@@ -55,8 +55,8 @@ func (i *InvSetTask) Start(taskContext *taskrunner.TaskContext) {
 		klog.V(4).Infof("keep in inventory %d applied failures", len(applyFailures))
 		pruneFailures := taskContext.PruneFailures()
 		klog.V(4).Infof("set inventory %d prune failures", len(pruneFailures))
-		allApplyObjs := object.Union(appliedObjs, applyFailures)
-		invObjs := object.Union(allApplyObjs, pruneFailures)
+		allApplyObjs := appliedObjs.Union(applyFailures)
+		invObjs := allApplyObjs.Union(pruneFailures)
 		klog.V(4).Infof("set inventory %d total objects", len(invObjs))
 		err := i.InvClient.Replace(i.InvInfo, invObjs, i.DryRun)
 		taskContext.TaskChannel() <- taskrunner.TaskResult{Err: err}

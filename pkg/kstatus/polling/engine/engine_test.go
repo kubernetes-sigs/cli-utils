@@ -25,12 +25,12 @@ import (
 
 func TestStatusPollerRunner(t *testing.T) {
 	testCases := map[string]struct {
-		identifiers         []object.ObjMetadata
+		identifiers         object.ObjMetadataSet
 		defaultStatusReader StatusReader
 		expectedEventTypes  []event.EventType
 	}{
 		"single resource": {
-			identifiers: []object.ObjMetadata{
+			identifiers: object.ObjMetadataSet{
 				{
 					GroupKind: schema.GroupKind{
 						Group: "apps",
@@ -55,7 +55,7 @@ func TestStatusPollerRunner(t *testing.T) {
 			},
 		},
 		"multiple resources": {
-			identifiers: []object.ObjMetadata{
+			identifiers: object.ObjMetadataSet{
 				{
 					GroupKind: schema.GroupKind{
 						Group: "apps",
@@ -114,7 +114,7 @@ func TestStatusPollerRunner(t *testing.T) {
 
 			options := Options{
 				PollInterval: 2 * time.Second,
-				ClusterReaderFactoryFunc: func(_ client.Reader, _ meta.RESTMapper, _ []object.ObjMetadata) (
+				ClusterReaderFactoryFunc: func(_ client.Reader, _ meta.RESTMapper, _ object.ObjMetadataSet) (
 					ClusterReader, error) {
 					return testutil.NewNoopClusterReader(), nil
 				},
@@ -140,7 +140,7 @@ func TestStatusPollerRunner(t *testing.T) {
 }
 
 func TestNewStatusPollerRunnerCancellation(t *testing.T) {
-	identifiers := make([]object.ObjMetadata, 0)
+	identifiers := make(object.ObjMetadataSet, 0)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
@@ -151,7 +151,7 @@ func TestNewStatusPollerRunnerCancellation(t *testing.T) {
 
 	options := Options{
 		PollInterval: 2 * time.Second,
-		ClusterReaderFactoryFunc: func(_ client.Reader, _ meta.RESTMapper, _ []object.ObjMetadata) (
+		ClusterReaderFactoryFunc: func(_ client.Reader, _ meta.RESTMapper, _ object.ObjMetadataSet) (
 			ClusterReader, error) {
 			return testutil.NewNoopClusterReader(), nil
 		},
@@ -176,7 +176,7 @@ func TestNewStatusPollerRunnerCancellation(t *testing.T) {
 }
 
 func TestNewStatusPollerRunnerIdentifierValidation(t *testing.T) {
-	identifiers := []object.ObjMetadata{
+	identifiers := object.ObjMetadataSet{
 		{
 			GroupKind: schema.GroupKind{
 				Group: "apps",
@@ -193,7 +193,7 @@ func TestNewStatusPollerRunnerIdentifierValidation(t *testing.T) {
 	}
 
 	eventChannel := engine.Poll(context.Background(), identifiers, Options{
-		ClusterReaderFactoryFunc: func(_ client.Reader, _ meta.RESTMapper, _ []object.ObjMetadata) (
+		ClusterReaderFactoryFunc: func(_ client.Reader, _ meta.RESTMapper, _ object.ObjMetadataSet) (
 			ClusterReader, error) {
 			return testutil.NewNoopClusterReader(), nil
 		},

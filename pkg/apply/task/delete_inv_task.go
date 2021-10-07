@@ -32,8 +32,8 @@ func (i *DeleteInvTask) Action() event.ResourceAction {
 	return event.InventoryAction
 }
 
-func (i *DeleteInvTask) Identifiers() []object.ObjMetadata {
-	return []object.ObjMetadata{}
+func (i *DeleteInvTask) Identifiers() object.ObjMetadataSet {
+	return object.ObjMetadataSet{}
 }
 
 // Start deletes the inventory object from the cluster.

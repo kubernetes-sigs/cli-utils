@@ -43,7 +43,7 @@ func (p *PruneTask) Action() event.ResourceAction {
 	return action
 }
 
-func (p *PruneTask) Identifiers() []object.ObjMetadata {
+func (p *PruneTask) Identifiers() object.ObjMetadataSet {
 	return object.UnstructuredsToObjMetasOrDie(p.Objects)
 }
 

@@ -20,7 +20,7 @@ type fakeLoader struct {
 
 var _ ManifestLoader = &fakeLoader{}
 
-func NewFakeLoader(f util.Factory, objs []object.ObjMetadata) *fakeLoader {
+func NewFakeLoader(f util.Factory, objs object.ObjMetadataSet) *fakeLoader {
 	return &fakeLoader{
 		factory:   f,
 		InvClient: inventory.NewFakeInventoryClient(objs),

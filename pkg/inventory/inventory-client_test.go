@@ -22,29 +22,29 @@ import (
 func TestGetClusterInventoryInfo(t *testing.T) {
 	tests := map[string]struct {
 		inv       InventoryInfo
-		localObjs []object.ObjMetadata
+		localObjs object.ObjMetadataSet
 		isError   bool
 	}{
 		"Nil local inventory object is an error": {
 			inv:       nil,
-			localObjs: []object.ObjMetadata{},
+			localObjs: object.ObjMetadataSet{},
 			isError:   true,
 		},
 		"Empty local inventory object": {
 			inv:       localInv,
-			localObjs: []object.ObjMetadata{},
+			localObjs: object.ObjMetadataSet{},
 			isError:   false,
 		},
 		"Local inventory with a single object": {
 			inv: localInv,
-			localObjs: []object.ObjMetadata{
+			localObjs: object.ObjMetadataSet{
 				ignoreErrInfoToObjMeta(pod2Info),
 			},
 			isError: false,
 		},
 		"Local inventory with multiple objects": {
 			inv: localInv,
-			localObjs: []object.ObjMetadata{
+			localObjs: object.ObjMetadataSet{
 				ignoreErrInfoToObjMeta(pod1Info),
 				ignoreErrInfoToObjMeta(pod2Info),
 				ignoreErrInfoToObjMeta(pod3Info)},
@@ -82,7 +82,7 @@ func TestGetClusterInventoryInfo(t *testing.T) {
 				if err != nil {
 					t.Fatalf("unexpected error received: %s", err)
 				}
-				if !object.SetEquals(tc.localObjs, clusterObjs) {
+				if !tc.localObjs.Equal(clusterObjs) {
 					t.Fatalf("expected cluster objs (%v), got (%v)", tc.localObjs, clusterObjs)
 				}
 			}
@@ -93,60 +93,60 @@ func TestGetClusterInventoryInfo(t *testing.T) {
 func TestMerge(t *testing.T) {
 	tests := map[string]struct {
 		localInv    InventoryInfo
-		localObjs   []object.ObjMetadata
-		clusterObjs []object.ObjMetadata
-		pruneObjs   []object.ObjMetadata
+		localObjs   object.ObjMetadataSet
+		clusterObjs object.ObjMetadataSet
+		pruneObjs   object.ObjMetadataSet
 		isError     bool
 	}{
 		"Nil local inventory object is error": {
 			localInv:    nil,
-			localObjs:   []object.ObjMetadata{},
-			clusterObjs: []object.ObjMetadata{},
-			pruneObjs:   []object.ObjMetadata{},
+			localObjs:   object.ObjMetadataSet{},
+			clusterObjs: object.ObjMetadataSet{},
+			pruneObjs:   object.ObjMetadataSet{},
 			isError:     true,
 		},
 		"Cluster and local inventories empty: no prune objects; no change": {
 			localInv:    copyInventory(),
-			localObjs:   []object.ObjMetadata{},
-			clusterObjs: []object.ObjMetadata{},
-			pruneObjs:   []object.ObjMetadata{},
+			localObjs:   object.ObjMetadataSet{},
+			clusterObjs: object.ObjMetadataSet{},
+			pruneObjs:   object.ObjMetadataSet{},
 			isError:     false,
 		},
 		"Cluster and local inventories same: no prune objects; no change": {
 			localInv: copyInventory(),
-			localObjs: []object.ObjMetadata{
+			localObjs: object.ObjMetadataSet{
 				ignoreErrInfoToObjMeta(pod1Info),
 			},
-			clusterObjs: []object.ObjMetadata{
+			clusterObjs: object.ObjMetadataSet{
 				ignoreErrInfoToObjMeta(pod1Info),
 			},
-			pruneObjs: []object.ObjMetadata{},
+			pruneObjs: object.ObjMetadataSet{},
 			isError:   false,
 		},
 		"Cluster two obj, local one: prune obj": {
 			localInv: copyInventory(),
-			localObjs: []object.ObjMetadata{
+			localObjs: object.ObjMetadataSet{
 				ignoreErrInfoToObjMeta(pod1Info),
 			},
-			clusterObjs: []object.ObjMetadata{
+			clusterObjs: object.ObjMetadataSet{
 				ignoreErrInfoToObjMeta(pod1Info),
 				ignoreErrInfoToObjMeta(pod3Info),
 			},
-			pruneObjs: []object.ObjMetadata{
+			pruneObjs: object.ObjMetadataSet{
 				ignoreErrInfoToObjMeta(pod3Info),
 			},
 			isError: false,
 		},
 		"Cluster multiple objs, local multiple different objs: prune objs": {
 			localInv: copyInventory(),
-			localObjs: []object.ObjMetadata{
+			localObjs: object.ObjMetadataSet{
 				ignoreErrInfoToObjMeta(pod2Info),
 			},
-			clusterObjs: []object.ObjMetadata{
+			clusterObjs: object.ObjMetadataSet{
 				ignoreErrInfoToObjMeta(pod1Info),
 				ignoreErrInfoToObjMeta(pod2Info),
 				ignoreErrInfoToObjMeta(pod3Info)},
-			pruneObjs: []object.ObjMetadata{
+			pruneObjs: object.ObjMetadataSet{
 				ignoreErrInfoToObjMeta(pod1Info),
 				ignoreErrInfoToObjMeta(pod3Info),
 			},
@@ -180,7 +180,7 @@ func TestMerge(t *testing.T) {
 				if !tc.isError && err != nil {
 					t.Fatalf("unexpected error: %s", err)
 				}
-				if !object.SetEquals(tc.pruneObjs, pruneObjs) {
+				if !tc.pruneObjs.Equal(pruneObjs) {
 					t.Errorf("expected (%v) prune objs; got (%v)", tc.pruneObjs, pruneObjs)
 				}
 			})
@@ -191,29 +191,29 @@ func TestMerge(t *testing.T) {
 func TestCreateInventory(t *testing.T) {
 	tests := map[string]struct {
 		inv       InventoryInfo
-		localObjs []object.ObjMetadata
+		localObjs object.ObjMetadataSet
 		isError   bool
 	}{
 		"Nil local inventory object is an error": {
 			inv:       nil,
-			localObjs: []object.ObjMetadata{},
+			localObjs: object.ObjMetadataSet{},
 			isError:   true,
 		},
 		"Empty local inventory object": {
 			inv:       localInv,
-			localObjs: []object.ObjMetadata{},
+			localObjs: object.ObjMetadataSet{},
 			isError:   false,
 		},
 		"Local inventory with a single object": {
 			inv: localInv,
-			localObjs: []object.ObjMetadata{
+			localObjs: object.ObjMetadataSet{
 				ignoreErrInfoToObjMeta(pod2Info),
 			},
 			isError: false,
 		},
 		"Local inventory with multiple objects": {
 			inv: localInv,
-			localObjs: []object.ObjMetadata{
+			localObjs: object.ObjMetadataSet{
 				ignoreErrInfoToObjMeta(pod1Info),
 				ignoreErrInfoToObjMeta(pod2Info),
 				ignoreErrInfoToObjMeta(pod3Info)},
@@ -267,35 +267,35 @@ func TestCreateInventory(t *testing.T) {
 
 func TestReplace(t *testing.T) {
 	tests := map[string]struct {
-		localObjs   []object.ObjMetadata
-		clusterObjs []object.ObjMetadata
+		localObjs   object.ObjMetadataSet
+		clusterObjs object.ObjMetadataSet
 	}{
 		"Cluster and local inventories empty": {
-			localObjs:   []object.ObjMetadata{},
-			clusterObjs: []object.ObjMetadata{},
+			localObjs:   object.ObjMetadataSet{},
+			clusterObjs: object.ObjMetadataSet{},
 		},
 		"Cluster and local inventories same": {
-			localObjs: []object.ObjMetadata{
+			localObjs: object.ObjMetadataSet{
 				ignoreErrInfoToObjMeta(pod1Info),
 			},
-			clusterObjs: []object.ObjMetadata{
+			clusterObjs: object.ObjMetadataSet{
 				ignoreErrInfoToObjMeta(pod1Info),
 			},
 		},
 		"Cluster two obj, local one": {
-			localObjs: []object.ObjMetadata{
+			localObjs: object.ObjMetadataSet{
 				ignoreErrInfoToObjMeta(pod1Info),
 			},
-			clusterObjs: []object.ObjMetadata{
+			clusterObjs: object.ObjMetadataSet{
 				ignoreErrInfoToObjMeta(pod1Info),
 				ignoreErrInfoToObjMeta(pod3Info),
 			},
 		},
 		"Cluster multiple objs, local multiple different objs": {
-			localObjs: []object.ObjMetadata{
+			localObjs: object.ObjMetadataSet{
 				ignoreErrInfoToObjMeta(pod2Info),
 			},
-			clusterObjs: []object.ObjMetadata{
+			clusterObjs: object.ObjMetadataSet{
 				ignoreErrInfoToObjMeta(pod1Info),
 				ignoreErrInfoToObjMeta(pod2Info),
 				ignoreErrInfoToObjMeta(pod3Info)},
@@ -307,11 +307,11 @@ func TestReplace(t *testing.T) {
 
 	// Client and server dry-run do not throw errors.
 	invClient, _ := NewInventoryClient(tf, WrapInventoryObj, InvInfoToConfigMap)
-	err := invClient.Replace(copyInventory(), []object.ObjMetadata{}, common.DryRunClient)
+	err := invClient.Replace(copyInventory(), object.ObjMetadataSet{}, common.DryRunClient)
 	if err != nil {
 		t.Fatalf("unexpected error received: %s", err)
 	}
-	err = invClient.Replace(copyInventory(), []object.ObjMetadata{}, common.DryRunServer)
+	err = invClient.Replace(copyInventory(), object.ObjMetadataSet{}, common.DryRunServer)
 	if err != nil {
 		t.Fatalf("unexpected error received: %s", err)
 	}
@@ -340,7 +340,7 @@ func TestReplace(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unexpected error received: %s", err)
 			}
-			if !object.SetEquals(tc.localObjs, actualObjs) {
+			if !tc.localObjs.Equal(actualObjs) {
 				t.Errorf("expected objects (%s), got (%s)", tc.localObjs, actualObjs)
 			}
 		})
@@ -350,27 +350,27 @@ func TestReplace(t *testing.T) {
 func TestGetClusterObjs(t *testing.T) {
 	tests := map[string]struct {
 		localInv    InventoryInfo
-		clusterObjs []object.ObjMetadata
+		clusterObjs object.ObjMetadataSet
 		isError     bool
 	}{
 		"Nil cluster inventory is error": {
 			localInv:    nil,
-			clusterObjs: []object.ObjMetadata{},
+			clusterObjs: object.ObjMetadataSet{},
 			isError:     true,
 		},
 		"No cluster objs": {
 			localInv:    copyInventory(),
-			clusterObjs: []object.ObjMetadata{},
+			clusterObjs: object.ObjMetadataSet{},
 			isError:     false,
 		},
 		"Single cluster obj": {
 			localInv:    copyInventory(),
-			clusterObjs: []object.ObjMetadata{ignoreErrInfoToObjMeta(pod1Info)},
+			clusterObjs: object.ObjMetadataSet{ignoreErrInfoToObjMeta(pod1Info)},
 			isError:     false,
 		},
 		"Multiple cluster objs": {
 			localInv:    copyInventory(),
-			clusterObjs: []object.ObjMetadata{ignoreErrInfoToObjMeta(pod1Info), ignoreErrInfoToObjMeta(pod3Info)},
+			clusterObjs: object.ObjMetadataSet{ignoreErrInfoToObjMeta(pod1Info), ignoreErrInfoToObjMeta(pod3Info)},
 			isError:     false,
 		},
 	}
@@ -397,7 +397,7 @@ func TestGetClusterObjs(t *testing.T) {
 			if !tc.isError && err != nil {
 				t.Fatalf("unexpected error received: %s", err)
 			}
-			if !object.SetEquals(tc.clusterObjs, clusterObjs) {
+			if !tc.clusterObjs.Equal(clusterObjs) {
 				t.Errorf("expected (%v) cluster inventory objs; got (%v)", tc.clusterObjs, clusterObjs)
 			}
 		})
@@ -407,25 +407,25 @@ func TestGetClusterObjs(t *testing.T) {
 func TestDeleteInventoryObj(t *testing.T) {
 	tests := map[string]struct {
 		inv       InventoryInfo
-		localObjs []object.ObjMetadata
+		localObjs object.ObjMetadataSet
 	}{
 		"Nil local inventory object is an error": {
 			inv:       nil,
-			localObjs: []object.ObjMetadata{},
+			localObjs: object.ObjMetadataSet{},
 		},
 		"Empty local inventory object": {
 			inv:       localInv,
-			localObjs: []object.ObjMetadata{},
+			localObjs: object.ObjMetadataSet{},
 		},
 		"Local inventory with a single object": {
 			inv: localInv,
-			localObjs: []object.ObjMetadata{
+			localObjs: object.ObjMetadataSet{
 				ignoreErrInfoToObjMeta(pod2Info),
 			},
 		},
 		"Local inventory with multiple objects": {
 			inv: localInv,
-			localObjs: []object.ObjMetadata{
+			localObjs: object.ObjMetadataSet{
 				ignoreErrInfoToObjMeta(pod1Info),
 				ignoreErrInfoToObjMeta(pod2Info),
 				ignoreErrInfoToObjMeta(pod3Info)},
@@ -477,7 +477,7 @@ func TestDeleteInventoryObj(t *testing.T) {
 
 type invAndObjs struct {
 	inv     InventoryInfo
-	invObjs []object.ObjMetadata
+	invObjs object.ObjMetadataSet
 }
 
 func TestMergeInventoryObjs(t *testing.T) {
@@ -486,68 +486,68 @@ func TestMergeInventoryObjs(t *testing.T) {
 	pod3Obj := ignoreErrInfoToObjMeta(pod3Info)
 	tests := map[string]struct {
 		invs     []invAndObjs
-		expected []object.ObjMetadata
+		expected object.ObjMetadataSet
 	}{
 		"Single inventory object with no inventory is valid": {
 			invs: []invAndObjs{
 				{
 					inv:     copyInventory(),
-					invObjs: []object.ObjMetadata{},
+					invObjs: object.ObjMetadataSet{},
 				},
 			},
-			expected: []object.ObjMetadata{},
+			expected: object.ObjMetadataSet{},
 		},
 		"Single inventory object returns same objects": {
 			invs: []invAndObjs{
 				{
 					inv:     copyInventory(),
-					invObjs: []object.ObjMetadata{pod1Obj},
+					invObjs: object.ObjMetadataSet{pod1Obj},
 				},
 			},
-			expected: []object.ObjMetadata{pod1Obj},
+			expected: object.ObjMetadataSet{pod1Obj},
 		},
 		"Two inventories with the same objects returns them": {
 			invs: []invAndObjs{
 				{
 					inv:     copyInventory(),
-					invObjs: []object.ObjMetadata{pod1Obj},
+					invObjs: object.ObjMetadataSet{pod1Obj},
 				},
 				{
 					inv:     copyInventory(),
-					invObjs: []object.ObjMetadata{pod1Obj},
+					invObjs: object.ObjMetadataSet{pod1Obj},
 				},
 			},
-			expected: []object.ObjMetadata{pod1Obj},
+			expected: object.ObjMetadataSet{pod1Obj},
 		},
 		"Two inventories with different retain the union": {
 			invs: []invAndObjs{
 				{
 					inv:     copyInventory(),
-					invObjs: []object.ObjMetadata{pod1Obj},
+					invObjs: object.ObjMetadataSet{pod1Obj},
 				},
 				{
 					inv:     copyInventory(),
-					invObjs: []object.ObjMetadata{pod2Obj},
+					invObjs: object.ObjMetadataSet{pod2Obj},
 				},
 			},
-			expected: []object.ObjMetadata{pod1Obj, pod2Obj},
+			expected: object.ObjMetadataSet{pod1Obj, pod2Obj},
 		},
 		"More than two inventory objects retains all objects": {
 			invs: []invAndObjs{
 				{
 					inv:     copyInventory(),
-					invObjs: []object.ObjMetadata{pod1Obj, pod2Obj},
+					invObjs: object.ObjMetadataSet{pod1Obj, pod2Obj},
 				},
 				{
 					inv:     copyInventory(),
-					invObjs: []object.ObjMetadata{pod2Obj},
+					invObjs: object.ObjMetadataSet{pod2Obj},
 				},
 				{
 					inv:     copyInventory(),
-					invObjs: []object.ObjMetadata{pod3Obj},
+					invObjs: object.ObjMetadataSet{pod3Obj},
 				},
 			},
-			expected: []object.ObjMetadata{pod1Obj, pod2Obj, pod3Obj},
+			expected: object.ObjMetadataSet{pod1Obj, pod2Obj, pod3Obj},
 		},
 	}
 
@@ -571,7 +571,7 @@ func TestMergeInventoryObjs(t *testing.T) {
 				}
 				wrapped := WrapInventoryObj(retained)
 				mergedObjs, _ := wrapped.Load()
-				if !object.SetEquals(tc.expected, mergedObjs) {
+				if !tc.expected.Equal(mergedObjs) {
 					t.Errorf("expected merged inventory objects (%v), got (%v)", tc.expected, mergedObjs)
 				}
 			})

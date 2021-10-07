@@ -31,7 +31,7 @@ func NewEventPrinter(ioStreams genericclioptions.IOStreams) *eventPrinter {
 // until the channel is closed. The provided cancelFunc is consulted on
 // every event and is responsible for stopping the poller when appropriate.
 // This function will block.
-func (ep *eventPrinter) Print(ch <-chan pollevent.Event, identifiers []object.ObjMetadata,
+func (ep *eventPrinter) Print(ch <-chan pollevent.Event, identifiers object.ObjMetadataSet,
 	cancelFunc collector.ObserverFunc) error {
 	coll := collector.NewResourceStatusCollector(identifiers)
 	// The actual work is done by the collector, which will invoke the

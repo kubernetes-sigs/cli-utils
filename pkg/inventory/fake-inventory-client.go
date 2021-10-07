@@ -12,7 +12,7 @@ import (
 
 // FakeInventoryClient is a testing implementation of the InventoryClient interface.
 type FakeInventoryClient struct {
-	Objs []object.ObjMetadata
+	Objs object.ObjMetadataSet
 	Err  error
 }
 
@@ -21,14 +21,14 @@ var (
 	_ InventoryClientFactory = FakeInventoryClientFactory{}
 )
 
-type FakeInventoryClientFactory []object.ObjMetadata
+type FakeInventoryClientFactory object.ObjMetadataSet
 
 func (f FakeInventoryClientFactory) NewInventoryClient(factory cmdutil.Factory) (InventoryClient, error) {
-	return NewFakeInventoryClient(f), nil
+	return NewFakeInventoryClient(object.ObjMetadataSet(f)), nil
 }
 
 // NewFakeInventoryClient returns a FakeInventoryClient.
-func NewFakeInventoryClient(initObjs []object.ObjMetadata) *FakeInventoryClient {
+func NewFakeInventoryClient(initObjs object.ObjMetadataSet) *FakeInventoryClient {
 	return &FakeInventoryClient{
 		Objs: initObjs,
 		Err:  nil,
@@ -36,9 +36,9 @@ func NewFakeInventoryClient(initObjs []object.ObjMetadata) *FakeInventoryClient 
 }
 
 // GetClusterObjs returns currently stored set of objects.
-func (fic *FakeInventoryClient) GetClusterObjs(InventoryInfo, common.DryRunStrategy) ([]object.ObjMetadata, error) {
+func (fic *FakeInventoryClient) GetClusterObjs(InventoryInfo, common.DryRunStrategy) (object.ObjMetadataSet, error) {
 	if fic.Err != nil {
-		return []object.ObjMetadata{}, fic.Err
+		return object.ObjMetadataSet{}, fic.Err
 	}
 	return fic.Objs, nil
 }
@@ -46,19 +46,19 @@ func (fic *FakeInventoryClient) GetClusterObjs(InventoryInfo, common.DryRunStrat
 // Merge stores the passed objects with the current stored cluster inventory
 // objects. Returns the set difference of the current set of objects minus
 // the passed set of objects, or an error if one is set up.
-func (fic *FakeInventoryClient) Merge(_ InventoryInfo, objs []object.ObjMetadata, _ common.DryRunStrategy) ([]object.ObjMetadata, error) {
+func (fic *FakeInventoryClient) Merge(_ InventoryInfo, objs object.ObjMetadataSet, _ common.DryRunStrategy) (object.ObjMetadataSet, error) {
 	if fic.Err != nil {
-		return []object.ObjMetadata{}, fic.Err
+		return object.ObjMetadataSet{}, fic.Err
 	}
-	diffObjs := object.SetDiff(fic.Objs, objs)
-	fic.Objs = object.Union(fic.Objs, objs)
+	diffObjs := fic.Objs.Diff(objs)
+	fic.Objs = fic.Objs.Union(objs)
 	return diffObjs, nil
 }
 
 // Replace the stored cluster inventory objs with the passed obj, or an
 // error if one is set up.
 
-func (fic *FakeInventoryClient) Replace(_ InventoryInfo, objs []object.ObjMetadata, _ common.DryRunStrategy) error {
+func (fic *FakeInventoryClient) Replace(_ InventoryInfo, objs object.ObjMetadataSet, _ common.DryRunStrategy) error {
 	if fic.Err != nil {
 		return fic.Err
 	}

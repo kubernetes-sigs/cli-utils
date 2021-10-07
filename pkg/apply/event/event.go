@@ -78,7 +78,7 @@ const (
 type ActionGroup struct {
 	Name        string
 	Action      ResourceAction
-	Identifiers []object.ObjMetadata
+	Identifiers object.ObjMetadataSet
 }
 
 type ErrorEvent struct {

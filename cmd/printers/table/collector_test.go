@@ -46,7 +46,7 @@ func TestResourceStateCollector_New(t *testing.T) {
 			resourceGroups: []event.ActionGroup{
 				{
 					Action: event.ApplyAction,
-					Identifiers: []object.ObjMetadata{
+					Identifiers: object.ObjMetadataSet{
 						depID, customID,
 					},
 				},
@@ -64,13 +64,13 @@ func TestResourceStateCollector_New(t *testing.T) {
 			resourceGroups: []event.ActionGroup{
 				{
 					Action: event.ApplyAction,
-					Identifiers: []object.ObjMetadata{
+					Identifiers: object.ObjMetadataSet{
 						customID,
 					},
 				},
 				{
 					Action: event.PruneAction,
-					Identifiers: []object.ObjMetadata{
+					Identifiers: object.ObjMetadataSet{
 						depID,
 					},
 				},
@@ -117,7 +117,7 @@ func TestResourceStateCollector_ProcessStatusEvent(t *testing.T) {
 			resourceGroups: []event.ActionGroup{
 				{
 					Action:      event.ApplyAction,
-					Identifiers: []object.ObjMetadata{depID},
+					Identifiers: object.ObjMetadataSet{depID},
 				},
 			},
 			statusEvent: event.StatusEvent{
@@ -130,7 +130,7 @@ func TestResourceStateCollector_ProcessStatusEvent(t *testing.T) {
 			resourceGroups: []event.ActionGroup{
 				{
 					Action: event.ApplyAction,
-					Identifiers: []object.ObjMetadata{
+					Identifiers: object.ObjMetadataSet{
 						depID, customID,
 					},
 				},
@@ -146,13 +146,13 @@ func TestResourceStateCollector_ProcessStatusEvent(t *testing.T) {
 			resourceGroups: []event.ActionGroup{
 				{
 					Action: event.ApplyAction,
-					Identifiers: []object.ObjMetadata{
+					Identifiers: object.ObjMetadataSet{
 						customID,
 					},
 				},
 				{
 					Action: event.PruneAction,
-					Identifiers: []object.ObjMetadata{
+					Identifiers: object.ObjMetadataSet{
 						depID,
 					},
 				},

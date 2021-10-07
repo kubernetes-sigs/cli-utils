@@ -20,91 +20,91 @@ func TestInvSetTask(t *testing.T) {
 	id3 := object.UnstructuredToObjMetaOrDie(obj3)
 
 	tests := map[string]struct {
-		appliedObjs   []object.ObjMetadata
-		applyFailures []object.ObjMetadata
-		prevInventory []object.ObjMetadata
-		pruneFailures []object.ObjMetadata
-		expectedObjs  []object.ObjMetadata
+		appliedObjs   object.ObjMetadataSet
+		applyFailures object.ObjMetadataSet
+		prevInventory object.ObjMetadataSet
+		pruneFailures object.ObjMetadataSet
+		expectedObjs  object.ObjMetadataSet
 	}{
 		"no apply objs, no prune failures; no inventory": {
-			appliedObjs:   []object.ObjMetadata{},
-			pruneFailures: []object.ObjMetadata{},
-			expectedObjs:  []object.ObjMetadata{},
+			appliedObjs:   object.ObjMetadataSet{},
+			pruneFailures: object.ObjMetadataSet{},
+			expectedObjs:  object.ObjMetadataSet{},
 		},
 		"one apply objs, no prune failures; one inventory": {
-			appliedObjs:   []object.ObjMetadata{id1},
-			pruneFailures: []object.ObjMetadata{},
-			expectedObjs:  []object.ObjMetadata{id1},
+			appliedObjs:   object.ObjMetadataSet{id1},
+			pruneFailures: object.ObjMetadataSet{},
+			expectedObjs:  object.ObjMetadataSet{id1},
 		},
 		"no apply objs, one prune failures; one inventory": {
-			appliedObjs:   []object.ObjMetadata{},
-			pruneFailures: []object.ObjMetadata{id1},
-			expectedObjs:  []object.ObjMetadata{id1},
+			appliedObjs:   object.ObjMetadataSet{},
+			pruneFailures: object.ObjMetadataSet{id1},
+			expectedObjs:  object.ObjMetadataSet{id1},
 		},
 		"one apply objs, one prune failures; one inventory": {
-			appliedObjs:   []object.ObjMetadata{id3},
-			pruneFailures: []object.ObjMetadata{id3},
-			expectedObjs:  []object.ObjMetadata{id3},
+			appliedObjs:   object.ObjMetadataSet{id3},
+			pruneFailures: object.ObjMetadataSet{id3},
+			expectedObjs:  object.ObjMetadataSet{id3},
 		},
 		"two apply objs, two prune failures; three inventory": {
-			appliedObjs:   []object.ObjMetadata{id1, id2},
-			pruneFailures: []object.ObjMetadata{id2, id3},
-			expectedObjs:  []object.ObjMetadata{id1, id2, id3},
+			appliedObjs:   object.ObjMetadataSet{id1, id2},
+			pruneFailures: object.ObjMetadataSet{id2, id3},
+			expectedObjs:  object.ObjMetadataSet{id1, id2, id3},
 		},
 		"no apply objs, no apply failures, no prune failures; no inventory": {
-			appliedObjs:   []object.ObjMetadata{},
-			applyFailures: []object.ObjMetadata{id3},
-			prevInventory: []object.ObjMetadata{},
-			pruneFailures: []object.ObjMetadata{},
-			expectedObjs:  []object.ObjMetadata{},
+			appliedObjs:   object.ObjMetadataSet{},
+			applyFailures: object.ObjMetadataSet{id3},
+			prevInventory: object.ObjMetadataSet{},
+			pruneFailures: object.ObjMetadataSet{},
+			expectedObjs:  object.ObjMetadataSet{},
 		},
 		"one apply failure not in prev inventory; no inventory": {
-			appliedObjs:   []object.ObjMetadata{},
-			applyFailures: []object.ObjMetadata{id3},
-			prevInventory: []object.ObjMetadata{},
-			pruneFailures: []object.ObjMetadata{},
-			expectedObjs:  []object.ObjMetadata{},
+			appliedObjs:   object.ObjMetadataSet{},
+			applyFailures: object.ObjMetadataSet{id3},
+			prevInventory: object.ObjMetadataSet{},
+			pruneFailures: object.ObjMetadataSet{},
+			expectedObjs:  object.ObjMetadataSet{},
 		},
 		"one apply obj, one apply failure not in prev inventory; one inventory": {
-			appliedObjs:   []object.ObjMetadata{id2},
-			applyFailures: []object.ObjMetadata{id3},
-			prevInventory: []object.ObjMetadata{},
-			pruneFailures: []object.ObjMetadata{},
-			expectedObjs:  []object.ObjMetadata{id2},
+			appliedObjs:   object.ObjMetadataSet{id2},
+			applyFailures: object.ObjMetadataSet{id3},
+			prevInventory: object.ObjMetadataSet{},
+			pruneFailures: object.ObjMetadataSet{},
+			expectedObjs:  object.ObjMetadataSet{id2},
 		},
 		"one apply obj, one apply failure in prev inventory; one inventory": {
-			appliedObjs:   []object.ObjMetadata{id2},
-			applyFailures: []object.ObjMetadata{id3},
-			prevInventory: []object.ObjMetadata{id3},
-			pruneFailures: []object.ObjMetadata{},
-			expectedObjs:  []object.ObjMetadata{id2, id3},
+			appliedObjs:   object.ObjMetadataSet{id2},
+			applyFailures: object.ObjMetadataSet{id3},
+			prevInventory: object.ObjMetadataSet{id3},
+			pruneFailures: object.ObjMetadataSet{},
+			expectedObjs:  object.ObjMetadataSet{id2, id3},
 		},
 		"one apply obj, two apply failures with one in prev inventory; two inventory": {
-			appliedObjs:   []object.ObjMetadata{id2},
-			applyFailures: []object.ObjMetadata{id1, id3},
-			prevInventory: []object.ObjMetadata{id3},
-			pruneFailures: []object.ObjMetadata{},
-			expectedObjs:  []object.ObjMetadata{id2, id3},
+			appliedObjs:   object.ObjMetadataSet{id2},
+			applyFailures: object.ObjMetadataSet{id1, id3},
+			prevInventory: object.ObjMetadataSet{id3},
+			pruneFailures: object.ObjMetadataSet{},
+			expectedObjs:  object.ObjMetadataSet{id2, id3},
 		},
 		"three apply failures with two in prev inventory; two inventory": {
-			appliedObjs:   []object.ObjMetadata{},
-			applyFailures: []object.ObjMetadata{id1, id2, id3},
-			prevInventory: []object.ObjMetadata{id2, id3},
-			pruneFailures: []object.ObjMetadata{},
-			expectedObjs:  []object.ObjMetadata{id2, id3},
+			appliedObjs:   object.ObjMetadataSet{},
+			applyFailures: object.ObjMetadataSet{id1, id2, id3},
+			prevInventory: object.ObjMetadataSet{id2, id3},
+			pruneFailures: object.ObjMetadataSet{},
+			expectedObjs:  object.ObjMetadataSet{id2, id3},
 		},
 		"three apply failures with three in prev inventory; three inventory": {
-			appliedObjs:   []object.ObjMetadata{},
-			applyFailures: []object.ObjMetadata{id1, id2, id3},
-			prevInventory: []object.ObjMetadata{id2, id3, id1},
-			pruneFailures: []object.ObjMetadata{},
-			expectedObjs:  []object.ObjMetadata{id2, id1, id3},
+			appliedObjs:   object.ObjMetadataSet{},
+			applyFailures: object.ObjMetadataSet{id1, id2, id3},
+			prevInventory: object.ObjMetadataSet{id2, id3, id1},
+			pruneFailures: object.ObjMetadataSet{},
+			expectedObjs:  object.ObjMetadataSet{id2, id1, id3},
 		},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			client := inventory.NewFakeInventoryClient([]object.ObjMetadata{})
+			client := inventory.NewFakeInventoryClient(object.ObjMetadataSet{})
 			eventChannel := make(chan event.Event)
 			resourceCache := cache.NewResourceCacheMap()
 			context := taskrunner.NewTaskContext(eventChannel, resourceCache)
@@ -137,7 +137,7 @@ func TestInvSetTask(t *testing.T) {
 				t.Errorf("unexpected error running InvAddTask: %s", result.Err)
 			}
 			actual, _ := client.GetClusterObjs(nil, common.DryRunNone)
-			if !object.SetEquals(tc.expectedObjs, actual) {
+			if !tc.expectedObjs.Equal(actual) {
 				t.Errorf("expected merged inventory (%s), got (%s)", tc.expectedObjs, actual)
 			}
 		})

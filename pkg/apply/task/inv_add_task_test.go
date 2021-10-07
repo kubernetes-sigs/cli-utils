@@ -75,34 +75,34 @@ func TestInvAddTask(t *testing.T) {
 	id3 := object.UnstructuredToObjMetaOrDie(obj3)
 
 	tests := map[string]struct {
-		initialObjs  []object.ObjMetadata
+		initialObjs  object.ObjMetadataSet
 		applyObjs    []*unstructured.Unstructured
-		expectedObjs []object.ObjMetadata
+		expectedObjs object.ObjMetadataSet
 	}{
 		"no initial inventory and no apply objects; no merged inventory": {
-			initialObjs:  []object.ObjMetadata{},
+			initialObjs:  object.ObjMetadataSet{},
 			applyObjs:    []*unstructured.Unstructured{},
-			expectedObjs: []object.ObjMetadata{},
+			expectedObjs: object.ObjMetadataSet{},
 		},
 		"no initial inventory, one apply object; one merged inventory": {
-			initialObjs:  []object.ObjMetadata{},
+			initialObjs:  object.ObjMetadataSet{},
 			applyObjs:    []*unstructured.Unstructured{obj1},
-			expectedObjs: []object.ObjMetadata{id1},
+			expectedObjs: object.ObjMetadataSet{id1},
 		},
 		"one initial inventory, no apply object; one merged inventory": {
-			initialObjs:  []object.ObjMetadata{id2},
+			initialObjs:  object.ObjMetadataSet{id2},
 			applyObjs:    []*unstructured.Unstructured{},
-			expectedObjs: []object.ObjMetadata{id2},
+			expectedObjs: object.ObjMetadataSet{id2},
 		},
 		"one initial inventory, one apply object; one merged inventory": {
-			initialObjs:  []object.ObjMetadata{id3},
+			initialObjs:  object.ObjMetadataSet{id3},
 			applyObjs:    []*unstructured.Unstructured{obj3},
-			expectedObjs: []object.ObjMetadata{id3},
+			expectedObjs: object.ObjMetadataSet{id3},
 		},
 		"three initial inventory, two same objects; three merged inventory": {
-			initialObjs:  []object.ObjMetadata{id1, id2, id3},
+			initialObjs:  object.ObjMetadataSet{id1, id2, id3},
 			applyObjs:    []*unstructured.Unstructured{obj2, obj3},
-			expectedObjs: []object.ObjMetadata{id1, id2, id3},
+			expectedObjs: object.ObjMetadataSet{id1, id2, id3},
 		},
 	}
 
@@ -125,7 +125,7 @@ func TestInvAddTask(t *testing.T) {
 			applyIds, err := object.UnstructuredsToObjMetas(tc.applyObjs)
 			require.NoError(t, err)
 
-			if !object.SetEquals(applyIds, task.Identifiers()) {
+			if !task.Identifiers().Equal(applyIds) {
 				t.Errorf("expected task ids (%s), got (%s)", applyIds, task.Identifiers())
 			}
 			task.Start(context)
@@ -134,7 +134,7 @@ func TestInvAddTask(t *testing.T) {
 				t.Errorf("unexpected error running InvAddTask: %s", result.Err)
 			}
 			actual, _ := client.GetClusterObjs(nil, common.DryRunNone)
-			if !object.SetEquals(tc.expectedObjs, actual) {
+			if !tc.expectedObjs.Equal(actual) {
 				t.Errorf("expected merged inventory (%s), got (%s)", tc.expectedObjs, actual)
 			}
 		})

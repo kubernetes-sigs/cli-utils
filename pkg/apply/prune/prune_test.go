@@ -596,7 +596,7 @@ func TestGetPruneObjs(t *testing.T) {
 			expectedIds, err := object.UnstructuredsToObjMetas(tc.expectedObjs)
 			require.NoError(t, err)
 
-			if !object.SetEquals(expectedIds, actualIds) {
+			if !object.ObjMetadataSetEquals(expectedIds, actualIds) {
 				t.Errorf("expected prune objects (%v), got (%v)", expectedIds, actualIds)
 			}
 		})
@@ -664,7 +664,7 @@ func TestPrune_PropagationPolicy(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			captureClient := &optionsCaptureNamespaceClient{}
 			po := PruneOptions{
-				InvClient: inventory.NewFakeInventoryClient([]object.ObjMetadata{}),
+				InvClient: inventory.NewFakeInventoryClient(object.ObjMetadataSet{}),
 				Client: &fakeDynamicClient{
 					resourceInterface: captureClient,
 				},

@@ -128,8 +128,8 @@ func (i InventoryCustomType) ID() string {
 	return id
 }
 
-func (i InventoryCustomType) Load() ([]object.ObjMetadata, error) {
-	var inv []object.ObjMetadata
+func (i InventoryCustomType) Load() (object.ObjMetadataSet, error) {
+	var inv object.ObjMetadataSet
 	s, found, err := unstructured.NestedSlice(i.inv.Object, "spec", "inventory")
 	if err != nil {
 		return inv, err
@@ -155,7 +155,7 @@ func (i InventoryCustomType) Load() ([]object.ObjMetadata, error) {
 	return inv, nil
 }
 
-func (i InventoryCustomType) Store(objs []object.ObjMetadata) error {
+func (i InventoryCustomType) Store(objs object.ObjMetadataSet) error {
 	var inv []interface{}
 	for _, obj := range objs {
 		inv = append(inv, map[string]interface{}{

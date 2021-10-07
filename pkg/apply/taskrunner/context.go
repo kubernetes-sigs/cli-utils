@@ -82,8 +82,8 @@ func (tc *TaskContext) ResourceUID(id object.ObjMetadata) (types.UID, bool) {
 
 // AppliedResources returns all the objects (as ObjMetadata) that
 // were added as applied resources to the TaskContext.
-func (tc *TaskContext) AppliedResources() []object.ObjMetadata {
-	all := make([]object.ObjMetadata, 0, len(tc.appliedResources))
+func (tc *TaskContext) AppliedResources() object.ObjMetadataSet {
+	all := make(object.ObjMetadataSet, 0, len(tc.appliedResources))
 	for r := range tc.appliedResources {
 		all = append(all, r)
 	}
@@ -129,8 +129,8 @@ func (tc *TaskContext) CaptureResourceFailure(id object.ObjMetadata) {
 	tc.failedResources[id] = struct{}{}
 }
 
-func (tc *TaskContext) ResourceFailures() []object.ObjMetadata {
-	failures := make([]object.ObjMetadata, 0, len(tc.failedResources))
+func (tc *TaskContext) ResourceFailures() object.ObjMetadataSet {
+	failures := make(object.ObjMetadataSet, 0, len(tc.failedResources))
 	for f := range tc.failedResources {
 		failures = append(failures, f)
 	}
@@ -141,8 +141,8 @@ func (tc *TaskContext) CapturePruneFailure(id object.ObjMetadata) {
 	tc.pruneFailures[id] = struct{}{}
 }
 
-func (tc *TaskContext) PruneFailures() []object.ObjMetadata {
-	failures := make([]object.ObjMetadata, 0, len(tc.pruneFailures))
+func (tc *TaskContext) PruneFailures() object.ObjMetadataSet {
+	failures := make(object.ObjMetadataSet, 0, len(tc.pruneFailures))
 	for f := range tc.pruneFailures {
 		failures = append(failures, f)
 	}

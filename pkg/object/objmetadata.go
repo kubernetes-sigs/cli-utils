@@ -17,9 +17,6 @@ package object
 
 import (
 	"fmt"
-	"hash/fnv"
-	"sort"
-	"strconv"
 	"strings"
 
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -58,19 +55,6 @@ type ObjMetadata struct {
 	Namespace string
 	Name      string
 	GroupKind schema.GroupKind
-}
-
-// ObjMetas is a slice of ObjMetadata.
-type ObjMetas []ObjMetadata
-
-// Contains checks if the provided ObjMetadata exists in the ObjMetas slice.
-func (oms ObjMetas) Contains(id ObjMetadata) bool {
-	for _, om := range oms {
-		if om == id {
-			return true
-		}
-	}
-	return false
 }
 
 // CreateObjMetadata returns an ObjMetadata struct filled
@@ -171,93 +155,4 @@ func RuntimeToObjMeta(obj runtime.Object) (ObjMetadata, error) {
 	}
 	return CreateObjMetadata(accessor.GetNamespace(), accessor.GetName(),
 		obj.GetObjectKind().GroupVersionKind().GroupKind())
-}
-
-// Hash returns a hash of the sorted strings from
-// the object metadata, or an error if one occurred.
-func Hash(objs []ObjMetadata) (string, error) {
-	objStrs := make([]string, 0, len(objs))
-	for _, obj := range objs {
-		objStrs = append(objStrs, obj.String())
-	}
-	hashInt, err := calcHash(objStrs)
-	if err != nil {
-		return "", err
-	}
-	return strconv.FormatUint(uint64(hashInt), 16), nil
-}
-
-// calcHash returns an unsigned int32 representing the hash
-// of the obj metadata strings. If there is an error writing bytes to
-// the hash, then the error is returned; nil is returned otherwise.
-// Used to quickly identify the set of resources in the inventory object.
-func calcHash(objs []string) (uint32, error) {
-	sort.Strings(objs)
-	h := fnv.New32a()
-	for _, obj := range objs {
-		_, err := h.Write([]byte(obj))
-		if err != nil {
-			return uint32(0), err
-		}
-	}
-	return h.Sum32(), nil
-}
-
-// SetDiff returns the slice of objects that exist in "a", but
-// do not exist in "b" (A - B).
-func SetDiff(setA []ObjMetadata, setB []ObjMetadata) []ObjMetadata {
-	// Create a map of the elements of A
-	m := make(map[ObjMetadata]struct{}, len(setA))
-	for _, a := range setA {
-		m[a] = struct{}{}
-	}
-	// Remove from A each element of B
-	for _, b := range setB {
-		delete(m, b) // OK to delete even if b not in m
-	}
-	// Create/return slice from the map of remaining items
-	diff := make([]ObjMetadata, 0, len(m))
-	for r := range m {
-		diff = append(diff, r)
-	}
-	return diff
-}
-
-// Union returns the slice of objects that is the set of unique
-// items of the merging of set A and set B.
-func Union(setA []ObjMetadata, setB []ObjMetadata) []ObjMetadata {
-	m := make(map[ObjMetadata]struct{}, len(setA)+len(setB))
-	for _, a := range setA {
-		m[a] = struct{}{}
-	}
-	for _, b := range setB {
-		m[b] = struct{}{}
-	}
-	union := make([]ObjMetadata, 0, len(m))
-	for u := range m {
-		union = append(union, u)
-	}
-	return union
-}
-
-// SetEquals returns true if the slice of objects in setA equals
-// the slice of objects in setB.
-func SetEquals(setA []ObjMetadata, setB []ObjMetadata) bool {
-	mapA := make(map[ObjMetadata]struct{}, len(setA))
-	for _, a := range setA {
-		mapA[a] = struct{}{}
-	}
-	mapB := make(map[ObjMetadata]struct{}, len(setB))
-	for _, b := range setB {
-		mapB[b] = struct{}{}
-	}
-	if len(mapA) != len(mapB) {
-		return false
-	}
-	for b := range mapB {
-		if _, exists := mapA[b]; !exists {
-			return false
-		}
-	}
-	return true
 }

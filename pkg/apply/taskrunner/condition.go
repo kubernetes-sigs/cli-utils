@@ -39,7 +39,7 @@ func (c Condition) Meets(s status.Status) bool {
 // conditionMet tests whether the provided Condition holds true for
 // all resources in the list, according to the ResourceCache.
 // Resources in the cache older that the applied generation are non-matches.
-func conditionMet(taskContext *TaskContext, ids []object.ObjMetadata, c Condition) bool {
+func conditionMet(taskContext *TaskContext, ids object.ObjMetadataSet, c Condition) bool {
 	switch c {
 	case AllCurrent:
 		return allMatchStatus(taskContext, ids, status.CurrentStatus)
@@ -52,7 +52,7 @@ func conditionMet(taskContext *TaskContext, ids []object.ObjMetadata, c Conditio
 
 // allMatchStatus checks whether all of the resources provided have the provided status.
 // Resources with older generations are considered non-matching.
-func allMatchStatus(taskContext *TaskContext, ids []object.ObjMetadata, s status.Status) bool {
+func allMatchStatus(taskContext *TaskContext, ids object.ObjMetadataSet, s status.Status) bool {
 	for _, id := range ids {
 		cached := taskContext.ResourceCache().Get(id)
 		if cached.Status != s {
@@ -74,7 +74,7 @@ func allMatchStatus(taskContext *TaskContext, ids []object.ObjMetadata, s status
 
 // allMatchStatus checks whether none of the resources provided have the provided status.
 // Resources with older generations are considered matching.
-func noneMatchStatus(taskContext *TaskContext, ids []object.ObjMetadata, s status.Status) bool {
+func noneMatchStatus(taskContext *TaskContext, ids object.ObjMetadataSet, s status.Status) bool {
 	for _, id := range ids {
 		cached := taskContext.ResourceCache().Get(id)
 		if cached.Status == s {

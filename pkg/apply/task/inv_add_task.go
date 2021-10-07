@@ -32,7 +32,7 @@ func (i *InvAddTask) Action() event.ResourceAction {
 	return event.InventoryAction
 }
 
-func (i *InvAddTask) Identifiers() []object.ObjMetadata {
+func (i *InvAddTask) Identifiers() object.ObjMetadataSet {
 	return object.UnstructuredsToObjMetasOrDie(i.Objects)
 }
 

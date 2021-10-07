@@ -37,7 +37,7 @@ func TestDeleteInvTask(t *testing.T) {
 	}
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			client := inventory.NewFakeInventoryClient([]object.ObjMetadata{})
+			client := inventory.NewFakeInventoryClient(object.ObjMetadataSet{})
 			client.Err = tc.err
 			eventChannel := make(chan event.Event)
 			resourceCache := cache.NewResourceCacheMap()

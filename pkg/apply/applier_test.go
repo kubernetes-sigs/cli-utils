@@ -77,7 +77,7 @@ type inventoryInfo struct {
 	name      string
 	namespace string
 	id        string
-	list      []object.ObjMetadata
+	set       object.ObjMetadataSet
 }
 
 func (i inventoryInfo) toWrapped() inventory.InventoryInfo {
@@ -229,7 +229,7 @@ func TestApplier(t *testing.T) {
 				name:      "inv-123",
 				namespace: "default",
 				id:        "test",
-				list: []object.ObjMetadata{
+				set: object.ObjMetadataSet{
 					object.UnstructuredToObjMetaOrDie(
 						testutil.Unstructured(t, resources["deployment"]),
 					),
@@ -302,7 +302,7 @@ func TestApplier(t *testing.T) {
 				name:      "inv-123",
 				namespace: "default",
 				id:        "test",
-				list: []object.ObjMetadata{
+				set: object.ObjMetadataSet{
 					object.UnstructuredToObjMetaOrDie(
 						testutil.Unstructured(t, resources["deployment"]),
 					),
@@ -423,7 +423,7 @@ func TestApplier(t *testing.T) {
 				name:      "abc-123",
 				namespace: "default",
 				id:        "test",
-				list: []object.ObjMetadata{
+				set: object.ObjMetadataSet{
 					object.UnstructuredToObjMetaOrDie(
 						testutil.Unstructured(t, resources["deployment"]),
 					),
@@ -466,7 +466,7 @@ func TestApplier(t *testing.T) {
 				name:      "abc-123",
 				namespace: "default",
 				id:        "test",
-				list: []object.ObjMetadata{
+				set: object.ObjMetadataSet{
 					object.UnstructuredToObjMetaOrDie(
 						testutil.Unstructured(t, resources["deployment"]),
 					),
@@ -540,7 +540,7 @@ func TestApplier(t *testing.T) {
 					inventoryName:      tc.invInfo.name,
 					inventoryNamespace: tc.invInfo.namespace,
 					inventoryID:        tc.invInfo.id,
-					inventoryList:      tc.invInfo.list,
+					inventorySet:       tc.invInfo.set,
 				},
 			}, &genericHandler{
 				resources: objs,
@@ -851,7 +851,7 @@ type inventoryObjectHandler struct {
 	inventoryName      string
 	inventoryNamespace string
 	inventoryID        string
-	inventoryList      []object.ObjMetadata
+	inventorySet       object.ObjMetadataSet
 	inventoryObj       *v1.ConfigMap
 }
 
@@ -874,15 +874,11 @@ func (i *inventoryObjectHandler) handle(t *testing.T, req *http.Request) (*http.
 		}
 		if cm.Name == i.inventoryName && cm.Namespace == i.inventoryNamespace {
 			i.inventoryObj = &cm
-			var inventoryList []object.ObjMetadata
-			for s := range cm.Data {
-				objMeta, err := object.ParseObjMetadata(s)
-				if err != nil {
-					return nil, false, err
-				}
-				inventoryList = append(inventoryList, objMeta)
+			inventorySet, err := object.FromStringMap(cm.Data)
+			if err != nil {
+				return nil, false, err
 			}
-			i.inventoryList = inventoryList
+			i.inventorySet = inventorySet
 
 			bodyRC := ioutil.NopCloser(bytes.NewReader(b))
 			var statusCode int
@@ -904,7 +900,7 @@ func (i *inventoryObjectHandler) handle(t *testing.T, req *http.Request) (*http.
 			},
 			Items: []v1.ConfigMap{},
 		}
-		if len(i.inventoryList) > 0 {
+		if len(i.inventorySet) > 0 {
 			cmList.Items = append(cmList.Items, i.currentInvObj())
 		}
 		bodyRC := ioutil.NopCloser(bytes.NewReader(toJSONBytes(t, &cmList)))
@@ -912,7 +908,7 @@ func (i *inventoryObjectHandler) handle(t *testing.T, req *http.Request) (*http.
 	}
 
 	if req.Method == http.MethodGet && invObjPathRegex.Match([]byte(req.URL.Path)) {
-		if len(i.inventoryList) == 0 {
+		if len(i.inventorySet) == 0 {
 			return &http.Response{StatusCode: http.StatusNotFound, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.StringBody("")}, true, nil
 		}
 		invObj := i.currentInvObj()
@@ -923,10 +919,6 @@ func (i *inventoryObjectHandler) handle(t *testing.T, req *http.Request) (*http.
 }
 
 func (i *inventoryObjectHandler) currentInvObj() v1.ConfigMap {
-	inv := make(map[string]string)
-	for _, objMeta := range i.inventoryList {
-		inv[objMeta.String()] = ""
-	}
 	return v1.ConfigMap{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: v1.SchemeGroupVersion.String(),
@@ -939,7 +931,7 @@ func (i *inventoryObjectHandler) currentInvObj() v1.ConfigMap {
 				common.InventoryLabel: i.inventoryID,
 			},
 		},
-		Data: inv,
+		Data: i.inventorySet.ToStringMap(),
 	}
 }
 
@@ -977,7 +969,7 @@ type fakePoller struct {
 	events []pollevent.Event
 }
 
-func (f *fakePoller) Poll(ctx context.Context, _ []object.ObjMetadata, _ polling.Options) <-chan pollevent.Event {
+func (f *fakePoller) Poll(ctx context.Context, _ object.ObjMetadataSet, _ polling.Options) <-chan pollevent.Event {
 	eventChannel := make(chan pollevent.Event)
 	go func() {
 		defer close(eventChannel)
