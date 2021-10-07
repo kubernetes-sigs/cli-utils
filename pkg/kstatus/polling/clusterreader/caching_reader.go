@@ -86,20 +86,19 @@ func buildGvkNamespaceSet(gks []schema.GroupKind, namespace string, gvkNamespace
 
 type gvkNamespaceSet struct {
 	gvkNamespaces []gkNamespace
-	seen          map[gkNamespace]bool
+	seen          map[gkNamespace]struct{}
 }
 
 func newGnSet() *gvkNamespaceSet {
 	return &gvkNamespaceSet{
-		gvkNamespaces: make([]gkNamespace, 0),
-		seen:          make(map[gkNamespace]bool),
+		seen: make(map[gkNamespace]struct{}),
 	}
 }
 
 func (g *gvkNamespaceSet) add(gn gkNamespace) {
 	if _, found := g.seen[gn]; !found {
 		g.gvkNamespaces = append(g.gvkNamespaces, gn)
-		g.seen[gn] = true
+		g.seen[gn] = struct{}{}
 	}
 }
 
