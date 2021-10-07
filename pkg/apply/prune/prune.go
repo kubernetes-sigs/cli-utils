@@ -103,21 +103,42 @@ func (po *PruneOptions) Prune(pruneObjs []*unstructured.Unstructured,
 		var filtered bool
 		var reason string
 		var err error
-		for _, filter := range pruneFilters {
-			klog.V(6).Infof("prune filter %s: %s", filter.Name(), pruneID)
-			filtered, reason, err = filter.Filter(pruneObj)
+		for _, pruneFilter := range pruneFilters {
+			klog.V(6).Infof("prune filter %s: %s", pruneFilter.Name(), pruneID)
+			filtered, reason, err = pruneFilter.Filter(pruneObj)
 			if err != nil {
 				if klog.V(5).Enabled() {
-					klog.Errorf("error during %s, (%s): %s", filter.Name(), pruneID, err)
+					klog.Errorf("error during %s, (%s): %s", pruneFilter.Name(), pruneID, err)
 				}
 				taskContext.EventChannel() <- eventFactory.CreateFailedEvent(pruneID, err)
 				taskContext.CapturePruneFailure(pruneID)
 				break
 			}
 			if filtered {
-				klog.V(4).Infof("prune filtered (filter: %q, resource: %q, reason: %q)", filter.Name(), pruneID, reason)
+				klog.V(4).Infof("prune filtered (filter: %q, resource: %q, reason: %q)", pruneFilter.Name(), pruneID, reason)
+				// pruneFailure indicates whether `taskContext.CapturePruneFailure` should be called.
+				pruneFailure := true
+				if pruneFilter.Name() == filter.PreventRemoveFilterName {
+					if o.DryRunStrategy.ClientOrServerDryRun() {
+						pruneFailure = false
+					} else {
+						err := po.handleDeletePrevention(pruneObj)
+						if err != nil {
+							if klog.V(4).Enabled() {
+								klog.Errorf("Failed to remove the %q annotation from %s: %v", inventory.OwningInventoryKey, pruneID, err)
+							}
+							taskContext.EventChannel() <- eventFactory.CreateFailedEvent(pruneID, err)
+							taskContext.CapturePruneFailure(pruneID)
+							break
+						} else {
+							pruneFailure = false
+						}
+					}
+				}
 				taskContext.EventChannel() <- eventFactory.CreateSkippedEvent(pruneObj, reason)
-				taskContext.CapturePruneFailure(pruneID)
+				if pruneFailure {
+					taskContext.CapturePruneFailure(pruneID)
+				}
 				break
 			}
 		}
@@ -149,6 +170,26 @@ func (po *PruneOptions) Prune(pruneObjs []*unstructured.Unstructured,
 			}
 		}
 		taskContext.EventChannel() <- eventFactory.CreateSuccessEvent(pruneObj)
+	}
+	return nil
+}
+
+// handleDeletePrevention removes the `config.k8s.io/owning-inventory` annotation from pruneObj.
+func (po *PruneOptions) handleDeletePrevention(pruneObj *unstructured.Unstructured) error {
+	pruneID := object.UnstructuredToObjMetaOrDie(pruneObj)
+	annotations := pruneObj.GetAnnotations()
+	if annotations != nil {
+		if _, ok := annotations[inventory.OwningInventoryKey]; ok {
+			klog.V(4).Infof("remove the %q annotation from the object %s", inventory.OwningInventoryKey, pruneID)
+			delete(annotations, inventory.OwningInventoryKey)
+			pruneObj.SetAnnotations(annotations)
+			namespacedClient, err := po.namespacedClient(pruneID)
+			if err != nil {
+				return err
+			}
+			_, err = namespacedClient.Update(context.TODO(), pruneObj, metav1.UpdateOptions{})
+			return err
+		}
 	}
 	return nil
 }

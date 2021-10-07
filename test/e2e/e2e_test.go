@@ -144,6 +144,10 @@ var _ = Describe("Applier", func() {
 					applyAndDestroyTest(c, invConfig, inventoryName, namespace.GetName())
 				})
 
+				It("Deletion Prevention", func() {
+					deletionPreventionTest(c, invConfig, inventoryName, namespace.GetName())
+				})
+
 				It("Apply CRD and CR", func() {
 					crdTest(c, invConfig, inventoryName, namespace.GetName())
 				})

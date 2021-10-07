@@ -136,8 +136,8 @@ func createInventoryInfo(children ...*unstructured.Unstructured) inventory.Inven
 	return inventory.WrapInventoryInfoObj(obj)
 }
 
-// preventDelete object contains the "on-remove:keep" lifecycle directive.
-var preventDelete = &unstructured.Unstructured{
+// podDeletionPrevention object contains the "on-remove:keep" lifecycle directive.
+var podDeletionPrevention = &unstructured.Unstructured{
 	Object: map[string]interface{}{
 		"apiVersion": "v1",
 		"kind":       "Pod",
@@ -145,12 +145,25 @@ var preventDelete = &unstructured.Unstructured{
 			"name":      "test-prevent-delete",
 			"namespace": testNamespace,
 			"annotations": map[string]interface{}{
-				common.OnRemoveAnnotation: common.OnRemoveKeep,
+				common.OnRemoveAnnotation:    common.OnRemoveKeep,
+				inventory.OwningInventoryKey: testInventoryLabel,
 			},
 			"uid": "prevent-delete",
 		},
 	},
 }
+
+var pdbDeletePreventionManifest = `
+apiVersion: "policy/v1beta1"
+kind: PodDisruptionBudget
+metadata:
+  name: pdb-delete-prevention
+  namespace: test-namespace
+  uid: uid2
+  annotations:
+    client.lifecycle.config.k8s.io/deletion: detach
+    config.k8s.io/owning-inventory: test-app-label
+`
 
 // Options with different dry-run values.
 var (
@@ -324,7 +337,7 @@ func TestPrune(t *testing.T) {
 			},
 		},
 		"Prevent delete annotation equals prune skipped": {
-			pruneObjs:    []*unstructured.Unstructured{preventDelete},
+			pruneObjs:    []*unstructured.Unstructured{podDeletionPrevention, testutil.Unstructured(t, pdbDeletePreventionManifest)},
 			pruneFilters: []filter.ValidationFilter{filter.PreventRemoveFilter{}},
 			options:      defaultOptions,
 			expectedEvents: []testutil.ExpEvent{
@@ -334,10 +347,16 @@ func TestPrune(t *testing.T) {
 						Operation: event.PruneSkipped,
 					},
 				},
+				{
+					EventType: event.PruneType,
+					PruneEvent: &testutil.ExpPruneEvent{
+						Operation: event.PruneSkipped,
+					},
+				},
 			},
 		},
 		"Prevent delete annotation equals delete skipped": {
-			pruneObjs:    []*unstructured.Unstructured{preventDelete},
+			pruneObjs:    []*unstructured.Unstructured{podDeletionPrevention, testutil.Unstructured(t, pdbDeletePreventionManifest)},
 			pruneFilters: []filter.ValidationFilter{filter.PreventRemoveFilter{}},
 			options:      defaultOptionsDestroy,
 			expectedEvents: []testutil.ExpEvent{
@@ -347,10 +366,16 @@ func TestPrune(t *testing.T) {
 						Operation: event.DeleteSkipped,
 					},
 				},
+				{
+					EventType: event.DeleteType,
+					DeleteEvent: &testutil.ExpDeleteEvent{
+						Operation: event.DeleteSkipped,
+					},
+				},
 			},
 		},
 		"Prevent delete annotation, one skipped, one pruned": {
-			pruneObjs:    []*unstructured.Unstructured{preventDelete, pod},
+			pruneObjs:    []*unstructured.Unstructured{podDeletionPrevention, pod},
 			pruneFilters: []filter.ValidationFilter{filter.PreventRemoveFilter{}},
 			options:      defaultOptions,
 			expectedEvents: []testutil.ExpEvent{
@@ -424,6 +449,72 @@ func TestPrune(t *testing.T) {
 			// Validate the expected/actual events
 			err = testutil.VerifyEvents(tc.expectedEvents, actualEvents)
 			assert.NoError(t, err)
+		})
+	}
+}
+
+func TestPruneDeletionPrevention(t *testing.T) {
+	tests := map[string]struct {
+		pruneObj *unstructured.Unstructured
+		options  Options
+	}{
+		"an object with the cli-utils.sigs.k8s.io/on-remove annotation (prune)": {
+			pruneObj: podDeletionPrevention,
+			options:  defaultOptions,
+		},
+		"an object with the cli-utils.sigs.k8s.io/on-remove annotation (destroy)": {
+			pruneObj: podDeletionPrevention,
+			options:  defaultOptionsDestroy,
+		},
+		"an object with the client.lifecycle.config.k8s.io/deletion annotation (prune)": {
+			pruneObj: testutil.Unstructured(t, pdbDeletePreventionManifest),
+			options:  defaultOptions,
+		},
+		"an object with the client.lifecycle.config.k8s.io/deletion annotation (destroy)": {
+			pruneObj: testutil.Unstructured(t, pdbDeletePreventionManifest),
+			options:  defaultOptionsDestroy,
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			pruneID, err := object.UnstructuredToObjMeta(tc.pruneObj)
+			require.NoError(t, err)
+
+			po := PruneOptions{
+				InvClient: inventory.NewFakeInventoryClient(object.ObjMetadataSet{pruneID}),
+				Client:    fake.NewSimpleDynamicClient(scheme.Scheme, tc.pruneObj),
+				Mapper: testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme,
+					scheme.Scheme.PrioritizedVersionsAllGroups()...),
+			}
+			// The event channel can not block; make sure its bigger than all
+			// the events that can be put on it.
+			eventChannel := make(chan event.Event, 2)
+			resourceCache := cache.NewResourceCacheMap()
+			taskContext := taskrunner.NewTaskContext(eventChannel, resourceCache)
+			err = func() error {
+				defer close(eventChannel)
+				// Run the prune and validate.
+				return po.Prune([]*unstructured.Unstructured{tc.pruneObj}, []filter.ValidationFilter{filter.PreventRemoveFilter{}}, taskContext, "test-0", tc.options)
+			}()
+
+			if err != nil {
+				t.Fatalf("Unexpected error during Prune(): %#v", err)
+			}
+			// verify that the object no longer has the annotation
+			obj, err := po.GetObject(pruneID)
+			if err != nil {
+				t.Fatalf("Unexpected error: %#v", err)
+			}
+
+			hasOwningInventoryAnnotation := false
+			for annotation := range obj.GetAnnotations() {
+				if annotation == inventory.OwningInventoryKey {
+					hasOwningInventoryAnnotation = true
+				}
+			}
+			if hasOwningInventoryAnnotation {
+				t.Fatalf("Prune() should remove the %s annotation", inventory.OwningInventoryKey)
+			}
 		})
 	}
 }
@@ -634,6 +725,30 @@ func TestGetObject_NotFoundError(t *testing.T) {
 	}
 	if !apierrors.IsNotFound(err) {
 		t.Fatalf("expected GetObject() to return a NotFound error, got %v", err)
+	}
+}
+
+func TestHandleDeletePrevention(t *testing.T) {
+	obj := testutil.Unstructured(t, pdbDeletePreventionManifest)
+	po := PruneOptions{
+		Client: fake.NewSimpleDynamicClient(scheme.Scheme, obj, namespace),
+		Mapper: testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme,
+			scheme.Scheme.PrioritizedVersionsAllGroups()...),
+	}
+	if err := po.handleDeletePrevention(obj); err != nil {
+		t.Fatalf("unexpected error %s returned", err)
+	}
+
+	// Get the object from the cluster and verify that the `config.k8s.io/owning-inventory` annotation is removed from the object.
+	liveObj, err := po.GetObject(testutil.ToIdentifier(t, pdbDeletePreventionManifest))
+	if err != nil {
+		t.Fatalf("unexpected error %s returned", err)
+	}
+	annotations := liveObj.GetAnnotations()
+	if annotations != nil {
+		if _, ok := annotations[inventory.OwningInventoryKey]; ok {
+			t.Fatalf("expected handleDeletePrevention() to remove the %q annotation", inventory.OwningInventoryKey)
+		}
 	}
 }
 

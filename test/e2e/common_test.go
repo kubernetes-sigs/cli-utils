@@ -36,6 +36,16 @@ func withNamespace(obj *unstructured.Unstructured, namespace string) *unstructur
 	return obj
 }
 
+func withAnnotation(obj *unstructured.Unstructured, key, value string) *unstructured.Unstructured {
+	annotations := obj.GetAnnotations()
+	if annotations == nil {
+		annotations = make(map[string]string)
+	}
+	annotations[key] = value
+	obj.SetAnnotations(annotations)
+	return obj
+}
+
 func withDependsOn(obj *unstructured.Unstructured, dep string) *unstructured.Unstructured {
 	a := obj.GetAnnotations()
 	if a == nil {

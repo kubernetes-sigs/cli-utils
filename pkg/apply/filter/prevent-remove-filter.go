@@ -15,10 +15,12 @@ import (
 // "prevent remove" annotation.
 type PreventRemoveFilter struct{}
 
+const PreventRemoveFilterName = "PreventRemoveFilter"
+
 // Name returns the preferred name for the filter. Usually
 // used for logging.
 func (prf PreventRemoveFilter) Name() string {
-	return "PreventRemoveFilter"
+	return PreventRemoveFilterName
 }
 
 // Filter returns true if the passed object should NOT be pruned (deleted)
