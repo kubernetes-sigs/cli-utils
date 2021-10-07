@@ -108,7 +108,7 @@ func (g *gvkNamespaceSet) add(gn gkNamespace) {
 // finding all combinations of GroupVersionKind and namespace referenced by the provided
 // identifiers. This list is then expanded to include any known generated resource types.
 type CachingClusterReader struct {
-	sync.RWMutex
+	mx sync.RWMutex
 
 	// clusterreader provides functions to read and list resources from the
 	// cluster.
@@ -144,8 +144,8 @@ type gkNamespace struct {
 // Get looks up the resource identified by the key and the object GVK in the cache. If the needed combination
 // of GVK and namespace is not part of the cache, that is considered an error.
 func (c *CachingClusterReader) Get(_ context.Context, key client.ObjectKey, obj *unstructured.Unstructured) error {
-	c.RLock()
-	defer c.RUnlock()
+	c.mx.RLock()
+	defer c.mx.RUnlock()
 	gvk := obj.GetObjectKind().GroupVersionKind()
 	mapping, err := c.mapper.RESTMapping(gvk.GroupKind())
 	if err != nil {
@@ -175,8 +175,8 @@ func (c *CachingClusterReader) Get(_ context.Context, key client.ObjectKey, obj 
 // ListNamespaceScoped lists all resource identifier by the GVK of the list, the namespace and the selector
 // from the cache. If the needed combination of GVK and namespace is not part of the cache, that is considered an error.
 func (c *CachingClusterReader) ListNamespaceScoped(_ context.Context, list *unstructured.UnstructuredList, namespace string, selector labels.Selector) error {
-	c.RLock()
-	defer c.RUnlock()
+	c.mx.RLock()
+	defer c.mx.RUnlock()
 	gvk := list.GroupVersionKind()
 	gn := gkNamespace{
 		GroupKind: gvk.GroupKind(),
@@ -212,8 +212,8 @@ func (c *CachingClusterReader) ListClusterScoped(ctx context.Context, list *unst
 // Sync loops over the list of gkNamespace we know of, and uses list calls to fetch the resources.
 // This information populates the cache.
 func (c *CachingClusterReader) Sync(ctx context.Context) error {
-	c.Lock()
-	defer c.Unlock()
+	c.mx.Lock()
+	defer c.mx.Unlock()
 	cache := make(map[gkNamespace]cacheEntry)
 	for _, gn := range c.gns {
 		mapping, err := c.mapper.RESTMapping(gn.GroupKind)
