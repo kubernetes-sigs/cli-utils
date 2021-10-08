@@ -9,7 +9,6 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/cli-utils/pkg/apply/cache"
@@ -97,7 +96,7 @@ func (d *Destroyer) Run(inv inventory.InventoryInfo, options DestroyerOptions) <
 		defer close(eventChannel)
 		// Retrieve the objects to be deleted from the cluster. Second parameter is empty
 		// because no local objects returns all inventory objects for deletion.
-		emptyLocalObjs := []*unstructured.Unstructured{}
+		emptyLocalObjs := object.UnstructuredSet{}
 		deleteObjs, err := d.pruneOptions.GetPruneObjs(inv, emptyLocalObjs, prune.Options{
 			DryRunStrategy: options.DryRunStrategy,
 		})

@@ -20,7 +20,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
@@ -107,7 +106,7 @@ func (t *TaskQueueBuilder) Build() (*TaskQueue, error) {
 
 // AppendInvAddTask appends an inventory add task to the task queue.
 // Returns a pointer to the Builder to chain function calls.
-func (t *TaskQueueBuilder) AppendInvAddTask(inv inventory.InventoryInfo, applyObjs []*unstructured.Unstructured,
+func (t *TaskQueueBuilder) AppendInvAddTask(inv inventory.InventoryInfo, applyObjs object.UnstructuredSet,
 	dryRun common.DryRunStrategy) *TaskQueueBuilder {
 	klog.V(2).Infoln("adding inventory add task")
 	t.tasks = append(t.tasks, &task.InvAddTask{
@@ -157,7 +156,7 @@ func (t *TaskQueueBuilder) AppendDeleteInvTask(inv inventory.InventoryInfo, dryR
 
 // AppendInvAddTask appends a task to the task queue to apply the passed objects
 // to the cluster. Returns a pointer to the Builder to chain function calls.
-func (t *TaskQueueBuilder) AppendApplyTask(applyObjs []*unstructured.Unstructured,
+func (t *TaskQueueBuilder) AppendApplyTask(applyObjs object.UnstructuredSet,
 	applyFilters []filter.ValidationFilter, applyMutators []mutator.Interface, o Options) *TaskQueueBuilder {
 	klog.V(2).Infof("adding apply task (%d objects)", len(applyObjs))
 	t.tasks = append(t.tasks, &task.ApplyTask{
@@ -193,7 +192,7 @@ func (t *TaskQueueBuilder) AppendWaitTask(waitIds object.ObjMetadataSet, conditi
 
 // AppendInvAddTask appends a task to delete objects from the cluster to the task queue.
 // Returns a pointer to the Builder to chain function calls.
-func (t *TaskQueueBuilder) AppendPruneTask(pruneObjs []*unstructured.Unstructured,
+func (t *TaskQueueBuilder) AppendPruneTask(pruneObjs object.UnstructuredSet,
 	pruneFilters []filter.ValidationFilter, o Options) *TaskQueueBuilder {
 	klog.V(2).Infof("adding prune task (%d objects)", len(pruneObjs))
 	t.tasks = append(t.tasks,
@@ -214,7 +213,7 @@ func (t *TaskQueueBuilder) AppendPruneTask(pruneObjs []*unstructured.Unstructure
 // AppendApplyWaitTasks adds apply and wait tasks to the task queue,
 // depending on build variables (like dry-run) and resource types
 // (like CRD's). Returns a pointer to the Builder to chain function calls.
-func (t *TaskQueueBuilder) AppendApplyWaitTasks(applyObjs []*unstructured.Unstructured,
+func (t *TaskQueueBuilder) AppendApplyWaitTasks(applyObjs object.UnstructuredSet,
 	applyFilters []filter.ValidationFilter, applyMutators []mutator.Interface, o Options) *TaskQueueBuilder {
 	// Use the "depends-on" annotation to create a graph, ands sort the
 	// objects to apply into sets using a topological sort.
@@ -237,7 +236,7 @@ func (t *TaskQueueBuilder) AppendApplyWaitTasks(applyObjs []*unstructured.Unstru
 // AppendPruneWaitTasks adds prune and wait tasks to the task queue
 // based on build variables (like dry-run). Returns a pointer to the
 // Builder to chain function calls.
-func (t *TaskQueueBuilder) AppendPruneWaitTasks(pruneObjs []*unstructured.Unstructured,
+func (t *TaskQueueBuilder) AppendPruneWaitTasks(pruneObjs object.UnstructuredSet,
 	pruneFilters []filter.ValidationFilter, o Options) *TaskQueueBuilder {
 	if o.Prune {
 		// Use the "depends-on" annotation to create a graph, ands sort the

@@ -87,7 +87,7 @@ func TestObjMetadataSetEquals(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			actual := tc.setA.Equal(tc.setB)
 			if tc.isEqual != actual {
-				t.Errorf("SetEqual expected (%t), got (%t)", tc.isEqual, actual)
+				t.Errorf("Equal expected (%t), got (%t)", tc.isEqual, actual)
 			}
 		})
 	}
@@ -135,7 +135,7 @@ func TestObjMetadataSetUnion(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			actual := tc.setA.Union(tc.setB)
 			if !tc.expected.Equal(actual) {
-				t.Errorf("SetDiff expected set (%s), got (%s)", tc.expected, actual)
+				t.Errorf("Union expected set (%s), got (%s)", tc.expected, actual)
 			}
 		})
 	}
@@ -183,7 +183,7 @@ func TestObjMetadataSetDiff(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			actual := tc.setA.Diff(tc.setB)
 			if !tc.expected.Equal(actual) {
-				t.Errorf("SetDiff expected set (%s), got (%s)", tc.expected, actual)
+				t.Errorf("Diff expected set (%s), got (%s)", tc.expected, actual)
 			}
 		})
 	}
@@ -219,7 +219,7 @@ func TestObjMetadataSetHash(t *testing.T) {
 				t.Fatalf("Received unexpected error: %s", err)
 			}
 			if tc.expected != actual {
-				t.Errorf("expected hash string (%s), got (%s)", tc.expected, actual)
+				t.Errorf("Hash expected (%s), got (%s)", tc.expected, actual)
 			}
 		})
 	}

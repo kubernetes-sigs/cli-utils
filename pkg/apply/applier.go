@@ -11,7 +11,6 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -69,8 +68,8 @@ type Applier struct {
 
 // prepareObjects returns the set of objects to apply and to prune or
 // an error if one occurred.
-func (a *Applier) prepareObjects(localInv inventory.InventoryInfo, localObjs []*unstructured.Unstructured,
-	o Options) ([]*unstructured.Unstructured, []*unstructured.Unstructured, error) {
+func (a *Applier) prepareObjects(localInv inventory.InventoryInfo, localObjs object.UnstructuredSet,
+	o Options) (object.UnstructuredSet, object.UnstructuredSet, error) {
 	if localInv == nil {
 		return nil, nil, fmt.Errorf("the local inventory can't be nil")
 	}
@@ -119,7 +118,7 @@ func (a *Applier) prepareObjects(localInv inventory.InventoryInfo, localObjs []*
 // before all the given resources have been applied to the cluster. Any
 // cancellation or timeout will only affect how long we Wait for the
 // resources to become current.
-func (a *Applier) Run(ctx context.Context, invInfo inventory.InventoryInfo, objects []*unstructured.Unstructured, options Options) <-chan event.Event {
+func (a *Applier) Run(ctx context.Context, invInfo inventory.InventoryInfo, objects object.UnstructuredSet, options Options) <-chan event.Event {
 	klog.V(4).Infof("apply run for %d objects", len(objects))
 	eventChannel := make(chan event.Event)
 	setDefaults(&options)

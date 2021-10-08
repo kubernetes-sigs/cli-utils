@@ -95,6 +95,6 @@ func (fic *FakeInventoryClient) GetClusterInventoryInfo(InventoryInfo, common.Dr
 	return nil, nil
 }
 
-func (fic *FakeInventoryClient) GetClusterInventoryObjs(_ InventoryInfo) ([]*unstructured.Unstructured, error) {
-	return []*unstructured.Unstructured{}, nil
+func (fic *FakeInventoryClient) GetClusterInventoryObjs(_ InventoryInfo) (object.UnstructuredSet, error) {
+	return object.UnstructuredSet{}, nil
 }

@@ -20,7 +20,7 @@ type InvAddTask struct {
 	TaskName  string
 	InvClient inventory.InventoryClient
 	InvInfo   inventory.InventoryInfo
-	Objects   []*unstructured.Unstructured
+	Objects   object.UnstructuredSet
 	DryRun    common.DryRunStrategy
 }
 
@@ -66,7 +66,7 @@ func (i *InvAddTask) ClearTimeout() {}
 // inventoryNamespaceInSet returns the the namespace the passed inventory
 // object will be applied to, or nil if this namespace object does not exist
 // in the passed slice "infos" or the inventory object is cluster-scoped.
-func inventoryNamespaceInSet(inv inventory.InventoryInfo, objs []*unstructured.Unstructured) *unstructured.Unstructured {
+func inventoryNamespaceInSet(inv inventory.InventoryInfo, objs object.UnstructuredSet) *unstructured.Unstructured {
 	if inv == nil {
 		return nil
 	}

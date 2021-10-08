@@ -43,7 +43,7 @@ type InventoryClient interface {
 	// GetClusterInventoryInfo returns the cluster inventory object.
 	GetClusterInventoryInfo(inv InventoryInfo, dryRun common.DryRunStrategy) (*unstructured.Unstructured, error)
 	// GetInventoryObjs looks up the inventory objects from the cluster.
-	GetClusterInventoryObjs(inv InventoryInfo) ([]*unstructured.Unstructured, error)
+	GetClusterInventoryObjs(inv InventoryInfo) (object.UnstructuredSet, error)
 }
 
 // ClusterInventoryClient is a concrete implementation of the
@@ -264,7 +264,7 @@ func (cic *ClusterInventoryClient) GetClusterInventoryInfo(inv InventoryInfo, dr
 	return clusterInv, nil
 }
 
-func (cic *ClusterInventoryClient) getClusterInventoryObjsByLabel(inv InventoryInfo) ([]*unstructured.Unstructured, error) {
+func (cic *ClusterInventoryClient) getClusterInventoryObjsByLabel(inv InventoryInfo) (object.UnstructuredSet, error) {
 	localInv := cic.invToUnstructuredFunc(inv)
 	if localInv == nil {
 		return nil, fmt.Errorf("retrieving cluster inventory object with nil local inventory")
@@ -300,7 +300,7 @@ func (cic *ClusterInventoryClient) getClusterInventoryObjsByLabel(inv InventoryI
 	return object.InfosToUnstructureds(retrievedInventoryInfos), nil
 }
 
-func (cic *ClusterInventoryClient) getClusterInventoryObjsByName(inv InventoryInfo) ([]*unstructured.Unstructured, error) {
+func (cic *ClusterInventoryClient) getClusterInventoryObjsByName(inv InventoryInfo) (object.UnstructuredSet, error) {
 	localInv := cic.invToUnstructuredFunc(inv)
 	if localInv == nil {
 		return nil, fmt.Errorf("retrieving cluster inventory object with nil local inventory")
@@ -321,21 +321,21 @@ func (cic *ClusterInventoryClient) getClusterInventoryObjsByName(inv InventoryIn
 		return nil, err
 	}
 	if apierrors.IsNotFound(err) {
-		return []*unstructured.Unstructured{}, nil
+		return object.UnstructuredSet{}, nil
 	}
 	clusterInv, ok := res.(*unstructured.Unstructured)
 	if !ok {
 		return nil, fmt.Errorf("retrieved cluster inventory object is not of type *Unstructured")
 	}
-	return []*unstructured.Unstructured{clusterInv}, nil
+	return object.UnstructuredSet{clusterInv}, nil
 }
 
-func (cic *ClusterInventoryClient) GetClusterInventoryObjs(inv InventoryInfo) ([]*unstructured.Unstructured, error) {
+func (cic *ClusterInventoryClient) GetClusterInventoryObjs(inv InventoryInfo) (object.UnstructuredSet, error) {
 	if inv == nil {
 		return nil, fmt.Errorf("inventoryInfo must be specified")
 	}
 
-	var clusterInvObjects []*unstructured.Unstructured
+	var clusterInvObjects object.UnstructuredSet
 	var err error
 	switch inv.Strategy() {
 	case NameStrategy:
@@ -355,7 +355,7 @@ func (cic *ClusterInventoryClient) GetClusterInventoryObjs(inv InventoryInfo) ([
 //
 // TODO(seans3): Remove this code once we're certain no customers have multiple
 // inventory objects in their clusters.
-func (cic *ClusterInventoryClient) mergeClusterInventory(invObjs []*unstructured.Unstructured, dryRun common.DryRunStrategy) (*unstructured.Unstructured, error) {
+func (cic *ClusterInventoryClient) mergeClusterInventory(invObjs object.UnstructuredSet, dryRun common.DryRunStrategy) (*unstructured.Unstructured, error) {
 	if len(invObjs) == 0 {
 		return nil, nil
 	}
