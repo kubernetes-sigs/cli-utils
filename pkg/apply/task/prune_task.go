@@ -5,7 +5,6 @@ package task
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/filter"
@@ -22,7 +21,7 @@ type PruneTask struct {
 	TaskName string
 
 	PruneOptions      *prune.PruneOptions
-	Objects           []*unstructured.Unstructured
+	Objects           object.UnstructuredSet
 	Filters           []filter.ValidationFilter
 	DryRunStrategy    common.DryRunStrategy
 	PropagationPolicy metav1.DeletionPropagation

@@ -97,19 +97,19 @@ metadata:
 func TestSortObjs(t *testing.T) {
 	testCases := map[string]struct {
 		objs     []*unstructured.Unstructured
-		expected [][]*unstructured.Unstructured
+		expected []object.UnstructuredSet
 		isError  bool
 	}{
 		"no objects returns no object sets": {
 			objs:     []*unstructured.Unstructured{},
-			expected: [][]*unstructured.Unstructured{},
+			expected: []object.UnstructuredSet{},
 			isError:  false,
 		},
 		"one object returns single object set": {
 			objs: []*unstructured.Unstructured{
 				testutil.Unstructured(t, resources["deployment"]),
 			},
-			expected: [][]*unstructured.Unstructured{
+			expected: []object.UnstructuredSet{
 				{
 					testutil.Unstructured(t, resources["deployment"]),
 				},
@@ -121,7 +121,7 @@ func TestSortObjs(t *testing.T) {
 				testutil.Unstructured(t, resources["deployment"]),
 				testutil.Unstructured(t, resources["secret"]),
 			},
-			expected: [][]*unstructured.Unstructured{
+			expected: []object.UnstructuredSet{
 				{
 					testutil.Unstructured(t, resources["deployment"]),
 					testutil.Unstructured(t, resources["secret"]),
@@ -135,7 +135,7 @@ func TestSortObjs(t *testing.T) {
 					testutil.AddDependsOn(t, testutil.ToIdentifier(t, resources["secret"]))),
 				testutil.Unstructured(t, resources["secret"]),
 			},
-			expected: [][]*unstructured.Unstructured{
+			expected: []object.UnstructuredSet{
 				{
 					testutil.Unstructured(t, resources["secret"]),
 				},
@@ -153,7 +153,7 @@ func TestSortObjs(t *testing.T) {
 					testutil.AddDependsOn(t, testutil.ToIdentifier(t, resources["pod"]))),
 				testutil.Unstructured(t, resources["pod"]),
 			},
-			expected: [][]*unstructured.Unstructured{
+			expected: []object.UnstructuredSet{
 				{
 					testutil.Unstructured(t, resources["pod"]),
 				},
@@ -174,7 +174,7 @@ func TestSortObjs(t *testing.T) {
 					testutil.AddDependsOn(t, testutil.ToIdentifier(t, resources["secret"]))),
 				testutil.Unstructured(t, resources["secret"]),
 			},
-			expected: [][]*unstructured.Unstructured{
+			expected: []object.UnstructuredSet{
 				{
 					testutil.Unstructured(t, resources["secret"]),
 				},
@@ -191,7 +191,7 @@ func TestSortObjs(t *testing.T) {
 				testutil.Unstructured(t, resources["namespace"]),
 				testutil.Unstructured(t, resources["secret"]),
 			},
-			expected: [][]*unstructured.Unstructured{
+			expected: []object.UnstructuredSet{
 				{
 					testutil.Unstructured(t, resources["namespace"]),
 				},
@@ -208,7 +208,7 @@ func TestSortObjs(t *testing.T) {
 				testutil.Unstructured(t, resources["crontab2"]),
 				testutil.Unstructured(t, resources["crd"]),
 			},
-			expected: [][]*unstructured.Unstructured{
+			expected: []object.UnstructuredSet{
 				{
 					testutil.Unstructured(t, resources["crd"]),
 				},
@@ -226,7 +226,7 @@ func TestSortObjs(t *testing.T) {
 				testutil.Unstructured(t, resources["namespace"]),
 				testutil.Unstructured(t, resources["crd"]),
 			},
-			expected: [][]*unstructured.Unstructured{
+			expected: []object.UnstructuredSet{
 				{
 					testutil.Unstructured(t, resources["crd"]),
 					testutil.Unstructured(t, resources["namespace"]),
@@ -245,7 +245,7 @@ func TestSortObjs(t *testing.T) {
 				testutil.Unstructured(t, resources["secret"],
 					testutil.AddDependsOn(t, testutil.ToIdentifier(t, resources["deployment"]))),
 			},
-			expected: [][]*unstructured.Unstructured{},
+			expected: []object.UnstructuredSet{},
 			isError:  true,
 		},
 		"three objects in cyclic dependency": {
@@ -257,7 +257,7 @@ func TestSortObjs(t *testing.T) {
 				testutil.Unstructured(t, resources["pod"],
 					testutil.AddDependsOn(t, testutil.ToIdentifier(t, resources["deployment"]))),
 			},
-			expected: [][]*unstructured.Unstructured{},
+			expected: []object.UnstructuredSet{},
 			isError:  true,
 		},
 	}
@@ -278,19 +278,19 @@ func TestSortObjs(t *testing.T) {
 func TestReverseSortObjs(t *testing.T) {
 	testCases := map[string]struct {
 		objs     []*unstructured.Unstructured
-		expected [][]*unstructured.Unstructured
+		expected []object.UnstructuredSet
 		isError  bool
 	}{
 		"no objects returns no object sets": {
 			objs:     []*unstructured.Unstructured{},
-			expected: [][]*unstructured.Unstructured{},
+			expected: []object.UnstructuredSet{},
 			isError:  false,
 		},
 		"one object returns single object set": {
 			objs: []*unstructured.Unstructured{
 				testutil.Unstructured(t, resources["deployment"]),
 			},
-			expected: [][]*unstructured.Unstructured{
+			expected: []object.UnstructuredSet{
 				{
 					testutil.Unstructured(t, resources["deployment"]),
 				},
@@ -305,7 +305,7 @@ func TestReverseSortObjs(t *testing.T) {
 					testutil.AddDependsOn(t, testutil.ToIdentifier(t, resources["pod"]))),
 				testutil.Unstructured(t, resources["pod"]),
 			},
-			expected: [][]*unstructured.Unstructured{
+			expected: []object.UnstructuredSet{
 				{
 					testutil.Unstructured(t, resources["deployment"]),
 				},
@@ -324,7 +324,7 @@ func TestReverseSortObjs(t *testing.T) {
 				testutil.Unstructured(t, resources["namespace"]),
 				testutil.Unstructured(t, resources["secret"]),
 			},
-			expected: [][]*unstructured.Unstructured{
+			expected: []object.UnstructuredSet{
 				{
 					testutil.Unstructured(t, resources["secret"]),
 					testutil.Unstructured(t, resources["deployment"]),
@@ -342,7 +342,7 @@ func TestReverseSortObjs(t *testing.T) {
 				testutil.Unstructured(t, resources["namespace"]),
 				testutil.Unstructured(t, resources["crd"]),
 			},
-			expected: [][]*unstructured.Unstructured{
+			expected: []object.UnstructuredSet{
 				{
 					testutil.Unstructured(t, resources["crontab1"]),
 					testutil.Unstructured(t, resources["crontab2"]),
@@ -716,7 +716,7 @@ func TestAddCRDEdges(t *testing.T) {
 
 // verifyObjSets ensures the expected and actual slice of object sets are the same,
 // and the sets are in order.
-func verifyObjSets(t *testing.T, expected [][]*unstructured.Unstructured, actual [][]*unstructured.Unstructured) {
+func verifyObjSets(t *testing.T, expected []object.UnstructuredSet, actual []object.UnstructuredSet) {
 	if len(expected) != len(actual) {
 		t.Fatalf("expected (%d) object sets, got (%d)", len(expected), len(actual))
 		return

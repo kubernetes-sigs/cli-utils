@@ -49,7 +49,7 @@ type ApplyTask struct {
 	Factory           util.Factory
 	InfoHelper        info.InfoHelper
 	Mapper            meta.RESTMapper
-	Objects           []*unstructured.Unstructured
+	Objects           object.UnstructuredSet
 	Filters           []filter.ValidationFilter
 	Mutators          []mutator.Interface
 	DryRunStrategy    common.DryRunStrategy
@@ -279,7 +279,7 @@ func (a *ApplyTask) createApplyFailedEvent(id object.ObjMetadata, err error) eve
 // a list of resources when failed to initialize the apply process.
 func (a *ApplyTask) sendBatchApplyEvents(
 	taskContext *taskrunner.TaskContext,
-	objects []*unstructured.Unstructured,
+	objects object.UnstructuredSet,
 	err error,
 ) {
 	for _, obj := range objects {

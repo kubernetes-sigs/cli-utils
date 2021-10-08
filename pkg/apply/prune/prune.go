@@ -87,7 +87,7 @@ type Options struct {
 //   taskContext - task for apply/prune
 //   taskName - name of the parent task group, for events
 //   o - options for dry-run
-func (po *PruneOptions) Prune(pruneObjs []*unstructured.Unstructured,
+func (po *PruneOptions) Prune(pruneObjs object.UnstructuredSet,
 	pruneFilters []filter.ValidationFilter,
 	taskContext *taskrunner.TaskContext,
 	taskName string,
@@ -158,14 +158,14 @@ func (po *PruneOptions) Prune(pruneObjs []*unstructured.Unstructured,
 // objects minus the set of currently applied objects. Returns an error
 // if one occurs.
 func (po *PruneOptions) GetPruneObjs(inv inventory.InventoryInfo,
-	localObjs []*unstructured.Unstructured, o Options) ([]*unstructured.Unstructured, error) {
+	localObjs object.UnstructuredSet, o Options) (object.UnstructuredSet, error) {
 	localIds := object.UnstructuredsToObjMetasOrDie(localObjs)
 	prevInvIds, err := po.InvClient.GetClusterObjs(inv, o.DryRunStrategy)
 	if err != nil {
 		return nil, err
 	}
 	pruneIds := prevInvIds.Diff(localIds)
-	pruneObjs := []*unstructured.Unstructured{}
+	pruneObjs := object.UnstructuredSet{}
 	for _, pruneID := range pruneIds {
 		pruneObj, err := po.GetObject(pruneID)
 		if err != nil {

@@ -18,9 +18,9 @@ import (
 // Each of the objects in an apply set is applied together. The order of
 // the returned applied sets is a topological ordering of the sets to apply.
 // Returns an single empty apply set if there are no objects to apply.
-func SortObjs(objs []*unstructured.Unstructured) ([][]*unstructured.Unstructured, error) {
+func SortObjs(objs object.UnstructuredSet) ([]object.UnstructuredSet, error) {
 	if len(objs) == 0 {
-		return [][]*unstructured.Unstructured{}, nil
+		return []object.UnstructuredSet{}, nil
 	}
 	// Create the graph, and build a map of object metadata to the object (Unstructured).
 	g := New()
@@ -35,14 +35,14 @@ func SortObjs(objs []*unstructured.Unstructured) ([][]*unstructured.Unstructured
 	addNamespaceEdges(g, objs)
 	addCRDEdges(g, objs)
 	// Run topological sort on the graph.
-	objSets := [][]*unstructured.Unstructured{}
+	objSets := []object.UnstructuredSet{}
 	sortedObjSets, err := g.Sort()
 	if err != nil {
-		return [][]*unstructured.Unstructured{}, err
+		return []object.UnstructuredSet{}, err
 	}
 	// Map the object metadata back to the sorted sets of unstructured objects.
 	for _, objSet := range sortedObjSets {
-		currentSet := []*unstructured.Unstructured{}
+		currentSet := object.UnstructuredSet{}
 		for _, id := range objSet {
 			var found bool
 			var obj *unstructured.Unstructured
@@ -56,11 +56,11 @@ func SortObjs(objs []*unstructured.Unstructured) ([][]*unstructured.Unstructured
 }
 
 // ReverseSortObjs is the same as SortObjs but using reverse ordering.
-func ReverseSortObjs(objs []*unstructured.Unstructured) ([][]*unstructured.Unstructured, error) {
+func ReverseSortObjs(objs object.UnstructuredSet) ([]object.UnstructuredSet, error) {
 	// Sorted objects using normal ordering.
 	s, err := SortObjs(objs)
 	if err != nil {
-		return [][]*unstructured.Unstructured{}, err
+		return []object.UnstructuredSet{}, err
 	}
 	// Reverse the ordering of the object sets using swaps.
 	for i, j := 0, len(s)-1; i < j; i, j = i+1, j-1 {
@@ -71,7 +71,7 @@ func ReverseSortObjs(objs []*unstructured.Unstructured) ([][]*unstructured.Unstr
 
 // addApplyTimeMutationEdges updates the graph with edges from objects
 // with an explicit "apply-time-mutation" annotation.
-func addApplyTimeMutationEdges(g *Graph, objs []*unstructured.Unstructured) {
+func addApplyTimeMutationEdges(g *Graph, objs object.UnstructuredSet) {
 	for _, obj := range objs {
 		id := object.UnstructuredToObjMetaOrDie(obj)
 		klog.V(3).Infof("adding vertex: %s", id)
@@ -95,7 +95,7 @@ func addApplyTimeMutationEdges(g *Graph, objs []*unstructured.Unstructured) {
 
 // addDependsOnEdges updates the graph with edges from objects
 // with an explicit "depends-on" annotation.
-func addDependsOnEdges(g *Graph, objs []*unstructured.Unstructured) {
+func addDependsOnEdges(g *Graph, objs object.UnstructuredSet) {
 	for _, obj := range objs {
 		id := object.UnstructuredToObjMetaOrDie(obj)
 		klog.V(3).Infof("adding vertex: %s", id)
@@ -117,7 +117,7 @@ func addDependsOnEdges(g *Graph, objs []*unstructured.Unstructured) {
 // addCRDEdges adds edges to the dependency graph from custom
 // resources to their definitions to ensure the CRD's exist
 // before applying the custom resources created with the definition.
-func addCRDEdges(g *Graph, objs []*unstructured.Unstructured) {
+func addCRDEdges(g *Graph, objs object.UnstructuredSet) {
 	crds := map[string]object.ObjMetadata{}
 	// First create a map of all the CRD's.
 	for _, u := range objs {
@@ -145,7 +145,7 @@ func addCRDEdges(g *Graph, objs []*unstructured.Unstructured) {
 // addNamespaceEdges adds edges to the dependency graph from namespaced
 // objects to the namespace objects. Ensures the namespaces exist
 // before the resources in those namespaces are applied.
-func addNamespaceEdges(g *Graph, objs []*unstructured.Unstructured) {
+func addNamespaceEdges(g *Graph, objs object.UnstructuredSet) {
 	namespaces := map[string]object.ObjMetadata{}
 	// First create a map of all the namespaces objects live in.
 	for _, obj := range objs {

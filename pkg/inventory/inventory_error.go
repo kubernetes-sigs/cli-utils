@@ -5,9 +5,7 @@
 
 package inventory
 
-import (
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-)
+import "sigs.k8s.io/cli-utils/pkg/object"
 
 const noInventoryErrorStr = `Package uninitialized. Please run "init" command.
 
@@ -34,7 +32,7 @@ func (g NoInventoryObjError) Error() string {
 }
 
 type MultipleInventoryObjError struct {
-	InventoryObjectTemplates []*unstructured.Unstructured
+	InventoryObjectTemplates object.UnstructuredSet
 }
 
 func (g MultipleInventoryObjError) Error() string {

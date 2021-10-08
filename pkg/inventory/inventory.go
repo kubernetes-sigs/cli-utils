@@ -46,7 +46,7 @@ type InventoryToUnstructuredFunc func(InventoryInfo) *unstructured.Unstructured
 
 // FindInventoryObj returns the "Inventory" object (ConfigMap with
 // inventory label) if it exists, or nil if it does not exist.
-func FindInventoryObj(objs []*unstructured.Unstructured) *unstructured.Unstructured {
+func FindInventoryObj(objs object.UnstructuredSet) *unstructured.Unstructured {
 	for _, obj := range objs {
 		if IsInventoryObject(obj) {
 			return obj
@@ -79,10 +79,10 @@ func retrieveInventoryLabel(obj *unstructured.Unstructured) (string, error) {
 	return inventoryLabel, nil
 }
 
-// ValidateNoInventory takes a slice of unstructured.Unstructured objects and
+// ValidateNoInventory takes a set of unstructured.Unstructured objects and
 // validates that no inventory object is in the input slice.
-func ValidateNoInventory(objs []*unstructured.Unstructured) error {
-	invs := make([]*unstructured.Unstructured, 0)
+func ValidateNoInventory(objs object.UnstructuredSet) error {
+	invs := make(object.UnstructuredSet, 0)
 	for _, obj := range objs {
 		if IsInventoryObject(obj) {
 			invs = append(invs, obj)
@@ -96,12 +96,12 @@ func ValidateNoInventory(objs []*unstructured.Unstructured) error {
 	}
 }
 
-// splitUnstructureds takes a slice of unstructured.Unstructured objects and
-// splits it into one slice that contains the inventory object templates and
+// splitUnstructureds takes a set of unstructured.Unstructured objects and
+// splits it into one set that contains the inventory object templates and
 // another one that contains the remaining resources.
-func SplitUnstructureds(objs []*unstructured.Unstructured) (*unstructured.Unstructured, []*unstructured.Unstructured, error) {
-	invs := make([]*unstructured.Unstructured, 0)
-	resources := make([]*unstructured.Unstructured, 0)
+func SplitUnstructureds(objs object.UnstructuredSet) (*unstructured.Unstructured, object.UnstructuredSet, error) {
+	invs := make(object.UnstructuredSet, 0)
+	resources := make(object.UnstructuredSet, 0)
 	for _, obj := range objs {
 		if IsInventoryObject(obj) {
 			invs = append(invs, obj)
