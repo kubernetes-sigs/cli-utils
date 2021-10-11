@@ -9,11 +9,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
-	"k8s.io/kubectl/pkg/scheme"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/kustomize/kyaml/kio/filters"
 	"sigs.k8s.io/kustomize/kyaml/kio/kioutil"
@@ -21,10 +20,6 @@ import (
 )
 
 func TestSetNamespaces(t *testing.T) {
-	// We need the RESTMapper in the testFactory to contain the CRD
-	// types, so add them to the scheme here.
-	_ = apiextv1.AddToScheme(scheme.Scheme)
-
 	testCases := map[string]struct {
 		objs             []*unstructured.Unstructured
 		defaultNamspace  string
@@ -166,9 +161,13 @@ func TestSetNamespaces(t *testing.T) {
 			defer tf.Cleanup()
 
 			mapper, err := tf.ToRESTMapper()
-			if !assert.NoError(t, err) {
-				t.FailNow()
-			}
+			require.NoError(t, err)
+			crdGV := schema.GroupVersion{Group: "apiextensions.k8s.io", Version: "v1"}
+			crdMapper := meta.NewDefaultRESTMapper([]schema.GroupVersion{crdGV})
+			crdMapper.AddSpecific(crdGV.WithKind("CustomResourceDefinition"),
+				crdGV.WithResource("customresourcedefinitions"),
+				crdGV.WithResource("customresourcedefinition"), meta.RESTScopeRoot)
+			mapper = meta.MultiRESTMapper([]meta.RESTMapper{mapper, crdMapper})
 
 			err = SetNamespaces(mapper, tc.objs, tc.defaultNamspace, tc.enforceNamespace)
 

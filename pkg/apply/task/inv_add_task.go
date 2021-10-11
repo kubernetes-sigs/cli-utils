@@ -5,12 +5,17 @@ package task
 
 import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/object"
+)
+
+var (
+	namespaceGVKv1 = schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Namespace"}
 )
 
 // InvAddTask encapsulates structures necessary to add/merge inventory
@@ -74,7 +79,7 @@ func inventoryNamespaceInSet(inv inventory.InventoryInfo, objs object.Unstructur
 
 	for _, obj := range objs {
 		gvk := obj.GetObjectKind().GroupVersionKind()
-		if gvk == object.CoreV1Namespace && obj.GetName() == invNamespace {
+		if gvk == namespaceGVKv1 && obj.GetName() == invNamespace {
 			inventory.AddInventoryIDAnnotation(obj, inv)
 			return obj
 		}

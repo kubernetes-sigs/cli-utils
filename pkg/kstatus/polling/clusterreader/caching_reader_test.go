@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -26,6 +25,7 @@ var (
 	deploymentGVK = appsv1.SchemeGroupVersion.WithKind("Deployment")
 	rsGVK         = appsv1.SchemeGroupVersion.WithKind("ReplicaSet")
 	podGVK        = v1.SchemeGroupVersion.WithKind("Pod")
+	crdGVK        = schema.GroupVersionKind{Group: "apiextensions.k8s.io", Version: "v1", Kind: "CustomResourceDefinition"}
 )
 
 func TestSync(t *testing.T) {
@@ -79,8 +79,8 @@ func TestSync(t *testing.T) {
 	}
 
 	fakeMapper := testutil.NewFakeRESTMapper(
-		appsv1.SchemeGroupVersion.WithKind("Deployment"),
-		appsv1.SchemeGroupVersion.WithKind("ReplicaSet"),
+		deploymentGVK,
+		rsGVK,
 		v1.SchemeGroupVersion.WithKind("Pod"),
 	)
 
@@ -115,7 +115,7 @@ func TestSync_Errors(t *testing.T) {
 	}{
 		"mapping and reader are successful": {
 			mapper: testutil.NewFakeRESTMapper(
-				apiextv1.SchemeGroupVersion.WithKind("CustomResourceDefinition"),
+				crdGVK,
 			),
 			readerError:     nil,
 			expectSyncError: false,
@@ -123,7 +123,7 @@ func TestSync_Errors(t *testing.T) {
 		},
 		"reader returns NotFound error": {
 			mapper: testutil.NewFakeRESTMapper(
-				apiextv1.SchemeGroupVersion.WithKind("CustomResourceDefinition"),
+				crdGVK,
 			),
 			readerError: errors.NewNotFound(schema.GroupResource{
 				Group:    "apiextensions.k8s.io",
@@ -135,7 +135,7 @@ func TestSync_Errors(t *testing.T) {
 		},
 		"reader returns other error": {
 			mapper: testutil.NewFakeRESTMapper(
-				apiextv1.SchemeGroupVersion.WithKind("CustomResourceDefinition"),
+				crdGVK,
 			),
 			readerError:     errors.NewInternalError(fmt.Errorf("testing")),
 			expectSyncError: false,
@@ -178,7 +178,7 @@ func TestSync_Errors(t *testing.T) {
 			require.NoError(t, err)
 
 			cacheEntry, found := clusterReader.cache[gkNamespace{
-				GroupKind: apiextv1.SchemeGroupVersion.WithKind("CustomResourceDefinition").GroupKind(),
+				GroupKind: crdGVK.GroupKind(),
 			}]
 			require.True(t, found)
 			if tc.cacheError {

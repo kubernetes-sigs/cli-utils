@@ -8,13 +8,16 @@ import (
 	"reflect"
 	"time"
 
-	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/object"
+)
+
+var (
+	crdGK = schema.GroupKind{Group: "apiextensions.k8s.io", Kind: "CustomResourceDefinition"}
 )
 
 // Task is the interface that must be implemented by
@@ -163,9 +166,7 @@ func (w *WaitTask) startAndComplete(taskContext *TaskContext) {
 func (w *WaitTask) complete(taskContext *TaskContext) {
 	var err error
 	for _, obj := range w.Ids {
-		if (obj.GroupKind.Group == v1.SchemeGroupVersion.Group ||
-			obj.GroupKind.Group == v1beta1.SchemeGroupVersion.Group) &&
-			obj.GroupKind.Kind == "CustomResourceDefinition" {
+		if obj.GroupKind == crdGK {
 			ddRESTMapper, err := extractDeferredDiscoveryRESTMapper(w.mapper)
 			if err == nil {
 				ddRESTMapper.Reset()
