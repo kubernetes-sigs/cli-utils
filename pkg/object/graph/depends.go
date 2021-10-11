@@ -7,7 +7,9 @@
 package graph
 
 import (
+	"fmt"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/object/dependson"
@@ -34,6 +36,7 @@ func SortObjs(objs []*unstructured.Unstructured) ([][]*unstructured.Unstructured
 	addDependsOnEdges(g, objs)
 	addNamespaceEdges(g, objs)
 	addCRDEdges(g, objs)
+	addGateKeeperEdges(g, objs)
 	// Run topological sort on the graph.
 	objSets := [][]*unstructured.Unstructured{}
 	sortedObjSets, err := g.Sort()
@@ -121,7 +124,7 @@ func addCRDEdges(g *Graph, objs []*unstructured.Unstructured) {
 	crds := map[string]object.ObjMetadata{}
 	// First create a map of all the CRD's.
 	for _, u := range objs {
-		if object.IsCRD(u) {
+		if object.IsCRD(u.GroupVersionKind().GroupKind()) {
 			groupKind, found := object.GetCRDGroupKind(u)
 			if found {
 				obj := object.UnstructuredToObjMetaOrDie(u)
@@ -137,6 +140,31 @@ func addCRDEdges(g *Graph, objs []*unstructured.Unstructured) {
 		if to, found := crds[groupKind.String()]; found {
 			from := object.UnstructuredToObjMetaOrDie(u)
 			klog.V(3).Infof("adding edge from: custom resource %s, to CRD: %s", from, to)
+			g.AddEdge(from, to)
+		}
+	}
+}
+
+func addGateKeeperEdges(g *Graph, objs []*unstructured.Unstructured) {
+	fmt.Println("checking for GateKeeper edges")
+	templates := make(map[schema.GroupKind]object.ObjMetadata)
+	for _, u := range objs {
+		if object.IsConstraintTemplate(u.GroupVersionKind().GroupKind()) {
+			groupKind, found := object.GetConstraintGroupKind(u)
+			if found {
+				fmt.Printf("Found constraint template: %s\n", groupKind.String())
+				obj := object.UnstructuredToObjMetaOrDie(u)
+				templates[groupKind] = obj
+			}
+		}
+	}
+
+	for _, u := range objs {
+		gvk := u.GroupVersionKind()
+		groupKind := gvk.GroupKind()
+		if to, found := templates[groupKind]; found {
+			from := object.UnstructuredToObjMetaOrDie(u)
+			klog.V(3).Infof("adding edge from: constraint %s, to template: %s", from, to)
 			g.AddEdge(from, to)
 		}
 	}

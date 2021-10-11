@@ -36,6 +36,9 @@ var legacyTypes = map[string]GetConditionsFn{
 	"ConfigMap":                  alwaysReady,
 	"batch/Job":                  jobConditions,
 	"apiextensions.k8s.io/CustomResourceDefinition": crdConditions,
+
+	// TODO: Move this to a separate file.
+	"templates.gatekeeper.sh/ConstraintTemplate": gkTemplateConditions,
 }
 
 const (
@@ -582,4 +585,26 @@ func crdConditions(u *unstructured.Unstructured) (*Result, error) {
 		}
 	}
 	return newInProgressStatus("Installing", "Install in progress"), nil
+}
+
+func gkTemplateConditions(u *unstructured.Unstructured) (*Result, error) {
+	obj := u.UnstructuredContent()
+
+	val, found, err := unstructured.NestedBool(obj, "status", "created")
+	if err != nil {
+		return nil, err
+	}
+
+	if !found || !val {
+		return &Result{
+			Status: InProgressStatus,
+			Message: "Template is being created",
+			Conditions: []Condition{},
+		}, nil
+	}
+	return &Result{
+		Status: CurrentStatus,
+		Message: "Template has been created",
+		Conditions: []Condition{},
+	}, nil
 }

@@ -8,8 +8,6 @@ import (
 	"reflect"
 	"time"
 
-	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/klog/v2"
@@ -163,9 +161,7 @@ func (w *WaitTask) startAndComplete(taskContext *TaskContext) {
 func (w *WaitTask) complete(taskContext *TaskContext) {
 	var err error
 	for _, obj := range w.Ids {
-		if (obj.GroupKind.Group == v1.SchemeGroupVersion.Group ||
-			obj.GroupKind.Group == v1beta1.SchemeGroupVersion.Group) &&
-			obj.GroupKind.Kind == "CustomResourceDefinition" {
+		if object.IsCRD(obj.GroupKind) || object.IsConstraintTemplate(obj.GroupKind) {
 			ddRESTMapper, err := extractDeferredDiscoveryRESTMapper(w.mapper)
 			if err == nil {
 				ddRESTMapper.Reset()

@@ -105,7 +105,7 @@ func isFieldError(err error) (*field.Error, bool) {
 func findCRDs(us []*unstructured.Unstructured) []*unstructured.Unstructured {
 	var crds []*unstructured.Unstructured
 	for _, u := range us {
-		if IsCRD(u) {
+		if IsCRD(u.GroupVersionKind().GroupKind()) {
 			crds = append(crds, u)
 		}
 	}

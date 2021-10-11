@@ -57,7 +57,7 @@ func SetNamespaces(mapper meta.RESTMapper, objs []*unstructured.Unstructured,
 
 	// find any crds in the set of resources.
 	for _, obj := range objs {
-		if object.IsCRD(obj) {
+		if object.IsCRD(obj.GroupVersionKind().GroupKind()) {
 			crdObjs = append(crdObjs, obj)
 		}
 	}
@@ -76,15 +76,12 @@ func SetNamespaces(mapper meta.RESTMapper, objs []*unstructured.Unstructured,
 		if err != nil {
 			var unknownTypeError *object.UnknownTypeError
 			if errors.As(err, &unknownTypeError) {
-				// If no scope was found, just add the resource type to the list
-				// of unknown types.
-				unknownGKs = append(unknownGKs, unknownTypeError.GroupKind)
+				unknownGKs = append(unknownGKs, obj.GroupVersionKind().GroupKind())
 				continue
-			} else {
-				// If something went wrong when looking up the scope, just
-				// give up.
-				return err
 			}
+			// If something went wrong when looking up the scope, just
+			// give up.
+			return err
 		}
 
 		switch scope {

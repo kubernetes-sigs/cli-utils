@@ -18,7 +18,11 @@ var (
 	CoreNamespace   = CoreV1Namespace.GroupKind()
 	CoreV1Namespace = corev1.SchemeGroupVersion.WithKind("Namespace")
 	ExtensionsCRD   = ExtensionsV1CRD.GroupKind()
-	ExtensionsV1CRD = extensionsv1.SchemeGroupVersion.WithKind("CustomResourceDefinition")
+	ExtensionsV1CRD       = extensionsv1.SchemeGroupVersion.WithKind("CustomResourceDefinition")
+	ConstraintTemplateCRD = schema.GroupKind{
+		Group: "templates.gatekeeper.sh",
+		Kind: "ConstraintTemplate",
+	}
 )
 
 // UnstructuredsToObjMetas converts a slice of unstructureds to a slice of
@@ -87,12 +91,12 @@ func IsNamespaced(u *unstructured.Unstructured) bool {
 
 // IsCRD returns true if the passed Unstructured object has
 // GroupKind == Extensions/CustomResourceDefinition; false otherwise.
-func IsCRD(u *unstructured.Unstructured) bool {
-	if u == nil {
-		return false
-	}
-	gvk := u.GroupVersionKind()
-	return ExtensionsCRD == gvk.GroupKind()
+func IsCRD(gk schema.GroupKind) bool {
+	return ExtensionsCRD == gk
+}
+
+func IsConstraintTemplate(gk schema.GroupKind) bool {
+	return ConstraintTemplateCRD == gk
 }
 
 // GetCRDGroupKind returns the GroupKind stored in the passed
@@ -111,6 +115,20 @@ func GetCRDGroupKind(u *unstructured.Unstructured) (schema.GroupKind, bool) {
 		}
 	}
 	return emptyGroupKind, false
+}
+
+func GetConstraintGroupKind(u *unstructured.Unstructured) (schema.GroupKind, bool) {
+	if u == nil {
+		return schema.GroupKind{}, false
+	}
+	kind, found, err := unstructured.NestedString(u.Object, "spec", "crd", "spec", "names", "kind")
+	if found && err == nil {
+		return schema.GroupKind{
+			Group: "constraints.gatekeeper.sh",
+			Kind: kind,
+		}, true
+	}
+	return schema.GroupKind{}, false
 }
 
 // UnknownTypeError captures information about a type for which no information
@@ -138,10 +156,9 @@ func LookupResourceScope(u *unstructured.Unstructured, crds []*unstructured.Unst
 		return nil, err
 	}
 
-	var scope meta.RESTScope
 	if err == nil {
 		// If we find the type in the cluster, we just look up the scope there.
-		scope = mapping.Scope
+		return mapping.Scope, nil
 	} else {
 		// If we couldn't find the type in the cluster, check if we find a
 		// match in any of the provided CRDs.
@@ -152,21 +169,22 @@ func LookupResourceScope(u *unstructured.Unstructured, crds []*unstructured.Unst
 				scopeName, _, _ := unstructured.NestedString(crd.Object, "spec", "scope")
 				switch scopeName {
 				case "Namespaced":
-					scope = meta.RESTScopeNamespace
+					return meta.RESTScopeNamespace, nil
 				case "Cluster":
-					scope = meta.RESTScopeRoot
+					return meta.RESTScopeRoot, nil
 				default:
 					return nil, fmt.Errorf("unknown scope %q", scopeName)
 				}
-				break
 			}
 		}
 	}
 
-	if scope == nil {
-		return nil, &UnknownTypeError{
-			GroupKind: gvk.GroupKind(),
-		}
+	// Finally, we check if this is a Gatekeeper policy.
+	if gvk.Group == "constraints.gatekeeper.sh" {
+		return meta.RESTScopeRoot, nil
 	}
-	return scope, nil
+
+	return nil, &UnknownTypeError{
+		GroupKind: gvk.GroupKind(),
+	}
 }

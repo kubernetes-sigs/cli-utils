@@ -174,7 +174,7 @@ func TestIsCRD(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			actual := IsCRD(tc.obj)
+			actual := IsCRD(tc.obj.GroupVersionKind().GroupKind())
 			if tc.isCRD != actual {
 				t.Errorf("expected IsCRD (%t), got (%t) for (%s)", tc.isCRD, actual, tc.obj)
 			}
