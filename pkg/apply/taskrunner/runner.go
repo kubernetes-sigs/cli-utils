@@ -9,6 +9,7 @@ import (
 	"sort"
 	"time"
 
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/cli-utils/pkg/apply/cache"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/poller"
@@ -50,6 +51,9 @@ type Options struct {
 // that does most of the work.
 func (tsr *taskStatusRunner) Run(ctx context.Context, taskQueue chan Task,
 	eventChannel chan event.Event, options Options) error {
+	// Give the poller its own context and run it in the background.
+	// If taskStatusRunner.Run is cancelled, baseRunner.run will exit early,
+	// causing the poller to be cancelled.
 	statusCtx, cancelFunc := context.WithCancel(context.Background())
 	statusChannel := tsr.statusPoller.Poll(statusCtx, tsr.identifiers, polling.Options{
 		PollInterval: options.PollInterval,
@@ -253,6 +257,7 @@ func (b *baseRunner) run(ctx context.Context, taskQueue chan Task,
 		case <-doneCh:
 			doneCh = nil // Set doneCh to nil so we don't enter a busy loop.
 			abort = true
+			klog.V(3).Info("taskrunner cancelled by caller")
 			completeIfWaitTask(currentTask, taskContext)
 		}
 	}

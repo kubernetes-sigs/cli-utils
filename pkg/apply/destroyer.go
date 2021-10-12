@@ -89,7 +89,7 @@ func setDestroyerDefaults(o *DestroyerOptions) {
 // Run performs the destroy step. Passes the inventory object. This
 // happens asynchronously on progress and any errors are reported
 // back on the event channel.
-func (d *Destroyer) Run(inv inventory.InventoryInfo, options DestroyerOptions) <-chan event.Event {
+func (d *Destroyer) Run(ctx context.Context, inv inventory.InventoryInfo, options DestroyerOptions) <-chan event.Event {
 	eventChannel := make(chan event.Event)
 	setDestroyerDefaults(&options)
 	go func() {
@@ -153,7 +153,7 @@ func (d *Destroyer) Run(inv inventory.InventoryInfo, options DestroyerOptions) <
 		runner := taskrunner.NewTaskStatusRunner(deleteIds, d.statusPoller, resourceCache)
 		klog.V(4).Infoln("destroyer running TaskStatusRunner...")
 		// TODO(seans): Make the poll interval configurable like the applier.
-		err = runner.Run(context.Background(), taskQueue.ToChannel(), eventChannel, taskrunner.Options{
+		err = runner.Run(ctx, taskQueue.ToChannel(), eventChannel, taskrunner.Options{
 			UseCache:         true,
 			PollInterval:     options.PollInterval,
 			EmitStatusEvents: options.EmitStatusEvents,

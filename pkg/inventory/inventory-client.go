@@ -281,7 +281,7 @@ func (cic *ClusterInventoryClient) getClusterInventoryObjsByLabel(inv InventoryI
 		return nil, err
 	}
 	labelSelector := fmt.Sprintf("%s=%s", common.InventoryLabel, label)
-	klog.V(4).Infof("prune inventory object fetch: %s/%s/%s", groupResource, namespace, labelSelector)
+	klog.V(4).Infof("inventory object fetch by label (group: %q, namespace: %q, selector: %q)", groupResource, namespace, labelSelector)
 	builder := cic.builderFunc()
 	retrievedInventoryInfos, err := builder.
 		Unstructured().
@@ -316,6 +316,7 @@ func (cic *ClusterInventoryClient) getClusterInventoryObjsByName(inv InventoryIn
 		return nil, err
 	}
 
+	klog.V(4).Infof("inventory object fetch by name (namespace: %q, name: %q)", inv.Namespace(), inv.Name())
 	res, err := helper.Get(inv.Namespace(), inv.Name())
 	if err != nil && !apierrors.IsNotFound(err) {
 		return nil, err

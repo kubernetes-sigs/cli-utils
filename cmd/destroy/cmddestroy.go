@@ -4,6 +4,7 @@
 package destroy
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -117,7 +118,7 @@ func (r *DestroyRunner) RunE(cmd *cobra.Command, args []string) error {
 	// Run the destroyer. It will return a channel where we can receive updates
 	// to keep track of progress and any issues.
 	printStatusEvents := r.deleteTimeout != time.Duration(0)
-	ch := d.Run(inv, apply.DestroyerOptions{
+	ch := d.Run(context.Background(), inv, apply.DestroyerOptions{
 		DeleteTimeout:           r.deleteTimeout,
 		DeletePropagationPolicy: deletePropPolicy,
 		InventoryPolicy:         inventoryPolicy,
