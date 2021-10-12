@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -106,4 +107,32 @@ func (e equalErrorString) Is(err error) bool {
 		return false
 	}
 	return e.err == err.Error()
+}
+
+// AssertEqual fails the test if the actual value does not deeply equal the
+// expected value. Prints a diff on failure.
+func AssertEqual(t *testing.T, actual, expected interface{}) {
+	t.Helper() // print the caller's file:line, instead of this func, on failure
+	matcher := Equal(expected)
+	match, err := matcher.Match(actual)
+	if err != nil {
+		t.Errorf("errored testing equality: %s", err)
+	}
+	if !match {
+		t.Error(matcher.FailureMessage(actual))
+	}
+}
+
+// AssertNotEqual fails the test if the actual value deeply equals the
+// expected value. Prints a diff on failure.
+func AssertNotEqual(t *testing.T, actual, expected interface{}) {
+	t.Helper() // print the caller's file:line, instead of this func, on failure
+	matcher := Equal(expected)
+	match, err := matcher.Match(actual)
+	if err != nil {
+		t.Errorf("errored testing equality: %s", err)
+	}
+	if match {
+		t.Error(matcher.NegatedFailureMessage(actual))
+	}
 }
