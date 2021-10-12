@@ -1,9 +1,14 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-  - pwittrock
   - seans3
-  - soltysh
   - liujingfang1
-  - barney-s
   - mortent
+
+reviewers:
+  - seans3
+  - liujingfang1
+  - mortent
+  - ash2k
+  - karlkfi
+  - haiyanmeng
