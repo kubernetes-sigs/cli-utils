@@ -22,7 +22,7 @@ import (
 func TestSetNamespaces(t *testing.T) {
 	testCases := map[string]struct {
 		objs             []*unstructured.Unstructured
-		defaultNamspace  string
+		defaultNamespace string
 		enforceNamespace bool
 
 		expectedNamespaces []string
@@ -41,7 +41,7 @@ func TestSetNamespaces(t *testing.T) {
 					Kind:    "PodDisruptionBudget",
 				}, "default"),
 			},
-			defaultNamspace:  "foo",
+			defaultNamespace: "foo",
 			enforceNamespace: false,
 			expectedNamespaces: []string{
 				"default",
@@ -56,7 +56,7 @@ func TestSetNamespaces(t *testing.T) {
 					Kind:    "Deployment",
 				}, ""),
 			},
-			defaultNamspace:    "foo",
+			defaultNamespace:   "foo",
 			enforceNamespace:   false,
 			expectedNamespaces: []string{"foo"},
 		},
@@ -68,7 +68,7 @@ func TestSetNamespaces(t *testing.T) {
 					Kind:    "Deployment",
 				}, "bar"),
 			},
-			defaultNamspace:    "bar",
+			defaultNamespace:   "bar",
 			enforceNamespace:   true,
 			expectedNamespaces: []string{"bar"},
 		},
@@ -80,7 +80,7 @@ func TestSetNamespaces(t *testing.T) {
 					Kind:    "Deployment",
 				}, "foo"),
 			},
-			defaultNamspace:  "bar",
+			defaultNamespace: "bar",
 			enforceNamespace: true,
 			expectedErr: &NamespaceMismatchError{
 				RequiredNamespace: "bar",
@@ -98,12 +98,13 @@ func TestSetNamespaces(t *testing.T) {
 					Group:   "apiextensions.k8s.io",
 					Version: "v1",
 					Kind:    "CustomResourceDefinition",
-				}, schema.GroupKind{
-					Group: "custom.io",
-					Kind:  "Custom",
+				}, schema.GroupVersionKind{
+					Group:   "custom.io",
+					Version: "v1",
+					Kind:    "Custom",
 				}, "Cluster"),
 			},
-			defaultNamspace:    "bar",
+			defaultNamespace:   "bar",
 			enforceNamespace:   true,
 			expectedNamespaces: []string{"", ""},
 		},
@@ -113,9 +114,10 @@ func TestSetNamespaces(t *testing.T) {
 					Group:   "apiextensions.k8s.io",
 					Version: "v1",
 					Kind:    "CustomResourceDefinition",
-				}, schema.GroupKind{
-					Group: "custom.io",
-					Kind:  "Custom",
+				}, schema.GroupVersionKind{
+					Group:   "custom.io",
+					Version: "v1",
+					Kind:    "Custom",
 				}, "Namespaced"),
 				toUnstructured(schema.GroupVersionKind{
 					Group:   "custom.io",
@@ -123,7 +125,7 @@ func TestSetNamespaces(t *testing.T) {
 					Kind:    "Custom",
 				}, ""),
 			},
-			defaultNamspace:    "bar",
+			defaultNamespace:   "bar",
 			enforceNamespace:   true,
 			expectedNamespaces: []string{"", "bar"},
 		},
@@ -141,14 +143,16 @@ func TestSetNamespaces(t *testing.T) {
 				}, ""),
 			},
 			expectedErr: &UnknownTypesError{
-				GroupKinds: []schema.GroupKind{
+				GroupVersionKinds: []schema.GroupVersionKind{
 					{
-						Group: "custom.io",
-						Kind:  "Custom",
+						Group:   "custom.io",
+						Version: "v1",
+						Kind:    "Custom",
 					},
 					{
-						Group: "custom.io",
-						Kind:  "AnotherCustom",
+						Group:   "custom.io",
+						Version: "v1",
+						Kind:    "AnotherCustom",
 					},
 				},
 			},
@@ -169,7 +173,7 @@ func TestSetNamespaces(t *testing.T) {
 				crdGV.WithResource("customresourcedefinition"), meta.RESTScopeRoot)
 			mapper = meta.MultiRESTMapper([]meta.RESTMapper{mapper, crdMapper})
 
-			err = SetNamespaces(mapper, tc.objs, tc.defaultNamspace, tc.enforceNamespace)
+			err = SetNamespaces(mapper, tc.objs, tc.defaultNamespace, tc.enforceNamespace)
 
 			if tc.expectedErr != nil {
 				require.Error(t, err)
@@ -177,7 +181,7 @@ func TestSetNamespaces(t *testing.T) {
 				return
 			}
 
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			for i, obj := range tc.objs {
 				assert.Equal(t, tc.expectedNamespaces[i], obj.GetNamespace())
@@ -352,18 +356,23 @@ func toUnstructured(gvk schema.GroupVersionKind, namespace string) *unstructured
 	}
 }
 
-func toCRDUnstructured(gvk schema.GroupVersionKind, gk schema.GroupKind,
+func toCRDUnstructured(crdGvk schema.GroupVersionKind, crGvk schema.GroupVersionKind,
 	scope string) *unstructured.Unstructured {
 	return &unstructured.Unstructured{
 		Object: map[string]interface{}{
-			"apiVersion": gvk.GroupVersion().String(),
-			"kind":       gvk.Kind,
+			"apiVersion": crdGvk.GroupVersion().String(),
+			"kind":       crdGvk.Kind,
 			"spec": map[string]interface{}{
-				"group": gk.Group,
+				"group": crGvk.Group,
 				"names": map[string]interface{}{
-					"kind": gk.Kind,
+					"kind": crGvk.Kind,
 				},
 				"scope": scope,
+				"versions": []interface{}{
+					map[string]interface{}{
+						"name": crGvk.Version,
+					},
+				},
 			},
 		},
 	}

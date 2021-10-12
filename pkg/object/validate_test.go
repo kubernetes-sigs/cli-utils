@@ -190,6 +190,8 @@ spec:
   names:
     kind: Custom
   scope: Cluster
+  versions:
+  - name: v1
 `,
 				),
 				testutil.Unstructured(t, `

@@ -33,6 +33,22 @@ spec:
   scope: Cluster
   names:
     kind: crontab
+  versions:
+  - name: v1
+`
+
+var testCRDv2 = `
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: test-crd
+spec:
+  group: example.com
+  scope: Cluster
+  names:
+    kind: crontab
+  versions:
+  - name: v2
 `
 
 var testCR = `
@@ -269,9 +285,23 @@ func TestLookupResourceScope(t *testing.T) {
 		"CR not found in the RESTMapper or the provided CRDs": {
 			resource: testutil.Unstructured(t, testCR),
 			expectedErr: &UnknownTypeError{
-				GroupKind: schema.GroupKind{
-					Group: "example.com",
-					Kind:  "crontab",
+				GroupVersionKind: schema.GroupVersionKind{
+					Group:   "example.com",
+					Version: "v1",
+					Kind:    "crontab",
+				},
+			},
+		},
+		"CR not found in the RESTMapper or the provided CRDs because version is missing": {
+			resource: testutil.Unstructured(t, testCR),
+			crds: []*unstructured.Unstructured{
+				testutil.Unstructured(t, testCRDv2),
+			},
+			expectedErr: &UnknownTypeError{
+				GroupVersionKind: schema.GroupVersionKind{
+					Group:   "example.com",
+					Version: "v1",
+					Kind:    "crontab",
 				},
 			},
 		},
