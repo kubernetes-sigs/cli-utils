@@ -128,7 +128,7 @@ func LookupResourceScope(u *unstructured.Unstructured, crds []*unstructured.Unst
 	gvk := u.GroupVersionKind()
 	// First see if we can find the type (and the scope) in the cluster through
 	// the RESTMapper.
-	mapping, err := mapper.RESTMapping(gvk.GroupKind())
+	mapping, err := mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
 	if err == nil {
 		// If we find the type in the cluster, we just look up the scope there.
 		return mapping.Scope, nil
