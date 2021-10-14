@@ -8,18 +8,16 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
-	"k8s.io/kubectl/pkg/scheme"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/testutil"
 )
 
 func TestValidate(t *testing.T) {
-	_ = apiextv1.AddToScheme(scheme.Scheme)
 	testCases := map[string]struct {
 		resources     []*unstructured.Unstructured
 		expectedError error
@@ -234,6 +232,12 @@ metadata:
 
 			mapper, err := tf.ToRESTMapper()
 			require.NoError(t, err)
+			crdGV := schema.GroupVersion{Group: "apiextensions.k8s.io", Version: "v1"}
+			crdMapper := meta.NewDefaultRESTMapper([]schema.GroupVersion{crdGV})
+			crdMapper.AddSpecific(crdGV.WithKind("CustomResourceDefinition"),
+				crdGV.WithResource("customresourcedefinitions"),
+				crdGV.WithResource("customresourcedefinition"), meta.RESTScopeRoot)
+			mapper = meta.MultiRESTMapper([]meta.RESTMapper{mapper, crdMapper})
 
 			err = (&object.Validator{
 				Mapper: mapper,

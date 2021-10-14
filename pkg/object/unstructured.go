@@ -7,18 +7,14 @@ package object
 import (
 	"fmt"
 
-	corev1 "k8s.io/api/core/v1"
-	extensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 var (
-	CoreNamespace   = CoreV1Namespace.GroupKind()
-	CoreV1Namespace = corev1.SchemeGroupVersion.WithKind("Namespace")
-	ExtensionsCRD   = ExtensionsV1CRD.GroupKind()
-	ExtensionsV1CRD = extensionsv1.SchemeGroupVersion.WithKind("CustomResourceDefinition")
+	namespaceGK = schema.GroupKind{Group: "", Kind: "Namespace"}
+	crdGK       = schema.GroupKind{Group: "apiextensions.k8s.io", Kind: "CustomResourceDefinition"}
 )
 
 // UnstructuredsToObjMetas converts a slice of unstructureds to a slice of
@@ -73,7 +69,7 @@ func IsKindNamespace(u *unstructured.Unstructured) bool {
 		return false
 	}
 	gvk := u.GroupVersionKind()
-	return CoreNamespace == gvk.GroupKind()
+	return namespaceGK == gvk.GroupKind()
 }
 
 // IsNamespaced returns true if the passed Unstructured object
@@ -92,7 +88,7 @@ func IsCRD(u *unstructured.Unstructured) bool {
 		return false
 	}
 	gvk := u.GroupVersionKind()
-	return ExtensionsCRD == gvk.GroupKind()
+	return crdGK == gvk.GroupKind()
 }
 
 // GetCRDGroupKind returns the GroupKind stored in the passed

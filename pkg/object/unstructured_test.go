@@ -8,12 +8,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
-	"k8s.io/kubectl/pkg/scheme"
 	. "sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/testutil"
 )
@@ -258,7 +256,6 @@ func TestGetCRDGroupKind(t *testing.T) {
 }
 
 func TestLookupResourceScope(t *testing.T) {
-	_ = apiextv1.AddToScheme(scheme.Scheme)
 	testCases := map[string]struct {
 		resource      *unstructured.Unstructured
 		crds          []*unstructured.Unstructured
