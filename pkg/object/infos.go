@@ -50,7 +50,10 @@ func UnstructuredToInfo(obj *unstructured.Unstructured) (*resource.Info, error) 
 	path, ok := annos[kioutil.PathAnnotation]
 	if ok {
 		source = path
+		// kyaml adds both annotations for the time being, so we need to remove them both
+		// before apply.
 		delete(annos, kioutil.PathAnnotation)
+		delete(annos, kioutil.LegacyPathAnnotation)
 		obj.SetAnnotations(annos)
 	}
 

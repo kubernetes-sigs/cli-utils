@@ -35,6 +35,24 @@ func TestUnstructuredToInfo(t *testing.T) {
 			expectedName:      "foo",
 			expectedNamespace: "",
 		},
+		"with both new and legacy annotations": {
+			obj: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"apiVersion": "apps/v1",
+					"kind":       "Deployment",
+					"metadata": map[string]interface{}{
+						"name": "foo",
+						"annotations": map[string]interface{}{
+							kioutil.PathAnnotation:       "deployment.yaml",
+							kioutil.LegacyPathAnnotation: "deployment.yaml",
+						},
+					},
+				},
+			},
+			expectedSource:    "deployment.yaml",
+			expectedName:      "foo",
+			expectedNamespace: "",
+		},
 		"without path annotation": {
 			obj: &unstructured.Unstructured{
 				Object: map[string]interface{}{
@@ -69,8 +87,10 @@ func TestUnstructuredToInfo(t *testing.T) {
 			}
 
 			if found {
-				_, hasAnnotation := annos[kioutil.PathAnnotation]
-				assert.False(t, hasAnnotation)
+				for _, a := range []kioutil.AnnotationKey{kioutil.PathAnnotation, kioutil.LegacyPathAnnotation} {
+					_, hasAnnotation := annos[a]
+					assert.False(t, hasAnnotation, "did not expect %s", a)
+				}
 			}
 		})
 	}
