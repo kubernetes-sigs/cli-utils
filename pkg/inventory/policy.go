@@ -66,7 +66,8 @@ const (
 	AdoptAll
 )
 
-const owningInventoryKey = "config.k8s.io/owning-inventory"
+// OwningInventoryKey is the annotation key indicating the inventory owning an object.
+const OwningInventoryKey = "config.k8s.io/owning-inventory"
 
 // inventoryIDMatchStatus represents the result of comparing the
 // id from current inventory info and the inventory-id from a live object.
@@ -81,7 +82,7 @@ const (
 
 func InventoryIDMatch(inv InventoryInfo, obj *unstructured.Unstructured) inventoryIDMatchStatus {
 	annotations := obj.GetAnnotations()
-	value, found := annotations[owningInventoryKey]
+	value, found := annotations[OwningInventoryKey]
 	if !found {
 		return Empty
 	}
@@ -101,7 +102,7 @@ func CanApply(inv InventoryInfo, obj *unstructured.Unstructured, policy Inventor
 		if policy != InventoryPolicyMustMatch {
 			return true, nil
 		}
-		err := fmt.Errorf("can't adopt an object without the annotation %s", owningInventoryKey)
+		err := fmt.Errorf("can't adopt an object without the annotation %s", OwningInventoryKey)
 		return false, NewNeedAdoptionError(err)
 	case Match:
 		return true, nil
@@ -109,7 +110,7 @@ func CanApply(inv InventoryInfo, obj *unstructured.Unstructured, policy Inventor
 		if policy == AdoptAll {
 			return true, nil
 		}
-		err := fmt.Errorf("can't apply the resource since its annotation %s is a different inventory object", owningInventoryKey)
+		err := fmt.Errorf("can't apply the resource since its annotation %s is a different inventory object", OwningInventoryKey)
 		return false, NewInventoryOverlapError(err)
 	}
 	// shouldn't reach here
@@ -137,7 +138,7 @@ func AddInventoryIDAnnotation(obj *unstructured.Unstructured, inv InventoryInfo)
 	if annotations == nil {
 		annotations = make(map[string]string)
 	}
-	annotations[owningInventoryKey] = inv.ID()
+	annotations[OwningInventoryKey] = inv.ID()
 	obj.SetAnnotations(annotations)
 }
 

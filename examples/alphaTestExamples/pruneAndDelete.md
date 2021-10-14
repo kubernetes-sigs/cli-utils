@@ -34,10 +34,14 @@ function expectedOutputLine() {
 }
 ```
 
-In this example we will just use two ConfigMap resources for simplicity, but
-of course any type of resource can be used. On one of our ConfigMaps, we add the
-**cli-utils.sigs.k8s.io/on-remove** annotation with the value of **keep**. This 
-annotation tells the kapply tool that this resource should not be deleted, even
+In this example we will just use three ConfigMap resources for simplicity, but
+of course any type of resource can be used.
+
+- the first ConfigMap resource does not have any annotations;
+- the second ConfigMap resource has the **cli-utils.sigs.k8s.io/on-remove** annotation with the value of **keep**;
+- the third ConfigMap resource has the **client.lifecycle.config.k8s.io/deletion** annotation with the value of **detach**.
+
+These two annotations tell the kapply tool that a resource should not be deleted, even
 if it would otherwise be pruned or deleted with the destroy command.
 
 <!-- @createFirstCM @testE2EAgainstLatestRelease-->
@@ -53,7 +57,7 @@ data:
 EOF
 ```
 
-This ConfigMap includes the lifecycle directive annotation
+This ConfigMap includes the **cli-utils.sigs.k8s.io/on-remove** annotation
 
 <!-- @createSecondCM @testE2EAgainstLatestRelease-->
 ```
@@ -64,6 +68,24 @@ metadata:
   name: secondmap
   annotations:
     cli-utils.sigs.k8s.io/on-remove: keep
+data:
+  artist: Husker Du
+  album: New Day Rising
+EOF
+```
+
+
+This ConfigMap includes the **client.lifecycle.config.k8s.io/deletion** annotation
+
+<!-- @createSecondCM @testE2EAgainstLatestRelease-->
+```
+cat <<EOF >$BASE/configMap3.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: thirdmap
+  annotations:
+    client.lifecycle.config.k8s.io/deletion: detach
 data:
   artist: Husker Du
   album: New Day Rising
@@ -90,14 +112,14 @@ expectedOutputLine "namespace: default is used for inventory object"
 
 ```
 
-Apply both resources to the cluster.
+Apply the three resources to the cluster.
 <!-- @runApply @testE2EAgainstLatestRelease -->
 ```
 kapply apply $BASE --reconcile-timeout=1m > $OUTPUT/status
 ```
 
 Use the preview command to show what will happen if we run destroy. This should
-show that the second ConfigMap will not be deleted even when using the destroy 
+show that secondmap and thirdmap will not be deleted even when using the destroy
 command.
 <!-- @runDestroyPreview @testE2EAgainstLatestRelease -->
 ```
@@ -106,10 +128,12 @@ kapply preview --destroy $BASE > $OUTPUT/status
 expectedOutputLine "configmap/firstmap deleted (preview)"
 
 expectedOutputLine "configmap/secondmap delete skipped (preview)"
+
+expectedOutputLine "configmap/thirdmap delete skipped (preview)"
 ```
 
-We run the destroy command and see that the resource without the annotation
-has been deleted, while the resource with the annotation is still in the 
+We run the destroy command and see that the resource without the annotations (firstmap)
+has been deleted, while the resources with the annotations (secondmap and thirdmap)  are still in the
 cluster.
 <!-- @runDestroy @testE2EAgainstLatestRelease -->
 ```
@@ -119,45 +143,58 @@ expectedOutputLine "configmap/firstmap deleted"
 
 expectedOutputLine "configmap/secondmap delete skipped"
 
-expectedOutputLine "1 resource(s) deleted, 1 skipped"
+expectedOutputLine "configmap/thirdmap delete skipped"
+
+expectedOutputLine "1 resource(s) deleted, 2 skipped"
 expectedNotFound "resource(s) pruned"
 
 kubectl get cm --no-headers | awk '{print $1}' > $OUTPUT/status
 expectedOutputLine "secondmap"
-```
 
+kubectl get cm --no-headers | awk '{print $1}' > $OUTPUT/status
+expectedOutputLine "thirdmap"
+```
 
 Apply the resources back to the cluster so we can demonstrate the lifecycle
 directive with pruning.
 <!-- @runApplyAgain @testE2EAgainstLatestRelease -->
 ```
-kapply apply $BASE --reconcile-timeout=1m > $OUTPUT/status
+kapply apply $BASE --inventory-policy=adopt --reconcile-timeout=1m > $OUTPUT/status
 ```
 
-Delete the manifest for the second configmap
+Delete the manifest for secondmap and thirdmap
 <!-- @runDeleteManifest @testE2EAgainstLatestRelease -->
 ```
 rm $BASE/configMap2.yaml
+
+rm $BASE/configMap3.yaml
 ```
 
-Run preview to see that while secondmap would normally be pruned, it 
+Run preview to see that while secondmap and thirdmap would normally be pruned, they
 will instead be skipped due to the lifecycle directive.
 <!-- @runPreviewForPrune @testE2EAgainstLatestRelease -->
 ```
 kapply preview $BASE > $OUTPUT/status
 
 expectedOutputLine "configmap/secondmap prune skipped (preview)"
+
+expectedOutputLine "configmap/thirdmap prune skipped (preview)"
 ```
 
-Run apply and verify that secondmap is still in the cluster.
+Run apply and verify that secondmap and thirdmap are still in the cluster.
 <!-- @runApplyToPrune @testE2EAgainstLatestRelease -->
 ```
 kapply apply $BASE > $OUTPUT/status
 
 expectedOutputLine "configmap/secondmap prune skipped"
 
+expectedOutputLine "configmap/thirdmap prune skipped"
+
 kubectl get cm --no-headers | awk '{print $1}' > $OUTPUT/status
 expectedOutputLine "secondmap"
+
+kubectl get cm --no-headers | awk '{print $1}' > $OUTPUT/status
+expectedOutputLine "thirdmap"
 
 kind delete cluster;
 ```
