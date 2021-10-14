@@ -139,12 +139,9 @@ func (r *PreviewRunner) RunE(cmd *cobra.Command, args []string) error {
 			return err
 		}
 
-		// Create a context
-		ctx := context.Background()
-
 		// Run the applier. It will return a channel where we can receive updates
 		// to keep track of progress and any issues.
-		ch = a.Run(ctx, inv, objs, apply.Options{
+		ch = a.Run(context.Background(), inv, objs, apply.Options{
 			EmitStatusEvents:  false,
 			NoPrune:           noPrune,
 			DryRunStrategy:    drs,
@@ -156,7 +153,7 @@ func (r *PreviewRunner) RunE(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return err
 		}
-		ch = d.Run(inv, apply.DestroyerOptions{
+		ch = d.Run(context.Background(), inv, apply.DestroyerOptions{
 			InventoryPolicy: inventoryPolicy,
 			DryRunStrategy:  drs,
 		})

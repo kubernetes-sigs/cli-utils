@@ -254,7 +254,7 @@ func pruneRetrieveErrorTest(c client.Client, invConfig InventoryConfig, inventor
 	destroyer := invConfig.DestroyerFactoryFunc()
 
 	options := apply.DestroyerOptions{InventoryPolicy: inventory.AdoptIfNoInventory}
-	destroyerEvents := runCollect(destroyer.Run(inv, options))
+	destroyerEvents := runCollect(destroyer.Run(context.TODO(), inv, options))
 
 	expEvents3 := []testutil.ExpEvent{
 		{

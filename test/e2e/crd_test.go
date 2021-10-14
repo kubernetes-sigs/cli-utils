@@ -175,7 +175,7 @@ func crdTest(_ client.Client, invConfig InventoryConfig, inventoryName, namespac
 	By("destroy the resources, including the crd")
 	destroyer := invConfig.DestroyerFactoryFunc()
 	options := apply.DestroyerOptions{InventoryPolicy: inventory.AdoptIfNoInventory}
-	destroyerEvents := runCollect(destroyer.Run(inv, options))
+	destroyerEvents := runCollect(destroyer.Run(context.TODO(), inv, options))
 
 	expEvents = []testutil.ExpEvent{
 		{

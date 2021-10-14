@@ -243,7 +243,7 @@ func dependsOnTest(c client.Client, invConfig InventoryConfig, inventoryName, na
 	By("destroy resources in opposite order")
 	destroyer := invConfig.DestroyerFactoryFunc()
 	options := apply.DestroyerOptions{InventoryPolicy: inventory.AdoptIfNoInventory}
-	destroyerEvents := runCollect(destroyer.Run(inv, options))
+	destroyerEvents := runCollect(destroyer.Run(context.TODO(), inv, options))
 
 	expEvents = []testutil.ExpEvent{
 		{

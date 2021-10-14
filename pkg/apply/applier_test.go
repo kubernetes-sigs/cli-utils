@@ -584,8 +584,12 @@ func TestApplierCancel(t *testing.T) {
 			},
 			clusterObjs: object.UnstructuredSet{},
 			options: Options{
-				NoPrune:         true,
-				InventoryPolicy: inventory.InventoryPolicyMustMatch,
+				// EmitStatusEvents required to test event output
+				EmitStatusEvents: true,
+				NoPrune:          true,
+				InventoryPolicy:  inventory.InventoryPolicyMustMatch,
+				// ReconcileTimeout required to enable WaitTasks
+				ReconcileTimeout: 1 * time.Minute,
 			},
 			statusEvents: []pollevent.Event{
 				{
@@ -721,8 +725,12 @@ func TestApplierCancel(t *testing.T) {
 			},
 			clusterObjs: object.UnstructuredSet{},
 			options: Options{
-				NoPrune:         true,
-				InventoryPolicy: inventory.InventoryPolicyMustMatch,
+				// EmitStatusEvents required to test event output
+				EmitStatusEvents: true,
+				NoPrune:          true,
+				InventoryPolicy:  inventory.InventoryPolicyMustMatch,
+				// ReconcileTimeout required to enable WaitTasks
+				ReconcileTimeout: 1 * time.Minute,
 			},
 			statusEvents: []pollevent.Event{
 				{
@@ -853,9 +861,6 @@ func TestApplierCancel(t *testing.T) {
 
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
-			expectedTimeout := 2 * time.Second
-			testTimeout := expectedTimeout + 10*time.Second
-
 			poller := newFakePoller(tc.statusEvents)
 
 			applier := newTestApplier(t,
@@ -866,19 +871,14 @@ func TestApplierCancel(t *testing.T) {
 			)
 
 			// Context for Applier.Run
-			runCtx, runCancel, isTimedOut := withTimeout(context.Background(), expectedTimeout)
+			runCtx, runCancel := context.WithTimeout(context.Background(), tc.runTimeout)
 			defer runCancel() // cleanup
 
 			// Context for this test (in case Applier.Run never closes the event channel)
-			testCtx, testCancel := context.WithTimeout(context.Background(), testTimeout)
+			testCtx, testCancel := context.WithTimeout(context.Background(), tc.testTimeout)
 			defer testCancel() // cleanup
 
-			eventChannel := applier.Run(runCtx, tc.invInfo.toWrapped(), tc.resources, Options{
-				EmitStatusEvents: true,
-				// ReconcileTimeout needs to block long enough to cancel the run,
-				// otherwise the WaitTask is skipped.
-				ReconcileTimeout: 1 * time.Minute,
-			})
+			eventChannel := applier.Run(runCtx, tc.invInfo.toWrapped(), tc.resources, tc.options)
 
 			// Start sending status events
 			poller.Start()
@@ -891,8 +891,8 @@ func TestApplierCancel(t *testing.T) {
 				case <-testCtx.Done():
 					// Test timed out
 					runCancel()
-					t.Fatalf("Applier.Run failed to respond to cancellation (expected: %s, timeout: %s)", expectedTimeout, testTimeout)
-					return
+					t.Errorf("Applier.Run failed to respond to cancellation (expected: %s, timeout: %s)", tc.runTimeout, tc.testTimeout)
+					break loop
 
 				case e, ok := <-eventChannel:
 					if !ok {
@@ -922,9 +922,9 @@ func TestApplierCancel(t *testing.T) {
 			// Validate that the expected timeout was the cause of the run completion.
 			// just in case something else cancelled the run
 			if tc.expectRunTimeout {
-				assert.True(t, isTimedOut.Get(), "Applier.Run exited, but not by expected timeout")
+				assert.Equal(t, context.DeadlineExceeded, runCtx.Err(), "Applier.Run exited, but not by expected timeout")
 			} else {
-				assert.False(t, isTimedOut.Get(), "Applier.Run exited, but was unexpectedly cancelled by timeout")
+				assert.Nil(t, runCtx.Err(), "Applier.Run exited, but not by expected timeout")
 			}
 		})
 	}

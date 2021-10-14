@@ -10,9 +10,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"regexp"
-	"sync"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -28,6 +26,7 @@ import (
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/klog/v2"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
+	"sigs.k8s.io/cli-utils/pkg/apply/info"
 	"sigs.k8s.io/cli-utils/pkg/apply/poller"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
@@ -63,17 +62,78 @@ func (i inventoryInfo) toWrapped() inventory.InventoryInfo {
 func newTestApplier(
 	t *testing.T,
 	invInfo inventoryInfo,
-	resourceSet object.UnstructuredSet,
+	resources object.UnstructuredSet,
 	clusterObjs object.UnstructuredSet,
 	statusPoller poller.Poller,
 ) *Applier {
-	tf := cmdtesting.NewTestFactory().WithNamespace(invInfo.namespace)
+	tf := newTestFactory(t, invInfo, resources, clusterObjs)
 	defer tf.Cleanup()
 
-	mapper, err := tf.ToRESTMapper()
-	if !assert.NoError(t, err) {
-		t.FailNow()
+	infoHelper := &fakeInfoHelper{
+		factory: tf,
 	}
+
+	invClient := newTestInventory(t, tf, infoHelper)
+
+	applier, err := NewApplier(tf, invClient, statusPoller)
+	require.NoError(t, err)
+
+	// Inject the fakeInfoHelper to allow generating Info
+	// objects that use the FakeRESTClient as the UnstructuredClient.
+	applier.infoHelper = infoHelper
+
+	return applier
+}
+
+func newTestDestroyer(
+	t *testing.T,
+	invInfo inventoryInfo,
+	clusterObjs object.UnstructuredSet,
+	statusPoller poller.Poller,
+) *Destroyer {
+	tf := newTestFactory(t, invInfo, object.UnstructuredSet{}, clusterObjs)
+	defer tf.Cleanup()
+
+	infoHelper := &fakeInfoHelper{
+		factory: tf,
+	}
+
+	invClient := newTestInventory(t, tf, infoHelper)
+
+	destroyer, err := NewDestroyer(tf, invClient, statusPoller)
+	require.NoError(t, err)
+
+	return destroyer
+}
+
+func newTestInventory(
+	t *testing.T,
+	tf *cmdtesting.TestFactory,
+	infoHelper info.InfoHelper,
+) inventory.InventoryClient {
+	// Use an InventoryClient with a fakeInfoHelper to allow generating Info
+	// objects that use the FakeRESTClient as the UnstructuredClient.
+	invClient, err := inventory.ClusterInventoryClientFactory{}.NewInventoryClient(tf)
+	require.NoError(t, err)
+
+	// TODO(mortent): This is not great, but at least this keeps the
+	// ugliness in the test code until we can find a way to wire it
+	// up so to avoid it.
+	invClient.(*inventory.ClusterInventoryClient).InfoHelper = infoHelper
+
+	return invClient
+}
+
+func newTestFactory(
+	t *testing.T,
+	invInfo inventoryInfo,
+	resourceSet object.UnstructuredSet,
+	clusterObjs object.UnstructuredSet,
+) *cmdtesting.TestFactory {
+	tf := cmdtesting.NewTestFactory().WithNamespace(invInfo.namespace)
+
+	mapper, err := tf.ToRESTMapper()
+	require.NoError(t, err)
 
 	objMap := make(map[object.ObjMetadata]resourceInfo)
 	for _, r := range resourceSet {
@@ -112,26 +172,7 @@ func newTestApplier(
 	tf.UnstructuredClient = newFakeRESTClient(t, handlers)
 	tf.FakeDynamicClient = fakeDynamicClient(t, mapper, objs...)
 
-	// Use an InventoryClient with a fakeInfoHelper to allow generating Info
-	// objects that use the FakeRESTClient as the UnstructuredClient.
-	invClient, err := inventory.ClusterInventoryClientFactory{}.NewInventoryClient(tf)
-	require.NoError(t, err)
-	infoHelper := &fakeInfoHelper{
-		factory: tf,
-	}
-	// TODO(mortent): This is not great, but at least this keeps the
-	// ugliness in the test code until we can find a way to wire it
-	// up so to avoid it.
-	invClient.(*inventory.ClusterInventoryClient).InfoHelper = infoHelper
-
-	applier, err := NewApplier(tf, invClient, statusPoller)
-	require.NoError(t, err)
-
-	// Inject the fakeInfoHelper to allow generating Info
-	// objects that use the FakeRESTClient as the UnstructuredClient.
-	applier.infoHelper = infoHelper
-
-	return applier
+	return tf
 }
 
 type resourceInfo struct {
@@ -208,6 +249,30 @@ func (g *genericHandler) handle(t *testing.T, req *http.Request) (*http.Response
 		if req.URL.Path == singlePath && req.Method == http.MethodPatch {
 			bodyRC := ioutil.NopCloser(bytes.NewReader(toJSONBytes(t, r.resource)))
 			return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: bodyRC}, true, nil
+		}
+
+		if req.URL.Path == singlePath && req.Method == http.MethodDelete {
+			if r.exists {
+				bodyRC := ioutil.NopCloser(bytes.NewReader(toJSONBytes(t, r.resource)))
+				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: bodyRC}, true, nil
+			}
+
+			// We're not testing DeletePropagationOrphan, so StatusOK should be
+			// safe. Otherwise, the status might be StatusAccepted.
+			// https://github.com/kubernetes/apiserver/blob/v0.22.2/pkg/endpoints/handlers/delete.go#L140
+			status := http.StatusOK
+
+			// Return Status object, if resource doesn't exist.
+			result := &metav1.Status{
+				Status: metav1.StatusSuccess,
+				Code:   int32(status),
+				Details: &metav1.StatusDetails{
+					Name: r.resource.GetName(),
+					Kind: r.resource.GetKind(),
+				},
+			}
+			bodyRC := ioutil.NopCloser(bytes.NewReader(toJSONBytes(t, result)))
+			return &http.Response{StatusCode: status, Header: cmdtesting.DefaultHeader(), Body: bodyRC}, true, nil
 		}
 
 		if req.URL.Path == allPath && req.Method == http.MethodPost {
@@ -449,50 +514,4 @@ func toJSONBytes(t *testing.T, obj runtime.Object) []byte {
 		t.Fatal(err)
 	}
 	return objBytes
-}
-
-type atomicBool struct {
-	value bool
-	mu    sync.RWMutex
-}
-
-func (b *atomicBool) Set(value bool) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	b.value = value
-}
-
-func (b *atomicBool) Get() bool {
-	b.mu.RLock()
-	defer b.mu.RUnlock()
-	return b.value
-}
-
-// withTimeout functions like context.WithTimeout, except it also returns an
-// atomicBool, which describes whether the timeout has occurred.
-// If the context is cancelled by the timeout, the atomicBool will be true.
-// If the context is cancelled before the timeout, the atomicBool will be false.
-func withTimeout(ctx context.Context, timeout time.Duration) (context.Context, context.CancelFunc, *atomicBool) {
-	timedOut := &atomicBool{}
-	ctx, cancel := context.WithCancel(ctx)
-	cancelCh := make(chan struct{})
-	go func() {
-		timeout := time.NewTimer(timeout)
-		defer timeout.Stop()
-		// wait for timeout or cancelCh to be closed
-		select {
-		case <-timeout.C:
-			// Cancelled by timeout
-			timedOut.Set(true)
-			cancel()
-		case <-cancelCh:
-			// Cancelled by caller
-		}
-	}()
-	cancelFn := func() {
-		// Cancelled by caller
-		close(cancelCh)
-		cancel()
-	}
-	return ctx, cancelFn, timedOut
 }

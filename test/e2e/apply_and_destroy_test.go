@@ -174,7 +174,7 @@ func applyAndDestroyTest(c client.Client, invConfig InventoryConfig, inventoryNa
 	destroyer := invConfig.DestroyerFactoryFunc()
 
 	options := apply.DestroyerOptions{InventoryPolicy: inventory.AdoptIfNoInventory}
-	destroyerEvents := runCollect(destroyer.Run(inventoryInfo, options))
+	destroyerEvents := runCollect(destroyer.Run(context.TODO(), inventoryInfo, options))
 
 	expEvents = []testutil.ExpEvent{
 		{
