@@ -127,7 +127,7 @@ func (r *StatusRunner) runE(cmd *cobra.Command, args []string) error {
 
 	// If the user has specified a timeout, we create a context with timeout,
 	// otherwise we create a context with cancel.
-	ctx := context.Background()
+	ctx := cmd.Context()
 	var cancel func()
 	if r.timeout != 0 {
 		ctx, cancel = context.WithTimeout(ctx, r.timeout)

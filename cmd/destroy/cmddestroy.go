@@ -77,11 +77,7 @@ type DestroyRunner struct {
 }
 
 func (r *DestroyRunner) RunE(cmd *cobra.Command, args []string) error {
-	// If specified, use command context.
 	ctx := cmd.Context()
-	if ctx == nil {
-		ctx = context.Background()
-	}
 	// If specified, cancel with timeout.
 	if r.timeout != 0 {
 		var cancel context.CancelFunc

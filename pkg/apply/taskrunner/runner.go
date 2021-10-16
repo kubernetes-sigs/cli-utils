@@ -9,7 +9,6 @@ import (
 	"sort"
 	"time"
 
-	"k8s.io/klog/v2"
 	"sigs.k8s.io/cli-utils/pkg/apply/cache"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/poller"
@@ -257,7 +256,7 @@ func (b *baseRunner) run(ctx context.Context, taskQueue chan Task,
 		case <-doneCh:
 			doneCh = nil // Set doneCh to nil so we don't enter a busy loop.
 			abort = true
-			klog.V(3).Info("taskrunner cancelled by caller")
+			abortReason = ctx.Err() // always non-nil when doneCh is closed
 			completeIfWaitTask(currentTask, taskContext)
 		}
 	}
