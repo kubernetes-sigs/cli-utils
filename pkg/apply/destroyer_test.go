@@ -143,6 +143,13 @@ func TestDestroyerCancel(t *testing.T) {
 				},
 				// Inventory cannot be deleted, because the objects still exist,
 				// even tho they've been deleted (ex: blocked by finalizer).
+				{
+					// Error
+					EventType: event.ErrorType,
+					ErrorEvent: &testutil.ExpErrorEvent{
+						Err: context.DeadlineExceeded,
+					},
+				},
 			},
 		},
 		"completed with timeout": {

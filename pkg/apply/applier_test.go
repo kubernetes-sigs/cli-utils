@@ -709,6 +709,13 @@ func TestApplierCancel(t *testing.T) {
 				// 		Type:      event.Finished,
 				// 	},
 				// },
+				{
+					// Error
+					EventType: event.ErrorType,
+					ErrorEvent: &testutil.ExpErrorEvent{
+						Err: context.DeadlineExceeded,
+					},
+				},
 			},
 		},
 		"completed with timeout": {

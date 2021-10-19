@@ -297,6 +297,7 @@ func TestBaseRunnerCancellation(t *testing.T) {
 				},
 			},
 			contextTimeout: 2 * time.Second,
+			expectedError:  context.Canceled,
 			expectedEventTypes: []event.Type{
 				event.ActionGroupType,
 				event.ApplyType,
@@ -315,6 +316,7 @@ func TestBaseRunnerCancellation(t *testing.T) {
 				},
 			},
 			contextTimeout: 2 * time.Second,
+			expectedError:  context.Canceled,
 			expectedEventTypes: []event.Type{
 				event.ActionGroupType,
 				event.ActionGroupType,

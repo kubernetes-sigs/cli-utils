@@ -59,6 +59,8 @@ func GetApplyRunner(factory cmdutil.Factory, invFactory inventory.InventoryClien
 	cmd.Flags().StringVar(&r.inventoryPolicy, flagutils.InventoryPolicyFlag, flagutils.InventoryPolicyStrict,
 		"It determines the behavior when the resources don't belong to current inventory. Available options "+
 			fmt.Sprintf("%q, %q and %q.", flagutils.InventoryPolicyStrict, flagutils.InventoryPolicyAdopt, flagutils.InventoryPolicyForceAdopt))
+	cmd.Flags().DurationVar(&r.timeout, "timeout", 0,
+		"How long to wait before exiting")
 
 	r.Command = cmd
 	return r
@@ -85,9 +87,18 @@ type ApplyRunner struct {
 	prunePropagationPolicy string
 	pruneTimeout           time.Duration
 	inventoryPolicy        string
+	timeout                time.Duration
 }
 
 func (r *ApplyRunner) RunE(cmd *cobra.Command, args []string) error {
+	ctx := cmd.Context()
+	// If specified, cancel with timeout.
+	if r.timeout != 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, r.timeout)
+		defer cancel()
+	}
+
 	prunePropPolicy, err := flagutils.ConvertPropagationPolicy(r.prunePropagationPolicy)
 	if err != nil {
 		return err
@@ -147,7 +158,7 @@ func (r *ApplyRunner) RunE(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	ch := a.Run(context.Background(), inv, objs, apply.Options{
+	ch := a.Run(ctx, inv, objs, apply.Options{
 		ServerSideOptions: r.serverSideOptions,
 		PollInterval:      r.period,
 		ReconcileTimeout:  r.reconcileTimeout,

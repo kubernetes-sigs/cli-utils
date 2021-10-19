@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -57,6 +58,8 @@ func GetPreviewRunner(factory cmdutil.Factory, invFactory inventory.InventoryCli
 	cmd.Flags().StringVar(&r.inventoryPolicy, flagutils.InventoryPolicyFlag, flagutils.InventoryPolicyStrict,
 		"It determines the behavior when the resources don't belong to current inventory. Available options "+
 			fmt.Sprintf("%q, %q and %q.", flagutils.InventoryPolicyStrict, flagutils.InventoryPolicyAdopt, flagutils.InventoryPolicyForceAdopt))
+	cmd.Flags().DurationVar(&r.timeout, "timeout", 0,
+		"How long to wait before exiting")
 
 	r.Command = cmd
 	return r
@@ -80,10 +83,19 @@ type PreviewRunner struct {
 	serverSideOptions common.ServerSideOptions
 	output            string
 	inventoryPolicy   string
+	timeout           time.Duration
 }
 
 // RunE is the function run from the cobra command.
 func (r *PreviewRunner) RunE(cmd *cobra.Command, args []string) error {
+	ctx := cmd.Context()
+	// If specified, cancel with timeout.
+	if r.timeout != 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, r.timeout)
+		defer cancel()
+	}
+
 	var ch <-chan event.Event
 
 	drs := common.DryRunClient
@@ -141,7 +153,7 @@ func (r *PreviewRunner) RunE(cmd *cobra.Command, args []string) error {
 
 		// Run the applier. It will return a channel where we can receive updates
 		// to keep track of progress and any issues.
-		ch = a.Run(context.Background(), inv, objs, apply.Options{
+		ch = a.Run(ctx, inv, objs, apply.Options{
 			EmitStatusEvents:  false,
 			NoPrune:           noPrune,
 			DryRunStrategy:    drs,
@@ -153,7 +165,7 @@ func (r *PreviewRunner) RunE(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return err
 		}
-		ch = d.Run(context.Background(), inv, apply.DestroyerOptions{
+		ch = d.Run(ctx, inv, apply.DestroyerOptions{
 			InventoryPolicy: inventoryPolicy,
 			DryRunStrategy:  drs,
 		})
