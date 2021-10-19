@@ -30,12 +30,12 @@ import (
 // handled by a separate printer with the KubectlPrinterAdapter bridging
 // between the two.
 func NewDestroyer(factory cmdutil.Factory, invClient inventory.InventoryClient, statusPoller poller.Poller) (*Destroyer, error) {
-	pruneOpts, err := prune.NewPruneOptions(factory, invClient)
+	pruner, err := prune.NewPruner(factory, invClient)
 	if err != nil {
 		return nil, fmt.Errorf("error setting up PruneOptions: %w", err)
 	}
 	return &Destroyer{
-		pruneOptions: pruneOpts,
+		pruner:       pruner,
 		statusPoller: statusPoller,
 		factory:      factory,
 		invClient:    invClient,
@@ -45,7 +45,7 @@ func NewDestroyer(factory cmdutil.Factory, invClient inventory.InventoryClient, 
 // Destroyer performs the step of grabbing all the previous inventory objects and
 // prune them. This also deletes all the previous inventory objects
 type Destroyer struct {
-	pruneOptions *prune.PruneOptions
+	pruner       *prune.Pruner
 	statusPoller poller.Poller
 	factory      cmdutil.Factory
 	invClient    inventory.InventoryClient
@@ -97,7 +97,7 @@ func (d *Destroyer) Run(ctx context.Context, inv inventory.InventoryInfo, option
 		// Retrieve the objects to be deleted from the cluster. Second parameter is empty
 		// because no local objects returns all inventory objects for deletion.
 		emptyLocalObjs := object.UnstructuredSet{}
-		deleteObjs, err := d.pruneOptions.GetPruneObjs(inv, emptyLocalObjs, prune.Options{
+		deleteObjs, err := d.pruner.GetPruneObjs(inv, emptyLocalObjs, prune.Options{
 			DryRunStrategy: options.DryRunStrategy,
 		})
 		if err != nil {
@@ -111,11 +111,11 @@ func (d *Destroyer) Run(ctx context.Context, inv inventory.InventoryInfo, option
 		}
 		klog.V(4).Infoln("destroyer building task queue...")
 		taskBuilder := &solver.TaskQueueBuilder{
-			PruneOptions: d.pruneOptions,
-			Factory:      d.factory,
-			Mapper:       mapper,
-			InvClient:    d.invClient,
-			Destroy:      true,
+			Pruner:    d.pruner,
+			Factory:   d.factory,
+			Mapper:    mapper,
+			InvClient: d.invClient,
+			Destroy:   true,
 		}
 		opts := solver.Options{
 			Prune:                  true,

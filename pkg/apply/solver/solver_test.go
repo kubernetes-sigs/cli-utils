@@ -22,8 +22,8 @@ import (
 )
 
 var (
-	pruneOptions = &prune.PruneOptions{}
-	resources    = map[string]string{
+	pruner    = &prune.Pruner{}
+	resources = map[string]string{
 		"pod": `
 kind: Pod
 apiVersion: v1
@@ -353,9 +353,9 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 			applyIds := object.UnstructuredsToObjMetasOrDie(tc.applyObjs)
 			fakeInvClient := inventory.NewFakeInventoryClient(applyIds)
 			tqb := TaskQueueBuilder{
-				PruneOptions: pruneOptions,
-				Mapper:       testutil.NewFakeRESTMapper(),
-				InvClient:    fakeInvClient,
+				Pruner:    pruner,
+				Mapper:    testutil.NewFakeRESTMapper(),
+				InvClient: fakeInvClient,
 			}
 			tq, err := tqb.AppendApplyWaitTasks(
 				tc.applyObjs,
@@ -651,9 +651,9 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 			pruneIds := object.UnstructuredsToObjMetasOrDie(tc.pruneObjs)
 			fakeInvClient := inventory.NewFakeInventoryClient(pruneIds)
 			tqb := TaskQueueBuilder{
-				PruneOptions: pruneOptions,
-				Mapper:       testutil.NewFakeRESTMapper(),
-				InvClient:    fakeInvClient,
+				Pruner:    pruner,
+				Mapper:    testutil.NewFakeRESTMapper(),
+				InvClient: fakeInvClient,
 			}
 			emptyPruneFilters := []filter.ValidationFilter{}
 			tq, err := tqb.AppendPruneWaitTasks(tc.pruneObjs, emptyPruneFilters, tc.options).Build()
