@@ -286,8 +286,8 @@ kind: Deployment
 metadata:
   name: foo
   annotations:
-    config.kubernetes.io/path: deployment.yaml
-    config.kubernetes.io/index: 0
+    internal.config.kubernetes.io/path: deployment.yaml
+    internal.config.kubernetes.io/index: 0
 `),
 			removeAnnotations: []kioutil.AnnotationKey{
 				kioutil.IndexAnnotation,
@@ -303,8 +303,8 @@ kind: Deployment
 metadata:
   name: foo
   annotations:
-    config.kubernetes.io/path: deployment.yaml
-    config.kubernetes.io/index: 0
+    internal.config.kubernetes.io/path: deployment.yaml
+    internal.config.kubernetes.io/index: 0
 `),
 			removeAnnotations: []kioutil.AnnotationKey{},
 			expectedAnnotations: []kioutil.AnnotationKey{
