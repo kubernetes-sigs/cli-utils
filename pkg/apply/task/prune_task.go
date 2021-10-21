@@ -20,7 +20,7 @@ import (
 type PruneTask struct {
 	TaskName string
 
-	PruneOptions      *prune.PruneOptions
+	Pruner            *prune.Pruner
 	Objects           object.UnstructuredSet
 	Filters           []filter.ValidationFilter
 	DryRunStrategy    common.DryRunStrategy
@@ -59,7 +59,7 @@ func (p *PruneTask) Start(taskContext *taskrunner.TaskContext) {
 			CurrentUIDs: taskContext.AppliedResourceUIDs(),
 		}
 		p.Filters = append(p.Filters, uidFilter)
-		err := p.PruneOptions.Prune(
+		err := p.Pruner.Prune(
 			p.Objects,
 			p.Filters,
 			taskContext,

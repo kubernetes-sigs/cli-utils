@@ -422,7 +422,7 @@ func TestPrune(t *testing.T) {
 			pruneIds, err := object.UnstructuredsToObjMetas(tc.pruneObjs)
 			require.NoError(t, err)
 
-			po := PruneOptions{
+			po := Pruner{
 				InvClient: inventory.NewFakeInventoryClient(pruneIds),
 				Client:    fake.NewSimpleDynamicClient(scheme.Scheme, objs...),
 				Mapper: testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme,
@@ -480,7 +480,7 @@ func TestPruneDeletionPrevention(t *testing.T) {
 			pruneID, err := object.UnstructuredToObjMeta(tc.pruneObj)
 			require.NoError(t, err)
 
-			po := PruneOptions{
+			po := Pruner{
 				InvClient: inventory.NewFakeInventoryClient(object.ObjMetadataSet{pruneID}),
 				Client:    fake.NewSimpleDynamicClient(scheme.Scheme, tc.pruneObj),
 				Mapper: testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme,
@@ -501,7 +501,7 @@ func TestPruneDeletionPrevention(t *testing.T) {
 				t.Fatalf("Unexpected error during Prune(): %#v", err)
 			}
 			// verify that the object no longer has the annotation
-			obj, err := po.GetObject(pruneID)
+			obj, err := po.getObject(pruneID)
 			if err != nil {
 				t.Fatalf("Unexpected error: %#v", err)
 			}
@@ -576,7 +576,7 @@ func TestPruneWithErrors(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			pruneIds, err := object.UnstructuredsToObjMetas(tc.pruneObjs)
 			require.NoError(t, err)
-			po := PruneOptions{
+			po := Pruner{
 				InvClient: inventory.NewFakeInventoryClient(pruneIds),
 				// Set up the fake dynamic client to recognize all objects, and the RESTMapper.
 				Client: &fakeDynamicClient{
@@ -667,7 +667,7 @@ func TestGetPruneObjs(t *testing.T) {
 			for _, obj := range tc.prevInventory {
 				objs = append(objs, obj)
 			}
-			po := PruneOptions{
+			po := Pruner{
 				InvClient: inventory.NewFakeInventoryClient(object.UnstructuredsToObjMetasOrDie(tc.prevInventory)),
 				Client:    fake.NewSimpleDynamicClient(scheme.Scheme, objs...),
 				Mapper: testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme,
@@ -695,12 +695,12 @@ func TestGetPruneObjs(t *testing.T) {
 }
 
 func TestGetObject_NoMatchError(t *testing.T) {
-	po := PruneOptions{
+	po := Pruner{
 		Client: fake.NewSimpleDynamicClient(scheme.Scheme, pod, namespace),
 		Mapper: testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme,
 			scheme.Scheme.PrioritizedVersionsAllGroups()...),
 	}
-	_, err := po.GetObject(testutil.ToIdentifier(t, crontabCRManifest))
+	_, err := po.getObject(testutil.ToIdentifier(t, crontabCRManifest))
 	if err == nil {
 		t.Fatalf("expected GetObject() to return a NoKindMatchError, got nil")
 	}
@@ -710,7 +710,7 @@ func TestGetObject_NoMatchError(t *testing.T) {
 }
 
 func TestGetObject_NotFoundError(t *testing.T) {
-	po := PruneOptions{
+	po := Pruner{
 		Client: fake.NewSimpleDynamicClient(scheme.Scheme, pod, namespace),
 		Mapper: testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme,
 			scheme.Scheme.PrioritizedVersionsAllGroups()...),
@@ -719,7 +719,7 @@ func TestGetObject_NotFoundError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error %s returned", err)
 	}
-	_, err = po.GetObject(objMeta)
+	_, err = po.getObject(objMeta)
 	if err == nil {
 		t.Fatalf("expected GetObject() to return a NotFound error, got nil")
 	}
@@ -730,17 +730,17 @@ func TestGetObject_NotFoundError(t *testing.T) {
 
 func TestHandleDeletePrevention(t *testing.T) {
 	obj := testutil.Unstructured(t, pdbDeletePreventionManifest)
-	po := PruneOptions{
+	po := Pruner{
 		Client: fake.NewSimpleDynamicClient(scheme.Scheme, obj, namespace),
 		Mapper: testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme,
 			scheme.Scheme.PrioritizedVersionsAllGroups()...),
 	}
-	if err := po.handleDeletePrevention(obj); err != nil {
+	if err := po.removeInventoryAnnotation(obj); err != nil {
 		t.Fatalf("unexpected error %s returned", err)
 	}
 
 	// Get the object from the cluster and verify that the `config.k8s.io/owning-inventory` annotation is removed from the object.
-	liveObj, err := po.GetObject(testutil.ToIdentifier(t, pdbDeletePreventionManifest))
+	liveObj, err := po.getObject(testutil.ToIdentifier(t, pdbDeletePreventionManifest))
 	if err != nil {
 		t.Fatalf("unexpected error %s returned", err)
 	}
@@ -778,7 +778,7 @@ func TestPrune_PropagationPolicy(t *testing.T) {
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			captureClient := &optionsCaptureNamespaceClient{}
-			po := PruneOptions{
+			po := Pruner{
 				InvClient: inventory.NewFakeInventoryClient(object.ObjMetadataSet{}),
 				Client: &fakeDynamicClient{
 					resourceInterface: captureClient,

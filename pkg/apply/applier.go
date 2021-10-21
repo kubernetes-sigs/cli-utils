@@ -31,7 +31,7 @@ import (
 
 // NewApplier returns a new Applier.
 func NewApplier(factory cmdutil.Factory, invClient inventory.InventoryClient, statusPoller poller.Poller) (*Applier, error) {
-	pruneOpts, err := prune.NewPruneOptions(factory, invClient)
+	pruner, err := prune.NewPruner(factory, invClient)
 	if err != nil {
 		return nil, err
 	}
@@ -40,7 +40,7 @@ func NewApplier(factory cmdutil.Factory, invClient inventory.InventoryClient, st
 		return nil, err
 	}
 	return &Applier{
-		pruneOptions: pruneOpts,
+		pruner:       pruner,
 		statusPoller: statusPoller,
 		factory:      factory,
 		invClient:    invClient,
@@ -59,7 +59,7 @@ func NewApplier(factory cmdutil.Factory, invClient inventory.InventoryClient, st
 // parameters and/or the set of resources that needs to be applied to the
 // cluster, different sets of tasks might be needed.
 type Applier struct {
-	pruneOptions *prune.PruneOptions
+	pruner       *prune.Pruner
 	statusPoller poller.Poller
 	factory      cmdutil.Factory
 	invClient    inventory.InventoryClient
@@ -100,7 +100,7 @@ func (a *Applier) prepareObjects(localInv inventory.InventoryInfo, localObjs obj
 			}
 		}
 	}
-	pruneObjs, err := a.pruneOptions.GetPruneObjs(localInv, localObjs, prune.Options{
+	pruneObjs, err := a.pruner.GetPruneObjs(localInv, localObjs, prune.Options{
 		DryRunStrategy: o.DryRunStrategy,
 	})
 	if err != nil {
@@ -155,12 +155,12 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.InventoryInfo, obje
 		// Fetch the queue (channel) of tasks that should be executed.
 		klog.V(4).Infoln("applier building task queue...")
 		taskBuilder := &solver.TaskQueueBuilder{
-			PruneOptions: a.pruneOptions,
-			Factory:      a.factory,
-			InfoHelper:   a.infoHelper,
-			Mapper:       mapper,
-			InvClient:    a.invClient,
-			Destroy:      false,
+			Pruner:     a.pruner,
+			Factory:    a.factory,
+			InfoHelper: a.infoHelper,
+			Mapper:     mapper,
+			InvClient:  a.invClient,
+			Destroy:    false,
 		}
 		opts := solver.Options{
 			ServerSideOptions:      options.ServerSideOptions,

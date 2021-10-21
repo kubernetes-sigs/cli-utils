@@ -38,11 +38,11 @@ import (
 const defaultWaitTimeout = 1 * time.Minute
 
 type TaskQueueBuilder struct {
-	PruneOptions *prune.PruneOptions
-	InfoHelper   info.InfoHelper
-	Factory      util.Factory
-	Mapper       meta.RESTMapper
-	InvClient    inventory.InventoryClient
+	Pruner     *prune.Pruner
+	InfoHelper info.InfoHelper
+	Factory    util.Factory
+	Mapper     meta.RESTMapper
+	InvClient  inventory.InventoryClient
 	// True if we are destroying, which deletes the inventory object
 	// as well (possibly) the inventory namespace.
 	Destroy bool
@@ -200,7 +200,7 @@ func (t *TaskQueueBuilder) AppendPruneTask(pruneObjs object.UnstructuredSet,
 			TaskName:          fmt.Sprintf("prune-%d", t.pruneCounter),
 			Objects:           pruneObjs,
 			Filters:           pruneFilters,
-			PruneOptions:      t.PruneOptions,
+			Pruner:            t.Pruner,
 			PropagationPolicy: o.PrunePropagationPolicy,
 			DryRunStrategy:    o.DryRunStrategy,
 			Destroy:           t.Destroy,
