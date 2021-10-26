@@ -21,6 +21,7 @@ const (
 	StatusType
 	PruneType
 	DeleteType
+	WaitType
 )
 
 // Event is the type of the objects that will be returned through
@@ -58,6 +59,9 @@ type Event struct {
 	// DeleteEvent contains information about object that have been
 	// deleted.
 	DeleteEvent DeleteEvent
+
+	// WaitEvent contains information about any errors encountered in a WaitTask.
+	WaitEvent WaitEvent
 }
 
 type InitEvent struct {
@@ -83,6 +87,11 @@ type ActionGroup struct {
 
 type ErrorEvent struct {
 	Err error
+}
+
+type WaitEvent struct {
+	GroupName string
+	Error     error
 }
 
 //go:generate stringer -type=ActionGroupEventType

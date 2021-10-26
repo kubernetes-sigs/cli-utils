@@ -23,6 +23,7 @@ type ExpEvent struct {
 	StatusEvent      *ExpStatusEvent
 	PruneEvent       *ExpPruneEvent
 	DeleteEvent      *ExpDeleteEvent
+	WaitEvent        *ExpWaitEvent
 }
 
 type ExpInitEvent struct {
@@ -65,6 +66,11 @@ type ExpDeleteEvent struct {
 	Operation  event.DeleteEventOperation
 	Identifier object.ObjMetadata
 	Error      error
+}
+
+type ExpWaitEvent struct {
+	GroupName string
+	Error     error
 }
 
 func VerifyEvents(expEvents []ExpEvent, events []event.Event) error {
@@ -234,6 +240,24 @@ func isMatch(ee ExpEvent, e event.Event) bool {
 			return de.Error != nil
 		}
 		return de.Error == nil
+
+	case event.WaitType:
+		wee := ee.WaitEvent
+		if wee == nil {
+			return true
+		}
+		we := e.WaitEvent
+
+		if wee.GroupName != "" {
+			if wee.GroupName != we.GroupName {
+				return false
+			}
+		}
+
+		if wee.Error != nil {
+			return cmp.Equal(wee.Error, we.Error, cmpopts.EquateErrors())
+		}
+		return we.Error == nil
 	}
 	return true
 }
@@ -315,6 +339,15 @@ func EventToExpEvent(e event.Event) ExpEvent {
 				Identifier: e.DeleteEvent.Identifier,
 				Operation:  e.DeleteEvent.Operation,
 				Error:      e.DeleteEvent.Error,
+			},
+		}
+
+	case event.WaitType:
+		return ExpEvent{
+			EventType: event.WaitType,
+			WaitEvent: &ExpWaitEvent{
+				GroupName: e.WaitEvent.GroupName,
+				Error:     e.WaitEvent.Error,
 			},
 		}
 	}

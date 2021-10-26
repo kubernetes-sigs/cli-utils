@@ -99,7 +99,7 @@ func (w *WaitTask) Start(taskContext *TaskContext) {
 
 // setTimer creates the timer with the timeout value taken from
 // the WaitTask struct. Once the timer expires, it will send
-// a message on the TaskChannel provided in the taskContext.
+// a message on the EventChannel provided in the taskContext.
 func (w *WaitTask) setTimer(taskContext *TaskContext) {
 	timer := time.NewTimer(w.Timeout)
 	go func() {
@@ -108,22 +108,47 @@ func (w *WaitTask) setTimer(taskContext *TaskContext) {
 		// Timeout is cancelled.
 		<-timer.C
 		select {
-		// We only send the taskResult if no one has gotten
+		// We only send the TimeoutError to the eventChannel if no one has gotten
 		// to the token first.
 		case <-w.token:
-			taskContext.TaskChannel() <- TaskResult{
-				Err: &TimeoutError{
-					Identifiers: w.Ids,
-					Timeout:     w.Timeout,
-					Condition:   w.Condition,
+			err := &TimeoutError{
+				Identifiers: w.Ids,
+				Timeout:     w.Timeout,
+				Condition:   w.Condition,
+			}
+			amendTimeoutError(taskContext, err)
+			taskContext.EventChannel() <- event.Event{
+				Type: event.WaitType,
+				WaitEvent: event.WaitEvent{
+					GroupName: w.Name(),
+					Error:     err,
 				},
 			}
+			taskContext.TaskChannel() <- TaskResult{}
 		default:
 			return
 		}
 	}()
 	w.cancelFunc = func() {
 		timer.Stop()
+	}
+}
+
+func amendTimeoutError(taskContext *TaskContext, err error) {
+	if timeoutErr, ok := err.(*TimeoutError); ok {
+		var timedOutResources []TimedOutResource
+		for _, id := range timeoutErr.Identifiers {
+			result := taskContext.ResourceCache().Get(id)
+			if timeoutErr.Condition.Meets(result.Status) {
+				continue
+			}
+			timedOutResources = append(timedOutResources, TimedOutResource{
+				Identifier: id,
+				Status:     result.Status,
+				Message:    result.StatusMessage,
+			})
+		}
+		timeoutErr.TimedOutResources = timedOutResources
 	}
 }
 
