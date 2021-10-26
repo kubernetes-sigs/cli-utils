@@ -48,6 +48,7 @@ func TestBaseRunner(t *testing.T) {
 		expectedError             error
 		expectedTimedOutResources []TimedOutResource
 		expectedErrorMsg          string
+		continueOnError           bool
 	}{
 		"wait task runs until condition is met": {
 			tasks: []Task{
@@ -124,6 +125,29 @@ func TestBaseRunner(t *testing.T) {
 			},
 			expectedErrorMsg: "timeout after 2 seconds waiting for 2 resources ([default_cm__ConfigMap default_dep_apps_Deployment]) to reach condition AllCurrent",
 		},
+		"wait task times out eventually (Unknown) - ignore timeout": {
+			tasks: []Task{
+				NewWaitTask("wait", object.ObjMetadataSet{depID, cmID}, AllCurrent,
+					2*time.Second, testutil.NewFakeRESTMapper()),
+			},
+			statusEventsDelay: time.Second,
+			statusEvents: []pollevent.Event{
+				{
+					EventType: pollevent.ResourceUpdateEvent,
+					Resource: &pollevent.ResourceStatus{
+						Identifier: cmID,
+						Status:     status.CurrentStatus,
+					},
+				},
+			},
+			expectedEventTypes: []event.Type{
+				event.ActionGroupType,
+				event.StatusType,
+				event.ActionGroupType,
+				event.ErrorType,
+			},
+			continueOnError: true,
+		},
 		"wait task times out eventually (InProgress)": {
 			tasks: []Task{
 				NewWaitTask("wait", object.ObjMetadataSet{depID, cmID}, AllCurrent,
@@ -157,6 +181,37 @@ func TestBaseRunner(t *testing.T) {
 				},
 			},
 			expectedErrorMsg: "timeout after 2 seconds waiting for 2 resources ([default_cm__ConfigMap default_dep_apps_Deployment]) to reach condition AllCurrent",
+		},
+		"wait task times out eventually (InProgress) - ignore timeout": {
+			tasks: []Task{
+				NewWaitTask("wait", object.ObjMetadataSet{depID, cmID}, AllCurrent,
+					2*time.Second, testutil.NewFakeRESTMapper()),
+			},
+			statusEventsDelay: time.Second,
+			statusEvents: []pollevent.Event{
+				{
+					EventType: pollevent.ResourceUpdateEvent,
+					Resource: &pollevent.ResourceStatus{
+						Identifier: cmID,
+						Status:     status.CurrentStatus,
+					},
+				},
+				{
+					EventType: pollevent.ResourceUpdateEvent,
+					Resource: &pollevent.ResourceStatus{
+						Identifier: depID,
+						Status:     status.InProgressStatus,
+					},
+				},
+			},
+			expectedEventTypes: []event.Type{
+				event.ActionGroupType,
+				event.StatusType,
+				event.StatusType,
+				event.ActionGroupType,
+				event.ErrorType,
+			},
+			continueOnError: true,
 		},
 		"tasks run in order": {
 			tasks: []Task{
@@ -239,7 +294,7 @@ func TestBaseRunner(t *testing.T) {
 			}()
 
 			err := runner.run(context.Background(), taskQueue, statusChannel,
-				eventChannel, baseOptions{emitStatusEvents: true})
+				eventChannel, baseOptions{emitStatusEvents: true, continueOnError: tc.continueOnError})
 			close(statusChannel)
 			close(eventChannel)
 			wg.Wait()

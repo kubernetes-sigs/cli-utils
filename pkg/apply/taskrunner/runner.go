@@ -9,7 +9,9 @@ import (
 	"sort"
 	"time"
 
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/cli-utils/pkg/apply/cache"
+	applyerror "sigs.k8s.io/cli-utils/pkg/apply/error"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/poller"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling"
@@ -43,6 +45,7 @@ type Options struct {
 	PollInterval     time.Duration
 	UseCache         bool
 	EmitStatusEvents bool
+	ContinueOnError  bool
 }
 
 // Run starts the execution of the taskqueue. It will start the
@@ -58,6 +61,7 @@ func (tsr *taskStatusRunner) Run(ctx context.Context, taskQueue chan Task,
 
 	o := baseOptions{
 		emitStatusEvents: options.EmitStatusEvents,
+		continueOnError:  options.ContinueOnError,
 	}
 	err := tsr.baseRunner.run(ctx, taskQueue, statusChannel, eventChannel, o)
 	// cancel the statusPoller by cancelling the context.
@@ -119,6 +123,7 @@ type baseRunner struct {
 type baseOptions struct {
 	// emitStatusEvents enables emitting events on the eventChannel
 	emitStatusEvents bool
+	continueOnError  bool
 }
 
 // run executes the tasks in the taskqueue.
@@ -219,8 +224,11 @@ func (b *baseRunner) run(ctx context.Context, taskQueue chan Task,
 				}
 			}
 		// A message on the taskChannel means that the current task
-		// has either completed or failed. If it has failed, we return
-		// the error. If the abort flag is true, which means something
+		// has either completed or failed.
+		// If it has failed and `o.continueOnError` is `false`, we return the error.
+		// If it has failed and `o.continueOnError` is `true`, we don't not return immediately, but
+		// instead log the error and send the error to eventChannel before continuing.
+		// If the abort flag is true, which means something
 		// else has gone wrong and we are waiting for the current task to
 		// finish, we exit.
 		// If everything is ok, we fetch and start the next task.
@@ -236,7 +244,11 @@ func (b *baseRunner) run(ctx context.Context, taskQueue chan Task,
 			}
 			if msg.Err != nil {
 				b.amendTimeoutError(taskContext, msg.Err)
-				return msg.Err
+				if !o.continueOnError {
+					return msg.Err
+				}
+				klog.Infof("ignore the TimeoutError: %v", msg.Err)
+				applyerror.HandleError(eventChannel, msg.Err)
 			}
 			if abort {
 				return abortReason

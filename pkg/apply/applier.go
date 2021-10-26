@@ -15,6 +15,7 @@ import (
 	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/cli-utils/pkg/apply/cache"
+	applyerror "sigs.k8s.io/cli-utils/pkg/apply/error"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/filter"
 	"sigs.k8s.io/cli-utils/pkg/apply/info"
@@ -127,12 +128,12 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.InventoryInfo, obje
 
 		client, err := a.factory.DynamicClient()
 		if err != nil {
-			handleError(eventChannel, err)
+			applyerror.HandleError(eventChannel, err)
 			return
 		}
 		mapper, err := a.factory.ToRESTMapper()
 		if err != nil {
-			handleError(eventChannel, err)
+			applyerror.HandleError(eventChannel, err)
 			return
 		}
 
@@ -141,13 +142,13 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.InventoryInfo, obje
 		if err := (&object.Validator{
 			Mapper: mapper,
 		}).Validate(objects); err != nil {
-			handleError(eventChannel, err)
+			applyerror.HandleError(eventChannel, err)
 			return
 		}
 
 		applyObjs, pruneObjs, err := a.prepareObjects(invInfo, objects, options)
 		if err != nil {
-			handleError(eventChannel, err)
+			applyerror.HandleError(eventChannel, err)
 			return
 		}
 		klog.V(4).Infof("calculated %d apply objs; %d prune objs", len(applyObjs), len(pruneObjs))
@@ -211,7 +212,7 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.InventoryInfo, obje
 			AppendInvSetTask(invInfo, options.DryRunStrategy).
 			Build()
 		if err != nil {
-			handleError(eventChannel, err)
+			applyerror.HandleError(eventChannel, err)
 		}
 		// Send event to inform the caller about the resources that
 		// will be applied/pruned.
@@ -230,9 +231,10 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.InventoryInfo, obje
 			PollInterval:     options.PollInterval,
 			UseCache:         true,
 			EmitStatusEvents: options.EmitStatusEvents,
+			ContinueOnError:  options.ContinueOnError,
 		})
 		if err != nil {
-			handleError(eventChannel, err)
+			applyerror.HandleError(eventChannel, err)
 		}
 	}()
 	return eventChannel
@@ -275,6 +277,9 @@ type Options struct {
 
 	// InventoryPolicy defines the inventory policy of apply.
 	InventoryPolicy inventory.InventoryPolicy
+
+	// ContinueOnError defines whether to continue on error.
+	ContinueOnError bool
 }
 
 // setDefaults set the options to the default values if they
@@ -285,15 +290,6 @@ func setDefaults(o *Options) {
 	}
 	if o.PrunePropagationPolicy == "" {
 		o.PrunePropagationPolicy = metav1.DeletePropagationBackground
-	}
-}
-
-func handleError(eventChannel chan event.Event, err error) {
-	eventChannel <- event.Event{
-		Type: event.ErrorType,
-		ErrorEvent: event.ErrorEvent{
-			Err: err,
-		},
 	}
 }
 

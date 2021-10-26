@@ -12,6 +12,7 @@ import (
 	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/cli-utils/pkg/apply/cache"
+	applyerror "sigs.k8s.io/cli-utils/pkg/apply/error"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/filter"
 	"sigs.k8s.io/cli-utils/pkg/apply/poller"
@@ -75,6 +76,9 @@ type DestroyerOptions struct {
 	// PollInterval defines how often we should poll for the status
 	// of resources.
 	PollInterval time.Duration
+
+	// ContinueOnError defines whether to continue on error.
+	ContinueOnError bool
 }
 
 func setDestroyerDefaults(o *DestroyerOptions) {
@@ -101,12 +105,12 @@ func (d *Destroyer) Run(inv inventory.InventoryInfo, options DestroyerOptions) <
 			DryRunStrategy: options.DryRunStrategy,
 		})
 		if err != nil {
-			handleError(eventChannel, err)
+			applyerror.HandleError(eventChannel, err)
 			return
 		}
 		mapper, err := d.factory.ToRESTMapper()
 		if err != nil {
-			handleError(eventChannel, err)
+			applyerror.HandleError(eventChannel, err)
 			return
 		}
 		klog.V(4).Infoln("destroyer building task queue...")
@@ -136,7 +140,7 @@ func (d *Destroyer) Run(inv inventory.InventoryInfo, options DestroyerOptions) <
 			AppendDeleteInvTask(inv, options.DryRunStrategy).
 			Build()
 		if err != nil {
-			handleError(eventChannel, err)
+			applyerror.HandleError(eventChannel, err)
 		}
 		// Send event to inform the caller about the resources that
 		// will be pruned.
@@ -157,9 +161,10 @@ func (d *Destroyer) Run(inv inventory.InventoryInfo, options DestroyerOptions) <
 			UseCache:         true,
 			PollInterval:     options.PollInterval,
 			EmitStatusEvents: options.EmitStatusEvents,
+			ContinueOnError:  options.ContinueOnError,
 		})
 		if err != nil {
-			handleError(eventChannel, err)
+			applyerror.HandleError(eventChannel, err)
 		}
 	}()
 	return eventChannel

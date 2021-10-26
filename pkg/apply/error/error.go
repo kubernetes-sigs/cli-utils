@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 package error
 
+import "sigs.k8s.io/cli-utils/pkg/apply/event"
+
 type UnknownTypeError struct {
 	err error
 }
@@ -36,4 +38,14 @@ func (e *InitializeApplyOptionError) Error() string {
 
 func NewInitializeApplyOptionError(err error) *InitializeApplyOptionError {
 	return &InitializeApplyOptionError{err: err}
+}
+
+// HandleError sends a ErrorType event onto eventChannel.
+func HandleError(eventChannel chan event.Event, err error) {
+	eventChannel <- event.Event{
+		Type: event.ErrorType,
+		ErrorEvent: event.ErrorEvent{
+			Err: err,
+		},
+	}
 }
