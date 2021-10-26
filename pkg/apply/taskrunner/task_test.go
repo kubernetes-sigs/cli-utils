@@ -15,7 +15,8 @@ import (
 )
 
 func TestWaitTask_TimeoutTriggered(t *testing.T) {
-	task := NewWaitTask("wait", object.ObjMetadataSet{}, AllCurrent,
+	taskName := "wait"
+	task := NewWaitTask(taskName, object.ObjMetadataSet{}, AllCurrent,
 		2*time.Second, testutil.NewFakeRESTMapper())
 
 	eventChannel := make(chan event.Event)
@@ -28,9 +29,16 @@ func TestWaitTask_TimeoutTriggered(t *testing.T) {
 	timer := time.NewTimer(3 * time.Second)
 
 	select {
-	case res := <-taskContext.TaskChannel():
-		if _, ok := IsTimeoutError(res.Err); !ok {
-			t.Errorf("expected timeout error, but got %v", res.Err)
+	case e := <-taskContext.EventChannel():
+		if e.Type != event.WaitType {
+			t.Errorf("expected a WaitType event, but got a %v event", e.Type)
+		}
+		if e.WaitEvent.GroupName != taskName {
+			t.Errorf("expected WaitEvent.GroupName = %q, but got %q", taskName, e.WaitEvent.GroupName)
+		}
+		err := e.WaitEvent.Error
+		if _, ok := IsTimeoutError(err); !ok {
+			t.Errorf("expected timeout error, but got %v", err)
 		}
 		return
 	case <-timer.C:

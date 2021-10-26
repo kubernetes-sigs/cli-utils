@@ -45,9 +45,8 @@ func TestBaseRunner(t *testing.T) {
 		statusEventsDelay         time.Duration
 		statusEvents              []pollevent.Event
 		expectedEventTypes        []event.Type
-		expectedError             error
 		expectedTimedOutResources []TimedOutResource
-		expectedErrorMsg          string
+		expectedTimeoutErrorMsg   string
 	}{
 		"wait task runs until condition is met": {
 			tasks: []Task{
@@ -112,9 +111,11 @@ func TestBaseRunner(t *testing.T) {
 				},
 			},
 			expectedEventTypes: []event.Type{
+				event.ActionGroupType,
 				event.StatusType,
+				event.WaitType,
+				event.ActionGroupType,
 			},
-			expectedError: &TimeoutError{},
 			expectedTimedOutResources: []TimedOutResource{
 				{
 					Identifier: depID,
@@ -122,7 +123,7 @@ func TestBaseRunner(t *testing.T) {
 					Message:    "resource not cached",
 				},
 			},
-			expectedErrorMsg: "timeout after 2 seconds waiting for 2 resources ([default_cm__ConfigMap default_dep_apps_Deployment]) to reach condition AllCurrent",
+			expectedTimeoutErrorMsg: "timeout after 2 seconds waiting for 2 resources ([default_cm__ConfigMap default_dep_apps_Deployment]) to reach condition AllCurrent",
 		},
 		"wait task times out eventually (InProgress)": {
 			tasks: []Task{
@@ -147,16 +148,19 @@ func TestBaseRunner(t *testing.T) {
 				},
 			},
 			expectedEventTypes: []event.Type{
+				event.ActionGroupType,
 				event.StatusType,
+				event.StatusType,
+				event.WaitType,
+				event.ActionGroupType,
 			},
-			expectedError: &TimeoutError{},
 			expectedTimedOutResources: []TimedOutResource{
 				{
 					Identifier: depID,
 					Status:     status.InProgressStatus,
 				},
 			},
-			expectedErrorMsg: "timeout after 2 seconds waiting for 2 resources ([default_cm__ConfigMap default_dep_apps_Deployment]) to reach condition AllCurrent",
+			expectedTimeoutErrorMsg: "timeout after 2 seconds waiting for 2 resources ([default_cm__ConfigMap default_dep_apps_Deployment]) to reach condition AllCurrent",
 		},
 		"tasks run in order": {
 			tasks: []Task{
@@ -244,18 +248,13 @@ func TestBaseRunner(t *testing.T) {
 			close(eventChannel)
 			wg.Wait()
 
-			if tc.expectedError != nil {
-				assert.IsType(t, tc.expectedError, err)
-				if timeoutError, ok := err.(*TimeoutError); ok {
-					assert.ElementsMatch(t, tc.expectedTimedOutResources,
-						timeoutError.TimedOutResources)
-					assert.Equal(t, timeoutError.Error(), tc.expectedErrorMsg)
-				}
-				return
-			} else if err != nil {
+			if err != nil {
 				t.Errorf("expected no error, but got %v", err)
 			}
 
+			for _, event := range events {
+				t.Log(event)
+			}
 			if want, got := len(tc.expectedEventTypes), len(events); want != got {
 				t.Errorf("expected %d events, but got %d", want, got)
 			}
@@ -264,6 +263,14 @@ func TestBaseRunner(t *testing.T) {
 				if want, got := expectedEventType, e.Type; want != got {
 					t.Errorf("expected event type %s, but got %s",
 						want, got)
+				}
+				if e.Type == event.WaitType {
+					err := e.WaitEvent.Error
+					if timeoutError, ok := err.(*TimeoutError); ok {
+						assert.ElementsMatch(t, tc.expectedTimedOutResources,
+							timeoutError.TimedOutResources)
+						assert.Equal(t, timeoutError.Error(), tc.expectedTimeoutErrorMsg)
+					}
 				}
 			}
 		})
