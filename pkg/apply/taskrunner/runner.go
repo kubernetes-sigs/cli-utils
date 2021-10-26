@@ -239,7 +239,6 @@ func (b *baseRunner) run(ctx context.Context, taskQueue chan Task,
 			}
 			if msg.Err != nil {
 				b.amendTimeoutError(taskContext, msg.Err)
-				return msg.Err
 			}
 			if abort {
 				return abortReason
