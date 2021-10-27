@@ -6,6 +6,7 @@ package apply
 import (
 	"context"
 	"fmt"
+	"sort"
 	"sync"
 	"testing"
 	"time"
@@ -82,6 +83,7 @@ metadata:
 	}
 )
 
+//nolint:dupl // event lists are very similar
 func TestApplier(t *testing.T) {
 	testCases := map[string]struct {
 		namespace string
@@ -95,8 +97,14 @@ func TestApplier(t *testing.T) {
 		options Options
 		// fake input events from the status poller
 		statusEvents []pollevent.Event
+		// expected output status events (async)
+		expectedStatusEvents []testutil.ExpEvent
 		// expected output events
 		expectedEvents []testutil.ExpEvent
+		// true if runTimeout is expected to have caused cancellation
+		expectRunTimeout bool
+		// true if testTimeout is expected to have caused cancellation
+		expectTestTimeout bool
 	}{
 		"initial apply without status or prune": {
 			namespace: "default",
@@ -116,17 +124,93 @@ func TestApplier(t *testing.T) {
 			expectedEvents: []testutil.ExpEvent{
 				{
 					EventType: event.InitType,
+					InitEvent: &testutil.ExpInitEvent{},
 				},
 				{
 					EventType: event.ActionGroupType,
+					ActionGroupEvent: &testutil.ExpActionGroupEvent{
+						GroupName: "inventory-add-0",
+						Action:    event.InventoryAction,
+						Type:      event.Started,
+					},
+				},
+				{
+					EventType: event.ActionGroupType,
+					ActionGroupEvent: &testutil.ExpActionGroupEvent{
+						GroupName: "inventory-add-0",
+						Action:    event.InventoryAction,
+						Type:      event.Finished,
+					},
+				},
+
+				{
+					EventType: event.ActionGroupType,
+					ActionGroupEvent: &testutil.ExpActionGroupEvent{
+						GroupName: "apply-0",
+						Action:    event.ApplyAction,
+						Type:      event.Started,
+					},
 				},
 				{
 					EventType: event.ApplyType,
+					ApplyEvent: &testutil.ExpApplyEvent{
+						GroupName:  "apply-0",
+						Operation:  event.Created, // Create new
+						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
+					},
 				},
 				{
 					EventType: event.ActionGroupType,
+					ActionGroupEvent: &testutil.ExpActionGroupEvent{
+						GroupName: "apply-0",
+						Action:    event.ApplyAction,
+						Type:      event.Finished,
+					},
 				},
+				{
+					EventType: event.ActionGroupType,
+					ActionGroupEvent: &testutil.ExpActionGroupEvent{
+						GroupName: "wait-0",
+						Action:    event.WaitAction,
+						Type:      event.Started,
+					},
+				},
+				{
+					EventType: event.WaitType,
+					WaitEvent: &testutil.ExpWaitEvent{
+						GroupName:  "wait-0",
+						Operation:  event.ReconcilePending,
+						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
+					},
+				},
+				// Timeout waiting for status event saying deployment is current
+				// TODO: update inventory after timeout
+				// {
+				// 	EventType: event.ActionGroupType,
+				// 	ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				// 		GroupName: "wait-0",
+				// 		Action:    event.WaitAction,
+				// 		Type:      event.Finished,
+				// 	},
+				// },
+				// {
+				// 	EventType: event.ActionGroupType,
+				// 	ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				// 		GroupName: "inventory-set-0",
+				// 		Action:    event.InventoryAction,
+				// 		Type:      event.Started,
+				// 	},
+				// },
+				// {
+				// 	EventType: event.ActionGroupType,
+				// 	ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				// 		GroupName: "inventory-set-0",
+				// 		Action:    event.InventoryAction,
+				// 		Type:      event.Finished,
+				// 	},
+				// },
 			},
+			expectTestTimeout: true,
 		},
 		"first apply multiple resources with status and prune": {
 			namespace: "default",
@@ -143,6 +227,7 @@ func TestApplier(t *testing.T) {
 			options: Options{
 				ReconcileTimeout: time.Minute,
 				InventoryPolicy:  inventory.InventoryPolicyMustMatch,
+				EmitStatusEvents: true,
 			},
 			statusEvents: []pollevent.Event{
 				{
@@ -170,42 +255,149 @@ func TestApplier(t *testing.T) {
 					},
 				},
 			},
+			expectedStatusEvents: []testutil.ExpEvent{
+				{
+					EventType: event.StatusType,
+					StatusEvent: &testutil.ExpStatusEvent{
+						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
+						Status:     status.InProgressStatus,
+					},
+				},
+				{
+					EventType: event.StatusType,
+					StatusEvent: &testutil.ExpStatusEvent{
+						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
+						Status:     status.CurrentStatus,
+					},
+				},
+				{
+					EventType: event.StatusType,
+					StatusEvent: &testutil.ExpStatusEvent{
+						Identifier: testutil.ToIdentifier(t, resources["secret"]),
+						Status:     status.CurrentStatus,
+					},
+				},
+			},
 			expectedEvents: []testutil.ExpEvent{
 				{
 					EventType: event.InitType,
+					InitEvent: &testutil.ExpInitEvent{},
 				},
 				{
 					EventType: event.ActionGroupType,
+					ActionGroupEvent: &testutil.ExpActionGroupEvent{
+						GroupName: "inventory-add-0",
+						Action:    event.InventoryAction,
+						Type:      event.Started,
+					},
+				},
+				{
+					EventType: event.ActionGroupType,
+					ActionGroupEvent: &testutil.ExpActionGroupEvent{
+						GroupName: "inventory-add-0",
+						Action:    event.InventoryAction,
+						Type:      event.Finished,
+					},
+				},
+
+				{
+					EventType: event.ActionGroupType,
+					ActionGroupEvent: &testutil.ExpActionGroupEvent{
+						GroupName: "apply-0",
+						Action:    event.ApplyAction,
+						Type:      event.Started,
+					},
+				},
+				// Secrets applied before Deployments (see pkg/ordering)
+				{
+					EventType: event.ApplyType,
+					ApplyEvent: &testutil.ExpApplyEvent{
+						GroupName:  "apply-0",
+						Operation:  event.Created, // Create new
+						Identifier: testutil.ToIdentifier(t, resources["secret"]),
+					},
 				},
 				{
 					EventType: event.ApplyType,
-				},
-				{
-					EventType: event.ApplyType,
-				},
-				{
-					EventType: event.ActionGroupType,
-				},
-				{
-					EventType: event.ActionGroupType,
-				},
-				{
-					EventType: event.StatusType,
-				},
-				{
-					EventType: event.StatusType,
-				},
-				{
-					EventType: event.StatusType,
+					ApplyEvent: &testutil.ExpApplyEvent{
+						GroupName:  "apply-0",
+						Operation:  event.Created, // Create new
+						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
+					},
 				},
 				{
 					EventType: event.ActionGroupType,
+					ActionGroupEvent: &testutil.ExpActionGroupEvent{
+						GroupName: "apply-0",
+						Action:    event.ApplyAction,
+						Type:      event.Finished,
+					},
 				},
 				{
 					EventType: event.ActionGroupType,
+					ActionGroupEvent: &testutil.ExpActionGroupEvent{
+						GroupName: "wait-0",
+						Action:    event.WaitAction,
+						Type:      event.Started,
+					},
+				},
+				// Secrets before Deployments (see pkg/ordering)
+				{
+					EventType: event.WaitType,
+					WaitEvent: &testutil.ExpWaitEvent{
+						GroupName:  "wait-0",
+						Operation:  event.ReconcilePending,
+						Identifier: testutil.ToIdentifier(t, resources["secret"]),
+					},
+				},
+				{
+					EventType: event.WaitType,
+					WaitEvent: &testutil.ExpWaitEvent{
+						GroupName:  "wait-0",
+						Operation:  event.ReconcilePending,
+						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
+					},
+				},
+				// Deployment before Secret (see statusEvents)
+				{
+					EventType: event.WaitType,
+					WaitEvent: &testutil.ExpWaitEvent{
+						GroupName:  "wait-0",
+						Operation:  event.Reconciled,
+						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
+					},
+				},
+				{
+					EventType: event.WaitType,
+					WaitEvent: &testutil.ExpWaitEvent{
+						GroupName:  "wait-0",
+						Operation:  event.Reconciled,
+						Identifier: testutil.ToIdentifier(t, resources["secret"]),
+					},
 				},
 				{
 					EventType: event.ActionGroupType,
+					ActionGroupEvent: &testutil.ExpActionGroupEvent{
+						GroupName: "wait-0",
+						Action:    event.WaitAction,
+						Type:      event.Finished,
+					},
+				},
+				{
+					EventType: event.ActionGroupType,
+					ActionGroupEvent: &testutil.ExpActionGroupEvent{
+						GroupName: "inventory-set-0",
+						Action:    event.InventoryAction,
+						Type:      event.Started,
+					},
+				},
+				{
+					EventType: event.ActionGroupType,
+					ActionGroupEvent: &testutil.ExpActionGroupEvent{
+						GroupName: "inventory-set-0",
+						Action:    event.InventoryAction,
+						Type:      event.Finished,
+					},
 				},
 			},
 		},
@@ -231,6 +423,7 @@ func TestApplier(t *testing.T) {
 			options: Options{
 				ReconcileTimeout: time.Minute,
 				InventoryPolicy:  inventory.AdoptIfNoInventory,
+				EmitStatusEvents: true,
 			},
 			statusEvents: []pollevent.Event{
 				{
@@ -250,39 +443,142 @@ func TestApplier(t *testing.T) {
 					},
 				},
 			},
+			expectedStatusEvents: []testutil.ExpEvent{
+				{
+					EventType: event.StatusType,
+					StatusEvent: &testutil.ExpStatusEvent{
+						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
+						Status:     status.CurrentStatus,
+					},
+				},
+				{
+					EventType: event.StatusType,
+					StatusEvent: &testutil.ExpStatusEvent{
+						Identifier: testutil.ToIdentifier(t, resources["secret"]),
+						Status:     status.CurrentStatus,
+					},
+				},
+			},
 			expectedEvents: []testutil.ExpEvent{
 				{
 					EventType: event.InitType,
+					InitEvent: &testutil.ExpInitEvent{},
 				},
 				{
 					EventType: event.ActionGroupType,
+					ActionGroupEvent: &testutil.ExpActionGroupEvent{
+						GroupName: "inventory-add-0",
+						Action:    event.InventoryAction,
+						Type:      event.Started,
+					},
+				},
+				{
+					EventType: event.ActionGroupType,
+					ActionGroupEvent: &testutil.ExpActionGroupEvent{
+						GroupName: "inventory-add-0",
+						Action:    event.InventoryAction,
+						Type:      event.Finished,
+					},
+				},
+
+				{
+					EventType: event.ActionGroupType,
+					ActionGroupEvent: &testutil.ExpActionGroupEvent{
+						GroupName: "apply-0",
+						Action:    event.ApplyAction,
+						Type:      event.Started,
+					},
+				},
+				// Secrets applied before Deployments (see pkg/ordering)
+				{
+					EventType: event.ApplyType,
+					ApplyEvent: &testutil.ExpApplyEvent{
+						GroupName:  "apply-0",
+						Operation:  event.Created, // Create new
+						Identifier: testutil.ToIdentifier(t, resources["secret"]),
+					},
 				},
 				{
 					EventType: event.ApplyType,
-				},
-				{
-					EventType: event.ApplyType,
-				},
-				{
-					EventType: event.ActionGroupType,
-				},
-				{
-					EventType: event.ActionGroupType,
-				},
-				{
-					EventType: event.StatusType,
-				},
-				{
-					EventType: event.StatusType,
+					ApplyEvent: &testutil.ExpApplyEvent{
+						GroupName:  "apply-0",
+						Operation:  event.Configured, // Update existing
+						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
+					},
 				},
 				{
 					EventType: event.ActionGroupType,
+					ActionGroupEvent: &testutil.ExpActionGroupEvent{
+						GroupName: "apply-0",
+						Action:    event.ApplyAction,
+						Type:      event.Finished,
+					},
 				},
 				{
 					EventType: event.ActionGroupType,
+					ActionGroupEvent: &testutil.ExpActionGroupEvent{
+						GroupName: "wait-0",
+						Action:    event.WaitAction,
+						Type:      event.Started,
+					},
+				},
+				// Secrets before Deployments (see pkg/ordering)
+				{
+					EventType: event.WaitType,
+					WaitEvent: &testutil.ExpWaitEvent{
+						GroupName:  "wait-0",
+						Operation:  event.ReconcilePending,
+						Identifier: testutil.ToIdentifier(t, resources["secret"]),
+					},
+				},
+				{
+					EventType: event.WaitType,
+					WaitEvent: &testutil.ExpWaitEvent{
+						GroupName:  "wait-0",
+						Operation:  event.ReconcilePending,
+						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
+					},
+				},
+				// Deployment before Secret (see statusEvents)
+				{
+					EventType: event.WaitType,
+					WaitEvent: &testutil.ExpWaitEvent{
+						GroupName:  "wait-0",
+						Operation:  event.Reconciled,
+						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
+					},
+				},
+				{
+					EventType: event.WaitType,
+					WaitEvent: &testutil.ExpWaitEvent{
+						GroupName:  "wait-0",
+						Operation:  event.Reconciled,
+						Identifier: testutil.ToIdentifier(t, resources["secret"]),
+					},
 				},
 				{
 					EventType: event.ActionGroupType,
+					ActionGroupEvent: &testutil.ExpActionGroupEvent{
+						GroupName: "wait-0",
+						Action:    event.WaitAction,
+						Type:      event.Finished,
+					},
+				},
+				{
+					EventType: event.ActionGroupType,
+					ActionGroupEvent: &testutil.ExpActionGroupEvent{
+						GroupName: "inventory-set-0",
+						Action:    event.InventoryAction,
+						Type:      event.Started,
+					},
+				},
+				{
+					EventType: event.ActionGroupType,
+					ActionGroupEvent: &testutil.ExpActionGroupEvent{
+						GroupName: "inventory-set-0",
+						Action:    event.InventoryAction,
+						Type:      event.Finished,
+					},
 				},
 			},
 		},
@@ -307,42 +603,188 @@ func TestApplier(t *testing.T) {
 				testutil.Unstructured(t, resources["secret"], testutil.AddOwningInv(t, "test")),
 			},
 			options: Options{
-				InventoryPolicy: inventory.InventoryPolicyMustMatch,
+				InventoryPolicy:  inventory.InventoryPolicyMustMatch,
+				EmitStatusEvents: true,
 			},
-			statusEvents: []pollevent.Event{},
+			statusEvents: []pollevent.Event{
+				{
+					EventType: pollevent.ResourceUpdateEvent,
+					Resource: &pollevent.ResourceStatus{
+						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
+						Status:     status.InProgressStatus,
+					},
+				},
+				{
+					EventType: pollevent.ResourceUpdateEvent,
+					Resource: &pollevent.ResourceStatus{
+						Identifier: testutil.ToIdentifier(t, resources["secret"]),
+						Status:     status.InProgressStatus,
+					},
+				},
+				{
+					EventType: pollevent.ResourceUpdateEvent,
+					Resource: &pollevent.ResourceStatus{
+						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
+						Status:     status.NotFoundStatus,
+					},
+				},
+				{
+					EventType: pollevent.ResourceUpdateEvent,
+					Resource: &pollevent.ResourceStatus{
+						Identifier: testutil.ToIdentifier(t, resources["secret"]),
+						Status:     status.NotFoundStatus,
+					},
+				},
+			},
+			expectedStatusEvents: []testutil.ExpEvent{
+				{
+					EventType: event.StatusType,
+					StatusEvent: &testutil.ExpStatusEvent{
+						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
+						Status:     status.InProgressStatus,
+					},
+				},
+				{
+					EventType: event.StatusType,
+					StatusEvent: &testutil.ExpStatusEvent{
+						Identifier: testutil.ToIdentifier(t, resources["secret"]),
+						Status:     status.InProgressStatus,
+					},
+				},
+				{
+					EventType: event.StatusType,
+					StatusEvent: &testutil.ExpStatusEvent{
+						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
+						Status:     status.NotFoundStatus,
+					},
+				},
+				{
+					EventType: event.StatusType,
+					StatusEvent: &testutil.ExpStatusEvent{
+						Identifier: testutil.ToIdentifier(t, resources["secret"]),
+						Status:     status.NotFoundStatus,
+					},
+				},
+			},
 			expectedEvents: []testutil.ExpEvent{
 				{
 					EventType: event.InitType,
+					InitEvent: &testutil.ExpInitEvent{},
 				},
 				{
-					// Inventory task starting
 					EventType: event.ActionGroupType,
-				},
-				{
-					// Inventory task finished
-					EventType: event.ActionGroupType,
-				},
-				{
-					// Prune task starting
-					EventType: event.ActionGroupType,
-				},
-				{
-					// Prune object
-					EventType: event.PruneType,
-					PruneEvent: &testutil.ExpPruneEvent{
-						Operation: event.Pruned,
+					ActionGroupEvent: &testutil.ExpActionGroupEvent{
+						GroupName: "inventory-add-0",
+						Action:    event.InventoryAction,
+						Type:      event.Started,
 					},
 				},
 				{
-					// Prune object
-					EventType: event.PruneType,
-					PruneEvent: &testutil.ExpPruneEvent{
-						Operation: event.Pruned,
+					EventType: event.ActionGroupType,
+					ActionGroupEvent: &testutil.ExpActionGroupEvent{
+						GroupName: "inventory-add-0",
+						Action:    event.InventoryAction,
+						Type:      event.Finished,
 					},
 				},
 				{
-					// Prune task finished
 					EventType: event.ActionGroupType,
+					ActionGroupEvent: &testutil.ExpActionGroupEvent{
+						GroupName: "prune-0",
+						Action:    event.PruneAction,
+						Type:      event.Started,
+					},
+				},
+				// Deployments deleted before Secrets (see pkg/ordering)
+				{
+					EventType: event.PruneType,
+					PruneEvent: &testutil.ExpPruneEvent{
+						GroupName:  "prune-0",
+						Operation:  event.Pruned,
+						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
+					},
+				},
+				{
+					EventType: event.PruneType,
+					PruneEvent: &testutil.ExpPruneEvent{
+						GroupName:  "prune-0",
+						Operation:  event.Pruned,
+						Identifier: testutil.ToIdentifier(t, resources["secret"]),
+					},
+				},
+				{
+					EventType: event.ActionGroupType,
+					ActionGroupEvent: &testutil.ExpActionGroupEvent{
+						GroupName: "prune-0",
+						Action:    event.PruneAction,
+						Type:      event.Finished,
+					},
+				},
+				{
+					EventType: event.ActionGroupType,
+					ActionGroupEvent: &testutil.ExpActionGroupEvent{
+						GroupName: "wait-0",
+						Action:    event.WaitAction,
+						Type:      event.Started,
+					},
+				},
+				// Deployments before Secrets (see pkg/ordering)
+				{
+					EventType: event.WaitType,
+					WaitEvent: &testutil.ExpWaitEvent{
+						GroupName:  "wait-0",
+						Operation:  event.ReconcilePending,
+						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
+					},
+				},
+				{
+					EventType: event.WaitType,
+					WaitEvent: &testutil.ExpWaitEvent{
+						GroupName:  "wait-0",
+						Operation:  event.ReconcilePending,
+						Identifier: testutil.ToIdentifier(t, resources["secret"]),
+					},
+				},
+				// Deployment before Secret (see statusEvents)
+				{
+					EventType: event.WaitType,
+					WaitEvent: &testutil.ExpWaitEvent{
+						GroupName:  "wait-0",
+						Operation:  event.Reconciled,
+						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
+					},
+				},
+				{
+					EventType: event.WaitType,
+					WaitEvent: &testutil.ExpWaitEvent{
+						GroupName:  "wait-0",
+						Operation:  event.Reconciled,
+						Identifier: testutil.ToIdentifier(t, resources["secret"]),
+					},
+				},
+				{
+					EventType: event.ActionGroupType,
+					ActionGroupEvent: &testutil.ExpActionGroupEvent{
+						GroupName: "wait-0",
+						Action:    event.WaitAction,
+						Type:      event.Finished,
+					},
+				},
+				{
+					EventType: event.ActionGroupType,
+					ActionGroupEvent: &testutil.ExpActionGroupEvent{
+						GroupName: "inventory-set-0",
+						Action:    event.InventoryAction,
+						Type:      event.Started,
+					},
+				},
+				{
+					EventType: event.ActionGroupType,
+					ActionGroupEvent: &testutil.ExpActionGroupEvent{
+						GroupName: "inventory-set-0",
+						Action:    event.InventoryAction,
+						Type:      event.Finished,
+					},
 				},
 			},
 		},
@@ -362,6 +804,7 @@ func TestApplier(t *testing.T) {
 			options: Options{
 				ReconcileTimeout: time.Minute,
 				InventoryPolicy:  inventory.InventoryPolicyMustMatch,
+				EmitStatusEvents: true,
 			},
 			statusEvents: []pollevent.Event{
 				{
@@ -379,33 +822,106 @@ func TestApplier(t *testing.T) {
 					},
 				},
 			},
+			expectedStatusEvents: []testutil.ExpEvent{
+				{
+					EventType: event.StatusType,
+					StatusEvent: &testutil.ExpStatusEvent{
+						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
+						Status:     status.InProgressStatus,
+					},
+				},
+				{
+					EventType: event.StatusType,
+					StatusEvent: &testutil.ExpStatusEvent{
+						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
+						Status:     status.CurrentStatus,
+					},
+				},
+			},
 			expectedEvents: []testutil.ExpEvent{
 				{
 					EventType: event.InitType,
+					InitEvent: &testutil.ExpInitEvent{},
 				},
 				{
 					EventType: event.ActionGroupType,
-				},
-				{
-					EventType: event.ApplyType,
-					ApplyEvent: &testutil.ExpApplyEvent{
-						Error: inventory.NewInventoryOverlapError(fmt.Errorf("")),
+					ActionGroupEvent: &testutil.ExpActionGroupEvent{
+						GroupName: "inventory-add-0",
+						Action:    event.InventoryAction,
+						Type:      event.Started,
 					},
 				},
 				{
 					EventType: event.ActionGroupType,
+					ActionGroupEvent: &testutil.ExpActionGroupEvent{
+						GroupName: "inventory-add-0",
+						Action:    event.InventoryAction,
+						Type:      event.Finished,
+					},
 				},
 				{
 					EventType: event.ActionGroupType,
+					ActionGroupEvent: &testutil.ExpActionGroupEvent{
+						GroupName: "apply-0",
+						Action:    event.ApplyAction,
+						Type:      event.Started,
+					},
+				},
+				{
+					EventType: event.ApplyType,
+					ApplyEvent: &testutil.ExpApplyEvent{
+						GroupName:  "apply-0",
+						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
+						Error:      testutil.EqualErrorType(inventory.NewInventoryOverlapError(fmt.Errorf(""))),
+					},
 				},
 				{
 					EventType: event.ActionGroupType,
+					ActionGroupEvent: &testutil.ExpActionGroupEvent{
+						GroupName: "apply-0",
+						Action:    event.ApplyAction,
+						Type:      event.Finished,
+					},
 				},
 				{
 					EventType: event.ActionGroupType,
+					ActionGroupEvent: &testutil.ExpActionGroupEvent{
+						GroupName: "wait-0",
+						Action:    event.WaitAction,
+						Type:      event.Started,
+					},
+				},
+				{
+					EventType: event.WaitType,
+					WaitEvent: &testutil.ExpWaitEvent{
+						GroupName:  "wait-0",
+						Operation:  event.ReconcileSkipped,
+						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
+					},
 				},
 				{
 					EventType: event.ActionGroupType,
+					ActionGroupEvent: &testutil.ExpActionGroupEvent{
+						GroupName: "wait-0",
+						Action:    event.WaitAction,
+						Type:      event.Finished,
+					},
+				},
+				{
+					EventType: event.ActionGroupType,
+					ActionGroupEvent: &testutil.ExpActionGroupEvent{
+						GroupName: "inventory-set-0",
+						Action:    event.InventoryAction,
+						Type:      event.Started,
+					},
+				},
+				{
+					EventType: event.ActionGroupType,
+					ActionGroupEvent: &testutil.ExpActionGroupEvent{
+						GroupName: "inventory-set-0",
+						Action:    event.InventoryAction,
+						Type:      event.Finished,
+					},
 				},
 			},
 		},
@@ -426,29 +942,93 @@ func TestApplier(t *testing.T) {
 				testutil.Unstructured(t, resources["deployment"], testutil.AddOwningInv(t, "unmatched")),
 			},
 			options: Options{
-				InventoryPolicy: inventory.InventoryPolicyMustMatch,
+				InventoryPolicy:  inventory.InventoryPolicyMustMatch,
+				EmitStatusEvents: true,
 			},
 			expectedEvents: []testutil.ExpEvent{
 				{
 					EventType: event.InitType,
+					InitEvent: &testutil.ExpInitEvent{},
 				},
 				{
 					EventType: event.ActionGroupType,
-				},
-				{
-					EventType: event.ActionGroupType,
-				},
-				{
-					EventType: event.ActionGroupType,
-				},
-				{
-					EventType: event.PruneType,
-					PruneEvent: &testutil.ExpPruneEvent{
-						Operation: event.PruneSkipped,
+					ActionGroupEvent: &testutil.ExpActionGroupEvent{
+						GroupName: "inventory-add-0",
+						Action:    event.InventoryAction,
+						Type:      event.Started,
 					},
 				},
 				{
 					EventType: event.ActionGroupType,
+					ActionGroupEvent: &testutil.ExpActionGroupEvent{
+						GroupName: "inventory-add-0",
+						Action:    event.InventoryAction,
+						Type:      event.Finished,
+					},
+				},
+				{
+					EventType: event.ActionGroupType,
+					ActionGroupEvent: &testutil.ExpActionGroupEvent{
+						GroupName: "prune-0",
+						Action:    event.PruneAction,
+						Type:      event.Started,
+					},
+				},
+				{
+					EventType: event.PruneType,
+					PruneEvent: &testutil.ExpPruneEvent{
+						GroupName:  "prune-0",
+						Operation:  event.PruneSkipped,
+						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
+					},
+				},
+				{
+					EventType: event.ActionGroupType,
+					ActionGroupEvent: &testutil.ExpActionGroupEvent{
+						GroupName: "prune-0",
+						Action:    event.PruneAction,
+						Type:      event.Finished,
+					},
+				},
+				{
+					EventType: event.ActionGroupType,
+					ActionGroupEvent: &testutil.ExpActionGroupEvent{
+						GroupName: "wait-0",
+						Action:    event.WaitAction,
+						Type:      event.Started,
+					},
+				},
+				{
+					EventType: event.WaitType,
+					WaitEvent: &testutil.ExpWaitEvent{
+						GroupName:  "wait-0",
+						Operation:  event.ReconcileSkipped,
+						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
+					},
+				},
+				{
+					EventType: event.ActionGroupType,
+					ActionGroupEvent: &testutil.ExpActionGroupEvent{
+						GroupName: "wait-0",
+						Action:    event.WaitAction,
+						Type:      event.Finished,
+					},
+				},
+				{
+					EventType: event.ActionGroupType,
+					ActionGroupEvent: &testutil.ExpActionGroupEvent{
+						GroupName: "inventory-set-0",
+						Action:    event.InventoryAction,
+						Type:      event.Started,
+					},
+				},
+				{
+					EventType: event.ActionGroupType,
+					ActionGroupEvent: &testutil.ExpActionGroupEvent{
+						GroupName: "inventory-set-0",
+						Action:    event.InventoryAction,
+						Type:      event.Finished,
+					},
 				},
 			},
 		},
@@ -469,29 +1049,133 @@ func TestApplier(t *testing.T) {
 				testutil.Unstructured(t, resources["deployment"], testutil.AddOwningInv(t, "test")),
 			},
 			options: Options{
-				InventoryPolicy: inventory.InventoryPolicyMustMatch,
+				InventoryPolicy:  inventory.InventoryPolicyMustMatch,
+				EmitStatusEvents: true,
+			},
+			statusEvents: []pollevent.Event{
+				{
+					EventType: pollevent.ResourceUpdateEvent,
+					Resource: &pollevent.ResourceStatus{
+						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
+						Status:     status.InProgressStatus,
+					},
+				},
+				{
+					EventType: pollevent.ResourceUpdateEvent,
+					Resource: &pollevent.ResourceStatus{
+						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
+						Status:     status.NotFoundStatus,
+					},
+				},
+			},
+			expectedStatusEvents: []testutil.ExpEvent{
+				{
+					EventType: event.StatusType,
+					StatusEvent: &testutil.ExpStatusEvent{
+						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
+						Status:     status.InProgressStatus,
+					},
+				},
+				{
+					EventType: event.StatusType,
+					StatusEvent: &testutil.ExpStatusEvent{
+						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
+						Status:     status.NotFoundStatus,
+					},
+				},
 			},
 			expectedEvents: []testutil.ExpEvent{
 				{
 					EventType: event.InitType,
+					InitEvent: &testutil.ExpInitEvent{},
 				},
 				{
 					EventType: event.ActionGroupType,
-				},
-				{
-					EventType: event.ActionGroupType,
-				},
-				{
-					EventType: event.ActionGroupType,
-				},
-				{
-					EventType: event.PruneType,
-					PruneEvent: &testutil.ExpPruneEvent{
-						Operation: event.Pruned,
+					ActionGroupEvent: &testutil.ExpActionGroupEvent{
+						GroupName: "inventory-add-0",
+						Action:    event.InventoryAction,
+						Type:      event.Started,
 					},
 				},
 				{
 					EventType: event.ActionGroupType,
+					ActionGroupEvent: &testutil.ExpActionGroupEvent{
+						GroupName: "inventory-add-0",
+						Action:    event.InventoryAction,
+						Type:      event.Finished,
+					},
+				},
+				{
+					EventType: event.ActionGroupType,
+					ActionGroupEvent: &testutil.ExpActionGroupEvent{
+						GroupName: "prune-0",
+						Action:    event.PruneAction,
+						Type:      event.Started,
+					},
+				},
+				{
+					EventType: event.PruneType,
+					PruneEvent: &testutil.ExpPruneEvent{
+						GroupName:  "prune-0",
+						Operation:  event.Pruned,
+						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
+					},
+				},
+				{
+					EventType: event.ActionGroupType,
+					ActionGroupEvent: &testutil.ExpActionGroupEvent{
+						GroupName: "prune-0",
+						Action:    event.PruneAction,
+						Type:      event.Finished,
+					},
+				},
+				{
+					EventType: event.ActionGroupType,
+					ActionGroupEvent: &testutil.ExpActionGroupEvent{
+						GroupName: "wait-0",
+						Action:    event.WaitAction,
+						Type:      event.Started,
+					},
+				},
+				{
+					EventType: event.WaitType,
+					WaitEvent: &testutil.ExpWaitEvent{
+						GroupName:  "wait-0",
+						Operation:  event.ReconcilePending,
+						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
+					},
+				},
+				{
+					EventType: event.WaitType,
+					WaitEvent: &testutil.ExpWaitEvent{
+						GroupName:  "wait-0",
+						Operation:  event.Reconciled,
+						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
+					},
+				},
+				{
+					EventType: event.ActionGroupType,
+					ActionGroupEvent: &testutil.ExpActionGroupEvent{
+						GroupName: "wait-0",
+						Action:    event.WaitAction,
+						Type:      event.Finished,
+					},
+				},
+				{
+					EventType: event.ActionGroupType,
+					ActionGroupEvent: &testutil.ExpActionGroupEvent{
+						GroupName: "inventory-set-0",
+						Action:    event.InventoryAction,
+						Type:      event.Started,
+					},
+				},
+				{
+					EventType: event.ActionGroupType,
+					ActionGroupEvent: &testutil.ExpActionGroupEvent{
+						GroupName: "inventory-set-0",
+						Action:    event.InventoryAction,
+						Type:      event.Finished,
+					},
 				},
 			},
 		},
@@ -508,24 +1192,39 @@ func TestApplier(t *testing.T) {
 				poller,
 			)
 
-			ctx := context.Background()
+			// Context for Applier.Run
+			runCtx, runCancel := context.WithCancel(context.Background())
+			defer runCancel() // cleanup
 
-			// enable events by default, since we're testing for them
-			tc.options.EmitStatusEvents = true
+			// Context for this test (in case Applier.Run never closes the event channel)
+			testTimeout := 10 * time.Second
+			testCtx, testCancel := context.WithTimeout(context.Background(), testTimeout)
+			defer testCancel() // cleanup
 
-			eventChannel := applier.Run(ctx, tc.invInfo.toWrapped(), tc.resources, tc.options)
+			eventChannel := applier.Run(runCtx, tc.invInfo.toWrapped(), tc.resources, tc.options)
 
 			// only start sending events once
 			var once sync.Once
 
 			var events []event.Event
-			timer := time.NewTimer(10 * time.Second)
 
 		loop:
 			for {
 				select {
+				case <-testCtx.Done():
+					// Test timed out
+					runCancel()
+					if tc.expectTestTimeout {
+						assert.Equal(t, context.DeadlineExceeded, testCtx.Err(), "Applier.Run failed to exit, but not because of expected timeout")
+					} else {
+						t.Errorf("Applier.Run failed to exit (timeout: %s)", testTimeout)
+					}
+					break loop
+
 				case e, ok := <-eventChannel:
 					if !ok {
+						// Event channel closed
+						testCancel()
 						break loop
 					}
 					if e.Type == event.ActionGroupType &&
@@ -540,14 +1239,37 @@ func TestApplier(t *testing.T) {
 						}
 					}
 					events = append(events, e)
-				case <-timer.C:
-					t.Errorf("timeout")
-					break loop
 				}
 			}
 
-			err := testutil.VerifyEvents(tc.expectedEvents, events)
-			assert.NoError(t, err)
+			// Convert events to test events for comparison
+			receivedEvents := testutil.EventsToExpEvents(events)
+
+			// Validate & remove expected status events
+			for _, e := range tc.expectedStatusEvents {
+				var removed int
+				receivedEvents, removed = testutil.RemoveEqualEvents(receivedEvents, e)
+				if removed < 1 {
+					t.Fatalf("Expected status event not received: %#v", e.StatusEvent)
+				}
+			}
+
+			// sort to allow comparison of multiple apply/prune tasks in the same task group
+			sort.Sort(testutil.GroupedEventsByID(receivedEvents))
+
+			// Validate the rest of the events
+			testutil.AssertEqual(t, receivedEvents, tc.expectedEvents)
+
+			// Validate that the expected timeout was the cause of the run completion.
+			// just in case something else cancelled the run
+			switch {
+			case tc.expectRunTimeout:
+				assert.Equal(t, context.DeadlineExceeded, runCtx.Err(), "Applier.Run exited, but not by expected context timeout")
+			case tc.expectTestTimeout:
+				assert.Equal(t, context.Canceled, runCtx.Err(), "Applier.Run exited, but not because of expected context cancellation")
+			default:
+				assert.Nil(t, runCtx.Err(), "Applier.Run exited, but context error is not nil")
+			}
 		})
 	}
 }
@@ -963,7 +1685,7 @@ func TestApplierCancel(t *testing.T) {
 				var removed int
 				receivedEvents, removed = testutil.RemoveEqualEvents(receivedEvents, e)
 				if removed < 1 {
-					t.Fatalf("Expected status event not received: %#v", e)
+					t.Fatalf("Expected status event not received: %#v", e.StatusEvent)
 				}
 			}
 

@@ -468,7 +468,6 @@ func TestWaitTask_SingleTaskResult(t *testing.T) {
 	eventChannel := make(chan event.Event, 10)
 	resourceCache := cache.NewResourceCacheMap()
 	taskContext := NewTaskContext(eventChannel, resourceCache)
-	taskContext.taskChannel = make(chan TaskResult, 10)
 	defer close(eventChannel)
 
 	// mark the deployment as applied
@@ -522,20 +521,17 @@ loop:
 				Operation:  event.ReconcilePending,
 			},
 		},
-	}
-	// Expect an event for every call to StatusUpdate,
-	// because the object is already Current.
-	for i := 0; i < 10; i++ {
-		expectedEvents = append(expectedEvents, event.Event{
+		// deployment1 reconciled
+		{
 			Type: event.WaitType,
 			WaitEvent: event.WaitEvent{
 				GroupName:  taskName,
 				Identifier: testDeploymentID,
 				Operation:  event.Reconciled,
 			},
-		})
+		},
 	}
-	assert.Equal(t, expectedEvents, receivedEvents)
+	testutil.AssertEqual(t, receivedEvents, expectedEvents)
 
 	expectedResults := []TaskResult{
 		{}, // Empty result means success

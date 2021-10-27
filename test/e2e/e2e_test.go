@@ -287,10 +287,7 @@ func createRandomNamespace(ctx context.Context, c client.Client) *v1.Namespace {
 
 func deleteInventoryCRD(ctx context.Context, c client.Client) {
 	invCRD := manifestToUnstructured(customprovider.InventoryCRD)
-	err := c.Delete(ctx, invCRD)
-	if err != nil && !apierrors.IsNotFound(err) {
-		Expect(err).ToNot(HaveOccurred())
-	}
+	deleteUnstructuredIfExists(ctx, c, invCRD)
 }
 
 func deleteUnstructuredIfExists(ctx context.Context, c client.Client, obj *unstructured.Unstructured) {

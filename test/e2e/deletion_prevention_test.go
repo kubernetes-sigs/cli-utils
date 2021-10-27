@@ -49,6 +49,7 @@ func deletionPreventionTest(ctx context.Context, c client.Client, invConfig Inve
 	By("Verify the inventory size is 3")
 	invConfig.InvSizeVerifyFunc(ctx, c, inventoryName, namespaceName, inventoryID, 3)
 
+	By("Dry-run apply resources")
 	resources = []*unstructured.Unstructured{
 		withNamespace(manifestToUnstructured(deployment1), namespaceName),
 	}
@@ -57,6 +58,7 @@ func deletionPreventionTest(ctx context.Context, c client.Client, invConfig Inve
 		ReconcileTimeout: 2 * time.Minute,
 		DryRunStrategy:   common.DryRunClient,
 	}))
+
 	By("Verify deployment still exists and has the config.k8s.io/owning-inventory annotation")
 	obj = assertUnstructuredExists(ctx, c, withNamespace(manifestToUnstructured(deployment1), namespaceName))
 	Expect(obj.GetAnnotations()[inventory.OwningInventoryKey]).To(Equal(inventoryInfo.ID()))
@@ -72,6 +74,7 @@ func deletionPreventionTest(ctx context.Context, c client.Client, invConfig Inve
 	By("Verify the inventory size is still 3")
 	invConfig.InvSizeVerifyFunc(ctx, c, inventoryName, namespaceName, inventoryID, 3)
 
+	By("Apply resources")
 	resources = []*unstructured.Unstructured{
 		withNamespace(manifestToUnstructured(deployment1), namespaceName),
 	}

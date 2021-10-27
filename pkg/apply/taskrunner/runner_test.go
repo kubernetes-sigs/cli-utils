@@ -86,12 +86,12 @@ func TestBaseRunner(t *testing.T) {
 				event.ApplyType,
 				event.ActionGroupType,
 				event.ActionGroupType,
-				event.WaitType, // deployment pending
-				event.WaitType, // configmap pending
-				event.StatusType,
-				event.WaitType, // configmap current
-				event.StatusType,
-				event.WaitType, // deployment current
+				event.WaitType,   // deployment pending
+				event.WaitType,   // configmap pending
+				event.StatusType, // configmap current
+				event.WaitType,   // configmap reconciled
+				event.StatusType, // deployment current
+				event.WaitType,   // deployment reconciled
 				event.ActionGroupType,
 				event.ActionGroupType,
 				event.PruneType,
@@ -137,11 +137,11 @@ func TestBaseRunner(t *testing.T) {
 			},
 			expectedEventTypes: []event.Type{
 				event.ActionGroupType,
-				event.WaitType, // configmap pending
-				event.WaitType, // deployment pending
-				event.StatusType,
-				event.WaitType, // configmap current
-				event.WaitType, // deployment timeout error
+				event.WaitType,   // configmap pending
+				event.WaitType,   // deployment pending
+				event.StatusType, // configmap current
+				event.WaitType,   // configmap reconciled
+				event.WaitType,   // deployment timeout error
 				event.ActionGroupType,
 			},
 			expectedWaitEvents: []event.WaitEvent{
@@ -191,12 +191,12 @@ func TestBaseRunner(t *testing.T) {
 			},
 			expectedEventTypes: []event.Type{
 				event.ActionGroupType,
-				event.WaitType, // configmap pending
-				event.WaitType, // deployment pending
-				event.StatusType,
-				event.WaitType, // configmap current
-				event.StatusType,
-				event.WaitType, // deployment timeout error
+				event.WaitType,   // configmap pending
+				event.WaitType,   // deployment pending
+				event.StatusType, // configmap current
+				event.WaitType,   // configmap reconciled
+				event.StatusType, // deployment inprogress
+				event.WaitType,   // deployment timeout error
 				event.ActionGroupType,
 			},
 			expectedWaitEvents: []event.WaitEvent{
