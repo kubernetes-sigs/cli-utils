@@ -184,10 +184,13 @@ var (
 
 func TestPrune(t *testing.T) {
 	tests := map[string]struct {
-		pruneObjs      []*unstructured.Unstructured
-		pruneFilters   []filter.ValidationFilter
-		options        Options
-		expectedEvents []testutil.ExpEvent
+		pruneObjs         []*unstructured.Unstructured
+		pruneFilters      []filter.ValidationFilter
+		options           Options
+		expectedEvents    []testutil.ExpEvent
+		expectedSkipped   object.ObjMetadataSet
+		expectedFailed    object.ObjMetadataSet
+		expectedAbandoned object.ObjMetadataSet
 	}{
 		"No pruned objects; no prune/delete events": {
 			pruneObjs:      []*unstructured.Unstructured{},
@@ -311,6 +314,9 @@ func TestPrune(t *testing.T) {
 					},
 				},
 			},
+			expectedSkipped: object.ObjMetadataSet{
+				object.UnstructuredToObjMetaOrDie(pod),
+			},
 		},
 		"UID match for only one object one pruned, one skipped": {
 			pruneObjs: []*unstructured.Unstructured{pod, pdb},
@@ -335,6 +341,9 @@ func TestPrune(t *testing.T) {
 					},
 				},
 			},
+			expectedSkipped: object.ObjMetadataSet{
+				object.UnstructuredToObjMetaOrDie(pod),
+			},
 		},
 		"Prevent delete annotation equals prune skipped": {
 			pruneObjs:    []*unstructured.Unstructured{podDeletionPrevention, testutil.Unstructured(t, pdbDeletePreventionManifest)},
@@ -353,6 +362,14 @@ func TestPrune(t *testing.T) {
 						Operation: event.PruneSkipped,
 					},
 				},
+			},
+			expectedSkipped: object.ObjMetadataSet{
+				object.UnstructuredToObjMetaOrDie(podDeletionPrevention),
+				testutil.ToIdentifier(t, pdbDeletePreventionManifest),
+			},
+			expectedAbandoned: object.ObjMetadataSet{
+				object.UnstructuredToObjMetaOrDie(podDeletionPrevention),
+				testutil.ToIdentifier(t, pdbDeletePreventionManifest),
 			},
 		},
 		"Prevent delete annotation equals delete skipped": {
@@ -373,6 +390,14 @@ func TestPrune(t *testing.T) {
 					},
 				},
 			},
+			expectedSkipped: object.ObjMetadataSet{
+				object.UnstructuredToObjMetaOrDie(podDeletionPrevention),
+				testutil.ToIdentifier(t, pdbDeletePreventionManifest),
+			},
+			expectedAbandoned: object.ObjMetadataSet{
+				object.UnstructuredToObjMetaOrDie(podDeletionPrevention),
+				testutil.ToIdentifier(t, pdbDeletePreventionManifest),
+			},
 		},
 		"Prevent delete annotation, one skipped, one pruned": {
 			pruneObjs:    []*unstructured.Unstructured{podDeletionPrevention, pod},
@@ -392,6 +417,12 @@ func TestPrune(t *testing.T) {
 					},
 				},
 			},
+			expectedSkipped: object.ObjMetadataSet{
+				object.UnstructuredToObjMetaOrDie(podDeletionPrevention),
+			},
+			expectedAbandoned: object.ObjMetadataSet{
+				object.UnstructuredToObjMetaOrDie(podDeletionPrevention),
+			},
 		},
 		"Namespace prune skipped": {
 			pruneObjs: []*unstructured.Unstructured{namespace},
@@ -408,6 +439,9 @@ func TestPrune(t *testing.T) {
 						Operation: event.PruneSkipped,
 					},
 				},
+			},
+			expectedSkipped: object.ObjMetadataSet{
+				object.UnstructuredToObjMetaOrDie(namespace),
 			},
 		},
 	}
@@ -449,6 +483,28 @@ func TestPrune(t *testing.T) {
 			// Validate the expected/actual events
 			err = testutil.VerifyEvents(tc.expectedEvents, actualEvents)
 			assert.NoError(t, err)
+
+			// validate record of failed prunes
+			for _, id := range tc.expectedFailed {
+				assert.Truef(t, taskContext.IsFailedDelete(id), "Prune() should mark object as failed: %s", id)
+			}
+			for _, id := range object.ObjMetadataSet(pruneIds).Diff(tc.expectedFailed) {
+				assert.Falsef(t, taskContext.IsFailedDelete(id), "Prune() should NOT mark object as failed: %s", id)
+			}
+			// validate record of skipped prunes
+			for _, id := range tc.expectedSkipped {
+				assert.Truef(t, taskContext.IsSkippedDelete(id), "Prune() should mark object as skipped: %s", id)
+			}
+			for _, id := range object.ObjMetadataSet(pruneIds).Diff(tc.expectedSkipped) {
+				assert.Falsef(t, taskContext.IsSkippedDelete(id), "Prune() should NOT mark object as skipped: %s", id)
+			}
+			// validate record of abandoned objects
+			for _, id := range tc.expectedAbandoned {
+				assert.Truef(t, taskContext.IsAbandonedObject(id), "Prune() should mark object as abandoned: %s", id)
+			}
+			for _, id := range object.ObjMetadataSet(pruneIds).Diff(tc.expectedAbandoned) {
+				assert.Falsef(t, taskContext.IsAbandonedObject(id), "Prune() should NOT mark object as abandoned: %s", id)
+			}
 		})
 	}
 }
@@ -496,25 +552,22 @@ func TestPruneDeletionPrevention(t *testing.T) {
 				// Run the prune and validate.
 				return po.Prune([]*unstructured.Unstructured{tc.pruneObj}, []filter.ValidationFilter{filter.PreventRemoveFilter{}}, taskContext, "test-0", tc.options)
 			}()
+			require.NoError(t, err)
 
-			if err != nil {
-				t.Fatalf("Unexpected error during Prune(): %#v", err)
-			}
 			// verify that the object no longer has the annotation
 			obj, err := po.getObject(pruneID)
-			if err != nil {
-				t.Fatalf("Unexpected error: %#v", err)
-			}
+			require.NoError(t, err)
 
-			hasOwningInventoryAnnotation := false
 			for annotation := range obj.GetAnnotations() {
 				if annotation == inventory.OwningInventoryKey {
-					hasOwningInventoryAnnotation = true
+					t.Errorf("Prune() should remove the %s annotation", inventory.OwningInventoryKey)
+					break
 				}
 			}
-			if hasOwningInventoryAnnotation {
-				t.Fatalf("Prune() should remove the %s annotation", inventory.OwningInventoryKey)
-			}
+
+			assert.Truef(t, taskContext.IsAbandonedObject(pruneID), "Prune() should mark object as abandoned")
+			assert.Truef(t, taskContext.IsSkippedDelete(pruneID), "Prune() should mark object as skipped")
+			assert.Falsef(t, taskContext.IsFailedDelete(pruneID), "Prune() should NOT mark object as failed")
 		})
 	}
 }

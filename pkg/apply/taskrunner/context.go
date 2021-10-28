@@ -15,31 +15,30 @@ import (
 // NewTaskContext returns a new TaskContext
 func NewTaskContext(eventChannel chan event.Event, resourceCache cache.ResourceCache) *TaskContext {
 	return &TaskContext{
-		taskChannel:      make(chan TaskResult),
-		eventChannel:     eventChannel,
-		resourceCache:    resourceCache,
-		appliedResources: make(map[object.ObjMetadata]applyInfo),
-		failedResources:  make(map[object.ObjMetadata]struct{}),
-		pruneFailures:    make(map[object.ObjMetadata]struct{}),
+		taskChannel:       make(chan TaskResult),
+		eventChannel:      eventChannel,
+		resourceCache:     resourceCache,
+		successfulApplies: make(map[object.ObjMetadata]applyInfo),
+		failedApplies:     make(map[object.ObjMetadata]struct{}),
+		failedDeletes:     make(map[object.ObjMetadata]struct{}),
+		skippedApplies:    make(map[object.ObjMetadata]struct{}),
+		skippedDeletes:    make(map[object.ObjMetadata]struct{}),
+		abandonedObjects:  make(map[object.ObjMetadata]struct{}),
 	}
 }
 
 // TaskContext defines a context that is passed between all
 // the tasks that is in a taskqueue.
 type TaskContext struct {
-	taskChannel chan TaskResult
-
-	eventChannel chan event.Event
-
-	resourceCache cache.ResourceCache
-
-	appliedResources map[object.ObjMetadata]applyInfo
-
-	// failedResources records the IDs of resources that are failed during applying.
-	failedResources map[object.ObjMetadata]struct{}
-
-	// pruneFailures records the IDs of resources that are failed during pruning.
-	pruneFailures map[object.ObjMetadata]struct{}
+	taskChannel       chan TaskResult
+	eventChannel      chan event.Event
+	resourceCache     cache.ResourceCache
+	successfulApplies map[object.ObjMetadata]applyInfo
+	failedApplies     map[object.ObjMetadata]struct{}
+	failedDeletes     map[object.ObjMetadata]struct{}
+	skippedApplies    map[object.ObjMetadata]struct{}
+	skippedDeletes    map[object.ObjMetadata]struct{}
+	abandonedObjects  map[object.ObjMetadata]struct{}
 }
 
 func (tc *TaskContext) TaskChannel() chan TaskResult {
@@ -54,19 +53,35 @@ func (tc *TaskContext) ResourceCache() cache.ResourceCache {
 	return tc.resourceCache
 }
 
-// ResourceApplied updates the context with information about the
+// IsSuccessfulApply returns true if the object apply was successful
+func (tc *TaskContext) IsSuccessfulApply(id object.ObjMetadata) bool {
+	_, found := tc.successfulApplies[id]
+	return found
+}
+
+// AddSuccessfulApply updates the context with information about the
 // resource identified by the provided id. Currently, we keep information
 // about the generation of the resource after the apply operation completed.
-func (tc *TaskContext) ResourceApplied(id object.ObjMetadata, uid types.UID, gen int64) {
-	tc.appliedResources[id] = applyInfo{
+func (tc *TaskContext) AddSuccessfulApply(id object.ObjMetadata, uid types.UID, gen int64) {
+	tc.successfulApplies[id] = applyInfo{
 		generation: gen,
 		uid:        uid,
 	}
 }
 
-// ResourceUID looks up the UID of the given resource
-func (tc *TaskContext) ResourceUID(id object.ObjMetadata) (types.UID, bool) {
-	ai, found := tc.appliedResources[id]
+// SuccessfulApplies returns all the objects (as ObjMetadata) that
+// were added as applied resources to the TaskContext.
+func (tc *TaskContext) SuccessfulApplies() object.ObjMetadataSet {
+	all := make(object.ObjMetadataSet, 0, len(tc.successfulApplies))
+	for r := range tc.successfulApplies {
+		all = append(all, r)
+	}
+	return all
+}
+
+// AppliedResourceUID looks up the UID of the given resource
+func (tc *TaskContext) AppliedResourceUID(id object.ObjMetadata) (types.UID, bool) {
+	ai, found := tc.successfulApplies[id]
 	if klog.V(4).Enabled() {
 		if found {
 			klog.Infof("resource applied UID cache hit (%s): %d", id, ai.uid)
@@ -80,21 +95,11 @@ func (tc *TaskContext) ResourceUID(id object.ObjMetadata) (types.UID, bool) {
 	return ai.uid, true
 }
 
-// AppliedResources returns all the objects (as ObjMetadata) that
-// were added as applied resources to the TaskContext.
-func (tc *TaskContext) AppliedResources() object.ObjMetadataSet {
-	all := make(object.ObjMetadataSet, 0, len(tc.appliedResources))
-	for r := range tc.appliedResources {
-		all = append(all, r)
-	}
-	return all
-}
-
 // AppliedResourceUIDs returns a set with the UIDs of all the
 // successfully applied resources.
 func (tc *TaskContext) AppliedResourceUIDs() sets.String {
 	uids := sets.NewString()
-	for _, ai := range tc.appliedResources {
+	for _, ai := range tc.successfulApplies {
 		uid := string(ai.uid)
 		if uid != "" {
 			uids.Insert(uid)
@@ -106,7 +111,7 @@ func (tc *TaskContext) AppliedResourceUIDs() sets.String {
 // AppliedGeneration looks up the generation of the given resource
 // after it was applied.
 func (tc *TaskContext) AppliedGeneration(id object.ObjMetadata) (int64, bool) {
-	ai, found := tc.appliedResources[id]
+	ai, found := tc.successfulApplies[id]
 	if klog.V(4).Enabled() {
 		if found {
 			klog.Infof("resource applied generation cache hit (%s): %d", id, ai.generation)
@@ -120,40 +125,84 @@ func (tc *TaskContext) AppliedGeneration(id object.ObjMetadata) (int64, bool) {
 	return ai.generation, true
 }
 
-func (tc *TaskContext) ResourceFailed(id object.ObjMetadata) bool {
-	_, found := tc.failedResources[id]
+// IsFailedApply returns true if the object failed to apply
+func (tc *TaskContext) IsFailedApply(id object.ObjMetadata) bool {
+	_, found := tc.failedApplies[id]
 	return found
 }
 
-func (tc *TaskContext) CaptureResourceFailure(id object.ObjMetadata) {
-	tc.failedResources[id] = struct{}{}
+// AddFailedApply registers that the object failed to apply
+func (tc *TaskContext) AddFailedApply(id object.ObjMetadata) {
+	tc.failedApplies[id] = struct{}{}
 }
 
-func (tc *TaskContext) ResourceFailures() object.ObjMetadataSet {
-	failures := make(object.ObjMetadataSet, 0, len(tc.failedResources))
-	for f := range tc.failedResources {
-		failures = append(failures, f)
-	}
-	return failures
+// FailedApplies returns all the objects that failed to apply
+func (tc *TaskContext) FailedApplies() object.ObjMetadataSet {
+	return object.ObjMetadataSetFromMap(tc.failedApplies)
 }
 
-func (tc *TaskContext) CapturePruneFailure(id object.ObjMetadata) {
-	tc.pruneFailures[id] = struct{}{}
-}
-
-func (tc *TaskContext) PruneFailures() object.ObjMetadataSet {
-	failures := make(object.ObjMetadataSet, 0, len(tc.pruneFailures))
-	for f := range tc.pruneFailures {
-		failures = append(failures, f)
-	}
-	return failures
-}
-
-// PruneFailed returns true if the passed object identifier
-// has been stored as a prune failure; false otherwise.
-func (tc *TaskContext) PruneFailed(id object.ObjMetadata) bool {
-	_, found := tc.pruneFailures[id]
+// IsFailedDelete returns true if the object failed to delete
+func (tc *TaskContext) IsFailedDelete(id object.ObjMetadata) bool {
+	_, found := tc.failedDeletes[id]
 	return found
+}
+
+// AddFailedDelete registers that the object failed to delete
+func (tc *TaskContext) AddFailedDelete(id object.ObjMetadata) {
+	tc.failedDeletes[id] = struct{}{}
+}
+
+// FailedDeletes returns all the objects that failed to delete
+func (tc *TaskContext) FailedDeletes() object.ObjMetadataSet {
+	return object.ObjMetadataSetFromMap(tc.failedDeletes)
+}
+
+// IsSkippedApply returns true if the object apply was skipped
+func (tc *TaskContext) IsSkippedApply(id object.ObjMetadata) bool {
+	_, found := tc.skippedApplies[id]
+	return found
+}
+
+// AddSkippedApply registers that the object apply was skipped
+func (tc *TaskContext) AddSkippedApply(id object.ObjMetadata) {
+	tc.skippedApplies[id] = struct{}{}
+}
+
+// SkippedApplies returns all the objects where apply was skipped
+func (tc *TaskContext) SkippedApplies() object.ObjMetadataSet {
+	return object.ObjMetadataSetFromMap(tc.skippedApplies)
+}
+
+// IsSkippedDelete returns true if the object delete was skipped
+func (tc *TaskContext) IsSkippedDelete(id object.ObjMetadata) bool {
+	_, found := tc.skippedDeletes[id]
+	return found
+}
+
+// AddSkippedDelete registers that the object delete was skipped
+func (tc *TaskContext) AddSkippedDelete(id object.ObjMetadata) {
+	tc.skippedDeletes[id] = struct{}{}
+}
+
+// SkippedDeletes returns all the objects where deletion was skipped
+func (tc *TaskContext) SkippedDeletes() object.ObjMetadataSet {
+	return object.ObjMetadataSetFromMap(tc.skippedDeletes)
+}
+
+// IsAbandonedObject returns true if the object is abandoned
+func (tc *TaskContext) IsAbandonedObject(id object.ObjMetadata) bool {
+	_, found := tc.abandonedObjects[id]
+	return found
+}
+
+// AddAbandonedObject registers that the object is abandoned
+func (tc *TaskContext) AddAbandonedObject(id object.ObjMetadata) {
+	tc.abandonedObjects[id] = struct{}{}
+}
+
+// AbandonedObjects returns all the abandoned objects
+func (tc *TaskContext) AbandonedObjects() object.ObjMetadataSet {
+	return object.ObjMetadataSetFromMap(tc.abandonedObjects)
 }
 
 // applyInfo captures information about resources that have been

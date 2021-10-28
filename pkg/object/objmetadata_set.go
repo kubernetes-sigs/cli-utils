@@ -20,6 +20,15 @@ func ObjMetadataSetEquals(setA []ObjMetadata, setB []ObjMetadata) bool {
 	return ObjMetadataSet(setA).Equal(ObjMetadataSet(setB))
 }
 
+// ObjMetadataSetFromMap constructs a set from a map
+func ObjMetadataSetFromMap(mapA map[ObjMetadata]struct{}) ObjMetadataSet {
+	setA := make(ObjMetadataSet, 0, len(mapA))
+	for f := range mapA {
+		setA = append(setA, f)
+	}
+	return setA
+}
+
 // Equal returns true if the two sets contain equivalent objects. Duplicates are
 // ignored.
 // This function satisfies the cmp.Equal interface from github.com/google/go-cmp
@@ -62,6 +71,28 @@ func (setA ObjMetadataSet) Remove(obj ObjMetadata) ObjMetadataSet {
 		}
 	}
 	return setA
+}
+
+// Intersection returns the set of unique objects in both set A and set B.
+func (setA ObjMetadataSet) Intersection(setB ObjMetadataSet) ObjMetadataSet {
+	var maxlen int
+	if len(setA) > len(setB) {
+		maxlen = len(setA)
+	} else {
+		maxlen = len(setB)
+	}
+	mapI := make(map[ObjMetadata]struct{}, maxlen)
+	mapB := setB.ToMap()
+	for _, a := range setA {
+		if _, ok := mapB[a]; ok {
+			mapI[a] = struct{}{}
+		}
+	}
+	intersection := make(ObjMetadataSet, 0, len(mapI))
+	for o := range mapI {
+		intersection = append(intersection, o)
+	}
+	return intersection
 }
 
 // Union returns the set of unique objects from the merging of set A and set B.
@@ -127,6 +158,15 @@ func calcHash(objs []string) (uint32, error) {
 		}
 	}
 	return h.Sum32(), nil
+}
+
+// ToMap returns the set as a map, with objMeta keys and empty struct values.
+func (setA ObjMetadataSet) ToMap() map[ObjMetadata]struct{} {
+	m := make(map[ObjMetadata]struct{}, len(setA))
+	for _, objMeta := range setA {
+		m[objMeta] = struct{}{}
+	}
+	return m
 }
 
 // ToStringMap returns the set as a serializable map, with objMeta keys and

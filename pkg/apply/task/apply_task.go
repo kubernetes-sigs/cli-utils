@@ -112,7 +112,7 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 					id,
 					applyerror.NewUnknownTypeError(err),
 				)
-				taskContext.CaptureResourceFailure(id)
+				taskContext.AddFailedApply(id)
 				continue
 			}
 
@@ -128,13 +128,13 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 						klog.Errorf("error during %s, (%s): %s", filter.Name(), id, filterErr)
 					}
 					taskContext.EventChannel() <- a.createApplyFailedEvent(id, filterErr)
-					taskContext.CaptureResourceFailure(id)
+					taskContext.AddFailedApply(id)
 					break
 				}
 				if filtered {
 					klog.V(4).Infof("apply filtered (filter: %q, resource: %q, reason: %q)", filter.Name(), id, reason)
 					taskContext.EventChannel() <- a.createApplyEvent(id, event.Unchanged, obj)
-					taskContext.CaptureResourceFailure(id)
+					taskContext.AddSkippedApply(id)
 					break
 				}
 			}
@@ -149,7 +149,7 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 					klog.Errorf("error mutating: %w", err)
 				}
 				taskContext.EventChannel() <- a.createApplyFailedEvent(id, err)
-				taskContext.CaptureResourceFailure(id)
+				taskContext.AddFailedApply(id)
 				continue
 			}
 
@@ -171,13 +171,13 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 					id,
 					applyerror.NewApplyRunError(err),
 				)
-				taskContext.CaptureResourceFailure(id)
+				taskContext.AddFailedApply(id)
 			} else if info.Object != nil {
 				acc, err := meta.Accessor(info.Object)
 				if err == nil {
 					uid := acc.GetUID()
 					gen := acc.GetGeneration()
-					taskContext.ResourceApplied(id, uid, gen)
+					taskContext.AddSuccessfulApply(id, uid, gen)
 				}
 			}
 		}
@@ -288,7 +288,7 @@ func (a *ApplyTask) sendBatchApplyEvents(
 			id,
 			applyerror.NewInitializeApplyOptionError(err),
 		)
-		taskContext.CaptureResourceFailure(id)
+		taskContext.AddFailedApply(id)
 	}
 }
 

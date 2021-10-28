@@ -18,7 +18,7 @@ type InvSetTask struct {
 	TaskName      string
 	InvClient     inventory.InventoryClient
 	InvInfo       inventory.InventoryInfo
-	PrevInventory map[object.ObjMetadata]bool
+	PrevInventory object.ObjMetadataSet
 	DryRun        common.DryRunStrategy
 }
 
@@ -34,31 +34,81 @@ func (i *InvSetTask) Identifiers() object.ObjMetadataSet {
 	return object.ObjMetadataSet{}
 }
 
-// Start sets the inventory using the resources applied and the
-// prunes that failed. This task must run after all the apply
-// and prune tasks have completed.
+// Start sets (creates or replaces) the inventory.
+//
+// The guiding principal is that anything in the cluster should be in the
+// inventory, unless it was explicitly abandoned.
+//
+// This task must run after all the apply and prune tasks have completed.
+//
+// Added objects:
+// - Applied resources (successful)
+//
+// Retained objects:
+// - Applied resources (filtered/skipped)
+// - Applied resources (failed)
+// - Deleted resources (filtered/skipped) that were not abandoned
+// - Deleted resources (failed)
+// - Abandoned resources (failed)
+//
+// Removed objects:
+// - Deleted resources (successful)
+// - Abandoned resources (successful)
 func (i *InvSetTask) Start(taskContext *taskrunner.TaskContext) {
 	go func() {
-		klog.V(2).Infoln("starting inventory replace task")
-		appliedObjs := taskContext.AppliedResources()
-		klog.V(4).Infof("set inventory %d applied objects", len(appliedObjs))
-		// If an object failed to apply, but it was previously stored in
-		// the inventory, then keep it in the inventory so we don't lose
-		// track of it for next apply/prune. An object not found in the cluster
-		// is NOT stored as an apply failure (so it is properly removed from the inventory).
-		applyFailures := object.ObjMetadataSet{}
-		for _, failure := range taskContext.ResourceFailures() {
-			if _, exists := i.PrevInventory[failure]; exists {
-				applyFailures = append(applyFailures, failure)
-			}
-		}
-		klog.V(4).Infof("keep in inventory %d applied failures", len(applyFailures))
-		pruneFailures := taskContext.PruneFailures()
-		klog.V(4).Infof("set inventory %d prune failures", len(pruneFailures))
-		allApplyObjs := appliedObjs.Union(applyFailures)
-		invObjs := allApplyObjs.Union(pruneFailures)
+		klog.V(2).Infof("starting inventory set task (name: %q)", i.Name())
+		invObjs := object.ObjMetadataSet{}
+
+		// If an object applied successfully, keep or add it to the inventory.
+		appliedObjs := taskContext.SuccessfulApplies()
+		klog.V(4).Infof("set inventory %d successful applies", len(appliedObjs))
+		invObjs = invObjs.Union(appliedObjs)
+
+		// If an object failed to apply and was previously stored in the inventory,
+		// then keep it in the inventory so it can be applied/pruned next time.
+		// This will remove new resources that failed to apply from the inventory,
+		// because even tho they were added by InvAddTask, the PrevInventory
+		// represents the inventory before the pipeline has run.
+		applyFailures := i.PrevInventory.Intersection(taskContext.FailedApplies())
+		klog.V(4).Infof("keep in inventory %d failed applies", len(applyFailures))
+		invObjs = invObjs.Union(applyFailures)
+
+		// If an object skipped apply and was previously stored in the inventory,
+		// then keep it in the inventory so it can be applied/pruned next time.
+		// It's likely that all the skipped applies are already in the inventory,
+		// because the apply filters all currently depend on cluster state,
+		// but we're doing the intersection anyway just to be sure.
+		applySkips := i.PrevInventory.Intersection(taskContext.SkippedApplies())
+		klog.V(4).Infof("keep in inventory %d skipped applies", len(applySkips))
+		invObjs = invObjs.Union(applySkips)
+
+		// If an object failed to delete and was previously stored in the inventory,
+		// then keep it in the inventory so it can be applied/pruned next time.
+		// It's likely that all the delete failures are already in the inventory,
+		// because the set of resources to prune comes from the inventory,
+		// but we're doing the intersection anyway just to be sure.
+		pruneFailures := i.PrevInventory.Intersection(taskContext.FailedDeletes())
+		klog.V(4).Infof("set inventory %d failed prunes", len(pruneFailures))
+		invObjs = invObjs.Union(pruneFailures)
+
+		// If an object skipped delete and was previously stored in the inventory,
+		// then keep it in the inventory so it can be applied/pruned next time.
+		// It's likely that all the skipped deletes are already in the inventory,
+		// because the set of resources to prune comes from the inventory,
+		// but we're doing the intersection anyway just to be sure.
+		pruneSkips := i.PrevInventory.Intersection(taskContext.SkippedDeletes())
+		klog.V(4).Infof("keep in inventory %d skipped prunes", len(pruneSkips))
+		invObjs = invObjs.Union(pruneSkips)
+
+		// If an object is abandoned, then remove it from the inventory.
+		abandonedObjects := taskContext.AbandonedObjects()
+		klog.V(4).Infof("remove from inventory %d abandoned objects", len(abandonedObjects))
+		invObjs = invObjs.Diff(abandonedObjects)
+
 		klog.V(4).Infof("set inventory %d total objects", len(invObjs))
 		err := i.InvClient.Replace(i.InvInfo, invObjs, i.DryRun)
+
+		klog.V(2).Infof("completing inventory set task (name: %q)", i.Name())
 		taskContext.TaskChannel() <- taskrunner.TaskResult{Err: err}
 	}()
 }
