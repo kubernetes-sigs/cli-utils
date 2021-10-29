@@ -5,9 +5,9 @@ package json
 
 import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"sigs.k8s.io/cli-utils/cmd/printers/printer"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/print/list"
+	"sigs.k8s.io/cli-utils/pkg/printers/printer"
 )
 
 func NewPrinter(ioStreams genericclioptions.IOStreams) printer.Printer {

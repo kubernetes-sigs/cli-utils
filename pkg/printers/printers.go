@@ -5,12 +5,12 @@ package printers
 
 import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"sigs.k8s.io/cli-utils/cmd/printers/events"
-	"sigs.k8s.io/cli-utils/cmd/printers/json"
-	"sigs.k8s.io/cli-utils/cmd/printers/printer"
-	"sigs.k8s.io/cli-utils/cmd/printers/table"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/print/list"
+	"sigs.k8s.io/cli-utils/pkg/printers/events"
+	"sigs.k8s.io/cli-utils/pkg/printers/json"
+	"sigs.k8s.io/cli-utils/pkg/printers/printer"
+	"sigs.k8s.io/cli-utils/pkg/printers/table"
 )
 
 const (
