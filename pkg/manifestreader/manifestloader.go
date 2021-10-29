@@ -6,20 +6,16 @@ package manifestreader
 import (
 	"io"
 
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/kubectl/pkg/cmd/util"
-	"sigs.k8s.io/cli-utils/pkg/inventory"
 )
 
 // ManifestLoader is an interface for reading
-// and parsing the resources and inventory info.
+// and parsing the resources
 type ManifestLoader interface {
-	InventoryInfo([]*unstructured.Unstructured) (inventory.InventoryInfo, []*unstructured.Unstructured, error)
 	ManifestReader(reader io.Reader, path string) (ManifestReader, error)
 }
 
 // manifestLoader implements the ManifestLoader interface
-// for ConfigMap as the inventory object.
 type manifestLoader struct {
 	factory util.Factory
 }
@@ -29,12 +25,6 @@ func NewManifestLoader(f util.Factory) ManifestLoader {
 	return &manifestLoader{
 		factory: f,
 	}
-}
-
-// InventoryInfo returns the InventoryInfo from a list of Unstructured objects.
-func (f *manifestLoader) InventoryInfo(objs []*unstructured.Unstructured) (inventory.InventoryInfo, []*unstructured.Unstructured, error) {
-	invObj, objs, err := inventory.SplitUnstructureds(objs)
-	return inventory.WrapInventoryInfoObj(invObj), objs, err
 }
 
 func (f *manifestLoader) ManifestReader(reader io.Reader, path string) (ManifestReader, error) {

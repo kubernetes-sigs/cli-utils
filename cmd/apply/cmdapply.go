@@ -132,10 +132,11 @@ func (r *ApplyRunner) RunE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	inv, objs, err := r.loader.InventoryInfo(objs)
+	invObj, objs, err := inventory.SplitUnstructureds(objs)
 	if err != nil {
 		return err
 	}
+	inv := inventory.WrapInventoryInfoObj(invObj)
 
 	if r.PreProcess != nil {
 		inventoryPolicy, err = r.PreProcess(inv, common.DryRunNone)
@@ -143,6 +144,7 @@ func (r *ApplyRunner) RunE(cmd *cobra.Command, args []string) error {
 			return err
 		}
 	}
+
 	statusPoller, err := factory.NewStatusPoller(r.factory)
 	if err != nil {
 		return err

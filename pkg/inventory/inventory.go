@@ -98,7 +98,9 @@ func ValidateNoInventory(objs object.UnstructuredSet) error {
 
 // splitUnstructureds takes a set of unstructured.Unstructured objects and
 // splits it into one set that contains the inventory object templates and
-// another one that contains the remaining resources.
+// another one that contains the remaining resources. If there is no inventory
+// object the first return value is nil. Returns an error if there are
+// more than one inventory objects.
 func SplitUnstructureds(objs object.UnstructuredSet) (*unstructured.Unstructured, object.UnstructuredSet, error) {
 	invs := make(object.UnstructuredSet, 0)
 	resources := make(object.UnstructuredSet, 0)
@@ -109,14 +111,16 @@ func SplitUnstructureds(objs object.UnstructuredSet) (*unstructured.Unstructured
 			resources = append(resources, obj)
 		}
 	}
-	if len(invs) == 0 {
-		return nil, resources, NoInventoryObjError{}
+	var inv *unstructured.Unstructured
+	var err error
+	if len(invs) == 1 {
+		inv = invs[0]
 	} else if len(invs) > 1 {
-		return nil, resources, MultipleInventoryObjError{
+		err = MultipleInventoryObjError{
 			InventoryObjectTemplates: invs,
 		}
 	}
-	return invs[0], resources, nil
+	return inv, resources, err
 }
 
 // addSuffixToName adds the passed suffix (usually a hash) as a suffix
