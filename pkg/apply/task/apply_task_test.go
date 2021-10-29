@@ -112,12 +112,17 @@ func TestApplyTask_BasicAppliedObjects(t *testing.T) {
 
 			// The applied resources should be stored in the TaskContext
 			// for the final inventory.
-			expected, err := object.UnstructuredsToObjMetas(objs)
+			expectedIDs, err := object.UnstructuredsToObjMetas(objs)
 			require.NoError(t, err)
 
-			actual := taskContext.AppliedResources()
-			if !actual.Equal(expected) {
-				t.Errorf("expected (%s) inventory resources, got (%s)", expected, actual)
+			actual := taskContext.SuccessfulApplies()
+			if !actual.Equal(expectedIDs) {
+				t.Errorf("expected (%s) inventory resources, got (%s)", expectedIDs, actual)
+			}
+
+			for _, id := range expectedIDs {
+				assert.Falsef(t, taskContext.IsFailedApply(id), "ApplyTask should NOT mark object as failed: %s", id)
+				assert.Falsef(t, taskContext.IsSkippedApply(id), "ApplyTask should NOT mark object as skipped: %s", id)
 			}
 		})
 	}
@@ -193,7 +198,7 @@ func TestApplyTask_FetchGeneration(t *testing.T) {
 					Name:      info.name,
 					Namespace: info.namespace,
 				}
-				uid, _ := taskContext.ResourceUID(id)
+				uid, _ := taskContext.AppliedResourceUID(id)
 				assert.Equal(t, info.uid, uid)
 
 				gen, _ := taskContext.AppliedGeneration(id)
@@ -341,8 +346,10 @@ func TestApplyTask_DryRun(t *testing.T) {
 func TestApplyTaskWithError(t *testing.T) {
 	testCases := map[string]struct {
 		objs            []*unstructured.Unstructured
-		expectedObjects []object.ObjMetadata
+		expectedObjects object.ObjMetadataSet
 		expectedEvents  []event.Event
+		expectedSkipped object.ObjMetadataSet
+		expectedFailed  object.ObjMetadataSet
 	}{
 		"some resources have apply error": {
 			objs: []*unstructured.Unstructured{
@@ -381,7 +388,7 @@ func TestApplyTaskWithError(t *testing.T) {
 					},
 				}),
 			},
-			expectedObjects: []object.ObjMetadata{
+			expectedObjects: object.ObjMetadataSet{
 				{
 					GroupKind: schema.GroupKind{
 						Group: "apiextensions.k8s.io",
@@ -404,6 +411,16 @@ func TestApplyTaskWithError(t *testing.T) {
 					ApplyEvent: event.ApplyEvent{
 						Error: fmt.Errorf("expected apply error"),
 					},
+				},
+			},
+			expectedFailed: object.ObjMetadataSet{
+				{
+					GroupKind: schema.GroupKind{
+						Group: "anothercustom.io",
+						Kind:  "AnotherCustom",
+					},
+					Name:      "bar-with-failure",
+					Namespace: "barbar",
 				},
 			},
 		},
@@ -468,6 +485,24 @@ func TestApplyTaskWithError(t *testing.T) {
 			for i, e := range events {
 				assert.Equal(t, tc.expectedEvents[i].Type, e.Type)
 				assert.Equal(t, tc.expectedEvents[i].ApplyEvent.Error.Error(), e.ApplyEvent.Error.Error())
+			}
+
+			applyIds, err := object.UnstructuredsToObjMetas(tc.objs)
+			require.NoError(t, err)
+
+			// validate record of failed prunes
+			for _, id := range tc.expectedFailed {
+				assert.Truef(t, taskContext.IsFailedApply(id), "ApplyTask should mark object as failed: %s", id)
+			}
+			for _, id := range object.ObjMetadataSet(applyIds).Diff(tc.expectedFailed) {
+				assert.Falsef(t, taskContext.IsFailedApply(id), "ApplyTask should NOT mark object as failed: %s", id)
+			}
+			// validate record of skipped prunes
+			for _, id := range tc.expectedSkipped {
+				assert.Truef(t, taskContext.IsSkippedApply(id), "ApplyTask should mark object as skipped: %s", id)
+			}
+			for _, id := range object.ObjMetadataSet(applyIds).Diff(tc.expectedSkipped) {
+				assert.Falsef(t, taskContext.IsSkippedApply(id), "ApplyTask should NOT mark object as skipped: %s", id)
 			}
 		})
 	}

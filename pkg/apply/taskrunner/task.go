@@ -142,8 +142,12 @@ func (w *WaitTask) checkCondition(taskContext *TaskContext) bool {
 func (w *WaitTask) pending(taskContext *TaskContext) object.ObjMetadataSet {
 	var ids object.ObjMetadataSet
 	for _, id := range w.Ids {
-		if (w.Condition == AllCurrent && taskContext.ResourceFailed(id)) ||
-			(w.Condition == AllNotFound && taskContext.PruneFailed(id)) {
+		if w.Condition == AllCurrent &&
+			taskContext.IsFailedApply(id) || taskContext.IsSkippedApply(id) {
+			continue
+		}
+		if w.Condition == AllNotFound &&
+			taskContext.IsFailedDelete(id) || taskContext.IsSkippedDelete(id) {
 			continue
 		}
 		ids = append(ids, id)

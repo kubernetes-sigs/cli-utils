@@ -125,15 +125,11 @@ func (t *TaskQueueBuilder) AppendInvAddTask(inv inventory.InventoryInfo, applyOb
 func (t *TaskQueueBuilder) AppendInvSetTask(inv inventory.InventoryInfo, dryRun common.DryRunStrategy) *TaskQueueBuilder {
 	klog.V(2).Infoln("adding inventory set task")
 	prevInvIds, _ := t.InvClient.GetClusterObjs(inv, dryRun)
-	prevInventory := make(map[object.ObjMetadata]bool, len(prevInvIds))
-	for _, prevInvID := range prevInvIds {
-		prevInventory[prevInvID] = true
-	}
 	t.tasks = append(t.tasks, &task.InvSetTask{
 		TaskName:      fmt.Sprintf("inventory-set-%d", t.invSetCounter),
 		InvClient:     t.InvClient,
 		InvInfo:       inv,
-		PrevInventory: prevInventory,
+		PrevInventory: prevInvIds,
 		DryRun:        dryRun,
 	})
 	t.invSetCounter += 1
