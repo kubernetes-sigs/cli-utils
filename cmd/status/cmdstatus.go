@@ -86,10 +86,11 @@ func (r *StatusRunner) runE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	inv, _, err := r.loader.InventoryInfo(objs)
+	invObj, _, err := inventory.SplitUnstructureds(objs)
 	if err != nil {
 		return err
 	}
+	inv := inventory.WrapInventoryInfoObj(invObj)
 
 	invClient, err := r.invFactory.NewInventoryClient(r.factory)
 	if err != nil {

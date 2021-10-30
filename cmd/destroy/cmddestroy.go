@@ -102,10 +102,11 @@ func (r *DestroyRunner) RunE(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	inv, _, err := r.loader.InventoryInfo(objs)
+	invObj, _, err := inventory.SplitUnstructureds(objs)
 	if err != nil {
 		return err
 	}
+	inv := inventory.WrapInventoryInfoObj(invObj)
 
 	if r.PreProcess != nil {
 		inventoryPolicy, err = r.PreProcess(inv, common.DryRunNone)

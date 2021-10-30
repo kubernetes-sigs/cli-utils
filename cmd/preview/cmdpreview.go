@@ -117,10 +117,11 @@ func (r *PreviewRunner) RunE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	inv, objs, err := r.loader.InventoryInfo(objs)
+	invObj, objs, err := inventory.SplitUnstructureds(objs)
 	if err != nil {
 		return err
 	}
+	inv := inventory.WrapInventoryInfoObj(invObj)
 
 	if r.PreProcess != nil {
 		inventoryPolicy, err = r.PreProcess(inv, drs)

@@ -241,47 +241,52 @@ func TestRetrieveInventoryLabel(t *testing.T) {
 
 func TestSplitUnstructureds(t *testing.T) {
 	tests := map[string]struct {
-		allObjs []*unstructured.Unstructured
-		invObj  *unstructured.Unstructured
-		objs    []*unstructured.Unstructured
-		isError bool
+		allObjs      []*unstructured.Unstructured
+		expectedInv  *unstructured.Unstructured
+		expectedObjs []*unstructured.Unstructured
+		isError      bool
 	}{
-		"No objects is an error": {
-			allObjs: []*unstructured.Unstructured{},
-			invObj:  nil,
-			objs:    []*unstructured.Unstructured{},
-			isError: true,
+		"No objects is returns nil and no objects": {
+			allObjs:      []*unstructured.Unstructured{},
+			expectedInv:  nil,
+			expectedObjs: []*unstructured.Unstructured{},
+			isError:      false,
 		},
-		"Only inventory object is true": {
-			allObjs: []*unstructured.Unstructured{inventoryObj},
-			invObj:  inventoryObj,
-			objs:    []*unstructured.Unstructured{},
-			isError: false,
+		"Only inventory object returns inv and no objects": {
+			allObjs:      []*unstructured.Unstructured{inventoryObj},
+			expectedInv:  inventoryObj,
+			expectedObjs: []*unstructured.Unstructured{},
+			isError:      false,
 		},
-		"Missing inventory object is false": {
-			allObjs: []*unstructured.Unstructured{pod1},
-			invObj:  nil,
-			objs:    []*unstructured.Unstructured{pod1},
-			isError: true,
+		"Single object returns nil inventory and object": {
+			allObjs:      []*unstructured.Unstructured{pod1},
+			expectedInv:  nil,
+			expectedObjs: []*unstructured.Unstructured{pod1},
+			isError:      false,
 		},
-		"Multiple non-inventory objects is false": {
-			allObjs: []*unstructured.Unstructured{pod1, pod2, pod3},
-			invObj:  nil,
-			objs:    []*unstructured.Unstructured{pod1, pod2, pod3},
-			isError: true,
+		"Multiple non-inventory objects returns nil inventory and objs": {
+			allObjs:      []*unstructured.Unstructured{pod1, pod2, pod3},
+			expectedInv:  nil,
+			expectedObjs: []*unstructured.Unstructured{pod1, pod2, pod3},
+			isError:      false,
 		},
-		"Inventory object with multiple others is true": {
-			allObjs: []*unstructured.Unstructured{pod1, pod2, inventoryObj, pod3},
-			invObj:  inventoryObj,
-			objs:    []*unstructured.Unstructured{pod1, pod2, pod3},
-			isError: false,
+		"Inventory object with multiple others splits correctly": {
+			allObjs:      []*unstructured.Unstructured{pod1, pod2, inventoryObj, pod3},
+			expectedInv:  inventoryObj,
+			expectedObjs: []*unstructured.Unstructured{pod1, pod2, pod3},
+			isError:      false,
+		},
+		"Multiple inventory objects returns error": {
+			allObjs:      []*unstructured.Unstructured{pod1, legacyInvObj, inventoryObj, pod3},
+			expectedInv:  nil,
+			expectedObjs: []*unstructured.Unstructured{},
+			isError:      true,
 		},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			invObj, infos, err := SplitUnstructureds(tc.allObjs)
-			inv := WrapInventoryInfoObj(invObj)
+			actualInv, actualObjs, err := SplitUnstructureds(tc.allObjs)
 			if !tc.isError && err != nil {
 				t.Fatalf("unexpected error received: %s", err)
 			}
@@ -291,13 +296,11 @@ func TestSplitUnstructureds(t *testing.T) {
 				}
 				return
 			}
-
-			if tc.invObj.GetName() != inv.Name() ||
-				tc.invObj.GetNamespace() != inv.Namespace() {
-				t.Errorf("expected inventory (%v); got (%v)", tc.invObj, inv)
+			if tc.expectedInv != actualInv {
+				t.Errorf("expected inventory object (%v), got (%v)", tc.expectedInv, actualInv)
 			}
-			if len(tc.objs) != len(infos) {
-				t.Errorf("expected %d objects; got %d", len(tc.objs), len(infos))
+			if len(tc.expectedObjs) != len(actualObjs) {
+				t.Errorf("expected %d objects; got %d", len(tc.expectedObjs), len(actualObjs))
 			}
 		})
 	}
