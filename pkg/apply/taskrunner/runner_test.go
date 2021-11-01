@@ -123,7 +123,7 @@ func TestBaseRunner(t *testing.T) {
 					Message:    "resource not cached",
 				},
 			},
-			expectedTimeoutErrorMsg: "timeout after 2 seconds waiting for 2 resources ([default_cm__ConfigMap default_dep_apps_Deployment]) to reach condition AllCurrent",
+			expectedTimeoutErrorMsg: "timeout after 2 seconds waiting for 1 resources ([default_dep_apps_Deployment]) to reach condition AllCurrent",
 		},
 		"wait task times out eventually (InProgress)": {
 			tasks: []Task{
@@ -160,7 +160,7 @@ func TestBaseRunner(t *testing.T) {
 					Status:     status.InProgressStatus,
 				},
 			},
-			expectedTimeoutErrorMsg: "timeout after 2 seconds waiting for 2 resources ([default_cm__ConfigMap default_dep_apps_Deployment]) to reach condition AllCurrent",
+			expectedTimeoutErrorMsg: "timeout after 2 seconds waiting for 1 resources ([default_dep_apps_Deployment]) to reach condition AllCurrent",
 		},
 		"tasks run in order": {
 			tasks: []Task{

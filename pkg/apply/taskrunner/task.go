@@ -114,17 +114,11 @@ func (w *WaitTask) setTimer(taskContext *TaskContext) {
 		// We only send the TimeoutError to the eventChannel if no one has gotten
 		// to the token first.
 		case <-w.token:
-			err := &TimeoutError{
-				Identifiers: w.Ids,
-				Timeout:     w.Timeout,
-				Condition:   w.Condition,
-			}
-			amendTimeoutError(taskContext, err)
 			taskContext.EventChannel() <- event.Event{
 				Type: event.WaitType,
 				WaitEvent: event.WaitEvent{
 					GroupName: w.Name(),
-					Error:     err,
+					Error:     w.timeoutError(taskContext),
 				},
 			}
 			taskContext.TaskChannel() <- TaskResult{}
@@ -137,21 +131,29 @@ func (w *WaitTask) setTimer(taskContext *TaskContext) {
 	}
 }
 
-func amendTimeoutError(taskContext *TaskContext, err error) {
-	if timeoutErr, ok := err.(*TimeoutError); ok {
-		var timedOutResources []TimedOutResource
-		for _, id := range timeoutErr.Identifiers {
-			result := taskContext.ResourceCache().Get(id)
-			if timeoutErr.Condition.Meets(result.Status) {
-				continue
-			}
-			timedOutResources = append(timedOutResources, TimedOutResource{
-				Identifier: id,
-				Status:     result.Status,
-				Message:    result.StatusMessage,
-			})
+// timeoutError returns an error with the objects that have not yet reached the
+// desired condition.
+func (w *WaitTask) timeoutError(taskContext *TaskContext) *TimeoutError {
+	expected := w.pending(taskContext)
+	ids := object.ObjMetadataSet{}
+	tors := []TimedOutResource{}
+	for _, id := range expected {
+		result := taskContext.ResourceCache().Get(id)
+		if w.Condition.Meets(result.Status) {
+			continue
 		}
-		timeoutErr.TimedOutResources = timedOutResources
+		ids = append(ids, id)
+		tors = append(tors, TimedOutResource{
+			Identifier: id,
+			Status:     result.Status,
+			Message:    result.StatusMessage,
+		})
+	}
+	return &TimeoutError{
+		Identifiers:       ids,
+		Timeout:           w.Timeout,
+		Condition:         w.Condition,
+		TimedOutResources: tors,
 	}
 }
 
@@ -219,6 +221,7 @@ func (w *WaitTask) complete(taskContext *TaskContext) {
 }
 
 // ClearTimeout cancels the timeout for the wait task.
+// No final TaskResult will be sent on the TaskChannel.
 func (w *WaitTask) ClearTimeout() {
 	w.cancelFunc()
 }
