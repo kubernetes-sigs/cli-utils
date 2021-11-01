@@ -252,9 +252,6 @@ func TestBaseRunner(t *testing.T) {
 				t.Errorf("expected no error, but got %v", err)
 			}
 
-			for _, event := range events {
-				t.Log(event)
-			}
 			if want, got := len(tc.expectedEventTypes), len(events); want != got {
 				t.Errorf("expected %d events, but got %d", want, got)
 			}
