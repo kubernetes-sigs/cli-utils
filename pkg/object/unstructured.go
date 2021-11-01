@@ -5,6 +5,7 @@
 package object
 
 import (
+	"errors"
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -112,11 +113,11 @@ func GetCRDGroupKind(u *unstructured.Unstructured) (schema.GroupKind, bool) {
 // UnknownTypeError captures information about a type for which no information
 // could be found in the cluster or among the known CRDs.
 type UnknownTypeError struct {
-	GroupKind schema.GroupKind
+	GroupVersionKind schema.GroupVersionKind
 }
 
 func (e *UnknownTypeError) Error() string {
-	return fmt.Sprintf("unknown resource type: %q", e.GroupKind.String())
+	return fmt.Sprintf("unknown resource type: %q", e.GroupVersionKind.String())
 }
 
 // LookupResourceScope tries to look up the scope of the type of the provided
@@ -127,42 +128,87 @@ func LookupResourceScope(u *unstructured.Unstructured, crds []*unstructured.Unst
 	gvk := u.GroupVersionKind()
 	// First see if we can find the type (and the scope) in the cluster through
 	// the RESTMapper.
-	mapping, err := mapper.RESTMapping(gvk.GroupKind())
+	mapping, err := mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+	if err == nil {
+		// If we find the type in the cluster, we just look up the scope there.
+		return mapping.Scope, nil
+	}
 	// Not finding a match is not an error here, so only error out for other
 	// error types.
-	if err != nil && !meta.IsNoMatchError(err) {
+	if !meta.IsNoMatchError(err) {
 		return nil, err
 	}
 
-	var scope meta.RESTScope
-	if err == nil {
-		// If we find the type in the cluster, we just look up the scope there.
-		scope = mapping.Scope
-	} else {
-		// If we couldn't find the type in the cluster, check if we find a
-		// match in any of the provided CRDs.
-		for _, crd := range crds {
-			group, _, _ := unstructured.NestedString(crd.Object, "spec", "group")
-			kind, _, _ := unstructured.NestedString(crd.Object, "spec", "names", "kind")
-			if gvk.Kind == kind && gvk.Group == group {
-				scopeName, _, _ := unstructured.NestedString(crd.Object, "spec", "scope")
-				switch scopeName {
-				case "Namespaced":
-					scope = meta.RESTScopeNamespace
-				case "Cluster":
-					scope = meta.RESTScopeRoot
-				default:
-					return nil, fmt.Errorf("unknown scope %q", scopeName)
-				}
-				break
+	// If we couldn't find the type in the cluster, check if we find a
+	// match in any of the provided CRDs.
+	for _, crd := range crds {
+		group, found, err := unstructured.NestedString(crd.Object, "spec", "group")
+		if err != nil {
+			return nil, fmt.Errorf("spec.group: %v", err)
+		}
+		if !found || group == "" {
+			return nil, errors.New("spec.group not found")
+		}
+		kind, found, err := unstructured.NestedString(crd.Object, "spec", "names", "kind")
+		if err != nil {
+			return nil, fmt.Errorf("spec.kind: %v", err)
+		}
+		if !found || kind == "" {
+			return nil, errors.New("spec.kind not found")
+		}
+		if gvk.Kind != kind || gvk.Group != group {
+			continue
+		}
+		versionDefined, err := crdDefinesVersion(crd, gvk.Version)
+		if err != nil {
+			return nil, err
+		}
+		if !versionDefined {
+			return nil, &UnknownTypeError{
+				GroupVersionKind: gvk,
 			}
 		}
-	}
-
-	if scope == nil {
-		return nil, &UnknownTypeError{
-			GroupKind: gvk.GroupKind(),
+		scopeName, _, err := unstructured.NestedString(crd.Object, "spec", "scope")
+		if err != nil {
+			return nil, fmt.Errorf("spec.scope: %v", err)
+		}
+		switch scopeName {
+		case "Namespaced":
+			return meta.RESTScopeNamespace, nil
+		case "Cluster":
+			return meta.RESTScopeRoot, nil
+		default:
+			return nil, fmt.Errorf("unknown scope %q", scopeName)
 		}
 	}
-	return scope, nil
+	return nil, &UnknownTypeError{
+		GroupVersionKind: gvk,
+	}
+}
+
+func crdDefinesVersion(crd *unstructured.Unstructured, version string) (bool, error) {
+	versionsSlice, found, err := unstructured.NestedSlice(crd.Object, "spec", "versions")
+	if err != nil {
+		return false, fmt.Errorf("spec.versions: %v", err)
+	}
+	if !found || len(versionsSlice) == 0 {
+		return false, errors.New("spec.versions not found")
+	}
+	for i, ver := range versionsSlice {
+		verObj, ok := ver.(map[string]interface{})
+		if !ok {
+			return false, fmt.Errorf("spec.versions[%d]: expecting map, got: %T", i, ver)
+		}
+		name, found, err := unstructured.NestedString(verObj, "name")
+		if err != nil {
+			return false, fmt.Errorf("spec.versions[%d].name: %w", i, err)
+		}
+		if !found {
+			return false, fmt.Errorf("spec.versions[%d].name not found", i)
+		}
+		if name == version {
+			return true, nil
+		}
+	}
+	return false, nil
 }
