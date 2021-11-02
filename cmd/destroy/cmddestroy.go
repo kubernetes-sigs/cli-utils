@@ -19,7 +19,6 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/manifestreader"
 	"sigs.k8s.io/cli-utils/pkg/printers"
-	"sigs.k8s.io/cli-utils/pkg/util/factory"
 )
 
 // GetDestroyRunner creates and returns the DestroyRunner which stores the cobra command.
@@ -107,15 +106,11 @@ func (r *DestroyRunner) RunE(cmd *cobra.Command, args []string) error {
 	}
 	inv := inventory.WrapInventoryInfoObj(invObj)
 
-	statusPoller, err := factory.NewStatusPoller(r.factory)
-	if err != nil {
-		return err
-	}
 	invClient, err := r.invFactory.NewInventoryClient(r.factory)
 	if err != nil {
 		return err
 	}
-	d, err := apply.NewDestroyer(r.factory, invClient, statusPoller)
+	d, err := apply.NewDestroyer(r.factory, invClient)
 	if err != nil {
 		return err
 	}

@@ -352,10 +352,8 @@ func newApplierFromInvFactory(invFactory inventory.InventoryClientFactory) *appl
 	f := newFactory()
 	invClient, err := invFactory.NewInventoryClient(f)
 	Expect(err).NotTo(HaveOccurred())
-	statusPoller, err := factory.NewStatusPoller(f)
-	Expect(err).NotTo(HaveOccurred())
 
-	a, err := apply.NewApplier(f, invClient, statusPoller)
+	a, err := apply.NewApplier(f, invClient)
 	Expect(err).NotTo(HaveOccurred())
 	return a
 }
@@ -364,10 +362,8 @@ func newDestroyerFromInvFactory(invFactory inventory.InventoryClientFactory) *ap
 	f := newFactory()
 	invClient, err := invFactory.NewInventoryClient(f)
 	Expect(err).NotTo(HaveOccurred())
-	statusPoller, err := factory.NewStatusPoller(f)
-	Expect(err).NotTo(HaveOccurred())
 
-	d, err := apply.NewDestroyer(f, invClient, statusPoller)
+	d, err := apply.NewDestroyer(f, invClient)
 	Expect(err).NotTo(HaveOccurred())
 	return d
 }

@@ -27,11 +27,16 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/ordering"
+	statusfactory "sigs.k8s.io/cli-utils/pkg/util/factory"
 )
 
 // NewApplier returns a new Applier.
-func NewApplier(factory cmdutil.Factory, invClient inventory.InventoryClient, statusPoller poller.Poller) (*Applier, error) {
+func NewApplier(factory cmdutil.Factory, invClient inventory.InventoryClient) (*Applier, error) {
 	pruner, err := prune.NewPruner(factory, invClient)
+	if err != nil {
+		return nil, err
+	}
+	statusPoller, err := statusfactory.NewStatusPoller(factory)
 	if err != nil {
 		return nil, err
 	}
@@ -41,7 +46,7 @@ func NewApplier(factory cmdutil.Factory, invClient inventory.InventoryClient, st
 	}
 	return &Applier{
 		pruner:       pruner,
-		statusPoller: statusPoller,
+		StatusPoller: statusPoller,
 		factory:      factory,
 		invClient:    invClient,
 		infoHelper:   info.NewInfoHelper(mapper, factory),
@@ -60,7 +65,7 @@ func NewApplier(factory cmdutil.Factory, invClient inventory.InventoryClient, st
 // cluster, different sets of tasks might be needed.
 type Applier struct {
 	pruner       *prune.Pruner
-	statusPoller poller.Poller
+	StatusPoller poller.Poller
 	factory      cmdutil.Factory
 	invClient    inventory.InventoryClient
 	infoHelper   info.InfoHelper
@@ -224,7 +229,7 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.InventoryInfo, obje
 		// Create a new TaskStatusRunner to execute the taskQueue.
 		klog.V(4).Infoln("applier building TaskStatusRunner...")
 		allIds := object.UnstructuredsToObjMetasOrDie(append(applyObjs, pruneObjs...))
-		runner := taskrunner.NewTaskStatusRunner(allIds, a.statusPoller, resourceCache)
+		runner := taskrunner.NewTaskStatusRunner(allIds, a.StatusPoller, resourceCache)
 		klog.V(4).Infoln("applier running TaskStatusRunner...")
 		err = runner.Run(ctx, taskQueue.ToChannel(), eventChannel, taskrunner.Options{
 			PollInterval:     options.PollInterval,
