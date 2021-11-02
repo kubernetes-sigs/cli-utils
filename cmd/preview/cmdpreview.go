@@ -20,7 +20,6 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/manifestreader"
 	"sigs.k8s.io/cli-utils/pkg/printers"
-	"sigs.k8s.io/cli-utils/pkg/util/factory"
 )
 
 var (
@@ -122,11 +121,6 @@ func (r *PreviewRunner) RunE(cmd *cobra.Command, args []string) error {
 	}
 	inv := inventory.WrapInventoryInfoObj(invObj)
 
-	statusPoller, err := factory.NewStatusPoller(r.factory)
-	if err != nil {
-		return err
-	}
-
 	invClient, err := r.invFactory.NewInventoryClient(r.factory)
 	if err != nil {
 		return err
@@ -139,7 +133,7 @@ func (r *PreviewRunner) RunE(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return err
 		}
-		a, err := apply.NewApplier(r.factory, invClient, statusPoller)
+		a, err := apply.NewApplier(r.factory, invClient)
 		if err != nil {
 			return err
 		}
@@ -154,7 +148,7 @@ func (r *PreviewRunner) RunE(cmd *cobra.Command, args []string) error {
 			InventoryPolicy:   inventoryPolicy,
 		})
 	} else {
-		d, err := apply.NewDestroyer(r.factory, invClient, statusPoller)
+		d, err := apply.NewDestroyer(r.factory, invClient)
 		if err != nil {
 			return err
 		}

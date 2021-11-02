@@ -21,6 +21,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/object"
+	statusfactory "sigs.k8s.io/cli-utils/pkg/util/factory"
 )
 
 // NewDestroyer returns a new destroyer. It will set up the ApplyOptions and
@@ -29,14 +30,18 @@ import (
 // the ApplyOptions were responsible for printing progress. This is now
 // handled by a separate printer with the KubectlPrinterAdapter bridging
 // between the two.
-func NewDestroyer(factory cmdutil.Factory, invClient inventory.InventoryClient, statusPoller poller.Poller) (*Destroyer, error) {
+func NewDestroyer(factory cmdutil.Factory, invClient inventory.InventoryClient) (*Destroyer, error) {
 	pruner, err := prune.NewPruner(factory, invClient)
 	if err != nil {
 		return nil, fmt.Errorf("error setting up PruneOptions: %w", err)
 	}
+	statusPoller, err := statusfactory.NewStatusPoller(factory)
+	if err != nil {
+		return nil, err
+	}
 	return &Destroyer{
 		pruner:       pruner,
-		statusPoller: statusPoller,
+		StatusPoller: statusPoller,
 		factory:      factory,
 		invClient:    invClient,
 	}, nil
@@ -46,7 +51,7 @@ func NewDestroyer(factory cmdutil.Factory, invClient inventory.InventoryClient, 
 // prune them. This also deletes all the previous inventory objects
 type Destroyer struct {
 	pruner       *prune.Pruner
-	statusPoller poller.Poller
+	StatusPoller poller.Poller
 	factory      cmdutil.Factory
 	invClient    inventory.InventoryClient
 }
@@ -150,7 +155,7 @@ func (d *Destroyer) Run(ctx context.Context, inv inventory.InventoryInfo, option
 		klog.V(4).Infoln("destroyer building TaskStatusRunner...")
 		deleteIds := object.UnstructuredsToObjMetasOrDie(deleteObjs)
 		resourceCache := cache.NewResourceCacheMap()
-		runner := taskrunner.NewTaskStatusRunner(deleteIds, d.statusPoller, resourceCache)
+		runner := taskrunner.NewTaskStatusRunner(deleteIds, d.StatusPoller, resourceCache)
 		klog.V(4).Infoln("destroyer running TaskStatusRunner...")
 		// TODO(seans): Make the poll interval configurable like the applier.
 		err = runner.Run(ctx, taskQueue.ToChannel(), eventChannel, taskrunner.Options{
