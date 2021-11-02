@@ -74,7 +74,6 @@ func PreviewCommand(f cmdutil.Factory, invFactory inventory.InventoryClientFacto
 // PreviewRunner encapsulates data necessary to run the preview command.
 type PreviewRunner struct {
 	Command    *cobra.Command
-	PreProcess func(info inventory.InventoryInfo, strategy common.DryRunStrategy) (inventory.InventoryPolicy, error)
 	factory    cmdutil.Factory
 	invFactory inventory.InventoryClientFactory
 	loader     manifestreader.ManifestLoader
@@ -122,13 +121,6 @@ func (r *PreviewRunner) RunE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	inv := inventory.WrapInventoryInfoObj(invObj)
-
-	if r.PreProcess != nil {
-		inventoryPolicy, err = r.PreProcess(inv, drs)
-		if err != nil {
-			return err
-		}
-	}
 
 	statusPoller, err := factory.NewStatusPoller(r.factory)
 	if err != nil {

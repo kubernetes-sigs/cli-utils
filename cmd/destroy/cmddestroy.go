@@ -63,7 +63,6 @@ func DestroyCommand(f cmdutil.Factory, invFactory inventory.InventoryClientFacto
 // DestroyRunner encapsulates data necessary to run the destroy command.
 type DestroyRunner struct {
 	Command    *cobra.Command
-	PreProcess func(info inventory.InventoryInfo, strategy common.DryRunStrategy) (inventory.InventoryPolicy, error)
 	ioStreams  genericclioptions.IOStreams
 	factory    cmdutil.Factory
 	invFactory inventory.InventoryClientFactory
@@ -107,13 +106,6 @@ func (r *DestroyRunner) RunE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	inv := inventory.WrapInventoryInfoObj(invObj)
-
-	if r.PreProcess != nil {
-		inventoryPolicy, err = r.PreProcess(inv, common.DryRunNone)
-		if err != nil {
-			return err
-		}
-	}
 
 	statusPoller, err := factory.NewStatusPoller(r.factory)
 	if err != nil {
