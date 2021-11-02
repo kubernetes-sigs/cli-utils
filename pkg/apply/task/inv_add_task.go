@@ -65,8 +65,11 @@ func (i *InvAddTask) Start(taskContext *taskrunner.TaskContext) {
 	}()
 }
 
-// ClearTimeout is not supported by the InvAddTask.
-func (i *InvAddTask) ClearTimeout() {}
+// Cancel is not supported by the InvAddTask.
+func (i *InvAddTask) Cancel(_ *taskrunner.TaskContext) {}
+
+// StatusUpdate is not supported by the InvAddTask.
+func (i *InvAddTask) StatusUpdate(_ *taskrunner.TaskContext, _ object.ObjMetadata) {}
 
 // inventoryNamespaceInSet returns the the namespace the passed inventory
 // object will be applied to, or nil if this namespace object does not exist

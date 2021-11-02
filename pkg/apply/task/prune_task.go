@@ -76,5 +76,8 @@ func (p *PruneTask) Start(taskContext *taskrunner.TaskContext) {
 	}()
 }
 
-// ClearTimeout is not supported by the PruneTask.
-func (p *PruneTask) ClearTimeout() {}
+// Cancel is not supported by the PruneTask.
+func (p *PruneTask) Cancel(_ *taskrunner.TaskContext) {}
+
+// StatusUpdate is not supported by the PruneTask.
+func (p *PruneTask) StatusUpdate(_ *taskrunner.TaskContext, _ object.ObjMetadata) {}

@@ -16,8 +16,17 @@ type Formatter interface {
 	FormatStatusEvent(se event.StatusEvent) error
 	FormatPruneEvent(pe event.PruneEvent) error
 	FormatDeleteEvent(de event.DeleteEvent) error
+	FormatWaitEvent(we event.WaitEvent) error
 	FormatErrorEvent(ee event.ErrorEvent) error
-	FormatActionGroupEvent(age event.ActionGroupEvent, ags []event.ActionGroup, as *ApplyStats, ps *PruneStats, ds *DeleteStats, c Collector) error
+	FormatActionGroupEvent(
+		age event.ActionGroupEvent,
+		ags []event.ActionGroup,
+		as *ApplyStats,
+		ps *PruneStats,
+		ds *DeleteStats,
+		ws *WaitStats,
+		c Collector,
+	) error
 }
 
 type FormatterFactory func(previewStrategy common.DryRunStrategy) Formatter
@@ -94,6 +103,24 @@ func (d *DeleteStats) incFailed() {
 	d.Failed++
 }
 
+type WaitStats struct {
+	Reconciled int
+	Timeout    int
+	Skipped    int
+}
+
+func (w *WaitStats) incReconciled() {
+	w.Reconciled++
+}
+
+func (w *WaitStats) incTimeout() {
+	w.Timeout++
+}
+
+func (w *WaitStats) incSkipped() {
+	w.Skipped++
+}
+
 type Collector interface {
 	LatestStatus() map[object.ObjMetadata]event.StatusEvent
 }
@@ -120,6 +147,7 @@ func (b *BaseListPrinter) Print(ch <-chan event.Event, previewStrategy common.Dr
 	applyStats := &ApplyStats{}
 	pruneStats := &PruneStats{}
 	deleteStats := &DeleteStats{}
+	waitStats := &WaitStats{}
 	statusCollector := &StatusCollector{
 		latestStatus: make(map[object.ObjMetadata]event.StatusEvent),
 	}
@@ -172,18 +200,45 @@ func (b *BaseListPrinter) Print(ch <-chan event.Event, previewStrategy common.Dr
 			if err := formatter.FormatDeleteEvent(e.DeleteEvent); err != nil {
 				return err
 			}
+		case event.WaitType:
+			switch e.WaitEvent.Operation {
+			case event.Reconciled:
+				waitStats.incReconciled()
+			case event.ReconcileSkipped:
+				waitStats.incSkipped()
+			case event.ReconcileTimeout:
+				waitStats.incTimeout()
+			}
+			if err := formatter.FormatWaitEvent(e.WaitEvent); err != nil {
+				return err
+			}
 		case event.ActionGroupType:
-			if err := formatter.FormatActionGroupEvent(e.ActionGroupEvent, actionGroups, applyStats,
-				pruneStats, deleteStats, statusCollector); err != nil {
+			if err := formatter.FormatActionGroupEvent(
+				e.ActionGroupEvent,
+				actionGroups,
+				applyStats,
+				pruneStats,
+				deleteStats,
+				waitStats,
+				statusCollector,
+			); err != nil {
 				return err
 			}
 		}
 	}
 	failedSum := applyStats.Failed + pruneStats.Failed + deleteStats.Failed
-	if failedSum > 0 {
+	switch {
+	case failedSum > 0 && waitStats.Timeout > 0:
+		return fmt.Errorf("%d resources failed, %d resources failed to reconcile before timeout",
+			failedSum, waitStats.Timeout)
+	case failedSum > 0:
 		return fmt.Errorf("%d resources failed", failedSum)
+	case waitStats.Timeout > 0:
+		return fmt.Errorf("%d resources failed to reconcile before timeout",
+			waitStats.Timeout)
+	default:
+		return nil
 	}
-	return nil
 }
 
 func ActionGroupByName(name string, ags []event.ActionGroup) (event.ActionGroup, bool) {

@@ -106,12 +106,13 @@ func (r *ApplyRunner) RunE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// Only print status events if we are waiting for status.
-	//TODO: This is not the right way to do this. There are situations where
-	// we do need status events event if we are not waiting for status. The
-	// printers should be updated to handle this.
 	var printStatusEvents bool
+	// Print status events if a wait timeout is specified
 	if r.reconcileTimeout != time.Duration(0) || r.pruneTimeout != time.Duration(0) {
+		printStatusEvents = true
+	}
+	// Always enable status events for the table printer
+	if r.output == printers.TablePrinter {
 		printStatusEvents = true
 	}
 

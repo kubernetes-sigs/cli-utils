@@ -27,8 +27,9 @@ func applyAndDestroyTest(c client.Client, invConfig InventoryConfig, inventoryNa
 
 	inventoryInfo := createInventoryInfo(invConfig, inventoryName, namespaceName, inventoryID)
 
+	deployment1Obj := withNamespace(manifestToUnstructured(deployment1), namespaceName)
 	resources := []*unstructured.Unstructured{
-		withNamespace(manifestToUnstructured(deployment1), namespaceName),
+		deployment1Obj,
 	}
 
 	applierEvents := runCollect(applier.Run(context.TODO(), inventoryInfo, resources, apply.Options{
@@ -75,7 +76,7 @@ func applyAndDestroyTest(c client.Client, invConfig InventoryConfig, inventoryNa
 			ApplyEvent: &testutil.ExpApplyEvent{
 				GroupName:  "apply-0",
 				Operation:  event.Created,
-				Identifier: object.UnstructuredToObjMetaOrDie(withNamespace(manifestToUnstructured(deployment1), namespaceName)),
+				Identifier: object.UnstructuredToObjMetaOrDie(deployment1Obj),
 				Error:      nil,
 			},
 		},
@@ -95,6 +96,24 @@ func applyAndDestroyTest(c client.Client, invConfig InventoryConfig, inventoryNa
 				Action:    event.WaitAction,
 				GroupName: "wait-0",
 				Type:      event.Started,
+			},
+		},
+		{
+			// Deployment reconcile Pending .
+			EventType: event.WaitType,
+			WaitEvent: &testutil.ExpWaitEvent{
+				GroupName:  "wait-0",
+				Operation:  event.ReconcilePending,
+				Identifier: object.UnstructuredToObjMetaOrDie(deployment1Obj),
+			},
+		},
+		{
+			// Deployment confirmed Current.
+			EventType: event.WaitType,
+			WaitEvent: &testutil.ExpWaitEvent{
+				GroupName:  "wait-0",
+				Operation:  event.Reconciled,
+				Identifier: object.UnstructuredToObjMetaOrDie(deployment1Obj),
 			},
 		},
 		{
@@ -131,7 +150,7 @@ func applyAndDestroyTest(c client.Client, invConfig InventoryConfig, inventoryNa
 	expected := testutil.ExpEvent{
 		EventType: event.StatusType,
 		StatusEvent: &testutil.ExpStatusEvent{
-			Identifier: object.UnstructuredToObjMetaOrDie(withNamespace(manifestToUnstructured(deployment1), namespaceName)),
+			Identifier: object.UnstructuredToObjMetaOrDie(deployment1Obj),
 			Status:     status.NotFoundStatus,
 			Error:      nil,
 		},
@@ -143,7 +162,7 @@ func applyAndDestroyTest(c client.Client, invConfig InventoryConfig, inventoryNa
 	expected = testutil.ExpEvent{
 		EventType: event.StatusType,
 		StatusEvent: &testutil.ExpStatusEvent{
-			Identifier: object.UnstructuredToObjMetaOrDie(withNamespace(manifestToUnstructured(deployment1), namespaceName)),
+			Identifier: object.UnstructuredToObjMetaOrDie(deployment1Obj),
 			Status:     status.InProgressStatus,
 			Error:      nil,
 		},
@@ -154,7 +173,7 @@ func applyAndDestroyTest(c client.Client, invConfig InventoryConfig, inventoryNa
 	expected = testutil.ExpEvent{
 		EventType: event.StatusType,
 		StatusEvent: &testutil.ExpStatusEvent{
-			Identifier: object.UnstructuredToObjMetaOrDie(withNamespace(manifestToUnstructured(deployment1), namespaceName)),
+			Identifier: object.UnstructuredToObjMetaOrDie(deployment1Obj),
 			Status:     status.CurrentStatus,
 			Error:      nil,
 		},
@@ -165,7 +184,7 @@ func applyAndDestroyTest(c client.Client, invConfig InventoryConfig, inventoryNa
 	Expect(received).To(testutil.Equal(expEvents))
 
 	By("Verify deployment created")
-	assertUnstructuredExists(c, withNamespace(manifestToUnstructured(deployment1), namespaceName))
+	assertUnstructuredExists(c, deployment1Obj)
 
 	By("Verify inventory")
 	invConfig.InvSizeVerifyFunc(c, inventoryName, namespaceName, inventoryID, 1)
@@ -197,7 +216,7 @@ func applyAndDestroyTest(c client.Client, invConfig InventoryConfig, inventoryNa
 			DeleteEvent: &testutil.ExpDeleteEvent{
 				GroupName:  "prune-0",
 				Operation:  event.Deleted,
-				Identifier: object.UnstructuredToObjMetaOrDie(withNamespace(manifestToUnstructured(deployment1), namespaceName)),
+				Identifier: object.UnstructuredToObjMetaOrDie(deployment1Obj),
 				Error:      nil,
 			},
 		},
@@ -252,7 +271,7 @@ func applyAndDestroyTest(c client.Client, invConfig InventoryConfig, inventoryNa
 	Expect(testutil.EventsToExpEvents(destroyerEvents)).To(testutil.Equal(expEvents))
 
 	By("Verify deployment deleted")
-	assertUnstructuredDoesNotExist(c, withNamespace(manifestToUnstructured(deployment1), namespaceName))
+	assertUnstructuredDoesNotExist(c, deployment1Obj)
 }
 
 func createInventoryInfo(invConfig InventoryConfig, inventoryName, namespaceName, inventoryID string) inventory.InventoryInfo {

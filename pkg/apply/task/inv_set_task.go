@@ -113,5 +113,8 @@ func (i *InvSetTask) Start(taskContext *taskrunner.TaskContext) {
 	}()
 }
 
-// ClearTimeout is not supported by the InvSetTask.
-func (i *InvSetTask) ClearTimeout() {}
+// Cancel is not supported by the InvSetTask.
+func (i *InvSetTask) Cancel(_ *taskrunner.TaskContext) {}
+
+// StatusUpdate is not supported by the InvSetTask.
+func (i *InvSetTask) StatusUpdate(_ *taskrunner.TaskContext, _ object.ObjMetadata) {}

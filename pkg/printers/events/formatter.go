@@ -82,12 +82,36 @@ func (ef *formatter) FormatDeleteEvent(de event.DeleteEvent) error {
 	return nil
 }
 
+func (ef *formatter) FormatWaitEvent(we event.WaitEvent) error {
+	gk := we.Identifier.GroupKind
+	name := we.Identifier.Name
+
+	switch we.Operation {
+	case event.ReconcilePending:
+		ef.print("%s reconcile pending", resourceIDToString(gk, name))
+	case event.Reconciled:
+		ef.print("%s reconciled", resourceIDToString(gk, name))
+	case event.ReconcileSkipped:
+		ef.print("%s reconcile skipped", resourceIDToString(gk, name))
+	case event.ReconcileTimeout:
+		ef.print("%s reconcile timeout", resourceIDToString(gk, name))
+	}
+	return nil
+}
+
 func (ef *formatter) FormatErrorEvent(_ event.ErrorEvent) error {
 	return nil
 }
 
-func (ef *formatter) FormatActionGroupEvent(age event.ActionGroupEvent, ags []event.ActionGroup,
-	as *list.ApplyStats, ps *list.PruneStats, ds *list.DeleteStats, c list.Collector) error {
+func (ef *formatter) FormatActionGroupEvent(
+	age event.ActionGroupEvent,
+	ags []event.ActionGroup,
+	as *list.ApplyStats,
+	ps *list.PruneStats,
+	ds *list.DeleteStats,
+	ws *list.WaitStats,
+	c list.Collector,
+) error {
 	if age.Action == event.ApplyAction &&
 		age.Type == event.Finished &&
 		list.IsLastActionGroup(age, ags) {
@@ -125,6 +149,12 @@ func (ef *formatter) FormatActionGroupEvent(age event.ActionGroupEvent, ags []ev
 				ef.printResourceStatus(id, se)
 			}
 		}
+	}
+
+	if age.Action == event.WaitAction &&
+		age.Type == event.Finished &&
+		list.IsLastActionGroup(age, ags) {
+		ef.print("%d resource(s) reconciled, %d skipped", ws.Reconciled, ds.Skipped)
 	}
 	return nil
 }

@@ -89,9 +89,20 @@ type ErrorEvent struct {
 	Err error
 }
 
+//go:generate stringer -type=WaitEventOperation -linecomment
+type WaitEventOperation int
+
+const (
+	ReconcilePending WaitEventOperation = iota // Pending
+	Reconciled
+	ReconcileSkipped // Skipped
+	ReconcileTimeout // Timeout
+)
+
 type WaitEvent struct {
-	GroupName string
-	Error     error
+	GroupName  string
+	Identifier object.ObjMetadata
+	Operation  WaitEventOperation
 }
 
 //go:generate stringer -type=ActionGroupEventType

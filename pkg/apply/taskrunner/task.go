@@ -4,6 +4,7 @@
 package taskrunner
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"time"
@@ -26,25 +27,20 @@ type Task interface {
 	Name() string
 	Action() event.ResourceAction
 	Identifiers() object.ObjMetadataSet
-	Start(taskContext *TaskContext)
-	ClearTimeout()
+	Start(*TaskContext)
+	StatusUpdate(*TaskContext, object.ObjMetadata)
+	Cancel(*TaskContext)
 }
 
 // NewWaitTask creates a new wait task where we will wait until
 // the resources specifies by ids all meet the specified condition.
 func NewWaitTask(name string, ids object.ObjMetadataSet, cond Condition, timeout time.Duration, mapper meta.RESTMapper) *WaitTask {
-	// Create the token channel and only add one item.
-	tokenChannel := make(chan struct{}, 1)
-	tokenChannel <- struct{}{}
-
 	return &WaitTask{
 		name:      name,
 		Ids:       ids,
 		Condition: cond,
 		Timeout:   timeout,
-
-		mapper: mapper,
-		token:  tokenChannel,
+		mapper:    mapper,
 	}
 }
 
@@ -71,14 +67,6 @@ type WaitTask struct {
 	// cancelFunc is a function that will cancel the timeout timer
 	// on the task.
 	cancelFunc func()
-
-	// token is a channel that is provided a single item when the
-	// task is created. Goroutines are only allowed to write to the
-	// taskChannel if they are able to get the item from the channel.
-	// This makes sure that the task only results in one message on the
-	// taskChannel, even if the condition is met and the task times out
-	// at the same time.
-	token chan struct{}
 }
 
 func (w *WaitTask) Name() string {
@@ -96,131 +84,178 @@ func (w *WaitTask) Identifiers() object.ObjMetadataSet {
 // Start kicks off the task. For the wait task, this just means
 // setting up the timeout timer.
 func (w *WaitTask) Start(taskContext *TaskContext) {
-	klog.V(2).Infof("starting wait task (%d objects)", len(w.Ids))
-	w.setTimer(taskContext)
-}
+	klog.V(2).Infof("starting wait task (name: %q, objects: %d)", w.Name(), len(w.Ids))
 
-// setTimer creates the timer with the timeout value taken from
-// the WaitTask struct. Once the timer expires, it will send
-// a message on the EventChannel provided in the taskContext.
-func (w *WaitTask) setTimer(taskContext *TaskContext) {
-	timer := time.NewTimer(w.Timeout)
+	// TODO: inherit context from task runner, passed through the TaskContext
+	ctx := context.Background()
+
+	// use a context wrapper to handle complete/cancel/timeout
+	if w.Timeout > 0 {
+		ctx, w.cancelFunc = context.WithTimeout(ctx, w.Timeout)
+	} else {
+		ctx, w.cancelFunc = context.WithCancel(ctx)
+	}
+
+	// A goroutine to handle ending the WaitTask.
 	go func() {
-		// TODO(mortent): See if there is a better way to do this. This
-		// solution will cause the goroutine to hang forever if the
-		// Timeout is cancelled.
-		<-timer.C
-		select {
-		// We only send the TimeoutError to the eventChannel if no one has gotten
-		// to the token first.
-		case <-w.token:
-			err := &TimeoutError{
-				Identifiers: w.Ids,
-				Timeout:     w.Timeout,
-				Condition:   w.Condition,
+		// Block until complete/cancel/timeout
+		<-ctx.Done()
+		// Err is always non-nil when Done channel is closed.
+		err := ctx.Err()
+
+		klog.V(2).Infof("completing wait task (name: %q)", w.name)
+
+		// reset RESTMapper, if a CRD was applied/pruned
+		foundCRD := false
+		for _, obj := range w.Ids {
+			if obj.GroupKind == crdGK {
+				foundCRD = true
+				break
 			}
-			amendTimeoutError(taskContext, err)
-			taskContext.EventChannel() <- event.Event{
-				Type: event.WaitType,
-				WaitEvent: event.WaitEvent{
-					GroupName: w.Name(),
-					Error:     err,
-				},
-			}
-			taskContext.TaskChannel() <- TaskResult{}
+		}
+		if foundCRD {
+			w.resetRESTMapper()
+		}
+
+		switch err {
+		case context.Canceled:
+			// happy path - cancelled or completed (not considered an error)
+		case context.DeadlineExceeded:
+			// timed out
+			w.sendTimeoutEvents(taskContext)
 		default:
-			return
+			// shouldn't happen, per context docs
+			klog.Errorf("wait task stopped with unexpected context error: %v", err)
 		}
+
+		// Done here. signal completion to the task runner
+		taskContext.TaskChannel() <- TaskResult{}
 	}()
-	w.cancelFunc = func() {
-		timer.Stop()
-	}
-}
 
-func amendTimeoutError(taskContext *TaskContext, err error) {
-	if timeoutErr, ok := err.(*TimeoutError); ok {
-		var timedOutResources []TimedOutResource
-		for _, id := range timeoutErr.Identifiers {
-			result := taskContext.ResourceCache().Get(id)
-			if timeoutErr.Condition.Meets(result.Status) {
-				continue
-			}
-			timedOutResources = append(timedOutResources, TimedOutResource{
-				Identifier: id,
-				Status:     result.Status,
-				Message:    result.StatusMessage,
-			})
+	// send initial events for all resources being waited on
+	for _, id := range w.Ids {
+		switch {
+		case w.skipped(taskContext, id):
+			w.sendEvent(taskContext, id, event.ReconcileSkipped)
+		case w.reconciledByID(taskContext, id):
+			w.sendEvent(taskContext, id, event.Reconciled)
+		default:
+			w.sendEvent(taskContext, id, event.ReconcilePending)
 		}
-		timeoutErr.TimedOutResources = timedOutResources
+	}
+
+	// exit early if all conditions are met
+	if w.reconciled(taskContext) {
+		w.cancelFunc()
 	}
 }
 
-// checkCondition checks whether the condition set in the task
-// is currently met given the status of resources in the cache.
-func (w *WaitTask) checkCondition(taskContext *TaskContext) bool {
+func (w *WaitTask) sendEvent(taskContext *TaskContext, id object.ObjMetadata, op event.WaitEventOperation) {
+	taskContext.EventChannel() <- event.Event{
+		Type: event.WaitType,
+		WaitEvent: event.WaitEvent{
+			GroupName:  w.Name(),
+			Identifier: id,
+			Operation:  op,
+		},
+	}
+}
+
+// sendTimeoutEvents sends a timeout event for every pending object that isn't
+// reconciled.
+func (w *WaitTask) sendTimeoutEvents(taskContext *TaskContext) {
+	for _, id := range w.pending(taskContext) {
+		if !w.reconciledByID(taskContext, id) {
+			w.sendEvent(taskContext, id, event.ReconcileTimeout)
+		}
+	}
+}
+
+// reconciledByID checks whether the condition set in the task is currently met
+// for the specified object given the status of resource in the cache.
+func (w *WaitTask) reconciledByID(taskContext *TaskContext, id object.ObjMetadata) bool {
+	return conditionMet(taskContext, object.ObjMetadataSet{id}, w.Condition)
+}
+
+// reconciled checks whether the condition set in the task is currently met
+// given the status of resources in the cache.
+func (w *WaitTask) reconciled(taskContext *TaskContext) bool {
 	return conditionMet(taskContext, w.pending(taskContext), w.Condition)
 }
 
-// pending returns the set of resources being waited on excluding
-// apply/delete failures. This includes resources which are skipped because of
-// filtering.
+// pending returns the set of resources being waited on (not skipped).
 func (w *WaitTask) pending(taskContext *TaskContext) object.ObjMetadataSet {
 	var ids object.ObjMetadataSet
 	for _, id := range w.Ids {
-		if w.Condition == AllCurrent &&
-			taskContext.IsFailedApply(id) || taskContext.IsSkippedApply(id) {
-			continue
+		if !w.skipped(taskContext, id) {
+			ids = append(ids, id)
 		}
-		if w.Condition == AllNotFound &&
-			taskContext.IsFailedDelete(id) || taskContext.IsSkippedDelete(id) {
-			continue
-		}
-		ids = append(ids, id)
 	}
 	return ids
 }
 
-// startAndComplete is invoked when the condition is already
-// met when the task should be started. In this case there is no
-// need to start a timer. So it just sets the cancelFunc and then
-// completes the task.
-func (w *WaitTask) startAndComplete(taskContext *TaskContext) {
-	w.cancelFunc = func() {}
-	w.complete(taskContext)
+// skipped returns true if the object failed or was skipped by a preceding
+// apply/delete/prune task.
+func (w *WaitTask) skipped(taskContext *TaskContext, id object.ObjMetadata) bool {
+	if w.Condition == AllCurrent &&
+		taskContext.IsFailedApply(id) || taskContext.IsSkippedApply(id) {
+		return true
+	}
+	if w.Condition == AllNotFound &&
+		taskContext.IsFailedDelete(id) || taskContext.IsSkippedDelete(id) {
+		return true
+	}
+	return false
 }
 
-// complete is invoked by the taskrunner when all the conditions
-// for the task has been met, or something has failed so the task
-// need to be stopped.
-func (w *WaitTask) complete(taskContext *TaskContext) {
-	var err error
-	for _, obj := range w.Ids {
-		if obj.GroupKind == crdGK {
-			ddRESTMapper, err := extractDeferredDiscoveryRESTMapper(w.mapper)
-			if err == nil {
-				ddRESTMapper.Reset()
-				// We only need to reset once.
-				break
-			}
-			continue
-		}
+// Cancel exits early with a timeout error
+func (w *WaitTask) Cancel(_ *TaskContext) {
+	w.cancelFunc()
+}
+
+// StatusUpdate validates whether the update meets the conditions to stop
+// the wait task. If the status is for a watched object and that object now
+// meets the desired condition, a WaitEvent will be sent before exiting.
+func (w *WaitTask) StatusUpdate(taskContext *TaskContext, id object.ObjMetadata) {
+	if klog.V(5).Enabled() {
+		status := taskContext.ResourceCache().Get(id).Status
+		klog.Errorf("status update (object: %q, status: %q)", id, status)
 	}
-	select {
-	// Only do something if we can get the token.
-	case <-w.token:
-		go func() {
-			taskContext.TaskChannel() <- TaskResult{
-				Err: err,
-			}
-		}()
-	default:
+
+	// ignored objects have already had skipped events sent at start
+	if w.skipped(taskContext, id) {
 		return
 	}
+
+	// if the condition is met for this object, send a wait event
+	if w.reconciledByID(taskContext, id) {
+		taskContext.EventChannel() <- event.Event{
+			Type: event.WaitType,
+			WaitEvent: event.WaitEvent{
+				GroupName:  w.Name(),
+				Identifier: id,
+				Operation:  event.Reconciled,
+			},
+		}
+	}
+
+	// if all conditions are met, complete the wait task
+	if w.reconciled(taskContext) {
+		w.cancelFunc()
+	}
 }
 
-// ClearTimeout cancels the timeout for the wait task.
-func (w *WaitTask) ClearTimeout() {
-	w.cancelFunc()
+// resetRESTMapper resets the RESTMapper so it can pick up new CRDs.
+func (w *WaitTask) resetRESTMapper() {
+	// TODO: find a way to add/remove mappers without resetting the entire mapper
+	// Resetting the mapper requires all CRDs to be queried again.
+	ddRESTMapper, err := extractDeferredDiscoveryRESTMapper(w.mapper)
+	if err != nil {
+		if klog.V(4).Enabled() {
+			klog.Errorf("error resetting RESTMapper: %v", err)
+		}
+	}
+	ddRESTMapper.Reset()
 }
 
 // extractDeferredDiscoveryRESTMapper unwraps the provided RESTMapper

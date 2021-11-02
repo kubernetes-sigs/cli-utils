@@ -69,8 +69,9 @@ type ExpDeleteEvent struct {
 }
 
 type ExpWaitEvent struct {
-	GroupName string
-	Error     error
+	GroupName  string
+	Operation  event.WaitEventOperation
+	Identifier object.ObjMetadata
 }
 
 func VerifyEvents(expEvents []ExpEvent, events []event.Event) error {
@@ -116,6 +117,8 @@ func isMatch(ee ExpEvent, e event.Event) bool {
 				return false
 			}
 		}
+		return true
+
 	case event.ActionGroupType:
 		agee := ee.ActionGroupEvent
 
@@ -136,6 +139,8 @@ func isMatch(ee ExpEvent, e event.Event) bool {
 		if agee.Type != age.Type {
 			return false
 		}
+		return true
+
 	case event.ApplyType:
 		aee := ee.ApplyEvent
 		// If no more information is specified, we consider it a match.
@@ -248,18 +253,26 @@ func isMatch(ee ExpEvent, e event.Event) bool {
 		}
 		we := e.WaitEvent
 
+		if wee.Identifier != object.NilObjMetadata {
+			if wee.Identifier != we.Identifier {
+				return false
+			}
+		}
+
 		if wee.GroupName != "" {
 			if wee.GroupName != we.GroupName {
 				return false
 			}
 		}
 
-		if wee.Error != nil {
-			return cmp.Equal(wee.Error, we.Error, cmpopts.EquateErrors())
+		if wee.Operation != we.Operation {
+			return false
 		}
-		return we.Error == nil
+		return true
+
+	default:
+		return true
 	}
-	return true
 }
 
 func EventsToExpEvents(events []event.Event) []ExpEvent {
@@ -346,8 +359,9 @@ func EventToExpEvent(e event.Event) ExpEvent {
 		return ExpEvent{
 			EventType: event.WaitType,
 			WaitEvent: &ExpWaitEvent{
-				GroupName: e.WaitEvent.GroupName,
-				Error:     e.WaitEvent.Error,
+				GroupName:  e.WaitEvent.GroupName,
+				Identifier: e.WaitEvent.Identifier,
+				Operation:  e.WaitEvent.Operation,
 			},
 		}
 	}
@@ -402,6 +416,12 @@ func (ape GroupedEventsByID) Less(i, j int) bool {
 			return false
 		}
 		return ape[i].DeleteEvent.Identifier.String() < ape[j].DeleteEvent.Identifier.String()
+	case event.WaitType:
+		if ape[i].WaitEvent.GroupName != ape[j].WaitEvent.GroupName {
+			// don't change order if not the same task group
+			return false
+		}
+		return ape[i].WaitEvent.Identifier.String() < ape[j].WaitEvent.Identifier.String()
 	default:
 		// don't change order if not ApplyType, PruneType, or DeleteType
 		return false

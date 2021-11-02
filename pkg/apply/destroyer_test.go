@@ -5,6 +5,7 @@ package apply
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -130,6 +131,15 @@ func TestDestroyerCancel(t *testing.T) {
 						Type:      event.Started,
 					},
 				},
+				{
+					// Deployment reconcile pending.
+					EventType: event.WaitType,
+					WaitEvent: &testutil.ExpWaitEvent{
+						GroupName:  "wait-0",
+						Operation:  event.ReconcilePending,
+						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
+					},
+				},
 				// Deployment never becomes NotFound.
 				// WaitTask is expected to be cancelled before DeleteTimeout.
 				{
@@ -249,7 +259,24 @@ func TestDestroyerCancel(t *testing.T) {
 						Type:      event.Started,
 					},
 				},
-				// Deployment becomes NotFound.
+				{
+					// Deployment reconcile pending.
+					EventType: event.WaitType,
+					WaitEvent: &testutil.ExpWaitEvent{
+						GroupName:  "wait-0",
+						Operation:  event.ReconcilePending,
+						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
+					},
+				},
+				{
+					// Deployment confirmed NotFound.
+					EventType: event.WaitType,
+					WaitEvent: &testutil.ExpWaitEvent{
+						GroupName:  "wait-0",
+						Operation:  event.Reconciled,
+						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
+					},
+				},
 				{
 					// WaitTask finished
 					EventType: event.ActionGroupType,
@@ -304,9 +331,8 @@ func TestDestroyerCancel(t *testing.T) {
 
 			eventChannel := destroyer.Run(runCtx, invInfo, tc.options)
 
-			// Start sending status events
-			poller.Start()
-
+			// only start poller once per run
+			var once sync.Once
 			var events []event.Event
 
 		loop:
@@ -325,6 +351,14 @@ func TestDestroyerCancel(t *testing.T) {
 						break loop
 					}
 					events = append(events, e)
+
+					if e.Type == event.ActionGroupType &&
+						e.ActionGroupEvent.Action == event.WaitAction {
+						once.Do(func() {
+							// Start sending status events after waiting starts
+							poller.Start()
+						})
+					}
 				}
 			}
 

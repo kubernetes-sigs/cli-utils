@@ -69,14 +69,27 @@ func (jf *formatter) FormatDeleteEvent(de event.DeleteEvent) error {
 	return jf.printEvent("delete", "resourceDeleted", eventInfo)
 }
 
+func (jf *formatter) FormatWaitEvent(we event.WaitEvent) error {
+	eventInfo := jf.baseResourceEvent(we.Identifier)
+	eventInfo["operation"] = we.Operation.String()
+	return jf.printEvent("wait", "resourceReconciled", eventInfo)
+}
+
 func (jf *formatter) FormatErrorEvent(ee event.ErrorEvent) error {
 	return jf.printEvent("error", "error", map[string]interface{}{
 		"error": ee.Err.Error(),
 	})
 }
 
-func (jf *formatter) FormatActionGroupEvent(age event.ActionGroupEvent, ags []event.ActionGroup,
-	as *list.ApplyStats, ps *list.PruneStats, ds *list.DeleteStats, c list.Collector) error {
+func (jf *formatter) FormatActionGroupEvent(
+	age event.ActionGroupEvent,
+	ags []event.ActionGroup,
+	as *list.ApplyStats,
+	ps *list.PruneStats,
+	ds *list.DeleteStats,
+	ws *list.WaitStats,
+	c list.Collector,
+) error {
 	if age.Action == event.ApplyAction && age.Type == event.Finished {
 		if err := jf.printEvent("apply", "completed", map[string]interface{}{
 			"count":           as.Sum(),
@@ -119,6 +132,15 @@ func (jf *formatter) FormatActionGroupEvent(age event.ActionGroupEvent, ags []ev
 			}
 		}
 	}
+
+	if age.Action == event.WaitAction && age.Type == event.Finished {
+		return jf.printEvent("wait", "completed", map[string]interface{}{
+			"reconciled": ws.Reconciled,
+			"skipped":    ws.Skipped,
+			"timeout":    ws.Timeout,
+		})
+	}
+
 	return nil
 }
 

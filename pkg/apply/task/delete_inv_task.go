@@ -49,5 +49,8 @@ func (i *DeleteInvTask) Start(taskContext *taskrunner.TaskContext) {
 	}()
 }
 
-// ClearTimeout is not supported by the DeleteInvTask.
-func (i *DeleteInvTask) ClearTimeout() {}
+// Cancel is not supported by the DeleteInvTask.
+func (i *DeleteInvTask) Cancel(_ *taskrunner.TaskContext) {}
+
+// StatusUpdate is not supported by the DeleteInvTask.
+func (i *DeleteInvTask) StatusUpdate(_ *taskrunner.TaskContext, _ object.ObjMetadata) {}

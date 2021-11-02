@@ -235,8 +235,11 @@ func (a *ApplyTask) sendTaskResult(taskContext *taskrunner.TaskContext) {
 	taskContext.TaskChannel() <- taskrunner.TaskResult{}
 }
 
-// ClearTimeout is not supported by the ApplyTask.
-func (a *ApplyTask) ClearTimeout() {}
+// Cancel is not supported by the ApplyTask.
+func (a *ApplyTask) Cancel(_ *taskrunner.TaskContext) {}
+
+// StatusUpdate is not supported by the ApplyTask.
+func (a *ApplyTask) StatusUpdate(_ *taskrunner.TaskContext, _ object.ObjMetadata) {}
 
 // mutate loops through the mutator list and executes them on the object.
 func (a *ApplyTask) mutate(ctx context.Context, obj *unstructured.Unstructured) error {

@@ -114,9 +114,19 @@ func (r *DestroyRunner) RunE(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+
+	var printStatusEvents bool
+	// Print status events if a wait timeout is specified
+	if r.deleteTimeout != time.Duration(0) {
+		printStatusEvents = true
+	}
+	// Always enable status events for the table printer
+	if r.output == printers.TablePrinter {
+		printStatusEvents = true
+	}
+
 	// Run the destroyer. It will return a channel where we can receive updates
 	// to keep track of progress and any issues.
-	printStatusEvents := r.deleteTimeout != time.Duration(0)
 	ch := d.Run(ctx, inv, apply.DestroyerOptions{
 		DeleteTimeout:           r.deleteTimeout,
 		DeletePropagationPolicy: deletePropPolicy,

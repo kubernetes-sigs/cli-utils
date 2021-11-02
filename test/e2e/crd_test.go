@@ -25,9 +25,12 @@ func crdTest(_ client.Client, invConfig InventoryConfig, inventoryName, namespac
 
 	inv := invConfig.InvWrapperFunc(invConfig.InventoryFactoryFunc(inventoryName, namespaceName, "test"))
 
+	crdObj := manifestToUnstructured(crd)
+	crObj := manifestToUnstructured(cr)
+
 	resources := []*unstructured.Unstructured{
-		manifestToUnstructured(cr),
-		manifestToUnstructured(crd),
+		crObj,
+		crdObj,
 	}
 
 	applierEvents := runCollect(applier.Run(context.TODO(), inv, resources, apply.Options{
@@ -35,6 +38,7 @@ func crdTest(_ client.Client, invConfig InventoryConfig, inventoryName, namespac
 		EmitStatusEvents: false,
 	}))
 
+	//nolint:dupl
 	expEvents := []testutil.ExpEvent{
 		{
 			// InitTask
@@ -74,7 +78,7 @@ func crdTest(_ client.Client, invConfig InventoryConfig, inventoryName, namespac
 			ApplyEvent: &testutil.ExpApplyEvent{
 				GroupName:  "apply-0",
 				Operation:  event.Created,
-				Identifier: object.UnstructuredToObjMetaOrDie(manifestToUnstructured(crd)),
+				Identifier: object.UnstructuredToObjMetaOrDie(crdObj),
 				Error:      nil,
 			},
 		},
@@ -94,6 +98,24 @@ func crdTest(_ client.Client, invConfig InventoryConfig, inventoryName, namespac
 				Action:    event.WaitAction,
 				GroupName: "wait-0",
 				Type:      event.Started,
+			},
+		},
+		{
+			// CRD reconcile Pending .
+			EventType: event.WaitType,
+			WaitEvent: &testutil.ExpWaitEvent{
+				GroupName:  "wait-0",
+				Operation:  event.ReconcilePending,
+				Identifier: object.UnstructuredToObjMetaOrDie(crdObj),
+			},
+		},
+		{
+			// CRD confirmed Current.
+			EventType: event.WaitType,
+			WaitEvent: &testutil.ExpWaitEvent{
+				GroupName:  "wait-0",
+				Operation:  event.Reconciled,
+				Identifier: object.UnstructuredToObjMetaOrDie(crdObj),
 			},
 		},
 		{
@@ -120,7 +142,7 @@ func crdTest(_ client.Client, invConfig InventoryConfig, inventoryName, namespac
 			ApplyEvent: &testutil.ExpApplyEvent{
 				GroupName:  "apply-1",
 				Operation:  event.Created,
-				Identifier: object.UnstructuredToObjMetaOrDie(manifestToUnstructured(cr)),
+				Identifier: object.UnstructuredToObjMetaOrDie(crObj),
 				Error:      nil,
 			},
 		},
@@ -140,6 +162,24 @@ func crdTest(_ client.Client, invConfig InventoryConfig, inventoryName, namespac
 				Action:    event.WaitAction,
 				GroupName: "wait-1",
 				Type:      event.Started,
+			},
+		},
+		{
+			// CR reconcile Pending .
+			EventType: event.WaitType,
+			WaitEvent: &testutil.ExpWaitEvent{
+				GroupName:  "wait-1",
+				Operation:  event.ReconcilePending,
+				Identifier: object.UnstructuredToObjMetaOrDie(crObj),
+			},
+		},
+		{
+			// CR confirmed Current.
+			EventType: event.WaitType,
+			WaitEvent: &testutil.ExpWaitEvent{
+				GroupName:  "wait-1",
+				Operation:  event.Reconciled,
+				Identifier: object.UnstructuredToObjMetaOrDie(crObj),
 			},
 		},
 		{
@@ -198,7 +238,7 @@ func crdTest(_ client.Client, invConfig InventoryConfig, inventoryName, namespac
 			DeleteEvent: &testutil.ExpDeleteEvent{
 				GroupName:  "prune-0",
 				Operation:  event.Deleted,
-				Identifier: object.UnstructuredToObjMetaOrDie(manifestToUnstructured(cr)),
+				Identifier: object.UnstructuredToObjMetaOrDie(crObj),
 				Error:      nil,
 			},
 		},
@@ -218,6 +258,24 @@ func crdTest(_ client.Client, invConfig InventoryConfig, inventoryName, namespac
 				Action:    event.WaitAction,
 				GroupName: "wait-0",
 				Type:      event.Started,
+			},
+		},
+		{
+			// CR reconcile Pending.
+			EventType: event.WaitType,
+			WaitEvent: &testutil.ExpWaitEvent{
+				GroupName:  "wait-0",
+				Operation:  event.ReconcilePending,
+				Identifier: object.UnstructuredToObjMetaOrDie(crObj),
+			},
+		},
+		{
+			// CR confirmed NotFound.
+			EventType: event.WaitType,
+			WaitEvent: &testutil.ExpWaitEvent{
+				GroupName:  "wait-0",
+				Operation:  event.Reconciled,
+				Identifier: object.UnstructuredToObjMetaOrDie(crObj),
 			},
 		},
 		{
@@ -244,7 +302,7 @@ func crdTest(_ client.Client, invConfig InventoryConfig, inventoryName, namespac
 			DeleteEvent: &testutil.ExpDeleteEvent{
 				GroupName:  "prune-1",
 				Operation:  event.Deleted,
-				Identifier: object.UnstructuredToObjMetaOrDie(manifestToUnstructured(crd)),
+				Identifier: object.UnstructuredToObjMetaOrDie(crdObj),
 				Error:      nil,
 			},
 		},
@@ -264,6 +322,24 @@ func crdTest(_ client.Client, invConfig InventoryConfig, inventoryName, namespac
 				Action:    event.WaitAction,
 				GroupName: "wait-1",
 				Type:      event.Started,
+			},
+		},
+		{
+			// CRD reconcile Pending.
+			EventType: event.WaitType,
+			WaitEvent: &testutil.ExpWaitEvent{
+				GroupName:  "wait-1",
+				Operation:  event.ReconcilePending,
+				Identifier: object.UnstructuredToObjMetaOrDie(crdObj),
+			},
+		},
+		{
+			// CRD confirmed NotFound.
+			EventType: event.WaitType,
+			WaitEvent: &testutil.ExpWaitEvent{
+				GroupName:  "wait-1",
+				Operation:  event.Reconciled,
+				Identifier: object.UnstructuredToObjMetaOrDie(crdObj),
 			},
 		},
 		{

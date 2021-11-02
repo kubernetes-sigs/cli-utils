@@ -215,6 +215,109 @@ func TestFormatter_FormatDeleteEvent(t *testing.T) {
 	}
 }
 
+func TestFormatter_FormatWaitEvent(t *testing.T) {
+	testCases := map[string]struct {
+		previewStrategy common.DryRunStrategy
+		event           event.WaitEvent
+		waitStats       *list.WaitStats
+		statusCollector list.Collector
+		expected        string
+	}{
+		"resource reconciled": {
+			previewStrategy: common.DryRunNone,
+			event: event.WaitEvent{
+				GroupName:  "wait-1",
+				Operation:  event.Reconciled,
+				Identifier: createIdentifier("apps", "Deployment", "default", "my-dep"),
+			},
+			expected: "deployment.apps/my-dep reconciled",
+		},
+		"resource reconciled (client-side dry-run)": {
+			previewStrategy: common.DryRunClient,
+			event: event.WaitEvent{
+				GroupName:  "wait-1",
+				Operation:  event.Reconciled,
+				Identifier: createIdentifier("apps", "Deployment", "default", "my-dep"),
+			},
+			expected: "deployment.apps/my-dep reconciled (preview)",
+		},
+		"resource reconciled (server-side dry-run)": {
+			previewStrategy: common.DryRunServer,
+			event: event.WaitEvent{
+				GroupName:  "wait-1",
+				Operation:  event.Reconciled,
+				Identifier: createIdentifier("apps", "Deployment", "default", "my-dep"),
+			},
+			expected: "deployment.apps/my-dep reconciled (preview-server)",
+		},
+		"resource reconcile timeout": {
+			previewStrategy: common.DryRunNone,
+			event: event.WaitEvent{
+				GroupName:  "wait-1",
+				Identifier: createIdentifier("apps", "Deployment", "default", "my-dep"),
+				Operation:  event.ReconcileTimeout,
+			},
+			expected: "deployment.apps/my-dep reconcile timeout",
+		},
+		"resource reconcile timeout (client-side dry-run)": {
+			previewStrategy: common.DryRunClient,
+			event: event.WaitEvent{
+				GroupName:  "wait-1",
+				Identifier: createIdentifier("apps", "Deployment", "default", "my-dep"),
+				Operation:  event.ReconcileTimeout,
+			},
+			expected: "deployment.apps/my-dep reconcile timeout (preview)",
+		},
+		"resource reconcile timeout (server-side dry-run)": {
+			previewStrategy: common.DryRunServer,
+			event: event.WaitEvent{
+				GroupName:  "wait-1",
+				Identifier: createIdentifier("apps", "Deployment", "default", "my-dep"),
+				Operation:  event.ReconcileTimeout,
+			},
+			expected: "deployment.apps/my-dep reconcile timeout (preview-server)",
+		},
+		"resource reconcile skipped": {
+			previewStrategy: common.DryRunNone,
+			event: event.WaitEvent{
+				GroupName:  "wait-1",
+				Operation:  event.ReconcileSkipped,
+				Identifier: createIdentifier("apps", "Deployment", "default", "my-dep"),
+			},
+			expected: "deployment.apps/my-dep reconcile skipped",
+		},
+		"resource reconcile skipped (client-side dry-run)": {
+			previewStrategy: common.DryRunClient,
+			event: event.WaitEvent{
+				GroupName:  "wait-1",
+				Operation:  event.ReconcileSkipped,
+				Identifier: createIdentifier("apps", "Deployment", "default", "my-dep"),
+			},
+			expected: "deployment.apps/my-dep reconcile skipped (preview)",
+		},
+		"resource reconcile skipped (server-side dry-run)": {
+			previewStrategy: common.DryRunServer,
+			event: event.WaitEvent{
+				GroupName:  "wait-1",
+				Operation:  event.ReconcileSkipped,
+				Identifier: createIdentifier("apps", "Deployment", "default", "my-dep"),
+			},
+			expected: "deployment.apps/my-dep reconcile skipped (preview-server)",
+		},
+	}
+
+	for tn, tc := range testCases {
+		t.Run(tn, func(t *testing.T) {
+			ioStreams, _, out, _ := genericclioptions.NewTestIOStreams() //nolint:dogsled
+			formatter := NewFormatter(ioStreams, tc.previewStrategy)
+			err := formatter.FormatWaitEvent(tc.event)
+			assert.NoError(t, err)
+
+			assert.Equal(t, tc.expected, strings.TrimSpace(out.String()))
+		})
+	}
+}
+
 func createObject(group, kind, namespace, name string) *unstructured.Unstructured {
 	return &unstructured.Unstructured{
 		Object: map[string]interface{}{
