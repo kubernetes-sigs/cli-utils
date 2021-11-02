@@ -219,8 +219,9 @@ func (b *baseRunner) run(ctx context.Context, taskQueue chan Task,
 				}
 			}
 		// A message on the taskChannel means that the current task
-		// has either completed or failed. If it has failed, we return
-		// the error. If the abort flag is true, which means something
+		// has either completed or failed.
+		// If it has failed, we return the error.
+		// If the abort flag is true, which means something
 		// else has gone wrong and we are waiting for the current task to
 		// finish, we exit.
 		// If everything is ok, we fetch and start the next task.
@@ -235,7 +236,6 @@ func (b *baseRunner) run(ctx context.Context, taskQueue chan Task,
 				},
 			}
 			if msg.Err != nil {
-				b.amendTimeoutError(taskContext, msg.Err)
 				return msg.Err
 			}
 			if abort {
@@ -255,24 +255,6 @@ func (b *baseRunner) run(ctx context.Context, taskQueue chan Task,
 			abort = true
 			completeIfWaitTask(currentTask, taskContext)
 		}
-	}
-}
-
-func (b *baseRunner) amendTimeoutError(taskContext *TaskContext, err error) {
-	if timeoutErr, ok := err.(*TimeoutError); ok {
-		var timedOutResources []TimedOutResource
-		for _, id := range timeoutErr.Identifiers {
-			result := taskContext.ResourceCache().Get(id)
-			if timeoutErr.Condition.Meets(result.Status) {
-				continue
-			}
-			timedOutResources = append(timedOutResources, TimedOutResource{
-				Identifier: id,
-				Status:     result.Status,
-				Message:    result.StatusMessage,
-			})
-		}
-		timeoutErr.TimedOutResources = timedOutResources
 	}
 }
 
