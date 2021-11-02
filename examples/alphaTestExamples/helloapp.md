@@ -171,7 +171,7 @@ expectedOutputLine "3 resource(s) applied. 0 created, 0 unchanged, 0 configured,
 
 # Verify that preview didn't create any resources.
 kubectl get all -n hellospace > $OUTPUT/status 2>&1
-expectedOutputLine "No resources found in hellospace namespace."
+expectedOutputLine "No resources found."
 ```
 
 Use the `kapply` binary in `MYGOBIN` to apply a deployment and verify it is successful.
