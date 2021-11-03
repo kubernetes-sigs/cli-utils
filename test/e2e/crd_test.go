@@ -19,6 +19,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+//nolint:dupl // expEvents similar to mutation tests
 func crdTest(_ client.Client, invConfig InventoryConfig, inventoryName, namespaceName string) {
 	By("apply a set of resources that includes both a crd and a cr")
 	applier := invConfig.ApplierFactoryFunc()
@@ -38,7 +39,6 @@ func crdTest(_ client.Client, invConfig InventoryConfig, inventoryName, namespac
 		EmitStatusEvents: false,
 	}))
 
-	//nolint:dupl
 	expEvents := []testutil.ExpEvent{
 		{
 			// InitTask

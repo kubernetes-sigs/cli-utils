@@ -31,6 +31,7 @@ import (
 // we test a toy example with a pod-a depending on pod-b, injecting the ip and
 // port from pod-b into an environment variable of pod-a.
 
+//nolint:dupl // expEvents similar to CRD tests
 func mutationTest(c client.Client, invConfig InventoryConfig, inventoryName, namespaceName string) {
 	By("apply resources in order with substitutions based on apply-time-mutation annotation")
 	applier := invConfig.ApplierFactoryFunc()
@@ -51,7 +52,6 @@ func mutationTest(c client.Client, invConfig InventoryConfig, inventoryName, nam
 		EmitStatusEvents: false,
 	}))
 
-	//nolint:dupl
 	expEvents := []testutil.ExpEvent{
 		{
 			// InitTask
