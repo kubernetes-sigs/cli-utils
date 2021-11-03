@@ -102,6 +102,9 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 			// Set the client and mapping fields on the provided
 			// info so they can be applied to the cluster.
 			info, err := a.InfoHelper.BuildInfo(obj)
+			// BuildInfo strips path annotations.
+			// Use modified object for filters, mutations, and events.
+			obj = info.Object.(*unstructured.Unstructured)
 			id := object.UnstructuredToObjMetaOrDie(obj)
 			if err != nil {
 				if klog.V(4).Enabled() {
