@@ -119,7 +119,7 @@ func (p *Pruner) Prune(
 				// If deletion was prevented, remove the inventory annotation.
 				if pruneFilter.Name() == filter.PreventRemoveFilterName {
 					if !opts.DryRunStrategy.ClientOrServerDryRun() {
-						err := p.removeInventoryAnnotation(obj)
+						obj, err = p.removeInventoryAnnotation(obj)
 						if err != nil {
 							if klog.V(4).Enabled() {
 								klog.Errorf("error removing annotation (object: %q, annotation: %q): %v", id, inventory.OwningInventoryKey, err)
@@ -163,7 +163,10 @@ func (p *Pruner) Prune(
 }
 
 // removeInventoryAnnotation removes the `config.k8s.io/owning-inventory` annotation from pruneObj.
-func (p *Pruner) removeInventoryAnnotation(obj *unstructured.Unstructured) error {
+func (p *Pruner) removeInventoryAnnotation(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+	// Make a copy of the input object to avoid modifying the input.
+	// This prevents race conditions when writing to the underlying map.
+	obj = obj.DeepCopy()
 	id := object.UnstructuredToObjMetaOrDie(obj)
 	annotations := obj.GetAnnotations()
 	if annotations != nil {
@@ -173,13 +176,13 @@ func (p *Pruner) removeInventoryAnnotation(obj *unstructured.Unstructured) error
 			obj.SetAnnotations(annotations)
 			namespacedClient, err := p.namespacedClient(id)
 			if err != nil {
-				return err
+				return obj, err
 			}
 			_, err = namespacedClient.Update(context.TODO(), obj, metav1.UpdateOptions{})
-			return err
+			return obj, err
 		}
 	}
-	return nil
+	return obj, nil
 }
 
 // GetPruneObjs calculates the set of prune objects, and retrieves them
