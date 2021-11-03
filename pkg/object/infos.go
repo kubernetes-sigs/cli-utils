@@ -44,6 +44,9 @@ func InfoToUnstructured(info *resource.Info) *unstructured.Unstructured {
 // UnstructuredToInfo transforms the passed Unstructured object into Info format,
 // or an error if one occurs.
 func UnstructuredToInfo(obj *unstructured.Unstructured) (*resource.Info, error) {
+	// make a copy of the input object to avoid modifying the input
+	obj = obj.DeepCopy()
+
 	annos := obj.GetAnnotations()
 
 	source := "unstructured"
