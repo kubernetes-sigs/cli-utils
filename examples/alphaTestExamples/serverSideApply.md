@@ -26,11 +26,18 @@ BASE=$DEMO_HOME/base
 mkdir -p $BASE
 OUTPUT=$DEMO_HOME/output
 mkdir -p $OUTPUT
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+NC='\033[0m' # No Color
 
 function expectedOutputLine() {
-  test 1 == \
-  $(grep "$@" $OUTPUT/status | wc -l); \
-  echo $?
+  if ! grep -q "$@" "$OUTPUT/status"; then
+    echo -e "${RED}Error: output line not found${NC}"
+    echo -e "${RED}Expected: $@${NC}"
+    exit 1
+  else
+    echo -e "${GREEN}Success: output line found${NC}"
+  fi
 }
 ```
 
@@ -77,7 +84,7 @@ Use the kapply init command to generate the inventory template. This contains
 the namespace and inventory id used by apply to create inventory objects. 
 <!-- @createInventoryTemplate @testE2EAgainstLatestRelease-->
 ```
-kapply init $BASE > $OUTPUT/status
+kapply init $BASE | tee $OUTPUT/status
 expectedOutputLine "namespace: default is used for inventory object"
 ```
 
@@ -85,22 +92,22 @@ Apply the "app" to the cluster. All the config maps should be created, and
 no resources should be pruned.
 <!-- @runServerSideApply @testE2EAgainstLatestRelease -->
 ```
-kapply apply $BASE --server-side --reconcile-timeout=1m > $OUTPUT/status
+kapply apply $BASE --server-side --reconcile-timeout=1m | tee $OUTPUT/status
 expectedOutputLine "configmap/cm-a serversideapplied"
 expectedOutputLine "configmap/cm-b serversideapplied"
 expectedOutputLine "2 serverside applied"
 
 # There should be only one inventory object
-kubectl get cm --selector='cli-utils.sigs.k8s.io/inventory-id' --no-headers | wc -l > $OUTPUT/status
+kubectl get cm --selector='cli-utils.sigs.k8s.io/inventory-id' --no-headers | wc -l | tee $OUTPUT/status
 expectedOutputLine "1"
 # There should be two config maps that are not the inventory object
-kubectl get cm --selector='name=test-config-map-label' --no-headers | wc -l > $OUTPUT/status
+kubectl get cm --selector='name=test-config-map-label' --no-headers | wc -l | tee $OUTPUT/status
 expectedOutputLine "2"
 # ConfigMap cm-a had been created in the cluster
-kubectl get configmap/cm-a --no-headers | wc -l > $OUTPUT/status
+kubectl get configmap/cm-a --no-headers | wc -l | tee $OUTPUT/status
 expectedOutputLine "1"
 # ConfigMap cm-b had been created in the cluster
-kubectl get configmap/cm-b --no-headers | wc -l > $OUTPUT/status
+kubectl get configmap/cm-b --no-headers | wc -l | tee $OUTPUT/status
 expectedOutputLine "1"
 ```
 
@@ -121,7 +128,7 @@ data:
   foo: baz
 EOF
 
-kapply apply $BASE --server-side --field-manager=sean --force-conflicts --reconcile-timeout=1m > $OUTPUT/status
+kapply apply $BASE --server-side --field-manager=sean --force-conflicts --reconcile-timeout=1m | tee $OUTPUT/status
 expectedOutputLine "configmap/cm-a serversideapplied"
 expectedOutputLine "configmap/cm-b serversideapplied"
 expectedOutputLine "2 serverside applied"

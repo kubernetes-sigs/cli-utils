@@ -25,11 +25,18 @@ BASE=$DEMO_HOME/base
 mkdir -p $BASE
 OUTPUT=$DEMO_HOME/output
 mkdir -p $OUTPUT
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+NC='\033[0m' # No Color
 
 function expectedOutputLine() {
-  test 1 == \
-  $(grep "$@" $OUTPUT/status | wc -l); \
-  echo $?
+  if ! grep -q "$@" "$OUTPUT/status"; then
+    echo -e "${RED}Error: output line not found${NC}"
+    echo -e "${RED}Expected: $@${NC}"
+    exit 1
+  else
+    echo -e "${GREEN}Success: output line found${NC}"
+  fi
 }
 ```
 
@@ -93,7 +100,7 @@ Use the kapply init command to generate the inventory template. This contains
 the namespace and inventory id used by apply to create inventory objects. 
 <!-- @createInventoryTemplate @testE2EAgainstLatestRelease-->
 ```
-kapply init $BASE > $OUTPUT/status
+kapply init $BASE | tee $OUTPUT/status
 expectedOutputLine "namespace: test-namespace is used for inventory object"
 ```
 
@@ -116,7 +123,7 @@ EOF
 # Remove the initial inventory template.
 rm -f $BASE/inventory-template.yaml
 
-kapply init $BASE > $OUTPUT/status
+kapply init $BASE | tee $OUTPUT/status
 expectedOutputLine "namespace: default is used for inventory object"
 ```
 
@@ -150,7 +157,7 @@ rules:
   verbs: ["get", "watch", "list"]
 EOF
 
-kapply init $BASE > $OUTPUT/status
+kapply init $BASE | tee $OUTPUT/status
 expectedOutputLine "namespace: test-namespace is used for inventory object"
 ```
 

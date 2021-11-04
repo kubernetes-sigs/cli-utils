@@ -32,6 +32,9 @@ BASE=$DEMO_HOME/base
 mkdir -p $BASE
 OUTPUT=$DEMO_HOME/output
 mkdir -p $OUTPUT
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+NC='\033[0m' # No Color
 
 mkdir $BASE/wordpress
 mkdir $BASE/mysql
@@ -47,9 +50,13 @@ curl -s -o "$BASE/mysql/#1.yaml" "https://raw.githubusercontent.com\
 /{secret,deployment,service}.yaml"
 
 function expectedOutputLine() {
-  test 1 == \
-  $(grep "$@" $OUTPUT/status | wc -l); \
-  echo $?
+  if ! grep -q "$@" "$OUTPUT/status"; then
+    echo -e "${RED}Error: output line not found${NC}"
+    echo -e "${RED}Expected: $@${NC}"
+    exit 1
+  else
+    echo -e "${GREEN}Success: output line found${NC}"
+  fi
 }
 ```
 
@@ -57,10 +64,10 @@ Use the kapply init command to generate the inventory template. This contains
 the namespace and inventory id used by apply to create inventory objects.
 <!-- @createInventoryTemplate @testE2EAgainstLatestRelease-->
 ```
-kapply init $BASE/mysql > $OUTPUT/status
+kapply init $BASE/mysql | tee $OUTPUT/status
 expectedOutputLine "namespace: default is used for inventory object"
 
-kapply init $BASE/wordpress > $OUTPUT/status
+kapply init $BASE/wordpress | tee $OUTPUT/status
 expectedOutputLine "namespace: default is used for inventory object"
 ```
 
@@ -74,7 +81,7 @@ kind create cluster
 Let's apply the mysql service
 <!-- @RunMysql @testE2EAgainstLatestRelease -->
 ```
-kapply apply $BASE/mysql --reconcile-timeout=120s --status-events > $OUTPUT/status;
+kapply apply $BASE/mysql --reconcile-timeout=120s --status-events | tee $OUTPUT/status
 
 expectedOutputLine "deployment.apps/mysql is Current: Deployment is available. Replicas: 1"
 
@@ -83,32 +90,32 @@ expectedOutputLine "secret/mysql-pass is Current: Resource is always ready"
 expectedOutputLine "service/mysql is Current: Service is ready"
 
 # Verify that we have the mysql resources in the cluster.
-kubectl get all --no-headers --selector=app=mysql | wc -l | xargs > $OUTPUT/status
+kubectl get all --no-headers --selector=app=mysql | wc -l | xargs | tee $OUTPUT/status
 expectedOutputLine "4"
 
 # Verify that we don't have any of the wordpress resources in the cluster. 
-kubectl get all --no-headers --selector=app=wordpress | wc -l | xargs > $OUTPUT/status
+kubectl get all --no-headers --selector=app=wordpress | wc -l | xargs | tee $OUTPUT/status
 expectedOutputLine "0"
 ```
 
 And the apply the wordpress service
 <!-- @RunWordpress @testE2EAgainstLatestRelease -->
 ```
-kapply apply $BASE/wordpress --reconcile-timeout=120s --status-events > $OUTPUT/status;
+kapply apply $BASE/wordpress --reconcile-timeout=120s --status-events | tee $OUTPUT/status
 
 expectedOutputLine "service/wordpress is Current: Service is ready"
 
 expectedOutputLine "deployment.apps/wordpress is Current: Deployment is available. Replicas: 1"
 
 # Verify that we now have the wordpress resources in the cluster.
-kubectl get all --no-headers --selector=app=wordpress | wc -l | xargs > $OUTPUT/status
+kubectl get all --no-headers --selector=app=wordpress | wc -l | xargs | tee $OUTPUT/status
 expectedOutputLine "4"
 ```
 
 Destroy one service and make sure that only that service is destroyed and clean-up the cluster.
 <!-- @destroyAppDeleteKindCluster @testE2EAgainstLatestRelease -->
 ```
-kapply destroy $BASE/wordpress > $OUTPUT/status;
+kapply destroy $BASE/wordpress | tee $OUTPUT/status;
 
 expectedOutputLine "service/wordpress deleted"
 
@@ -117,7 +124,7 @@ expectedOutputLine "deployment.apps/wordpress deleted"
 expectedOutputLine "2 resource(s) deleted, 0 skipped"
 
 # Verify that we still have the mysql resources in the cluster.
-kubectl get all --no-headers --selector=app=mysql | wc -l | xargs > $OUTPUT/status
+kubectl get all --no-headers --selector=app=mysql | wc -l | xargs | tee $OUTPUT/status
 expectedOutputLine "4"
 
 # TODO: When we implement wait for prune/destroy, add a check here to make

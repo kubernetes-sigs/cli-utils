@@ -28,11 +28,18 @@ BASE=$DEMO_HOME/base
 mkdir -p $BASE
 OUTPUT=$DEMO_HOME/output
 mkdir -p $OUTPUT
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+NC='\033[0m' # No Color
 
 function expectedOutputLine() {
-  test 1 == \
-  $(grep "$@" $OUTPUT/status | wc -l); \
-  echo $?
+  if ! grep -q "$@" "$OUTPUT/status"; then
+    echo -e "${RED}Error: output line not found${NC}"
+    echo -e "${RED}Expected: $@${NC}"
+    exit 1
+  else
+    echo -e "${GREEN}Success: output line found${NC}"
+  fi
 }
 ```
 
@@ -86,7 +93,7 @@ Use the kapply init command to generate the inventory template. This contains
 the namespace and inventory id used by apply to create inventory objects. 
 <!-- @createInventoryTemplate @testE2EAgainstLatestRelease-->
 ```
-kapply init $BASE > $OUTPUT/status
+kapply init $BASE | tee $OUTPUT/status
 expectedOutputLine "namespace: default is used for inventory object"
 ```
 
@@ -94,27 +101,27 @@ Apply the "app" to the cluster. All the config maps should be created, and
 no resources should be pruned.
 <!-- @runApply @testE2EAgainstLatestRelease -->
 ```
-kapply apply $BASE --reconcile-timeout=1m > $OUTPUT/status
+kapply apply $BASE --reconcile-timeout=1m | tee $OUTPUT/status
 expectedOutputLine "configmap/cm-a created"
 expectedOutputLine "configmap/cm-b created"
 expectedOutputLine "configmap/cm-c created"
 
 # There should be only one inventory object
-kubectl get cm --selector='cli-utils.sigs.k8s.io/inventory-id' --no-headers | wc -l > $OUTPUT/status
+kubectl get cm --selector='cli-utils.sigs.k8s.io/inventory-id' --no-headers | wc -l | tee $OUTPUT/status
 expectedOutputLine "1"
 # Capture the inventory object name for later testing
 invName=$(kubectl get cm --selector='cli-utils.sigs.k8s.io/inventory-id' --no-headers | awk '{print $1}')
 # There should be three config maps
-kubectl get cm --selector='name=test-config-map-label' --no-headers | wc -l > $OUTPUT/status
+kubectl get cm --selector='name=test-config-map-label' --no-headers | wc -l | tee $OUTPUT/status
 expectedOutputLine "3"
 # ConfigMap cm-a had been created in the cluster
-kubectl get configmap/cm-a --no-headers | wc -l > $OUTPUT/status
+kubectl get configmap/cm-a --no-headers | wc -l | tee $OUTPUT/status
 expectedOutputLine "1"
 # ConfigMap cm-b had been created in the cluster
-kubectl get configmap/cm-b --no-headers | wc -l > $OUTPUT/status
+kubectl get configmap/cm-b --no-headers | wc -l | tee $OUTPUT/status
 expectedOutputLine "1"
 # ConfigMap cm-c had been created in the cluster
-kubectl get configmap/cm-c --no-headers | wc -l > $OUTPUT/status
+kubectl get configmap/cm-c --no-headers | wc -l | tee $OUTPUT/status
 expectedOutputLine "1"
 ```
 
@@ -146,7 +153,7 @@ cm-b, cm-c should be unchanged.
 cm-d should be created.
 <!-- @applySecondTime @testE2EAgainstLatestRelease -->
 ```
-kapply apply $BASE --reconcile-timeout=1m > $OUTPUT/status
+kapply apply $BASE --reconcile-timeout=1m | tee $OUTPUT/status
 expectedOutputLine "configmap/cm-a pruned"
 expectedOutputLine "configmap/cm-b unchanged"
 expectedOutputLine "configmap/cm-c unchanged"
@@ -154,21 +161,21 @@ expectedOutputLine "configmap/cm-d created"
 expectedOutputLine "1 resource(s) pruned, 0 skipped"
 
 # There should be only one inventory object
-kubectl get cm --selector='cli-utils.sigs.k8s.io/inventory-id' --no-headers | wc -l > $OUTPUT/status
+kubectl get cm --selector='cli-utils.sigs.k8s.io/inventory-id' --no-headers | wc -l | tee $OUTPUT/status
 expectedOutputLine "1"
 # The inventory object should have the same name
-kubectl get configmap/${invName} --no-headers > $OUTPUT/status
+kubectl get configmap/${invName} --no-headers | tee $OUTPUT/status
 expectedOutputLine "${invName}"
 # There should be three config maps
-kubectl get cm --selector='name=test-config-map-label' --no-headers | wc -l > $OUTPUT/status
+kubectl get cm --selector='name=test-config-map-label' --no-headers | wc -l | tee $OUTPUT/status
 expectedOutputLine "3"
 # ConfigMap cm-b had been created in the cluster
-kubectl get configmap/cm-b --no-headers | wc -l > $OUTPUT/status
+kubectl get configmap/cm-b --no-headers | wc -l | tee $OUTPUT/status
 expectedOutputLine "1"
 # ConfigMap cm-c had been created in the cluster
-kubectl get configmap/cm-c --no-headers | wc -l > $OUTPUT/status
+kubectl get configmap/cm-c --no-headers | wc -l | tee $OUTPUT/status
 expectedOutputLine "1"
 # ConfigMap cm-d had been created in the cluster
-kubectl get configmap/cm-d --no-headers | wc -l > $OUTPUT/status
+kubectl get configmap/cm-d --no-headers | wc -l | tee $OUTPUT/status
 expectedOutputLine "1"
 ```
