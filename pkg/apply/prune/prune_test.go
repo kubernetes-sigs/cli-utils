@@ -788,16 +788,26 @@ func TestHandleDeletePrevention(t *testing.T) {
 		Mapper: testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme,
 			scheme.Scheme.PrioritizedVersionsAllGroups()...),
 	}
-	if err := po.removeInventoryAnnotation(obj); err != nil {
-		t.Fatalf("unexpected error %s returned", err)
-	}
-
-	// Get the object from the cluster and verify that the `config.k8s.io/owning-inventory` annotation is removed from the object.
-	liveObj, err := po.getObject(testutil.ToIdentifier(t, pdbDeletePreventionManifest))
+	var err error
+	obj, err = po.removeInventoryAnnotation(obj)
 	if err != nil {
 		t.Fatalf("unexpected error %s returned", err)
 	}
-	annotations := liveObj.GetAnnotations()
+	// Verify annotation removed from the local object
+	annotations := obj.GetAnnotations()
+	if annotations != nil {
+		if _, ok := annotations[inventory.OwningInventoryKey]; ok {
+			t.Fatalf("expected handleDeletePrevention() to remove the %q annotation", inventory.OwningInventoryKey)
+		}
+	}
+
+	// Get the object from the cluster
+	obj, err = po.getObject(testutil.ToIdentifier(t, pdbDeletePreventionManifest))
+	if err != nil {
+		t.Fatalf("unexpected error %s returned", err)
+	}
+	// Verify annotation removed from the remote object
+	annotations = obj.GetAnnotations()
 	if annotations != nil {
 		if _, ok := annotations[inventory.OwningInventoryKey]; ok {
 			t.Fatalf("expected handleDeletePrevention() to remove the %q annotation", inventory.OwningInventoryKey)
