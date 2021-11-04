@@ -74,7 +74,7 @@ kind create cluster
 Let's apply the mysql service
 <!-- @RunMysql @testE2EAgainstLatestRelease -->
 ```
-kapply apply $BASE/mysql --reconcile-timeout=120s > $OUTPUT/status;
+kapply apply $BASE/mysql --reconcile-timeout=120s --status-events > $OUTPUT/status;
 
 expectedOutputLine "deployment.apps/mysql is Current: Deployment is available. Replicas: 1"
 
@@ -94,7 +94,7 @@ expectedOutputLine "0"
 And the apply the wordpress service
 <!-- @RunWordpress @testE2EAgainstLatestRelease -->
 ```
-kapply apply $BASE/wordpress --reconcile-timeout=120s > $OUTPUT/status;
+kapply apply $BASE/wordpress --reconcile-timeout=120s --status-events > $OUTPUT/status;
 
 expectedOutputLine "service/wordpress is Current: Service is ready"
 

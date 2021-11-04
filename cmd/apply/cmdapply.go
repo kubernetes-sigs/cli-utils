@@ -60,6 +60,8 @@ func GetApplyRunner(factory cmdutil.Factory, invFactory inventory.InventoryClien
 			fmt.Sprintf("%q, %q and %q.", flagutils.InventoryPolicyStrict, flagutils.InventoryPolicyAdopt, flagutils.InventoryPolicyForceAdopt))
 	cmd.Flags().DurationVar(&r.timeout, "timeout", 0,
 		"How long to wait before exiting")
+	cmd.Flags().BoolVar(&r.printStatusEvents, "status-events", false,
+		"Print status events (always enabled for table output)")
 
 	r.Command = cmd
 	return r
@@ -86,6 +88,7 @@ type ApplyRunner struct {
 	pruneTimeout           time.Duration
 	inventoryPolicy        string
 	timeout                time.Duration
+	printStatusEvents      bool
 }
 
 func (r *ApplyRunner) RunE(cmd *cobra.Command, args []string) error {
@@ -104,16 +107,6 @@ func (r *ApplyRunner) RunE(cmd *cobra.Command, args []string) error {
 	inventoryPolicy, err := flagutils.ConvertInventoryPolicy(r.inventoryPolicy)
 	if err != nil {
 		return err
-	}
-
-	var printStatusEvents bool
-	// Print status events if a wait timeout is specified
-	if r.reconcileTimeout != time.Duration(0) || r.pruneTimeout != time.Duration(0) {
-		printStatusEvents = true
-	}
-	// Always enable status events for the table printer
-	if r.output == printers.TablePrinter {
-		printStatusEvents = true
 	}
 
 	// TODO: Fix DemandOneDirectory to no longer return FileNameFlags
@@ -148,13 +141,19 @@ func (r *ApplyRunner) RunE(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+
+	// Always enable status events for the table printer
+	if r.output == printers.TablePrinter {
+		r.printStatusEvents = true
+	}
+
 	ch := a.Run(ctx, inv, objs, apply.Options{
 		ServerSideOptions: r.serverSideOptions,
 		PollInterval:      r.period,
 		ReconcileTimeout:  r.reconcileTimeout,
 		// If we are not waiting for status, tell the applier to not
 		// emit the events.
-		EmitStatusEvents:       printStatusEvents,
+		EmitStatusEvents:       r.printStatusEvents,
 		NoPrune:                r.noPrune,
 		DryRunStrategy:         common.DryRunNone,
 		PrunePropagationPolicy: prunePropPolicy,
@@ -165,5 +164,5 @@ func (r *ApplyRunner) RunE(cmd *cobra.Command, args []string) error {
 	// The printer will print updates from the channel. It will block
 	// until the channel is closed.
 	printer := printers.GetPrinter(r.output, r.ioStreams)
-	return printer.Print(ch, common.DryRunNone, printStatusEvents)
+	return printer.Print(ch, common.DryRunNone, r.printStatusEvents)
 }
