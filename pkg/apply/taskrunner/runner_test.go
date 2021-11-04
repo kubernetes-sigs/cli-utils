@@ -41,12 +41,11 @@ var (
 
 func TestBaseRunner(t *testing.T) {
 	testCases := map[string]struct {
-		tasks                     []Task
-		statusEventsDelay         time.Duration
-		statusEvents              []pollevent.Event
-		expectedEventTypes        []event.Type
-		expectedTimedOutResources []TimedOutResource
-		expectedTimeoutErrorMsg   string
+		tasks              []Task
+		statusEventsDelay  time.Duration
+		statusEvents       []pollevent.Event
+		expectedEventTypes []event.Type
+		expectedWaitEvents []event.WaitEvent
 	}{
 		"wait task runs until condition is met": {
 			tasks: []Task{
@@ -87,12 +86,38 @@ func TestBaseRunner(t *testing.T) {
 				event.ApplyType,
 				event.ActionGroupType,
 				event.ActionGroupType,
+				event.WaitType, // deployment pending
+				event.WaitType, // configmap pending
 				event.StatusType,
+				event.WaitType, // configmap current
 				event.StatusType,
+				event.WaitType, // deployment current
 				event.ActionGroupType,
 				event.ActionGroupType,
 				event.PruneType,
 				event.ActionGroupType,
+			},
+			expectedWaitEvents: []event.WaitEvent{
+				{
+					GroupName:  "wait",
+					Identifier: depID,
+					Operation:  event.ReconcilePending,
+				},
+				{
+					GroupName:  "wait",
+					Identifier: cmID,
+					Operation:  event.ReconcilePending,
+				},
+				{
+					GroupName:  "wait",
+					Identifier: cmID,
+					Operation:  event.Reconciled,
+				},
+				{
+					GroupName:  "wait",
+					Identifier: depID,
+					Operation:  event.Reconciled,
+				},
 			},
 		},
 		"wait task times out eventually (Unknown)": {
@@ -112,18 +137,35 @@ func TestBaseRunner(t *testing.T) {
 			},
 			expectedEventTypes: []event.Type{
 				event.ActionGroupType,
+				event.WaitType, // configmap pending
+				event.WaitType, // deployment pending
 				event.StatusType,
-				event.WaitType,
+				event.WaitType, // configmap current
+				event.WaitType, // deployment timeout error
 				event.ActionGroupType,
 			},
-			expectedTimedOutResources: []TimedOutResource{
+			expectedWaitEvents: []event.WaitEvent{
 				{
+					GroupName:  "wait",
 					Identifier: depID,
-					Status:     status.UnknownStatus,
-					Message:    "resource not cached",
+					Operation:  event.ReconcilePending,
+				},
+				{
+					GroupName:  "wait",
+					Identifier: cmID,
+					Operation:  event.ReconcilePending,
+				},
+				{
+					GroupName:  "wait",
+					Identifier: cmID,
+					Operation:  event.Reconciled,
+				},
+				{
+					GroupName:  "wait",
+					Identifier: depID,
+					Operation:  event.ReconcileTimeout,
 				},
 			},
-			expectedTimeoutErrorMsg: "timeout after 2 seconds waiting for 2 resources ([default_cm__ConfigMap default_dep_apps_Deployment]) to reach condition AllCurrent",
 		},
 		"wait task times out eventually (InProgress)": {
 			tasks: []Task{
@@ -149,18 +191,36 @@ func TestBaseRunner(t *testing.T) {
 			},
 			expectedEventTypes: []event.Type{
 				event.ActionGroupType,
+				event.WaitType, // configmap pending
+				event.WaitType, // deployment pending
 				event.StatusType,
+				event.WaitType, // configmap current
 				event.StatusType,
-				event.WaitType,
+				event.WaitType, // deployment timeout error
 				event.ActionGroupType,
 			},
-			expectedTimedOutResources: []TimedOutResource{
+			expectedWaitEvents: []event.WaitEvent{
 				{
+					GroupName:  "wait",
 					Identifier: depID,
-					Status:     status.InProgressStatus,
+					Operation:  event.ReconcilePending,
+				},
+				{
+					GroupName:  "wait",
+					Identifier: cmID,
+					Operation:  event.ReconcilePending,
+				},
+				{
+					GroupName:  "wait",
+					Identifier: cmID,
+					Operation:  event.Reconciled,
+				},
+				{
+					GroupName:  "wait",
+					Identifier: depID,
+					Operation:  event.ReconcileTimeout,
 				},
 			},
-			expectedTimeoutErrorMsg: "timeout after 2 seconds waiting for 2 resources ([default_cm__ConfigMap default_dep_apps_Deployment]) to reach condition AllCurrent",
 		},
 		"tasks run in order": {
 			tasks: []Task{
@@ -255,6 +315,7 @@ func TestBaseRunner(t *testing.T) {
 			if want, got := len(tc.expectedEventTypes), len(events); want != got {
 				t.Errorf("expected %d events, but got %d", want, got)
 			}
+			var waitEvents []event.WaitEvent
 			for i, e := range events {
 				expectedEventType := tc.expectedEventTypes[i]
 				if want, got := expectedEventType, e.Type; want != got {
@@ -262,14 +323,10 @@ func TestBaseRunner(t *testing.T) {
 						want, got)
 				}
 				if e.Type == event.WaitType {
-					err := e.WaitEvent.Error
-					if timeoutError, ok := err.(*TimeoutError); ok {
-						assert.ElementsMatch(t, tc.expectedTimedOutResources,
-							timeoutError.TimedOutResources)
-						assert.Equal(t, timeoutError.Error(), tc.expectedTimeoutErrorMsg)
-					}
+					waitEvents = append(waitEvents, e.WaitEvent)
 				}
 			}
+			assert.Equal(t, tc.expectedWaitEvents, waitEvents)
 		})
 	}
 }
@@ -323,6 +380,7 @@ func TestBaseRunnerCancellation(t *testing.T) {
 			expectedError:  context.Canceled,
 			expectedEventTypes: []event.Type{
 				event.ActionGroupType,
+				event.WaitType, // pending
 				event.ActionGroupType,
 			},
 		},
@@ -372,6 +430,7 @@ func TestBaseRunnerCancellation(t *testing.T) {
 			expectedError:  testError,
 			expectedEventTypes: []event.Type{
 				event.ActionGroupType,
+				event.WaitType, // pending
 				event.ActionGroupType,
 			},
 		},
@@ -471,4 +530,6 @@ func (f *fakeApplyTask) Start(taskContext *TaskContext) {
 	}()
 }
 
-func (f *fakeApplyTask) ClearTimeout() {}
+func (f *fakeApplyTask) Cancel(_ *TaskContext) {}
+
+func (f *fakeApplyTask) StatusUpdate(_ *TaskContext, _ object.ObjMetadata) {}

@@ -106,11 +106,43 @@ var (
 		},
 	}
 
+	reconciledColumnDef = table.ColumnDef{
+		// Column containing the reconciliation status.
+		ColumnName:   "reconciled",
+		ColumnHeader: "RECONCILED",
+		ColumnWidth:  10,
+		PrintResourceFunc: func(w io.Writer, width int, r table.Resource) (
+			int,
+			error,
+		) {
+			var resInfo *ResourceInfo
+			switch res := r.(type) {
+			case *ResourceInfo:
+				resInfo = res
+			default:
+				return 0, nil
+			}
+
+			var text string
+			switch resInfo.ResourceAction {
+			case event.WaitAction:
+				text = resInfo.WaitOpResult.String()
+			}
+
+			if len(text) > width {
+				text = text[:width]
+			}
+			_, err := fmt.Fprint(w, text)
+			return len(text), err
+		},
+	}
+
 	columns = []table.ColumnDefinition{
 		table.MustColumn("namespace"),
 		table.MustColumn("resource"),
 		actionColumnDef,
 		table.MustColumn("status"),
+		reconciledColumnDef,
 		table.MustColumn("conditions"),
 		table.MustColumn("age"),
 		table.MustColumn("message"),

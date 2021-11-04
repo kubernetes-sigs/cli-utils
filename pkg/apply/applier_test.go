@@ -6,6 +6,7 @@ package apply
 import (
 	"context"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -514,6 +515,9 @@ func TestApplier(t *testing.T) {
 
 			eventChannel := applier.Run(ctx, tc.invInfo.toWrapped(), tc.resources, tc.options)
 
+			// only start sending events once
+			var once sync.Once
+
 			var events []event.Event
 			timer := time.NewTimer(10 * time.Second)
 
@@ -526,12 +530,13 @@ func TestApplier(t *testing.T) {
 					}
 					if e.Type == event.ActionGroupType &&
 						e.ActionGroupEvent.Type == event.Finished {
-						// If we do not also check for PruneAction, then the tests
-						// hang, timeout, and fail.
+						// Send events after the first apply/prune task ends
 						if e.ActionGroupEvent.Action == event.ApplyAction ||
 							e.ActionGroupEvent.Action == event.PruneAction {
-							// start events
-							poller.Start()
+							once.Do(func() {
+								// start events
+								poller.Start()
+							})
 						}
 					}
 					events = append(events, e)
@@ -679,8 +684,18 @@ func TestApplierCancel(t *testing.T) {
 						Type:      event.Started,
 					},
 				},
+				{
+					// Deployment reconcile pending.
+					EventType: event.WaitType,
+					WaitEvent: &testutil.ExpWaitEvent{
+						GroupName:  "wait-0",
+						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
+						Operation:  event.ReconcilePending,
+					},
+				},
 				// Deployment never becomes Current.
 				// WaitTask is expected to be cancelled before ReconcileTimeout.
+				// Cancelled WaitTask do not sent individual timeout WaitEvents
 				{
 					// WaitTask finished
 					EventType: event.ActionGroupType,
@@ -834,7 +849,24 @@ func TestApplierCancel(t *testing.T) {
 						Type:      event.Started,
 					},
 				},
-				// Deployment becomes Current.
+				{
+					// Deployment reconcile pending.
+					EventType: event.WaitType,
+					WaitEvent: &testutil.ExpWaitEvent{
+						GroupName:  "wait-0",
+						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
+						Operation:  event.ReconcilePending,
+					},
+				},
+				{
+					// Deployment becomes Current.
+					EventType: event.WaitType,
+					WaitEvent: &testutil.ExpWaitEvent{
+						GroupName:  "wait-0",
+						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
+						Operation:  event.Reconciled,
+					},
+				},
 				{
 					// WaitTask finished
 					EventType: event.ActionGroupType,
@@ -887,8 +919,8 @@ func TestApplierCancel(t *testing.T) {
 
 			eventChannel := applier.Run(runCtx, tc.invInfo.toWrapped(), tc.resources, tc.options)
 
-			// Start sending status events
-			poller.Start()
+			// only start sending events once
+			var once sync.Once
 
 			var events []event.Event
 
@@ -908,6 +940,18 @@ func TestApplierCancel(t *testing.T) {
 						break loop
 					}
 					events = append(events, e)
+
+					if e.Type == event.ActionGroupType &&
+						e.ActionGroupEvent.Type == event.Finished {
+						// Send events after the first apply/prune task ends
+						if e.ActionGroupEvent.Action == event.ApplyAction ||
+							e.ActionGroupEvent.Action == event.PruneAction {
+							once.Do(func() {
+								// start events
+								poller.Start()
+							})
+						}
+					}
 				}
 			}
 

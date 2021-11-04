@@ -31,17 +31,21 @@ import (
 // we test a toy example with a pod-a depending on pod-b, injecting the ip and
 // port from pod-b into an environment variable of pod-a.
 
+//nolint:dupl // expEvents similar to CRD tests
 func mutationTest(c client.Client, invConfig InventoryConfig, inventoryName, namespaceName string) {
 	By("apply resources in order with substitutions based on apply-time-mutation annotation")
 	applier := invConfig.ApplierFactoryFunc()
 
 	inv := invConfig.InvWrapperFunc(invConfig.InventoryFactoryFunc(inventoryName, namespaceName, "test"))
 
+	podAObj := withNamespace(manifestToUnstructured(podA), namespaceName)
+	podBObj := withNamespace(manifestToUnstructured(podB), namespaceName)
+
 	// Dependency order: podA -> podB
 	// Apply order: podB, podA
 	resources := []*unstructured.Unstructured{
-		withNamespace(manifestToUnstructured(podA), namespaceName),
-		withNamespace(manifestToUnstructured(podB), namespaceName),
+		podAObj,
+		podBObj,
 	}
 
 	applierEvents := runCollect(applier.Run(context.TODO(), inv, resources, apply.Options{
@@ -87,7 +91,7 @@ func mutationTest(c client.Client, invConfig InventoryConfig, inventoryName, nam
 			ApplyEvent: &testutil.ExpApplyEvent{
 				GroupName:  "apply-0",
 				Operation:  event.Created,
-				Identifier: object.UnstructuredToObjMetaOrDie(withNamespace(manifestToUnstructured(podB), namespaceName)),
+				Identifier: object.UnstructuredToObjMetaOrDie(podBObj),
 				Error:      nil,
 			},
 		},
@@ -110,6 +114,24 @@ func mutationTest(c client.Client, invConfig InventoryConfig, inventoryName, nam
 			},
 		},
 		{
+			// PodB reconcile Pending.
+			EventType: event.WaitType,
+			WaitEvent: &testutil.ExpWaitEvent{
+				GroupName:  "wait-0",
+				Operation:  event.ReconcilePending,
+				Identifier: object.UnstructuredToObjMetaOrDie(podBObj),
+			},
+		},
+		{
+			// PodB confirmed Current.
+			EventType: event.WaitType,
+			WaitEvent: &testutil.ExpWaitEvent{
+				GroupName:  "wait-0",
+				Operation:  event.Reconciled,
+				Identifier: object.UnstructuredToObjMetaOrDie(podBObj),
+			},
+		},
+		{
 			// WaitTask finished
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
@@ -128,12 +150,12 @@ func mutationTest(c client.Client, invConfig InventoryConfig, inventoryName, nam
 			},
 		},
 		{
-			// Apply pod3 second
+			// Apply PodA second
 			EventType: event.ApplyType,
 			ApplyEvent: &testutil.ExpApplyEvent{
 				GroupName:  "apply-1",
 				Operation:  event.Created,
-				Identifier: object.UnstructuredToObjMetaOrDie(withNamespace(manifestToUnstructured(podA), namespaceName)),
+				Identifier: object.UnstructuredToObjMetaOrDie(podAObj),
 				Error:      nil,
 			},
 		},
@@ -153,6 +175,24 @@ func mutationTest(c client.Client, invConfig InventoryConfig, inventoryName, nam
 				Action:    event.WaitAction,
 				GroupName: "wait-1",
 				Type:      event.Started,
+			},
+		},
+		{
+			// PodA reconcile Pending.
+			EventType: event.WaitType,
+			WaitEvent: &testutil.ExpWaitEvent{
+				GroupName:  "wait-1",
+				Operation:  event.ReconcilePending,
+				Identifier: object.UnstructuredToObjMetaOrDie(podAObj),
+			},
+		},
+		{
+			// PodA confirmed Current.
+			EventType: event.WaitType,
+			WaitEvent: &testutil.ExpWaitEvent{
+				GroupName:  "wait-1",
+				Operation:  event.Reconciled,
+				Identifier: object.UnstructuredToObjMetaOrDie(podAObj),
 			},
 		},
 		{
@@ -186,7 +226,7 @@ func mutationTest(c client.Client, invConfig InventoryConfig, inventoryName, nam
 	Expect(testutil.EventsToExpEvents(applierEvents)).To(testutil.Equal(expEvents))
 
 	By("verify podB is created and ready")
-	result := assertUnstructuredExists(c, withNamespace(manifestToUnstructured(podB), namespaceName))
+	result := assertUnstructuredExists(c, podBObj)
 
 	podIP, found, err := testutil.NestedField(result.Object, "status", "podIP")
 	Expect(err).NotTo(HaveOccurred())
@@ -201,7 +241,7 @@ func mutationTest(c client.Client, invConfig InventoryConfig, inventoryName, nam
 	host := fmt.Sprintf("%s:%d", podIP, containerPort)
 
 	By("verify podA is mutated, created, and ready")
-	result = assertUnstructuredExists(c, withNamespace(manifestToUnstructured(podA), namespaceName))
+	result = assertUnstructuredExists(c, podAObj)
 
 	podIP, found, err = testutil.NestedField(result.Object, "status", "podIP")
 	Expect(err).NotTo(HaveOccurred())
@@ -234,12 +274,12 @@ func mutationTest(c client.Client, invConfig InventoryConfig, inventoryName, nam
 			},
 		},
 		{
-			// Delete podA first
+			// Delete PodA first
 			EventType: event.DeleteType,
 			DeleteEvent: &testutil.ExpDeleteEvent{
 				GroupName:  "prune-0",
 				Operation:  event.Deleted,
-				Identifier: object.UnstructuredToObjMetaOrDie(withNamespace(manifestToUnstructured(podA), namespaceName)),
+				Identifier: object.UnstructuredToObjMetaOrDie(podAObj),
 				Error:      nil,
 			},
 		},
@@ -262,6 +302,24 @@ func mutationTest(c client.Client, invConfig InventoryConfig, inventoryName, nam
 			},
 		},
 		{
+			// PodA reconcile Pending.
+			EventType: event.WaitType,
+			WaitEvent: &testutil.ExpWaitEvent{
+				GroupName:  "wait-0",
+				Operation:  event.ReconcilePending,
+				Identifier: object.UnstructuredToObjMetaOrDie(podAObj),
+			},
+		},
+		{
+			// PodA confirmed NotFound.
+			EventType: event.WaitType,
+			WaitEvent: &testutil.ExpWaitEvent{
+				GroupName:  "wait-0",
+				Operation:  event.Reconciled,
+				Identifier: object.UnstructuredToObjMetaOrDie(podAObj),
+			},
+		},
+		{
 			// WaitTask finished
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
@@ -280,12 +338,12 @@ func mutationTest(c client.Client, invConfig InventoryConfig, inventoryName, nam
 			},
 		},
 		{
-			// Delete pod3 second
+			// Delete PodB second
 			EventType: event.DeleteType,
 			DeleteEvent: &testutil.ExpDeleteEvent{
 				GroupName:  "prune-1",
 				Operation:  event.Deleted,
-				Identifier: object.UnstructuredToObjMetaOrDie(withNamespace(manifestToUnstructured(podB), namespaceName)),
+				Identifier: object.UnstructuredToObjMetaOrDie(podBObj),
 				Error:      nil,
 			},
 		},
@@ -305,6 +363,24 @@ func mutationTest(c client.Client, invConfig InventoryConfig, inventoryName, nam
 				Action:    event.WaitAction,
 				GroupName: "wait-1",
 				Type:      event.Started,
+			},
+		},
+		{
+			// PodB reconcile Pending.
+			EventType: event.WaitType,
+			WaitEvent: &testutil.ExpWaitEvent{
+				GroupName:  "wait-1",
+				Operation:  event.ReconcilePending,
+				Identifier: object.UnstructuredToObjMetaOrDie(podBObj),
+			},
+		},
+		{
+			// PodB confirmed NotFound.
+			EventType: event.WaitType,
+			WaitEvent: &testutil.ExpWaitEvent{
+				GroupName:  "wait-1",
+				Operation:  event.Reconciled,
+				Identifier: object.UnstructuredToObjMetaOrDie(podBObj),
 			},
 		},
 		{
@@ -339,8 +415,8 @@ func mutationTest(c client.Client, invConfig InventoryConfig, inventoryName, nam
 	Expect(testutil.EventsToExpEvents(destroyerEvents)).To(testutil.Equal(expEvents))
 
 	By("verify podB deleted")
-	assertUnstructuredDoesNotExist(c, withNamespace(manifestToUnstructured(podB), namespaceName))
+	assertUnstructuredDoesNotExist(c, podBObj)
 
 	By("verify podA deleted")
-	assertUnstructuredDoesNotExist(c, withNamespace(manifestToUnstructured(podA), namespaceName))
+	assertUnstructuredDoesNotExist(c, podAObj)
 }

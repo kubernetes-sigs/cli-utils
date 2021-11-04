@@ -5,6 +5,7 @@ package json
 
 import (
 	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 
@@ -79,6 +80,25 @@ func TestFormatter_FormatApplyEvent(t *testing.T) {
 					"operation": "Configured",
 					"timestamp": "",
 					"type":      "apply",
+				},
+			},
+		},
+		"resource apply error": {
+			previewStrategy: common.DryRunNone,
+			event: event.ApplyEvent{
+				Identifier: createIdentifier("apps", "Deployment", "", "my-dep"),
+				Error:      errors.New("example error"),
+			},
+			expected: []map[string]interface{}{
+				{
+					"eventType": "resourceFailed",
+					"group":     "apps",
+					"kind":      "Deployment",
+					"name":      "my-dep",
+					"namespace": "",
+					"timestamp": "",
+					"type":      "apply",
+					"error":     "example error",
 				},
 			},
 		},
@@ -200,6 +220,23 @@ func TestFormatter_FormatPruneEvent(t *testing.T) {
 				"type":      "prune",
 			},
 		},
+		"resource prune error": {
+			previewStrategy: common.DryRunNone,
+			event: event.PruneEvent{
+				Identifier: createIdentifier("apps", "Deployment", "", "my-dep"),
+				Error:      errors.New("example error"),
+			},
+			expected: map[string]interface{}{
+				"eventType": "resourceFailed",
+				"group":     "apps",
+				"kind":      "Deployment",
+				"name":      "my-dep",
+				"namespace": "",
+				"timestamp": "",
+				"type":      "prune",
+				"error":     "example error",
+			},
+		},
 	}
 
 	for tn, tc := range testCases {
@@ -256,6 +293,23 @@ func TestFormatter_FormatDeleteEvent(t *testing.T) {
 				"type":      "delete",
 			},
 		},
+		"resource delete error": {
+			previewStrategy: common.DryRunNone,
+			event: event.DeleteEvent{
+				Identifier: createIdentifier("apps", "Deployment", "default", "my-dep"),
+				Error:      errors.New("example error"),
+			},
+			expected: map[string]interface{}{
+				"eventType": "resourceFailed",
+				"group":     "apps",
+				"kind":      "Deployment",
+				"name":      "my-dep",
+				"namespace": "default",
+				"timestamp": "",
+				"type":      "delete",
+				"error":     "example error",
+			},
+		},
 	}
 
 	for tn, tc := range testCases {
@@ -263,6 +317,135 @@ func TestFormatter_FormatDeleteEvent(t *testing.T) {
 			ioStreams, _, out, _ := genericclioptions.NewTestIOStreams() //nolint:dogsled
 			formatter := NewFormatter(ioStreams, tc.previewStrategy)
 			err := formatter.FormatDeleteEvent(tc.event)
+			assert.NoError(t, err)
+
+			assertOutput(t, tc.expected, out.String())
+		})
+	}
+}
+
+func TestFormatter_FormatWaitEvent(t *testing.T) {
+	testCases := map[string]struct {
+		previewStrategy common.DryRunStrategy
+		event           event.WaitEvent
+		statusCollector list.Collector
+		expected        map[string]interface{}
+	}{
+		"resource reconciled": {
+			previewStrategy: common.DryRunNone,
+			event: event.WaitEvent{
+				GroupName:  "wait-1",
+				Operation:  event.Reconciled,
+				Identifier: createIdentifier("apps", "Deployment", "default", "my-dep"),
+			},
+			expected: map[string]interface{}{
+				"eventType": "resourceReconciled",
+				"group":     "apps",
+				"kind":      "Deployment",
+				"name":      "my-dep",
+				"namespace": "default",
+				"operation": "Reconciled",
+				"timestamp": "",
+				"type":      "wait",
+			},
+		},
+		"resource reconciled (client-side dry-run)": {
+			previewStrategy: common.DryRunClient,
+			event: event.WaitEvent{
+				GroupName:  "wait-1",
+				Operation:  event.Reconciled,
+				Identifier: createIdentifier("apps", "Deployment", "default", "my-dep"),
+			},
+			expected: map[string]interface{}{
+				"eventType": "resourceReconciled",
+				"group":     "apps",
+				"kind":      "Deployment",
+				"name":      "my-dep",
+				"namespace": "default",
+				"operation": "Reconciled",
+				"timestamp": "",
+				"type":      "wait",
+			},
+		},
+		"resource reconciled (server-side dry-run)": {
+			previewStrategy: common.DryRunServer,
+			event: event.WaitEvent{
+				GroupName:  "wait-1",
+				Operation:  event.Reconciled,
+				Identifier: createIdentifier("apps", "Deployment", "default", "my-dep"),
+			},
+			expected: map[string]interface{}{
+				"eventType": "resourceReconciled",
+				"group":     "apps",
+				"kind":      "Deployment",
+				"name":      "my-dep",
+				"namespace": "default",
+				"operation": "Reconciled",
+				"timestamp": "",
+				"type":      "wait",
+			},
+		},
+		"resource reconcile pending": {
+			previewStrategy: common.DryRunServer,
+			event: event.WaitEvent{
+				GroupName:  "wait-1",
+				Operation:  event.ReconcilePending,
+				Identifier: createIdentifier("apps", "Deployment", "default", "my-dep"),
+			},
+			expected: map[string]interface{}{
+				"eventType": "resourceReconciled",
+				"group":     "apps",
+				"kind":      "Deployment",
+				"name":      "my-dep",
+				"namespace": "default",
+				"operation": "Pending",
+				"timestamp": "",
+				"type":      "wait",
+			},
+		},
+		"resource reconcile skipped": {
+			previewStrategy: common.DryRunServer,
+			event: event.WaitEvent{
+				GroupName:  "wait-1",
+				Operation:  event.ReconcileSkipped,
+				Identifier: createIdentifier("apps", "Deployment", "default", "my-dep"),
+			},
+			expected: map[string]interface{}{
+				"eventType": "resourceReconciled",
+				"group":     "apps",
+				"kind":      "Deployment",
+				"name":      "my-dep",
+				"namespace": "default",
+				"operation": "Skipped",
+				"timestamp": "",
+				"type":      "wait",
+			},
+		},
+		"resource reconcile timeout": {
+			previewStrategy: common.DryRunServer,
+			event: event.WaitEvent{
+				GroupName:  "wait-1",
+				Operation:  event.ReconcileTimeout,
+				Identifier: createIdentifier("apps", "Deployment", "default", "my-dep"),
+			},
+			expected: map[string]interface{}{
+				"eventType": "resourceReconciled",
+				"group":     "apps",
+				"kind":      "Deployment",
+				"name":      "my-dep",
+				"namespace": "default",
+				"operation": "Timeout",
+				"timestamp": "",
+				"type":      "wait",
+			},
+		},
+	}
+
+	for tn, tc := range testCases {
+		t.Run(tn, func(t *testing.T) {
+			ioStreams, _, out, _ := genericclioptions.NewTestIOStreams() //nolint:dogsled
+			formatter := NewFormatter(ioStreams, tc.previewStrategy)
+			err := formatter.FormatWaitEvent(tc.event)
 			assert.NoError(t, err)
 
 			assertOutput(t, tc.expected, out.String())

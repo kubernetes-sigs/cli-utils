@@ -26,8 +26,9 @@ func inventoryPolicyMustMatchTest(c client.Client, invConfig InventoryConfig, na
 
 	firstInvName := randomString("first-inv-")
 	firstInv := invConfig.InvWrapperFunc(invConfig.InventoryFactoryFunc(firstInvName, namespaceName, firstInvName))
+	deployment1Obj := withNamespace(manifestToUnstructured(deployment1), namespaceName)
 	firstResources := []*unstructured.Unstructured{
-		withNamespace(manifestToUnstructured(deployment1), namespaceName),
+		deployment1Obj,
 	}
 
 	runWithNoErr(applier.Run(context.TODO(), firstInv, firstResources, apply.Options{
@@ -38,8 +39,9 @@ func inventoryPolicyMustMatchTest(c client.Client, invConfig InventoryConfig, na
 	By("Apply second set of resources")
 	secondInvName := randomString("second-inv-")
 	secondInv := invConfig.InvWrapperFunc(invConfig.InventoryFactoryFunc(secondInvName, namespaceName, secondInvName))
+	deployment1Obj = withNamespace(manifestToUnstructured(deployment1), namespaceName)
 	secondResources := []*unstructured.Unstructured{
-		withReplicas(withNamespace(manifestToUnstructured(deployment1), namespaceName), 6),
+		withReplicas(deployment1Obj, 6),
 	}
 
 	applierEvents := runCollect(applier.Run(context.TODO(), secondInv, secondResources, apply.Options{
@@ -87,7 +89,7 @@ func inventoryPolicyMustMatchTest(c client.Client, invConfig InventoryConfig, na
 			EventType: event.ApplyType,
 			ApplyEvent: &testutil.ExpApplyEvent{
 				GroupName:  "apply-0",
-				Identifier: object.UnstructuredToObjMetaOrDie(withNamespace(manifestToUnstructured(deployment1), namespaceName)),
+				Identifier: object.UnstructuredToObjMetaOrDie(deployment1Obj),
 				Error: testutil.EqualErrorType(
 					inventory.NewInventoryOverlapError(errors.New("test")),
 				),
@@ -109,6 +111,15 @@ func inventoryPolicyMustMatchTest(c client.Client, invConfig InventoryConfig, na
 				Action:    event.WaitAction,
 				GroupName: "wait-0",
 				Type:      event.Started,
+			},
+		},
+		{
+			// Wait skipped because apply failed
+			EventType: event.WaitType,
+			WaitEvent: &testutil.ExpWaitEvent{
+				GroupName:  "wait-0",
+				Operation:  event.ReconcileSkipped,
+				Identifier: object.UnstructuredToObjMetaOrDie(deployment1Obj),
 			},
 		},
 		{
@@ -145,7 +156,7 @@ func inventoryPolicyMustMatchTest(c client.Client, invConfig InventoryConfig, na
 	expected := testutil.ExpEvent{
 		EventType: event.StatusType,
 		StatusEvent: &testutil.ExpStatusEvent{
-			Identifier: object.UnstructuredToObjMetaOrDie(withNamespace(manifestToUnstructured(deployment1), namespaceName)),
+			Identifier: object.UnstructuredToObjMetaOrDie(deployment1Obj),
 			Status:     status.InProgressStatus,
 			Error:      nil,
 		},
@@ -156,7 +167,7 @@ func inventoryPolicyMustMatchTest(c client.Client, invConfig InventoryConfig, na
 	expected = testutil.ExpEvent{
 		EventType: event.StatusType,
 		StatusEvent: &testutil.ExpStatusEvent{
-			Identifier: object.UnstructuredToObjMetaOrDie(withNamespace(manifestToUnstructured(deployment1), namespaceName)),
+			Identifier: object.UnstructuredToObjMetaOrDie(deployment1Obj),
 			Status:     status.CurrentStatus,
 			Error:      nil,
 		},
@@ -167,7 +178,7 @@ func inventoryPolicyMustMatchTest(c client.Client, invConfig InventoryConfig, na
 	Expect(received).To(testutil.Equal(expEvents))
 
 	By("Verify resource wasn't updated")
-	result := assertUnstructuredExists(c, withNamespace(manifestToUnstructured(deployment1), namespaceName))
+	result := assertUnstructuredExists(c, deployment1Obj)
 	replicas, found, err := testutil.NestedField(result.Object, "spec", "replicas")
 	Expect(err).NotTo(HaveOccurred())
 	Expect(found).To(BeTrue())
@@ -178,7 +189,8 @@ func inventoryPolicyMustMatchTest(c client.Client, invConfig InventoryConfig, na
 
 func inventoryPolicyAdoptIfNoInventoryTest(c client.Client, invConfig InventoryConfig, namespaceName string) {
 	By("Create unmanaged resource")
-	err := c.Create(context.TODO(), withNamespace(manifestToUnstructured(deployment1), namespaceName))
+	deployment1Obj := withNamespace(manifestToUnstructured(deployment1), namespaceName)
+	err := c.Create(context.TODO(), deployment1Obj)
 	Expect(err).NotTo(HaveOccurred())
 
 	By("Apply resources")
@@ -186,8 +198,9 @@ func inventoryPolicyAdoptIfNoInventoryTest(c client.Client, invConfig InventoryC
 
 	invName := randomString("test-inv-")
 	inv := invConfig.InvWrapperFunc(invConfig.InventoryFactoryFunc(invName, namespaceName, invName))
+	deployment1Obj = withNamespace(manifestToUnstructured(deployment1), namespaceName)
 	resources := []*unstructured.Unstructured{
-		withReplicas(withNamespace(manifestToUnstructured(deployment1), namespaceName), 6),
+		withReplicas(deployment1Obj, 6),
 	}
 
 	applierEvents := runCollect(applier.Run(context.TODO(), inv, resources, apply.Options{
@@ -236,7 +249,7 @@ func inventoryPolicyAdoptIfNoInventoryTest(c client.Client, invConfig InventoryC
 			ApplyEvent: &testutil.ExpApplyEvent{
 				GroupName:  "apply-0",
 				Operation:  event.Configured,
-				Identifier: object.UnstructuredToObjMetaOrDie(withNamespace(manifestToUnstructured(deployment1), namespaceName)),
+				Identifier: object.UnstructuredToObjMetaOrDie(deployment1Obj),
 				Error:      nil,
 			},
 		},
@@ -256,6 +269,24 @@ func inventoryPolicyAdoptIfNoInventoryTest(c client.Client, invConfig InventoryC
 				Action:    event.WaitAction,
 				GroupName: "wait-0",
 				Type:      event.Started,
+			},
+		},
+		{
+			// Deployment reconcile Pending.
+			EventType: event.WaitType,
+			WaitEvent: &testutil.ExpWaitEvent{
+				GroupName:  "wait-0",
+				Operation:  event.ReconcilePending,
+				Identifier: object.UnstructuredToObjMetaOrDie(deployment1Obj),
+			},
+		},
+		{
+			// Deployment confirmed Current.
+			EventType: event.WaitType,
+			WaitEvent: &testutil.ExpWaitEvent{
+				GroupName:  "wait-0",
+				Operation:  event.Reconciled,
+				Identifier: object.UnstructuredToObjMetaOrDie(deployment1Obj),
 			},
 		},
 		{
@@ -292,7 +323,7 @@ func inventoryPolicyAdoptIfNoInventoryTest(c client.Client, invConfig InventoryC
 	expected := testutil.ExpEvent{
 		EventType: event.StatusType,
 		StatusEvent: &testutil.ExpStatusEvent{
-			Identifier: object.UnstructuredToObjMetaOrDie(withNamespace(manifestToUnstructured(deployment1), namespaceName)),
+			Identifier: object.UnstructuredToObjMetaOrDie(deployment1Obj),
 			Status:     status.InProgressStatus,
 			Error:      nil,
 		},
@@ -303,7 +334,7 @@ func inventoryPolicyAdoptIfNoInventoryTest(c client.Client, invConfig InventoryC
 	expected = testutil.ExpEvent{
 		EventType: event.StatusType,
 		StatusEvent: &testutil.ExpStatusEvent{
-			Identifier: object.UnstructuredToObjMetaOrDie(withNamespace(manifestToUnstructured(deployment1), namespaceName)),
+			Identifier: object.UnstructuredToObjMetaOrDie(deployment1Obj),
 			Status:     status.CurrentStatus,
 			Error:      nil,
 		},
@@ -314,7 +345,7 @@ func inventoryPolicyAdoptIfNoInventoryTest(c client.Client, invConfig InventoryC
 	Expect(received).To(testutil.Equal(expEvents))
 
 	By("Verify resource was updated and added to inventory")
-	result := assertUnstructuredExists(c, withNamespace(manifestToUnstructured(deployment1), namespaceName))
+	result := assertUnstructuredExists(c, deployment1Obj)
 
 	replicas, found, err := testutil.NestedField(result.Object, "spec", "replicas")
 	Expect(err).NotTo(HaveOccurred())
@@ -336,8 +367,9 @@ func inventoryPolicyAdoptAllTest(c client.Client, invConfig InventoryConfig, nam
 
 	firstInvName := randomString("first-inv-")
 	firstInv := invConfig.InvWrapperFunc(invConfig.InventoryFactoryFunc(firstInvName, namespaceName, firstInvName))
+	deployment1Obj := withNamespace(manifestToUnstructured(deployment1), namespaceName)
 	firstResources := []*unstructured.Unstructured{
-		withNamespace(manifestToUnstructured(deployment1), namespaceName),
+		deployment1Obj,
 	}
 
 	runWithNoErr(applier.Run(context.TODO(), firstInv, firstResources, apply.Options{
@@ -348,8 +380,9 @@ func inventoryPolicyAdoptAllTest(c client.Client, invConfig InventoryConfig, nam
 	By("Apply resources")
 	secondInvName := randomString("test-inv-")
 	secondInv := invConfig.InvWrapperFunc(invConfig.InventoryFactoryFunc(secondInvName, namespaceName, secondInvName))
+	deployment1Obj = withNamespace(manifestToUnstructured(deployment1), namespaceName)
 	secondResources := []*unstructured.Unstructured{
-		withReplicas(withNamespace(manifestToUnstructured(deployment1), namespaceName), 6),
+		withReplicas(deployment1Obj, 6),
 	}
 
 	applierEvents := runCollect(applier.Run(context.TODO(), secondInv, secondResources, apply.Options{
@@ -398,7 +431,7 @@ func inventoryPolicyAdoptAllTest(c client.Client, invConfig InventoryConfig, nam
 			ApplyEvent: &testutil.ExpApplyEvent{
 				GroupName:  "apply-0",
 				Operation:  event.Configured,
-				Identifier: object.UnstructuredToObjMetaOrDie(withNamespace(manifestToUnstructured(deployment1), namespaceName)),
+				Identifier: object.UnstructuredToObjMetaOrDie(deployment1Obj),
 				Error:      nil,
 			},
 		},
@@ -418,6 +451,24 @@ func inventoryPolicyAdoptAllTest(c client.Client, invConfig InventoryConfig, nam
 				Action:    event.WaitAction,
 				GroupName: "wait-0",
 				Type:      event.Started,
+			},
+		},
+		{
+			// Deployment reconcile Pending.
+			EventType: event.WaitType,
+			WaitEvent: &testutil.ExpWaitEvent{
+				GroupName:  "wait-0",
+				Operation:  event.ReconcilePending,
+				Identifier: object.UnstructuredToObjMetaOrDie(deployment1Obj),
+			},
+		},
+		{
+			// Deployment confirmed Current.
+			EventType: event.WaitType,
+			WaitEvent: &testutil.ExpWaitEvent{
+				GroupName:  "wait-0",
+				Operation:  event.Reconciled,
+				Identifier: object.UnstructuredToObjMetaOrDie(deployment1Obj),
 			},
 		},
 		{
@@ -454,7 +505,7 @@ func inventoryPolicyAdoptAllTest(c client.Client, invConfig InventoryConfig, nam
 	expected := testutil.ExpEvent{
 		EventType: event.StatusType,
 		StatusEvent: &testutil.ExpStatusEvent{
-			Identifier: object.UnstructuredToObjMetaOrDie(withNamespace(manifestToUnstructured(deployment1), namespaceName)),
+			Identifier: object.UnstructuredToObjMetaOrDie(deployment1Obj),
 			Status:     status.InProgressStatus,
 			Error:      nil,
 		},
@@ -465,7 +516,7 @@ func inventoryPolicyAdoptAllTest(c client.Client, invConfig InventoryConfig, nam
 	expected = testutil.ExpEvent{
 		EventType: event.StatusType,
 		StatusEvent: &testutil.ExpStatusEvent{
-			Identifier: object.UnstructuredToObjMetaOrDie(withNamespace(manifestToUnstructured(deployment1), namespaceName)),
+			Identifier: object.UnstructuredToObjMetaOrDie(deployment1Obj),
 			Status:     status.CurrentStatus,
 			Error:      nil,
 		},
@@ -476,7 +527,7 @@ func inventoryPolicyAdoptAllTest(c client.Client, invConfig InventoryConfig, nam
 	Expect(received).To(testutil.Equal(expEvents))
 
 	By("Verify resource was updated and added to inventory")
-	result := assertUnstructuredExists(c, withNamespace(manifestToUnstructured(deployment1), namespaceName))
+	result := assertUnstructuredExists(c, deployment1Obj)
 
 	replicas, found, err := testutil.NestedField(result.Object, "spec", "replicas")
 	Expect(err).NotTo(HaveOccurred())

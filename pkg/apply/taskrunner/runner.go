@@ -183,9 +183,7 @@ func (b *baseRunner) run(ctx context.Context, taskQueue chan Task,
 				abort = true
 				abortReason = fmt.Errorf("polling for status failed: %v",
 					statusEvent.Error)
-				// If the current task is a wait task, we just set it
-				// to complete so we can exit the loop as soon as possible.
-				completeIfWaitTask(currentTask, taskContext)
+				currentTask.Cancel(taskContext)
 				continue
 			}
 
@@ -202,24 +200,23 @@ func (b *baseRunner) run(ctx context.Context, taskQueue chan Task,
 				}
 			}
 
+			id := statusEvent.Resource.Identifier
+			oldStatus := taskContext.ResourceCache().Get(id).Status
+			newStatus := statusEvent.Resource.Status
+
 			// Update the cache to track the latest resource spec & status.
 			// Status is computed from the resource on-demand.
 			// Warning: Resource may be nil!
-			taskContext.ResourceCache().Put(
-				statusEvent.Resource.Identifier,
-				cache.ResourceStatus{
-					Resource:      statusEvent.Resource.Resource,
-					Status:        statusEvent.Resource.Status,
-					StatusMessage: statusEvent.Resource.Message,
-				},
-			)
+			taskContext.ResourceCache().Put(id, cache.ResourceStatus{
+				Resource:      statusEvent.Resource.Resource,
+				Status:        statusEvent.Resource.Status,
+				StatusMessage: statusEvent.Resource.Message,
+			})
 
-			// If the current task is a wait task, we check whether
-			// the condition has been met. If so, we complete the task.
-			if wt, ok := currentTask.(*WaitTask); ok {
-				if wt.checkCondition(taskContext) {
-					completeIfWaitTask(currentTask, taskContext)
-				}
+			// send a status update to the running task, but only if the status
+			// has changed and the task is tracking the object.
+			if oldStatus != newStatus && currentTask.Identifiers().Contains(id) {
+				currentTask.StatusUpdate(taskContext, id)
 			}
 		// A message on the taskChannel means that the current task
 		// has either completed or failed.
@@ -229,7 +226,6 @@ func (b *baseRunner) run(ctx context.Context, taskQueue chan Task,
 		// finish, we exit.
 		// If everything is ok, we fetch and start the next task.
 		case msg := <-taskContext.TaskChannel():
-			currentTask.ClearTimeout()
 			taskContext.EventChannel() <- event.Event{
 				Type: event.ActionGroupType,
 				ActionGroupEvent: event.ActionGroupEvent{
@@ -257,16 +253,8 @@ func (b *baseRunner) run(ctx context.Context, taskQueue chan Task,
 			doneCh = nil // Set doneCh to nil so we don't enter a busy loop.
 			abort = true
 			abortReason = ctx.Err() // always non-nil when doneCh is closed
-			completeIfWaitTask(currentTask, taskContext)
+			currentTask.Cancel(taskContext)
 		}
-	}
-}
-
-// completeIfWaitTask checks if the current task is a wait task. If so,
-// we invoke the complete function to complete it.
-func completeIfWaitTask(currentTask Task, taskContext *TaskContext) {
-	if wt, ok := currentTask.(*WaitTask); ok {
-		wt.complete(taskContext)
 	}
 }
 
@@ -295,20 +283,8 @@ func (b *baseRunner) nextTask(taskQueue chan Task,
 		},
 	}
 
-	switch st := tsk.(type) {
-	case *WaitTask:
-		// The wait tasks need to be handled specifically here. Before
-		// starting a new wait task, we check if the condition is already
-		// met. Without this check, a task might end up waiting for
-		// status events when the condition is in fact already met.
-		if st.checkCondition(taskContext) {
-			st.startAndComplete(taskContext)
-		} else {
-			st.Start(taskContext)
-		}
-	default:
-		tsk.Start(taskContext)
-	}
+	tsk.Start(taskContext)
+
 	return tsk, false
 }
 

@@ -79,6 +79,10 @@ type ResourceInfo struct {
 	// DeleteOpResult contains the result after
 	// a delete operation on a resource
 	DeleteOpResult event.DeleteEventOperation
+
+	// WaitOpResult contains the result after
+	// a wait operation on a resource
+	WaitOpResult event.WaitEventOperation
 }
 
 // Identifier returns the identifier for the given resource.
@@ -173,6 +177,8 @@ func (r *ResourceStateCollector) processEvent(ev event.Event) error {
 		r.processApplyEvent(ev.ApplyEvent)
 	case event.PruneType:
 		r.processPruneEvent(ev.PruneEvent)
+	case event.WaitType:
+		r.processWaitEvent(ev.WaitEvent)
 	case event.ErrorType:
 		return ev.ErrorEvent.Err
 	}
@@ -215,6 +221,18 @@ func (r *ResourceStateCollector) processPruneEvent(e event.PruneEvent) {
 	previous.PruneOpResult = e.Operation
 }
 
+// processPruneEvent handles event related to prune operations.
+func (r *ResourceStateCollector) processWaitEvent(e event.WaitEvent) {
+	identifier := e.Identifier
+	klog.V(7).Infof("processing wait event for %s", identifier)
+	previous, found := r.resourceInfos[identifier]
+	if !found {
+		klog.V(4).Infof("%s wait event not found in ResourceInfos; no processing", identifier)
+		return
+	}
+	previous.WaitOpResult = e.Operation
+}
+
 // ResourceState contains the latest state for all the resources.
 type ResourceState struct {
 	resourceInfos ResourceInfos
@@ -251,6 +269,7 @@ func (r *ResourceStateCollector) LatestState() *ResourceState {
 			ApplyOpResult:  ri.ApplyOpResult,
 			PruneOpResult:  ri.PruneOpResult,
 			DeleteOpResult: ri.DeleteOpResult,
+			WaitOpResult:   ri.WaitOpResult,
 		})
 	}
 	sort.Sort(resourceInfos)
