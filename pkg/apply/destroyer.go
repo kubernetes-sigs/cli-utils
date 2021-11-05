@@ -142,6 +142,7 @@ func (d *Destroyer) Run(ctx context.Context, inv inventory.InventoryInfo, option
 			Build()
 		if err != nil {
 			handleError(eventChannel, err)
+			return
 		}
 		// Send event to inform the caller about the resources that
 		// will be pruned.
@@ -165,6 +166,7 @@ func (d *Destroyer) Run(ctx context.Context, inv inventory.InventoryInfo, option
 		})
 		if err != nil {
 			handleError(eventChannel, err)
+			return
 		}
 	}()
 	return eventChannel

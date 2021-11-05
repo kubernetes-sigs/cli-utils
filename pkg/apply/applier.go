@@ -216,6 +216,7 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.InventoryInfo, obje
 			Build()
 		if err != nil {
 			handleError(eventChannel, err)
+			return
 		}
 		// Send event to inform the caller about the resources that
 		// will be applied/pruned.
@@ -237,6 +238,7 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.InventoryInfo, obje
 		})
 		if err != nil {
 			handleError(eventChannel, err)
+			return
 		}
 	}()
 	return eventChannel
