@@ -6,9 +6,7 @@ package info
 import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/resource"
-	"k8s.io/client-go/rest"
 	"k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
@@ -43,7 +41,7 @@ func (ih *infoHelper) UpdateInfo(info *resource.Info) error {
 	}
 	info.Mapping = mapping
 
-	c, err := ih.getClient(gvk.GroupVersion())
+	c, err := ih.factory.UnstructuredClientForMapping(mapping)
 	if err != nil {
 		return err
 	}
@@ -58,20 +56,4 @@ func (ih *infoHelper) BuildInfo(obj *unstructured.Unstructured) (*resource.Info,
 	}
 	err = ih.UpdateInfo(info)
 	return info, err
-}
-
-func (ih *infoHelper) getClient(gv schema.GroupVersion) (*rest.RESTClient, error) {
-	cfg, err := ih.factory.ToRESTConfig()
-	if err != nil {
-		return nil, err
-	}
-	cfg.ContentConfig = resource.UnstructuredPlusDefaultContentConfig()
-	cfg.GroupVersion = &gv
-	if len(gv.Group) == 0 {
-		cfg.APIPath = "/api"
-	} else {
-		cfg.APIPath = "/apis"
-	}
-
-	return rest.RESTClientFor(cfg)
 }
