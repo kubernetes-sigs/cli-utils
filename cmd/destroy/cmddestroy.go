@@ -48,6 +48,8 @@ func GetDestroyRunner(factory cmdutil.Factory, invFactory inventory.InventoryCli
 		"Background", "Propagation policy for deletion")
 	cmd.Flags().DurationVar(&r.timeout, "timeout", 0,
 		"How long to wait before exiting")
+	cmd.Flags().BoolVar(&r.printStatusEvents, "status-events", false,
+		"Print status events (always enabled for table output)")
 
 	r.Command = cmd
 	return r
@@ -72,6 +74,7 @@ type DestroyRunner struct {
 	deletePropagationPolicy string
 	inventoryPolicy         string
 	timeout                 time.Duration
+	printStatusEvents       bool
 }
 
 func (r *DestroyRunner) RunE(cmd *cobra.Command, args []string) error {
@@ -115,14 +118,9 @@ func (r *DestroyRunner) RunE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	var printStatusEvents bool
-	// Print status events if a wait timeout is specified
-	if r.deleteTimeout != time.Duration(0) {
-		printStatusEvents = true
-	}
 	// Always enable status events for the table printer
 	if r.output == printers.TablePrinter {
-		printStatusEvents = true
+		r.printStatusEvents = true
 	}
 
 	// Run the destroyer. It will return a channel where we can receive updates
@@ -131,11 +129,11 @@ func (r *DestroyRunner) RunE(cmd *cobra.Command, args []string) error {
 		DeleteTimeout:           r.deleteTimeout,
 		DeletePropagationPolicy: deletePropPolicy,
 		InventoryPolicy:         inventoryPolicy,
-		EmitStatusEvents:        printStatusEvents,
+		EmitStatusEvents:        r.printStatusEvents,
 	})
 
 	// The printer will print updates from the channel. It will block
 	// until the channel is closed.
 	printer := printers.GetPrinter(r.output, r.ioStreams)
-	return printer.Print(ch, common.DryRunNone, printStatusEvents)
+	return printer.Print(ch, common.DryRunNone, r.printStatusEvents)
 }

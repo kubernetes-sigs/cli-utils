@@ -177,7 +177,7 @@ expectedOutputLine "No resources found in hellospace namespace."
 Use the `kapply` binary in `MYGOBIN` to apply a deployment and verify it is successful.
 <!-- @runHelloApp @testE2EAgainstLatestRelease -->
 ```
-kapply apply $BASE --reconcile-timeout=1m > $OUTPUT/status
+kapply apply $BASE --reconcile-timeout=1m --status-events > $OUTPUT/status
 
 expectedOutputLine "deployment.apps/the-deployment is Current: Deployment is available. Replicas: 3"
 
@@ -207,7 +207,7 @@ EOF
 
 rm $BASE/configMap.yaml
 
-kapply apply $BASE --reconcile-timeout=120s > $OUTPUT/status;
+kapply apply $BASE --reconcile-timeout=120s --status-events > $OUTPUT/status;
 
 expectedOutputLine "configmap/the-map2 is Current: Resource is always ready"
 
