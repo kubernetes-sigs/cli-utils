@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -57,8 +59,9 @@ func TestGetClusterInventoryInfo(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			invClient, _ := NewInventoryClient(tf,
+			invClient, err := NewInventoryClient(tf,
 				WrapInventoryObj, InvInfoToConfigMap)
+			require.NoError(t, err)
 			fakeBuilder := FakeBuilder{}
 			fakeBuilder.SetInventoryObjs(tc.localObjs)
 			invClient.builderFunc = fakeBuilder.GetBuilder()
@@ -162,8 +165,9 @@ func TestMerge(t *testing.T) {
 			drs := common.Strategies[i]
 			t.Run(name, func(t *testing.T) {
 				// Create the local inventory object storing "tc.localObjs"
-				invClient, _ := NewInventoryClient(tf,
+				invClient, err := NewInventoryClient(tf,
 					WrapInventoryObj, InvInfoToConfigMap)
+				require.NoError(t, err)
 				// Create a fake builder to return "tc.clusterObjs" from
 				// the cluster inventory object.
 				fakeBuilder := FakeBuilder{}
@@ -192,24 +196,22 @@ func TestCreateInventory(t *testing.T) {
 	tests := map[string]struct {
 		inv       InventoryInfo
 		localObjs object.ObjMetadataSet
-		isError   bool
+		error     string
 	}{
 		"Nil local inventory object is an error": {
 			inv:       nil,
 			localObjs: object.ObjMetadataSet{},
-			isError:   true,
+			error:     "attempting create a nil inventory object",
 		},
 		"Empty local inventory object": {
 			inv:       localInv,
 			localObjs: object.ObjMetadataSet{},
-			isError:   false,
 		},
 		"Local inventory with a single object": {
 			inv: localInv,
 			localObjs: object.ObjMetadataSet{
 				ignoreErrInfoToObjMeta(pod2Info),
 			},
-			isError: false,
 		},
 		"Local inventory with multiple objects": {
 			inv: localInv,
@@ -217,7 +219,6 @@ func TestCreateInventory(t *testing.T) {
 				ignoreErrInfoToObjMeta(pod1Info),
 				ignoreErrInfoToObjMeta(pod2Info),
 				ignoreErrInfoToObjMeta(pod3Info)},
-			isError: false,
 		},
 	}
 
@@ -248,18 +249,18 @@ func TestCreateInventory(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			invClient, _ := NewInventoryClient(tf,
+			invClient, err := NewInventoryClient(tf,
 				WrapInventoryObj, InvInfoToConfigMap)
+			require.NoError(t, err)
 			inv := invClient.invToUnstructuredFunc(tc.inv)
 			if inv != nil {
 				inv = storeObjsInInventory(tc.inv, tc.localObjs)
 			}
-			err := invClient.createInventoryObj(inv, common.DryRunNone)
-			if !tc.isError && err != nil {
-				t.Fatalf("unexpected error received: %s", err)
-			}
-			if tc.isError && err == nil {
-				t.Fatalf("expected error but received none")
+			err = invClient.createInventoryObj(inv, common.DryRunNone)
+			if tc.error != "" {
+				assert.EqualError(t, err, tc.error)
+			} else {
+				assert.NoError(t, err)
 			}
 		})
 	}
@@ -306,8 +307,9 @@ func TestReplace(t *testing.T) {
 	defer tf.Cleanup()
 
 	// Client and server dry-run do not throw errors.
-	invClient, _ := NewInventoryClient(tf, WrapInventoryObj, InvInfoToConfigMap)
-	err := invClient.Replace(copyInventory(), object.ObjMetadataSet{}, common.DryRunClient)
+	invClient, err := NewInventoryClient(tf, WrapInventoryObj, InvInfoToConfigMap)
+	require.NoError(t, err)
+	err = invClient.Replace(copyInventory(), object.ObjMetadataSet{}, common.DryRunClient)
 	if err != nil {
 		t.Fatalf("unexpected error received: %s", err)
 	}
@@ -319,8 +321,9 @@ func TestReplace(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			// Create inventory client, and store the cluster objs in the inventory object.
-			invClient, _ := NewInventoryClient(tf,
+			invClient, err := NewInventoryClient(tf,
 				WrapInventoryObj, InvInfoToConfigMap)
+			require.NoError(t, err)
 			wrappedInv := invClient.InventoryFactoryFunc(inventoryObj)
 			if err := wrappedInv.Store(tc.clusterObjs); err != nil {
 				t.Fatalf("unexpected error storing inventory objects: %s", err)
@@ -380,8 +383,9 @@ func TestGetClusterObjs(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			invClient, _ := NewInventoryClient(tf,
+			invClient, err := NewInventoryClient(tf,
 				WrapInventoryObj, InvInfoToConfigMap)
+			require.NoError(t, err)
 			// Create fake builder returning "tc.clusterObjs" from cluster inventory.
 			fakeBuilder := FakeBuilder{}
 			fakeBuilder.SetInventoryObjs(tc.clusterObjs)
@@ -460,13 +464,14 @@ func TestDeleteInventoryObj(t *testing.T) {
 		for i := range common.Strategies {
 			drs := common.Strategies[i]
 			t.Run(name, func(t *testing.T) {
-				invClient, _ := NewInventoryClient(tf,
+				invClient, err := NewInventoryClient(tf,
 					WrapInventoryObj, InvInfoToConfigMap)
+				require.NoError(t, err)
 				inv := invClient.invToUnstructuredFunc(tc.inv)
 				if inv != nil {
 					inv = storeObjsInInventory(tc.inv, tc.localObjs)
 				}
-				err := invClient.deleteInventoryObjByName(inv, drs)
+				err = invClient.deleteInventoryObjByName(inv, drs)
 				if err != nil {
 					t.Fatalf("unexpected error received: %s", err)
 				}
@@ -558,8 +563,9 @@ func TestMergeInventoryObjs(t *testing.T) {
 		for i := range common.Strategies {
 			drs := common.Strategies[i]
 			t.Run(name, func(t *testing.T) {
-				invClient, _ := NewInventoryClient(tf,
+				invClient, err := NewInventoryClient(tf,
 					WrapInventoryObj, InvInfoToConfigMap)
+				require.NoError(t, err)
 				inventories := []*unstructured.Unstructured{}
 				for _, i := range tc.invs {
 					inv := storeObjsInInventory(i.inv, i.invObjs)

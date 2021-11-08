@@ -52,7 +52,6 @@ type ClusterInventoryClient struct {
 	builderFunc           func() *resource.Builder
 	mapper                meta.RESTMapper
 	validator             validation.Schema
-	clientFunc            func(*meta.RESTMapping) (resource.RESTClient, error)
 	InventoryFactoryFunc  InventoryFactoryFunc
 	invToUnstructuredFunc InventoryToUnstructuredFunc
 	InfoHelper            info.InfoHelper
@@ -79,7 +78,6 @@ func NewInventoryClient(factory cmdutil.Factory,
 		builderFunc:           builderFunc,
 		mapper:                mapper,
 		validator:             validator,
-		clientFunc:            factory.UnstructuredClientForMapping,
 		InventoryFactoryFunc:  invFunc,
 		invToUnstructuredFunc: invToUnstructuredFunc,
 		InfoHelper:            info.NewInfoHelper(mapper, factory),
@@ -311,10 +309,7 @@ func (cic *ClusterInventoryClient) getClusterInventoryObjsByName(inv InventoryIn
 		return nil, err
 	}
 
-	helper, err := cic.helperFromInfo(invInfo)
-	if err != nil {
-		return nil, err
-	}
+	helper := cic.helperFromInfo(invInfo)
 
 	klog.V(4).Infof("inventory object fetch by name (namespace: %q, name: %q)", inv.Namespace(), inv.Name())
 	res, err := helper.Get(inv.Namespace(), inv.Name())
@@ -420,7 +415,7 @@ func (cic *ClusterInventoryClient) applyInventoryObj(obj *unstructured.Unstructu
 	if err != nil {
 		return err
 	}
-	helper := resource.NewHelper(invInfo.Client, invInfo.Mapping)
+	helper := cic.helperFromInfo(invInfo)
 	klog.V(4).Infof("replacing inventory object: %s/%s", invInfo.Namespace, invInfo.Name)
 	var overwrite = true
 	replacedObj, err := helper.Replace(invInfo.Namespace, invInfo.Name, overwrite, invInfo.Object)
@@ -450,10 +445,7 @@ func (cic *ClusterInventoryClient) createInventoryObj(obj *unstructured.Unstruct
 	if err != nil {
 		return err
 	}
-	helper, err := cic.helperFromInfo(invInfo)
-	if err != nil {
-		return err
-	}
+	helper := cic.helperFromInfo(invInfo)
 	klog.V(4).Infof("creating inventory object: %s/%s", invInfo.Namespace, invInfo.Name)
 	var clearResourceVersion = false
 	createdObj, err := helper.Create(invInfo.Namespace, clearResourceVersion, invInfo.Object)
@@ -478,10 +470,7 @@ func (cic *ClusterInventoryClient) deleteInventoryObjByName(obj *unstructured.Un
 	if err != nil {
 		return err
 	}
-	helper, err := cic.helperFromInfo(invInfo)
-	if err != nil {
-		return err
-	}
+	helper := cic.helperFromInfo(invInfo)
 	klog.V(4).Infof("deleting inventory object: %s/%s", invInfo.Namespace, invInfo.Name)
 	_, err = helper.Delete(invInfo.Namespace, invInfo.Name)
 	return err
@@ -498,10 +487,7 @@ func (cic *ClusterInventoryClient) ApplyInventoryNamespace(obj *unstructured.Uns
 	if err != nil {
 		return err
 	}
-	helper, err := cic.helperFromInfo(invInfo)
-	if err != nil {
-		return err
-	}
+	helper := cic.helperFromInfo(invInfo)
 	klog.V(4).Infof("applying inventory namespace: %s", invInfo.Name)
 	if err := util.CreateApplyAnnotation(invInfo.Object, unstructured.UnstructuredJSONScheme); err != nil {
 		return err
@@ -524,18 +510,6 @@ func (cic *ClusterInventoryClient) toInfo(obj *unstructured.Unstructured) (*reso
 
 // helperFromInfo returns the resource.Helper to talk to the APIServer based
 // on the information from the passed "info", or an error if one occurred.
-func (cic *ClusterInventoryClient) helperFromInfo(info *resource.Info) (*resource.Helper, error) {
-	obj, err := object.InfoToObjMeta(info)
-	if err != nil {
-		return nil, err
-	}
-	mapping, err := cic.mapper.RESTMapping(obj.GroupKind)
-	if err != nil {
-		return nil, err
-	}
-	client, err := cic.clientFunc(mapping)
-	if err != nil {
-		return nil, err
-	}
-	return resource.NewHelper(client, mapping), nil
+func (cic *ClusterInventoryClient) helperFromInfo(info *resource.Info) *resource.Helper {
+	return resource.NewHelper(info.Client, info.Mapping)
 }
