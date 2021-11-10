@@ -25,9 +25,11 @@ func continueOnErrorTest(ctx context.Context, c client.Client, invConfig Invento
 
 	inv := invConfig.InvWrapperFunc(invConfig.InventoryFactoryFunc(inventoryName, namespaceName, "test"))
 
+	invalidCrdObj := manifestToUnstructured(invalidCrd)
+	pod1Obj := withNamespace(manifestToUnstructured(pod1), namespaceName)
 	resources := []*unstructured.Unstructured{
-		manifestToUnstructured(invalidCrd),
-		withNamespace(manifestToUnstructured(pod1), namespaceName),
+		invalidCrdObj,
+		pod1Obj,
 	}
 
 	applierEvents := runCollect(applier.Run(ctx, inv, resources, apply.Options{}))
@@ -70,7 +72,7 @@ func continueOnErrorTest(ctx context.Context, c client.Client, invConfig Invento
 			EventType: event.ApplyType,
 			ApplyEvent: &testutil.ExpApplyEvent{
 				GroupName:  "apply-0",
-				Identifier: object.UnstructuredToObjMetaOrDie(manifestToUnstructured(invalidCrd)),
+				Identifier: object.UnstructuredToObjMetaOrDie(invalidCrdObj),
 				Error: testutil.EqualErrorType(
 					applyerror.NewApplyRunError(errors.New("failed to apply")),
 				),
@@ -82,7 +84,7 @@ func continueOnErrorTest(ctx context.Context, c client.Client, invConfig Invento
 			ApplyEvent: &testutil.ExpApplyEvent{
 				GroupName:  "apply-0",
 				Operation:  event.Created,
-				Identifier: object.UnstructuredToObjMetaOrDie(withNamespace(manifestToUnstructured(pod1), namespaceName)),
+				Identifier: object.UnstructuredToObjMetaOrDie(pod1Obj),
 				Error:      nil,
 			},
 		},
@@ -95,26 +97,51 @@ func continueOnErrorTest(ctx context.Context, c client.Client, invConfig Invento
 				Type:      event.Finished,
 			},
 		},
-		// Note: No WaitTask when apply fails
-		// TODO: why no wait after create tho?
-		// {
-		// 	// WaitTask start
-		// 	EventType: event.ActionGroupType,
-		// 	ActionGroupEvent: &testutil.ExpActionGroupEvent{
-		// 		Action: event.WaitAction,
-		// 		Name:   "wait-0",
-		// 		Type:   event.Started,
-		// 	},
-		// },
-		// {
-		// 	// WaitTask finished
-		// 	EventType: event.ActionGroupType,
-		// 	ActionGroupEvent: &testutil.ExpActionGroupEvent{
-		// 		Action: event.WaitAction,
-		// 		Name:   "wait-0",
-		// 		Type:   event.Finished,
-		// 	},
-		// },
+		{
+			// WaitTask start
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action:    event.WaitAction,
+				GroupName: "wait-0",
+				Type:      event.Started,
+			},
+		},
+		{
+			// CRD reconcile Skipped.
+			EventType: event.WaitType,
+			WaitEvent: &testutil.ExpWaitEvent{
+				GroupName:  "wait-0",
+				Operation:  event.ReconcileSkipped,
+				Identifier: object.UnstructuredToObjMetaOrDie(invalidCrdObj),
+			},
+		},
+		{
+			// Pod1 reconcile Pending.
+			EventType: event.WaitType,
+			WaitEvent: &testutil.ExpWaitEvent{
+				GroupName:  "wait-0",
+				Operation:  event.ReconcilePending,
+				Identifier: object.UnstructuredToObjMetaOrDie(pod1Obj),
+			},
+		},
+		{
+			// Pod1 confirmed Current.
+			EventType: event.WaitType,
+			WaitEvent: &testutil.ExpWaitEvent{
+				GroupName:  "wait-0",
+				Operation:  event.Reconciled,
+				Identifier: object.UnstructuredToObjMetaOrDie(pod1Obj),
+			},
+		},
+		{
+			// WaitTask finished
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action:    event.WaitAction,
+				GroupName: "wait-0",
+				Type:      event.Finished,
+			},
+		},
 		{
 			// InvSetTask start
 			EventType: event.ActionGroupType,
@@ -140,8 +167,8 @@ func continueOnErrorTest(ctx context.Context, c client.Client, invConfig Invento
 	Expect(receivedEvents).To(testutil.Equal(expEvents))
 
 	By("Verify pod1 created")
-	assertUnstructuredExists(ctx, c, withNamespace(manifestToUnstructured(pod1), namespaceName))
+	assertUnstructuredExists(ctx, c, pod1Obj)
 
 	By("Verify CRD not created")
-	assertUnstructuredDoesNotExist(ctx, c, manifestToUnstructured(invalidCrd))
+	assertUnstructuredDoesNotExist(ctx, c, invalidCrdObj)
 }

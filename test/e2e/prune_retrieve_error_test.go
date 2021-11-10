@@ -26,8 +26,9 @@ func pruneRetrieveErrorTest(ctx context.Context, c client.Client, invConfig Inve
 
 	inv := createInventoryInfo(invConfig, inventoryName, namespaceName, inventoryID)
 
+	pod1Obj := withNamespace(manifestToUnstructured(pod1), namespaceName)
 	resource1 := []*unstructured.Unstructured{
-		withNamespace(manifestToUnstructured(pod1), namespaceName),
+		pod1Obj,
 	}
 
 	applierEvents := runCollect(applier.Run(ctx, inv, resource1, apply.Options{
@@ -68,12 +69,12 @@ func pruneRetrieveErrorTest(ctx context.Context, c client.Client, invConfig Inve
 			},
 		},
 		{
-			// Create deployment
+			// Create Pod1
 			EventType: event.ApplyType,
 			ApplyEvent: &testutil.ExpApplyEvent{
 				GroupName:  "apply-0",
 				Operation:  event.Created,
-				Identifier: object.UnstructuredToObjMetaOrDie(withNamespace(manifestToUnstructured(pod1), namespaceName)),
+				Identifier: object.UnstructuredToObjMetaOrDie(pod1Obj),
 				Error:      nil,
 			},
 		},
@@ -86,25 +87,42 @@ func pruneRetrieveErrorTest(ctx context.Context, c client.Client, invConfig Inve
 				Type:      event.Finished,
 			},
 		},
-		// TODO: Why no waiting???
-		// {
-		// 	// WaitTask start
-		// 	EventType: event.ActionGroupType,
-		// 	ActionGroupEvent: &testutil.ExpActionGroupEvent{
-		// 		Action: event.WaitAction,
-		// 		Name:   "wait-0",
-		// 		Type:   event.Started,
-		// 	},
-		// },
-		// {
-		// 	// WaitTask finished
-		// 	EventType: event.ActionGroupType,
-		// 	ActionGroupEvent: &testutil.ExpActionGroupEvent{
-		// 		Action: event.WaitAction,
-		// 		Name:   "wait-0",
-		// 		Type:   event.Finished,
-		// 	},
-		// },
+		{
+			// WaitTask start
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action:    event.WaitAction,
+				GroupName: "wait-0",
+				Type:      event.Started,
+			},
+		},
+		{
+			// Pod1 reconcile Pending.
+			EventType: event.WaitType,
+			WaitEvent: &testutil.ExpWaitEvent{
+				GroupName:  "wait-0",
+				Operation:  event.ReconcilePending,
+				Identifier: object.UnstructuredToObjMetaOrDie(pod1Obj),
+			},
+		},
+		{
+			// Pod1 confirmed Current.
+			EventType: event.WaitType,
+			WaitEvent: &testutil.ExpWaitEvent{
+				GroupName:  "wait-0",
+				Operation:  event.Reconciled,
+				Identifier: object.UnstructuredToObjMetaOrDie(pod1Obj),
+			},
+		},
+		{
+			// WaitTask finished
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action:    event.WaitAction,
+				GroupName: "wait-0",
+				Type:      event.Finished,
+			},
+		},
 		{
 			// InvSetTask start
 			EventType: event.ActionGroupType,
@@ -126,20 +144,25 @@ func pruneRetrieveErrorTest(ctx context.Context, c client.Client, invConfig Inve
 	}
 	Expect(testutil.EventsToExpEvents(applierEvents)).To(testutil.Equal(expEvents))
 
-	By("Verify pod1 created")
-	assertUnstructuredExists(ctx, c, withNamespace(manifestToUnstructured(pod1), namespaceName))
+	By("Verify pod1 created and ready")
+	result := assertUnstructuredExists(ctx, c, pod1Obj)
+	podIP, found, err := testutil.NestedField(result.Object, "status", "podIP")
+	Expect(err).NotTo(HaveOccurred())
+	Expect(found).To(BeTrue())
+	Expect(podIP).NotTo(BeEmpty()) // use podIP as proxy for readiness
 
 	// Delete the previously applied resource, which is referenced in the inventory.
 	By("delete resource, which is referenced in the inventory")
-	deleteUnstructuredAndWait(ctx, c, withNamespace(manifestToUnstructured(pod1), namespaceName))
+	deleteUnstructuredAndWait(ctx, c, pod1Obj)
 
 	By("Verify inventory")
 	// The inventory should still have the previously deleted item.
 	invConfig.InvSizeVerifyFunc(ctx, c, inventoryName, namespaceName, inventoryID, 1)
 
 	By("apply a different resource, and validate the inventory accurately reflects only this object")
+	pod2Obj := withNamespace(manifestToUnstructured(pod2), namespaceName)
 	resource2 := []*unstructured.Unstructured{
-		withNamespace(manifestToUnstructured(pod2), namespaceName),
+		pod2Obj,
 	}
 
 	applierEvents2 := runCollect(applier.Run(ctx, inv, resource2, apply.Options{
@@ -185,7 +208,7 @@ func pruneRetrieveErrorTest(ctx context.Context, c client.Client, invConfig Inve
 			ApplyEvent: &testutil.ExpApplyEvent{
 				GroupName:  "apply-0",
 				Operation:  event.Created,
-				Identifier: object.UnstructuredToObjMetaOrDie(withNamespace(manifestToUnstructured(pod2), namespaceName)),
+				Identifier: object.UnstructuredToObjMetaOrDie(pod2Obj),
 				Error:      nil,
 			},
 		},
@@ -198,26 +221,43 @@ func pruneRetrieveErrorTest(ctx context.Context, c client.Client, invConfig Inve
 				Type:      event.Finished,
 			},
 		},
+		{
+			// WaitTask start
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action:    event.WaitAction,
+				GroupName: "wait-0",
+				Type:      event.Started,
+			},
+		},
+		{
+			// Pod2 reconcile Pending.
+			EventType: event.WaitType,
+			WaitEvent: &testutil.ExpWaitEvent{
+				GroupName:  "wait-0",
+				Operation:  event.ReconcilePending,
+				Identifier: object.UnstructuredToObjMetaOrDie(pod2Obj),
+			},
+		},
+		{
+			// Pod2 confirmed Current.
+			EventType: event.WaitType,
+			WaitEvent: &testutil.ExpWaitEvent{
+				GroupName:  "wait-0",
+				Operation:  event.Reconciled,
+				Identifier: object.UnstructuredToObjMetaOrDie(pod2Obj),
+			},
+		},
+		{
+			// WaitTask finished
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action:    event.WaitAction,
+				GroupName: "wait-0",
+				Type:      event.Finished,
+			},
+		},
 		// Don't prune pod1, it should already be deleted.
-		// TODO: Why is waiting skipped on create?
-		// {
-		// 	// WaitTask start
-		// 	EventType: event.ActionGroupType,
-		// 	ActionGroupEvent: &testutil.ExpActionGroupEvent{
-		// 		Action: event.WaitAction,
-		// 		Name:   "wait-0",
-		// 		Type:   event.Started,
-		// 	},
-		// },
-		// {
-		// 	// WaitTask finished
-		// 	EventType: event.ActionGroupType,
-		// 	ActionGroupEvent: &testutil.ExpActionGroupEvent{
-		// 		Action: event.WaitAction,
-		// 		Name:   "wait-0",
-		// 		Type:   event.Finished,
-		// 	},
-		// },
 		{
 			// InvSetTask start
 			EventType: event.ActionGroupType,
@@ -239,12 +279,15 @@ func pruneRetrieveErrorTest(ctx context.Context, c client.Client, invConfig Inve
 	}
 	Expect(testutil.EventsToExpEvents(applierEvents2)).To(testutil.Equal(expEvents2))
 
-	By("Wait for pod2 to be created")
-	// TODO: change behavior so the user doesn't need to code their own wait
-	waitForCreation(ctx, c, withNamespace(manifestToUnstructured(pod2), namespaceName))
+	By("Verify pod2 created and ready")
+	result = assertUnstructuredExists(ctx, c, pod2Obj)
+	podIP, found, err = testutil.NestedField(result.Object, "status", "podIP")
+	Expect(err).NotTo(HaveOccurred())
+	Expect(found).To(BeTrue())
+	Expect(podIP).NotTo(BeEmpty()) // use podIP as proxy for readiness
 
 	By("Verify pod1 still deleted")
-	assertUnstructuredDoesNotExist(ctx, c, withNamespace(manifestToUnstructured(pod1), namespaceName))
+	assertUnstructuredDoesNotExist(ctx, c, pod1Obj)
 
 	By("Verify inventory")
 	// The inventory should only have the currently applied item.
@@ -277,7 +320,7 @@ func pruneRetrieveErrorTest(ctx context.Context, c client.Client, invConfig Inve
 			DeleteEvent: &testutil.ExpDeleteEvent{
 				GroupName:  "prune-0",
 				Operation:  event.Deleted,
-				Identifier: object.UnstructuredToObjMetaOrDie(withNamespace(manifestToUnstructured(pod2), namespaceName)),
+				Identifier: object.UnstructuredToObjMetaOrDie(pod2Obj),
 				Error:      nil,
 			},
 		},
@@ -290,25 +333,42 @@ func pruneRetrieveErrorTest(ctx context.Context, c client.Client, invConfig Inve
 				Type:      event.Finished,
 			},
 		},
-		// TODO: Why is waiting skipped on destroy?
-		// {
-		// 	// WaitTask start
-		// 	EventType: event.ActionGroupType,
-		// 	ActionGroupEvent: &testutil.ExpActionGroupEvent{
-		// 		Action: event.WaitAction,
-		// 		Name:   "wait-0",
-		// 		Type:   event.Started,
-		// 	},
-		// },
-		// {
-		// 	// WaitTask finished
-		// 	EventType: event.ActionGroupType,
-		// 	ActionGroupEvent: &testutil.ExpActionGroupEvent{
-		// 		Action: event.WaitAction,
-		// 		Name:   "wait-0",
-		// 		Type:   event.Finished,
-		// 	},
-		// },
+		{
+			// WaitTask start
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action:    event.WaitAction,
+				GroupName: "wait-0",
+				Type:      event.Started,
+			},
+		},
+		{
+			// Pod2 reconcile Pending.
+			EventType: event.WaitType,
+			WaitEvent: &testutil.ExpWaitEvent{
+				GroupName:  "wait-0",
+				Operation:  event.ReconcilePending,
+				Identifier: object.UnstructuredToObjMetaOrDie(pod2Obj),
+			},
+		},
+		{
+			// Pod2 confirmed NotFound.
+			EventType: event.WaitType,
+			WaitEvent: &testutil.ExpWaitEvent{
+				GroupName:  "wait-0",
+				Operation:  event.Reconciled,
+				Identifier: object.UnstructuredToObjMetaOrDie(pod2Obj),
+			},
+		},
+		{
+			// WaitTask finished
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action:    event.WaitAction,
+				GroupName: "wait-0",
+				Type:      event.Finished,
+			},
+		},
 		{
 			// DeleteInvTask start
 			EventType: event.ActionGroupType,
@@ -331,9 +391,8 @@ func pruneRetrieveErrorTest(ctx context.Context, c client.Client, invConfig Inve
 	Expect(testutil.EventsToExpEvents(destroyerEvents)).To(testutil.Equal(expEvents3))
 
 	By("Verify pod1 is deleted")
-	assertUnstructuredDoesNotExist(ctx, c, withNamespace(manifestToUnstructured(pod1), namespaceName))
+	assertUnstructuredDoesNotExist(ctx, c, pod1Obj)
 
-	By("Wait for pod2 to be deleted")
-	// TODO: change behavior so the user doesn't need to code their own wait
-	waitForDeletion(ctx, c, withNamespace(manifestToUnstructured(pod2), namespaceName))
+	By("Verify pod2 is deleted")
+	assertUnstructuredDoesNotExist(ctx, c, pod2Obj)
 }

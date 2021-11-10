@@ -7,11 +7,14 @@
 package graph
 
 import (
+	"sort"
+
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/object/dependson"
 	"sigs.k8s.io/cli-utils/pkg/object/mutation"
+	"sigs.k8s.io/cli-utils/pkg/ordering"
 )
 
 // SortObjs returns a slice of the sets of objects to apply (in order).
@@ -50,6 +53,8 @@ func SortObjs(objs object.UnstructuredSet) ([]object.UnstructuredSet, error) {
 				currentSet = append(currentSet, obj)
 			}
 		}
+		// Sort each set in apply order
+		sort.Sort(ordering.SortableUnstructureds(currentSet))
 		objSets = append(objSets, currentSet)
 	}
 	return objSets, nil
@@ -65,6 +70,12 @@ func ReverseSortObjs(objs object.UnstructuredSet) ([]object.UnstructuredSet, err
 	// Reverse the ordering of the object sets using swaps.
 	for i, j := 0, len(s)-1; i < j; i, j = i+1, j-1 {
 		s[i], s[j] = s[j], s[i]
+	}
+	// Reverse the ordering of the objects in each set using swaps.
+	for _, c := range s {
+		for i, j := 0, len(c)-1; i < j; i, j = i+1, j-1 {
+			c[i], c[j] = c[j], c[i]
+		}
 	}
 	return s, nil
 }

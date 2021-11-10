@@ -35,8 +35,6 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/object/graph"
 )
 
-const defaultWaitTimeout = 1 * time.Minute
-
 type TaskQueueBuilder struct {
 	Pruner     *prune.Pruner
 	InfoHelper info.InfoHelper
@@ -217,13 +215,12 @@ func (t *TaskQueueBuilder) AppendApplyWaitTasks(applyObjs object.UnstructuredSet
 	if err != nil {
 		t.err = err
 	}
-	addWaitTask, waitTimeout := waitTaskTimeout(o.DryRunStrategy.ClientOrServerDryRun(),
-		len(applySets), o.ReconcileTimeout)
 	for _, applySet := range applySets {
 		t.AppendApplyTask(applySet, applyFilters, applyMutators, o)
-		if addWaitTask {
+		// dry-run skips wait tasks
+		if !o.DryRunStrategy.ClientOrServerDryRun() {
 			applyIds := object.UnstructuredsToObjMetasOrDie(applySet)
-			t.AppendWaitTask(applyIds, taskrunner.AllCurrent, waitTimeout)
+			t.AppendWaitTask(applyIds, taskrunner.AllCurrent, o.ReconcileTimeout)
 		}
 	}
 	return t
@@ -241,31 +238,14 @@ func (t *TaskQueueBuilder) AppendPruneWaitTasks(pruneObjs object.UnstructuredSet
 		if err != nil {
 			t.err = err
 		}
-		addWaitTask, waitTimeout := waitTaskTimeout(o.DryRunStrategy.ClientOrServerDryRun(),
-			len(pruneSets), o.PruneTimeout)
 		for _, pruneSet := range pruneSets {
 			t.AppendPruneTask(pruneSet, pruneFilters, o)
-			if addWaitTask {
+			// dry-run skips wait tasks
+			if !o.DryRunStrategy.ClientOrServerDryRun() {
 				pruneIds := object.UnstructuredsToObjMetasOrDie(pruneSet)
-				t.AppendWaitTask(pruneIds, taskrunner.AllNotFound, waitTimeout)
+				t.AppendWaitTask(pruneIds, taskrunner.AllNotFound, o.PruneTimeout)
 			}
 		}
 	}
 	return t
-}
-
-// waitTaskTimeout returns true if the wait task should be added to the task queue;
-// false otherwise. If true, also returns the duration within wait task before timeout.
-func waitTaskTimeout(dryRun bool, numObjSets int, waitTimeout time.Duration) (bool, time.Duration) {
-	var zeroTimeout = time.Duration(0)
-	if dryRun {
-		return false, zeroTimeout
-	}
-	if waitTimeout != zeroTimeout {
-		return true, waitTimeout
-	}
-	if numObjSets > 1 {
-		return true, defaultWaitTimeout
-	}
-	return false, zeroTimeout
 }

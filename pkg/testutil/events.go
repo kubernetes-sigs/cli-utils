@@ -421,6 +421,17 @@ func (ape GroupedEventsByID) Less(i, j int) bool {
 			// don't change order if not the same task group
 			return false
 		}
+		if ape[i].WaitEvent.Operation != ape[j].WaitEvent.Operation {
+			// don't change order if not the same operation
+			return false
+		}
+		if ape[i].WaitEvent.Operation != event.Reconciled {
+			// pending, skipped, and timeout operations are predictably ordered
+			// using the order in WaitTask.Ids.
+			// So we only need to sort Reconciled events, which occur in the
+			// order the Waitask receives StatusEvents with Current/NotFound.
+			return false
+		}
 		return ape[i].WaitEvent.Identifier.String() < ape[j].WaitEvent.Identifier.String()
 	default:
 		// don't change order if not ApplyType, PruneType, or DeleteType

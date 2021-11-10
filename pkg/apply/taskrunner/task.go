@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"sync"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -54,19 +55,22 @@ func NewWaitTask(name string, ids object.ObjMetadataSet, cond Condition, timeout
 type WaitTask struct {
 	// name allows providing a name for the task.
 	name string
-	// Ids is the list of resources that we are waiting for.
+	// Ids is the full list of resources that we are waiting for.
 	Ids object.ObjMetadataSet
 	// Condition defines the status we want all resources to reach
 	Condition Condition
 	// Timeout defines how long we are willing to wait for the condition
 	// to be met.
 	Timeout time.Duration
-
+	// mapper is the RESTMapper to update after CRDs have been reconciled
 	mapper meta.RESTMapper
-
 	// cancelFunc is a function that will cancel the timeout timer
 	// on the task.
-	cancelFunc func()
+	cancelFunc context.CancelFunc
+	// pending is the set of resources that we are still waiting for.
+	pending object.ObjMetadataSet
+	// mu protects the pending ObjMetadataSet
+	mu sync.RWMutex
 }
 
 func (w *WaitTask) Name() string {
@@ -97,6 +101,8 @@ func (w *WaitTask) Start(taskContext *TaskContext) {
 		ctx, w.cancelFunc = context.WithCancel(ctx)
 	}
 
+	w.startInner(taskContext)
+
 	// A goroutine to handle ending the WaitTask.
 	go func() {
 		// Block until complete/cancel/timeout
@@ -106,49 +112,20 @@ func (w *WaitTask) Start(taskContext *TaskContext) {
 
 		klog.V(2).Infof("wait task completing (name: %q,): %v", w.name, err)
 
-		// reset RESTMapper, if a CRD was applied/pruned
-		foundCRD := false
-		for _, obj := range w.Ids {
-			if obj.GroupKind == crdGK {
-				foundCRD = true
-				break
-			}
-		}
-		if foundCRD {
-			w.resetRESTMapper()
-		}
-
 		switch err {
 		case context.Canceled:
 			// happy path - cancelled or completed (not considered an error)
 		case context.DeadlineExceeded:
 			// timed out
 			w.sendTimeoutEvents(taskContext)
-		default:
-			// shouldn't happen, per context docs
-			klog.Errorf("wait task stopped with unexpected context error: %v", err)
 		}
+
+		// Update RESTMapper to pick up new custom resource types
+		w.updateRESTMapper(taskContext)
 
 		// Done here. signal completion to the task runner
 		taskContext.TaskChannel() <- TaskResult{}
 	}()
-
-	// send initial events for all resources being waited on
-	for _, id := range w.Ids {
-		switch {
-		case w.skipped(taskContext, id):
-			w.sendEvent(taskContext, id, event.ReconcileSkipped)
-		case w.reconciledByID(taskContext, id):
-			w.sendEvent(taskContext, id, event.Reconciled)
-		default:
-			w.sendEvent(taskContext, id, event.ReconcilePending)
-		}
-	}
-
-	// exit early if all conditions are met
-	if w.reconciled(taskContext) {
-		w.cancelFunc()
-	}
 }
 
 func (w *WaitTask) sendEvent(taskContext *TaskContext, id object.ObjMetadata, op event.WaitEventOperation) {
@@ -162,13 +139,42 @@ func (w *WaitTask) sendEvent(taskContext *TaskContext, id object.ObjMetadata, op
 	})
 }
 
-// sendTimeoutEvents sends a timeout event for every pending object that isn't
-// reconciled.
-func (w *WaitTask) sendTimeoutEvents(taskContext *TaskContext) {
-	for _, id := range w.pending(taskContext) {
-		if !w.reconciledByID(taskContext, id) {
-			w.sendEvent(taskContext, id, event.ReconcileTimeout)
+// startInner sends initial pending, skipped, an reconciled events.
+// If all objects are reconciled or skipped, cancelFunc is called.
+// The pending set is write locked during execution of startInner.
+func (w *WaitTask) startInner(taskContext *TaskContext) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	pending := object.ObjMetadataSet{}
+	for _, id := range w.Ids {
+		switch {
+		case w.skipped(taskContext, id):
+			w.sendEvent(taskContext, id, event.ReconcileSkipped)
+		case w.reconciledByID(taskContext, id):
+			w.sendEvent(taskContext, id, event.Reconciled)
+		default:
+			pending = append(pending, id)
+			w.sendEvent(taskContext, id, event.ReconcilePending)
 		}
+	}
+	w.pending = pending
+
+	if len(pending) == 0 {
+		// all reconciled - clear pending and exit
+		klog.V(3).Infof("all objects reconciled or skipped (name: %q)", w.name)
+		w.cancelFunc()
+	}
+}
+
+// sendTimeoutEvents sends a timeout event for every remaining pending object
+// The pending set is read locked during execution of sendTimeoutEvents.
+func (w *WaitTask) sendTimeoutEvents(taskContext *TaskContext) {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+
+	for _, id := range w.pending {
+		w.sendEvent(taskContext, id, event.ReconcileTimeout)
 	}
 }
 
@@ -176,23 +182,6 @@ func (w *WaitTask) sendTimeoutEvents(taskContext *TaskContext) {
 // for the specified object given the status of resource in the cache.
 func (w *WaitTask) reconciledByID(taskContext *TaskContext, id object.ObjMetadata) bool {
 	return conditionMet(taskContext, object.ObjMetadataSet{id}, w.Condition)
-}
-
-// reconciled checks whether the condition set in the task is currently met
-// given the status of resources in the cache.
-func (w *WaitTask) reconciled(taskContext *TaskContext) bool {
-	return conditionMet(taskContext, w.pending(taskContext), w.Condition)
-}
-
-// pending returns the set of resources being waited on (not skipped).
-func (w *WaitTask) pending(taskContext *TaskContext) object.ObjMetadataSet {
-	var ids object.ObjMetadataSet
-	for _, id := range w.Ids {
-		if !w.skipped(taskContext, id) {
-			ids = append(ids, id)
-		}
-	}
-	return ids
 }
 
 // skipped returns true if the object failed or was skipped by a preceding
@@ -214,35 +203,73 @@ func (w *WaitTask) Cancel(_ *TaskContext) {
 	w.cancelFunc()
 }
 
-// StatusUpdate validates whether the update meets the conditions to stop
-// the wait task. If the status is for a watched object and that object now
-// meets the desired condition, a WaitEvent will be sent before exiting.
+// StatusUpdate records objects status updates and sends WaitEvents.
+// If all objects are reconciled or skipped, cancelFunc is called.
+// The pending set is write locked during execution of StatusUpdate.
 func (w *WaitTask) StatusUpdate(taskContext *TaskContext, id object.ObjMetadata) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
 	if klog.V(5).Enabled() {
 		status := taskContext.ResourceCache().Get(id).Status
 		klog.Errorf("status update (object: %q, status: %q)", id, status)
 	}
 
-	// ignored objects have already had skipped events sent at start
-	if w.skipped(taskContext, id) {
+	switch {
+	case w.pending.Contains(id):
+		// pending - check if reconciled
+		if w.reconciledByID(taskContext, id) {
+			// reconciled - remove from pending & send event
+			w.pending = w.pending.Remove(id)
+			w.sendEvent(taskContext, id, event.Reconciled)
+		} else {
+			// can't be all reconciled now, so don't bother checking
+			return
+		}
+	case !w.Ids.Contains(id):
+		// not in wait group - ignore
 		return
-	}
-
-	// if the condition is met for this object, send a wait event
-	if w.reconciledByID(taskContext, id) {
-		w.sendEvent(taskContext, id, event.Reconciled)
+	case w.skipped(taskContext, id):
+		// skipped - ignore
+		return
+	default:
+		// reconciled - check if unreconciled
+		if !w.reconciledByID(taskContext, id) {
+			// unreconciled - add to pending & send event
+			w.pending = append(w.pending, id)
+			w.sendEvent(taskContext, id, event.ReconcilePending)
+			// can't be all reconciled now, so don't bother checking
+			return
+		}
 	}
 
 	// if all conditions are met, complete the wait task
-	if w.reconciled(taskContext) {
+	if conditionMet(taskContext, w.pending, w.Condition) {
+		// all reconciled - clear pending and exit
+		w.pending = object.ObjMetadataSet{}
+		klog.V(3).Infof("all objects reconciled or skipped (name: %q)", w.name)
 		w.cancelFunc()
 	}
 }
 
-// resetRESTMapper resets the RESTMapper so it can pick up new CRDs.
-func (w *WaitTask) resetRESTMapper() {
-	// TODO: find a way to add/remove mappers without resetting the entire mapper
-	// Resetting the mapper requires all CRDs to be queried again.
+// updateRESTMapper resets the RESTMapper if CRDs were applied, so that new
+// resource types can be applied by subsequent tasks.
+// TODO: find a way to add/remove mappers without resetting the entire mapper
+// Resetting the mapper requires all CRDs to be queried again.
+func (w *WaitTask) updateRESTMapper(taskContext *TaskContext) {
+	foundCRD := false
+	for _, id := range w.Ids {
+		if id.GroupKind == crdGK && !w.skipped(taskContext, id) {
+			foundCRD = true
+			break
+		}
+	}
+	if !foundCRD {
+		// no update required
+		return
+	}
+
+	klog.V(5).Infof("resetting RESTMapper")
 	ddRESTMapper, err := extractDeferredDiscoveryRESTMapper(w.mapper)
 	if err != nil {
 		if klog.V(4).Enabled() {
@@ -255,8 +282,10 @@ func (w *WaitTask) resetRESTMapper() {
 // extractDeferredDiscoveryRESTMapper unwraps the provided RESTMapper
 // interface to get access to the underlying DeferredDiscoveryRESTMapper
 // that can be reset.
-func extractDeferredDiscoveryRESTMapper(mapper meta.RESTMapper) (*restmapper.DeferredDiscoveryRESTMapper,
-	error) {
+func extractDeferredDiscoveryRESTMapper(mapper meta.RESTMapper) (
+	*restmapper.DeferredDiscoveryRESTMapper,
+	error,
+) {
 	val := reflect.ValueOf(mapper)
 	if val.Type().Kind() != reflect.Struct {
 		return nil, fmt.Errorf("unexpected RESTMapper type: %s", val.Type().String())
@@ -264,7 +293,7 @@ func extractDeferredDiscoveryRESTMapper(mapper meta.RESTMapper) (*restmapper.Def
 	fv := val.FieldByName("RESTMapper")
 	ddRESTMapper, ok := fv.Interface().(*restmapper.DeferredDiscoveryRESTMapper)
 	if !ok {
-		return nil, fmt.Errorf("unexpected RESTMapper type")
+		return nil, fmt.Errorf("unexpected RESTMapper field type: %s", fv.Type())
 	}
 	return ddRESTMapper, nil
 }

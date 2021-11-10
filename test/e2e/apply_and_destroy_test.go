@@ -229,25 +229,42 @@ func applyAndDestroyTest(ctx context.Context, c client.Client, invConfig Invento
 				Type:      event.Finished,
 			},
 		},
-		// TODO: Why is waiting skipped on destroy?
-		// {
-		// 	// WaitTask start
-		// 	EventType: event.ActionGroupType,
-		// 	ActionGroupEvent: &testutil.ExpActionGroupEvent{
-		// 		Action: event.WaitAction,
-		// 		Name:   "wait-0",
-		// 		Type:   event.Started,
-		// 	},
-		// },
-		// {
-		// 	// WaitTask finished
-		// 	EventType: event.ActionGroupType,
-		// 	ActionGroupEvent: &testutil.ExpActionGroupEvent{
-		// 		Action: event.WaitAction,
-		// 		Name:   "wait-0",
-		// 		Type:   event.Finished,
-		// 	},
-		// },
+		{
+			// WaitTask start
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action:    event.WaitAction,
+				GroupName: "wait-0",
+				Type:      event.Started,
+			},
+		},
+		{
+			// Deployment reconcile Pending .
+			EventType: event.WaitType,
+			WaitEvent: &testutil.ExpWaitEvent{
+				GroupName:  "wait-0",
+				Operation:  event.ReconcilePending,
+				Identifier: object.UnstructuredToObjMetaOrDie(deployment1Obj),
+			},
+		},
+		{
+			// Deployment confirmed NotFound.
+			EventType: event.WaitType,
+			WaitEvent: &testutil.ExpWaitEvent{
+				GroupName:  "wait-0",
+				Operation:  event.Reconciled,
+				Identifier: object.UnstructuredToObjMetaOrDie(deployment1Obj),
+			},
+		},
+		{
+			// WaitTask finished
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action:    event.WaitAction,
+				GroupName: "wait-0",
+				Type:      event.Finished,
+			},
+		},
 		{
 			// DeleteInvTask start
 			EventType: event.ActionGroupType,
