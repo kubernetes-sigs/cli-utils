@@ -201,8 +201,6 @@ func (b *baseRunner) run(ctx context.Context, taskQueue chan Task,
 			}
 
 			id := statusEvent.Resource.Identifier
-			oldStatus := taskContext.ResourceCache().Get(id).Status
-			newStatus := statusEvent.Resource.Status
 
 			// Update the cache to track the latest resource spec & status.
 			// Status is computed from the resource on-demand.
@@ -215,7 +213,7 @@ func (b *baseRunner) run(ctx context.Context, taskQueue chan Task,
 
 			// send a status update to the running task, but only if the status
 			// has changed and the task is tracking the object.
-			if oldStatus != newStatus && currentTask.Identifiers().Contains(id) {
+			if currentTask.Identifiers().Contains(id) {
 				currentTask.StatusUpdate(taskContext, id)
 			}
 		// A message on the taskChannel means that the current task
