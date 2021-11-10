@@ -45,23 +45,23 @@ func (i *InvAddTask) Identifiers() object.ObjMetadataSet {
 // into the current inventory.
 func (i *InvAddTask) Start(taskContext *taskrunner.TaskContext) {
 	go func() {
-		klog.V(2).Infoln("starting inventory add task")
+		klog.V(2).Infof("inventory add task starting (name: %q)", i.Name())
 		if err := inventory.ValidateNoInventory(i.Objects); err != nil {
-			taskContext.TaskChannel() <- taskrunner.TaskResult{Err: err}
+			i.sendTaskResult(taskContext, err)
 			return
 		}
 		// Ensures the namespace exists before applying the inventory object into it.
 		if invNamespace := inventoryNamespaceInSet(i.InvInfo, i.Objects); invNamespace != nil {
 			klog.V(4).Infof("applying inventory namespace %s", invNamespace.GetName())
 			if err := i.InvClient.ApplyInventoryNamespace(invNamespace, i.DryRun); err != nil {
-				taskContext.TaskChannel() <- taskrunner.TaskResult{Err: err}
+				i.sendTaskResult(taskContext, err)
 				return
 			}
 		}
 		klog.V(4).Infof("merging %d local objects into inventory", len(i.Objects))
 		currentObjs := object.UnstructuredsToObjMetasOrDie(i.Objects)
 		_, err := i.InvClient.Merge(i.InvInfo, currentObjs, i.DryRun)
-		taskContext.TaskChannel() <- taskrunner.TaskResult{Err: err}
+		i.sendTaskResult(taskContext, err)
 	}()
 }
 
@@ -88,4 +88,11 @@ func inventoryNamespaceInSet(inv inventory.InventoryInfo, objs object.Unstructur
 		}
 	}
 	return nil
+}
+
+func (i *InvAddTask) sendTaskResult(taskContext *taskrunner.TaskContext, err error) {
+	klog.V(2).Infof("inventory add task completing (name: %q)", i.Name())
+	taskContext.TaskChannel() <- taskrunner.TaskResult{
+		Err: err,
+	}
 }

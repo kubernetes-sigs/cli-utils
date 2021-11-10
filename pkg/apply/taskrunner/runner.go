@@ -189,7 +189,7 @@ func (b *baseRunner) run(ctx context.Context, taskQueue chan Task,
 
 			if o.emitStatusEvents {
 				// Forward all normal events to the eventChannel
-				eventChannel <- event.Event{
+				taskContext.SendEvent(event.Event{
 					Type: event.StatusType,
 					StatusEvent: event.StatusEvent{
 						Identifier:       statusEvent.Resource.Identifier,
@@ -197,7 +197,7 @@ func (b *baseRunner) run(ctx context.Context, taskQueue chan Task,
 						Resource:         statusEvent.Resource.Resource,
 						Error:            statusEvent.Error,
 					},
-				}
+				})
 			}
 
 			id := statusEvent.Resource.Identifier
@@ -226,14 +226,14 @@ func (b *baseRunner) run(ctx context.Context, taskQueue chan Task,
 		// finish, we exit.
 		// If everything is ok, we fetch and start the next task.
 		case msg := <-taskContext.TaskChannel():
-			taskContext.EventChannel() <- event.Event{
+			taskContext.SendEvent(event.Event{
 				Type: event.ActionGroupType,
 				ActionGroupEvent: event.ActionGroupEvent{
 					GroupName: currentTask.Name(),
 					Action:    currentTask.Action(),
 					Type:      event.Finished,
 				},
-			}
+			})
 			if msg.Err != nil {
 				return msg.Err
 			}
@@ -274,14 +274,14 @@ func (b *baseRunner) nextTask(taskQueue chan Task,
 		return nil, true
 	}
 
-	taskContext.EventChannel() <- event.Event{
+	taskContext.SendEvent(event.Event{
 		Type: event.ActionGroupType,
 		ActionGroupEvent: event.ActionGroupEvent{
 			GroupName: tsk.Name(),
 			Action:    tsk.Action(),
 			Type:      event.Started,
 		},
-	}
+	})
 
 	tsk.Start(taskContext)
 

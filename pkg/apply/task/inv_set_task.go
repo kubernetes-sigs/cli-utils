@@ -56,7 +56,7 @@ func (i *InvSetTask) Identifiers() object.ObjMetadataSet {
 // - Abandoned resources (successful)
 func (i *InvSetTask) Start(taskContext *taskrunner.TaskContext) {
 	go func() {
-		klog.V(2).Infof("starting inventory set task (name: %q)", i.Name())
+		klog.V(2).Infof("inventory set task starting (name: %q)", i.Name())
 		invObjs := object.ObjMetadataSet{}
 
 		// If an object applied successfully, keep or add it to the inventory.
@@ -108,7 +108,7 @@ func (i *InvSetTask) Start(taskContext *taskrunner.TaskContext) {
 		klog.V(4).Infof("set inventory %d total objects", len(invObjs))
 		err := i.InvClient.Replace(i.InvInfo, invObjs, i.DryRun)
 
-		klog.V(2).Infof("completing inventory set task (name: %q)", i.Name())
+		klog.V(2).Infof("inventory set task completing (name: %q)", i.Name())
 		taskContext.TaskChannel() <- taskrunner.TaskResult{Err: err}
 	}()
 }

@@ -110,7 +110,7 @@ func (p *Pruner) Prune(
 				if klog.V(5).Enabled() {
 					klog.Errorf("error during %s, (%s): %v", pruneFilter.Name(), id, err)
 				}
-				taskContext.EventChannel() <- eventFactory.CreateFailedEvent(id, err)
+				taskContext.SendEvent(eventFactory.CreateFailedEvent(id, err))
 				taskContext.AddFailedDelete(id)
 				break
 			}
@@ -124,7 +124,7 @@ func (p *Pruner) Prune(
 							if klog.V(4).Enabled() {
 								klog.Errorf("error removing annotation (object: %q, annotation: %q): %v", id, inventory.OwningInventoryKey, err)
 							}
-							taskContext.EventChannel() <- eventFactory.CreateFailedEvent(id, err)
+							taskContext.SendEvent(eventFactory.CreateFailedEvent(id, err))
 							taskContext.AddFailedDelete(id)
 							break
 						} else {
@@ -134,7 +134,7 @@ func (p *Pruner) Prune(
 						}
 					}
 				}
-				taskContext.EventChannel() <- eventFactory.CreateSkippedEvent(obj, reason)
+				taskContext.SendEvent(eventFactory.CreateSkippedEvent(obj, reason))
 				taskContext.AddSkippedDelete(id)
 				break
 			}
@@ -152,12 +152,12 @@ func (p *Pruner) Prune(
 				if klog.V(4).Enabled() {
 					klog.Errorf("error deleting object (object: %q): %v", id, err)
 				}
-				taskContext.EventChannel() <- eventFactory.CreateFailedEvent(id, err)
+				taskContext.SendEvent(eventFactory.CreateFailedEvent(id, err))
 				taskContext.AddFailedDelete(id)
 				continue
 			}
 		}
-		taskContext.EventChannel() <- eventFactory.CreateSuccessEvent(obj)
+		taskContext.SendEvent(eventFactory.CreateSuccessEvent(obj))
 	}
 	return nil
 }

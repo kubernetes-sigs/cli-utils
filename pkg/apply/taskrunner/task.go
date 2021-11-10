@@ -84,7 +84,8 @@ func (w *WaitTask) Identifiers() object.ObjMetadataSet {
 // Start kicks off the task. For the wait task, this just means
 // setting up the timeout timer.
 func (w *WaitTask) Start(taskContext *TaskContext) {
-	klog.V(2).Infof("starting wait task (name: %q, objects: %d)", w.Name(), len(w.Ids))
+	klog.V(2).Infof("wait task starting (name: %q, objects: %d)",
+		w.Name(), len(w.Ids))
 
 	// TODO: inherit context from task runner, passed through the TaskContext
 	ctx := context.Background()
@@ -103,7 +104,7 @@ func (w *WaitTask) Start(taskContext *TaskContext) {
 		// Err is always non-nil when Done channel is closed.
 		err := ctx.Err()
 
-		klog.V(2).Infof("completing wait task (name: %q)", w.name)
+		klog.V(2).Infof("wait task completing (name: %q,): %v", w.name, err)
 
 		// reset RESTMapper, if a CRD was applied/pruned
 		foundCRD := false
@@ -151,14 +152,14 @@ func (w *WaitTask) Start(taskContext *TaskContext) {
 }
 
 func (w *WaitTask) sendEvent(taskContext *TaskContext, id object.ObjMetadata, op event.WaitEventOperation) {
-	taskContext.EventChannel() <- event.Event{
+	taskContext.SendEvent(event.Event{
 		Type: event.WaitType,
 		WaitEvent: event.WaitEvent{
 			GroupName:  w.Name(),
 			Identifier: id,
 			Operation:  op,
 		},
-	}
+	})
 }
 
 // sendTimeoutEvents sends a timeout event for every pending object that isn't
@@ -229,14 +230,7 @@ func (w *WaitTask) StatusUpdate(taskContext *TaskContext, id object.ObjMetadata)
 
 	// if the condition is met for this object, send a wait event
 	if w.reconciledByID(taskContext, id) {
-		taskContext.EventChannel() <- event.Event{
-			Type: event.WaitType,
-			WaitEvent: event.WaitEvent{
-				GroupName:  w.Name(),
-				Identifier: id,
-				Operation:  event.Reconciled,
-			},
-		}
+		w.sendEvent(taskContext, id, event.Reconciled)
 	}
 
 	// if all conditions are met, complete the wait task

@@ -523,7 +523,7 @@ func (f *fakeApplyTask) Identifiers() object.ObjMetadataSet {
 func (f *fakeApplyTask) Start(taskContext *TaskContext) {
 	go func() {
 		<-time.NewTimer(f.duration).C
-		taskContext.EventChannel() <- f.resultEvent
+		taskContext.SendEvent(f.resultEvent)
 		taskContext.TaskChannel() <- TaskResult{
 			Err: f.err,
 		}

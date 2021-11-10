@@ -85,7 +85,8 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 		// TODO: pipe Context through TaskContext
 		ctx := context.TODO()
 		objects := a.Objects
-		klog.V(2).Infof("apply task starting (objects: %d, name: %q)", len(objects), a.Name())
+		klog.V(2).Infof("apply task starting (name: %q, objects: %d)",
+			a.Name(), len(objects))
 		// Create a new instance of the applyOptions interface and use it
 		// to apply the objects.
 		ao, err := applyOptionsFactoryFunc(a.Name(), taskContext.EventChannel(),
@@ -111,10 +112,10 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 					klog.Errorf("unable to convert obj to info for %s/%s (%s)--continue",
 						obj.GetNamespace(), obj.GetName(), err)
 				}
-				taskContext.EventChannel() <- a.createApplyFailedEvent(
+				taskContext.SendEvent(a.createApplyFailedEvent(
 					id,
 					applyerror.NewUnknownTypeError(err),
-				)
+				))
 				taskContext.AddFailedApply(id)
 				continue
 			}
@@ -130,13 +131,13 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 					if klog.V(5).Enabled() {
 						klog.Errorf("error during %s, (%s): %s", filter.Name(), id, filterErr)
 					}
-					taskContext.EventChannel() <- a.createApplyFailedEvent(id, filterErr)
+					taskContext.SendEvent(a.createApplyFailedEvent(id, filterErr))
 					taskContext.AddFailedApply(id)
 					break
 				}
 				if filtered {
 					klog.V(4).Infof("apply filtered (filter: %q, resource: %q, reason: %q)", filter.Name(), id, reason)
-					taskContext.EventChannel() <- a.createApplyEvent(id, event.Unchanged, obj)
+					taskContext.SendEvent(a.createApplyEvent(id, event.Unchanged, obj))
 					taskContext.AddSkippedApply(id)
 					break
 				}
@@ -151,7 +152,7 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 				if klog.V(5).Enabled() {
 					klog.Errorf("error mutating: %w", err)
 				}
-				taskContext.EventChannel() <- a.createApplyFailedEvent(id, err)
+				taskContext.SendEvent(a.createApplyFailedEvent(id, err))
 				taskContext.AddFailedApply(id)
 				continue
 			}
@@ -170,10 +171,10 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 				if klog.V(4).Enabled() {
 					klog.Errorf("error applying (%s/%s) %s", info.Namespace, info.Name, err)
 				}
-				taskContext.EventChannel() <- a.createApplyFailedEvent(
+				taskContext.SendEvent(a.createApplyFailedEvent(
 					id,
 					applyerror.NewApplyRunError(err),
-				)
+				))
 				taskContext.AddFailedApply(id)
 			} else if info.Object != nil {
 				acc, err := meta.Accessor(info.Object)
@@ -232,6 +233,7 @@ func newApplyOptions(taskName string, eventChannel chan event.Event, serverSideO
 }
 
 func (a *ApplyTask) sendTaskResult(taskContext *taskrunner.TaskContext) {
+	klog.V(2).Infof("apply task completing (name: %q)", a.Name())
 	taskContext.TaskChannel() <- taskrunner.TaskResult{}
 }
 
@@ -290,10 +292,10 @@ func (a *ApplyTask) sendBatchApplyEvents(
 ) {
 	for _, obj := range objects {
 		id := object.UnstructuredToObjMetaOrDie(obj)
-		taskContext.EventChannel() <- a.createApplyFailedEvent(
+		taskContext.SendEvent(a.createApplyFailedEvent(
 			id,
 			applyerror.NewInitializeApplyOptionError(err),
-		)
+		))
 		taskContext.AddFailedApply(id)
 	}
 }
