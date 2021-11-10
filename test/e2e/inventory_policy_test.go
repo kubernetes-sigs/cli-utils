@@ -20,7 +20,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func inventoryPolicyMustMatchTest(c client.Client, invConfig InventoryConfig, namespaceName string) {
+func inventoryPolicyMustMatchTest(ctx context.Context, c client.Client, invConfig InventoryConfig, namespaceName string) {
 	By("Apply first set of resources")
 	applier := invConfig.ApplierFactoryFunc()
 
@@ -31,7 +31,7 @@ func inventoryPolicyMustMatchTest(c client.Client, invConfig InventoryConfig, na
 		deployment1Obj,
 	}
 
-	runWithNoErr(applier.Run(context.TODO(), firstInv, firstResources, apply.Options{
+	runWithNoErr(applier.Run(ctx, firstInv, firstResources, apply.Options{
 		ReconcileTimeout: 2 * time.Minute,
 		EmitStatusEvents: true,
 	}))
@@ -44,7 +44,7 @@ func inventoryPolicyMustMatchTest(c client.Client, invConfig InventoryConfig, na
 		withReplicas(deployment1Obj, 6),
 	}
 
-	applierEvents := runCollect(applier.Run(context.TODO(), secondInv, secondResources, apply.Options{
+	applierEvents := runCollect(applier.Run(ctx, secondInv, secondResources, apply.Options{
 		ReconcileTimeout: 2 * time.Minute,
 		EmitStatusEvents: true,
 		InventoryPolicy:  inventory.InventoryPolicyMustMatch,
@@ -178,20 +178,19 @@ func inventoryPolicyMustMatchTest(c client.Client, invConfig InventoryConfig, na
 	Expect(received).To(testutil.Equal(expEvents))
 
 	By("Verify resource wasn't updated")
-	result := assertUnstructuredExists(c, deployment1Obj)
+	result := assertUnstructuredExists(ctx, c, deployment1Obj)
 	replicas, found, err := testutil.NestedField(result.Object, "spec", "replicas")
 	Expect(err).NotTo(HaveOccurred())
 	Expect(found).To(BeTrue())
 	Expect(replicas).To(Equal(int64(4)))
 
-	invConfig.InvCountVerifyFunc(c, namespaceName, 2)
+	invConfig.InvCountVerifyFunc(ctx, c, namespaceName, 2)
 }
 
-func inventoryPolicyAdoptIfNoInventoryTest(c client.Client, invConfig InventoryConfig, namespaceName string) {
+func inventoryPolicyAdoptIfNoInventoryTest(ctx context.Context, c client.Client, invConfig InventoryConfig, namespaceName string) {
 	By("Create unmanaged resource")
 	deployment1Obj := withNamespace(manifestToUnstructured(deployment1), namespaceName)
-	err := c.Create(context.TODO(), deployment1Obj)
-	Expect(err).NotTo(HaveOccurred())
+	createUnstructuredAndWait(ctx, c, deployment1Obj)
 
 	By("Apply resources")
 	applier := invConfig.ApplierFactoryFunc()
@@ -203,7 +202,7 @@ func inventoryPolicyAdoptIfNoInventoryTest(c client.Client, invConfig InventoryC
 		withReplicas(deployment1Obj, 6),
 	}
 
-	applierEvents := runCollect(applier.Run(context.TODO(), inv, resources, apply.Options{
+	applierEvents := runCollect(applier.Run(ctx, inv, resources, apply.Options{
 		ReconcileTimeout: 2 * time.Minute,
 		EmitStatusEvents: true,
 		InventoryPolicy:  inventory.AdoptIfNoInventory,
@@ -345,7 +344,7 @@ func inventoryPolicyAdoptIfNoInventoryTest(c client.Client, invConfig InventoryC
 	Expect(received).To(testutil.Equal(expEvents))
 
 	By("Verify resource was updated and added to inventory")
-	result := assertUnstructuredExists(c, deployment1Obj)
+	result := assertUnstructuredExists(ctx, c, deployment1Obj)
 
 	replicas, found, err := testutil.NestedField(result.Object, "spec", "replicas")
 	Expect(err).NotTo(HaveOccurred())
@@ -357,11 +356,11 @@ func inventoryPolicyAdoptIfNoInventoryTest(c client.Client, invConfig InventoryC
 	Expect(found).To(BeTrue())
 	Expect(value).To(Equal(invName))
 
-	invConfig.InvCountVerifyFunc(c, namespaceName, 1)
-	invConfig.InvSizeVerifyFunc(c, invName, namespaceName, invName, 1)
+	invConfig.InvCountVerifyFunc(ctx, c, namespaceName, 1)
+	invConfig.InvSizeVerifyFunc(ctx, c, invName, namespaceName, invName, 1)
 }
 
-func inventoryPolicyAdoptAllTest(c client.Client, invConfig InventoryConfig, namespaceName string) {
+func inventoryPolicyAdoptAllTest(ctx context.Context, c client.Client, invConfig InventoryConfig, namespaceName string) {
 	By("Apply an initial set of resources")
 	applier := invConfig.ApplierFactoryFunc()
 
@@ -372,7 +371,7 @@ func inventoryPolicyAdoptAllTest(c client.Client, invConfig InventoryConfig, nam
 		deployment1Obj,
 	}
 
-	runWithNoErr(applier.Run(context.TODO(), firstInv, firstResources, apply.Options{
+	runWithNoErr(applier.Run(ctx, firstInv, firstResources, apply.Options{
 		ReconcileTimeout: 2 * time.Minute,
 		EmitStatusEvents: true,
 	}))
@@ -385,7 +384,7 @@ func inventoryPolicyAdoptAllTest(c client.Client, invConfig InventoryConfig, nam
 		withReplicas(deployment1Obj, 6),
 	}
 
-	applierEvents := runCollect(applier.Run(context.TODO(), secondInv, secondResources, apply.Options{
+	applierEvents := runCollect(applier.Run(ctx, secondInv, secondResources, apply.Options{
 		ReconcileTimeout: 2 * time.Minute,
 		EmitStatusEvents: true,
 		InventoryPolicy:  inventory.AdoptAll,
@@ -527,7 +526,7 @@ func inventoryPolicyAdoptAllTest(c client.Client, invConfig InventoryConfig, nam
 	Expect(received).To(testutil.Equal(expEvents))
 
 	By("Verify resource was updated and added to inventory")
-	result := assertUnstructuredExists(c, deployment1Obj)
+	result := assertUnstructuredExists(ctx, c, deployment1Obj)
 
 	replicas, found, err := testutil.NestedField(result.Object, "spec", "replicas")
 	Expect(err).NotTo(HaveOccurred())
@@ -539,5 +538,5 @@ func inventoryPolicyAdoptAllTest(c client.Client, invConfig InventoryConfig, nam
 	Expect(found).To(BeTrue())
 	Expect(value).To(Equal(secondInvName))
 
-	invConfig.InvCountVerifyFunc(c, namespaceName, 2)
+	invConfig.InvCountVerifyFunc(ctx, c, namespaceName, 2)
 }

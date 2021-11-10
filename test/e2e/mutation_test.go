@@ -32,7 +32,7 @@ import (
 // port from pod-b into an environment variable of pod-a.
 
 //nolint:dupl // expEvents similar to CRD tests
-func mutationTest(c client.Client, invConfig InventoryConfig, inventoryName, namespaceName string) {
+func mutationTest(ctx context.Context, c client.Client, invConfig InventoryConfig, inventoryName, namespaceName string) {
 	By("apply resources in order with substitutions based on apply-time-mutation annotation")
 	applier := invConfig.ApplierFactoryFunc()
 
@@ -48,7 +48,7 @@ func mutationTest(c client.Client, invConfig InventoryConfig, inventoryName, nam
 		podBObj,
 	}
 
-	applierEvents := runCollect(applier.Run(context.TODO(), inv, resources, apply.Options{
+	applierEvents := runCollect(applier.Run(ctx, inv, resources, apply.Options{
 		EmitStatusEvents: false,
 	}))
 
@@ -226,7 +226,7 @@ func mutationTest(c client.Client, invConfig InventoryConfig, inventoryName, nam
 	Expect(testutil.EventsToExpEvents(applierEvents)).To(testutil.Equal(expEvents))
 
 	By("verify podB is created and ready")
-	result := assertUnstructuredExists(c, podBObj)
+	result := assertUnstructuredExists(ctx, c, podBObj)
 
 	podIP, found, err := testutil.NestedField(result.Object, "status", "podIP")
 	Expect(err).NotTo(HaveOccurred())
@@ -241,7 +241,7 @@ func mutationTest(c client.Client, invConfig InventoryConfig, inventoryName, nam
 	host := fmt.Sprintf("%s:%d", podIP, containerPort)
 
 	By("verify podA is mutated, created, and ready")
-	result = assertUnstructuredExists(c, podAObj)
+	result = assertUnstructuredExists(ctx, c, podAObj)
 
 	podIP, found, err = testutil.NestedField(result.Object, "status", "podIP")
 	Expect(err).NotTo(HaveOccurred())
@@ -256,7 +256,7 @@ func mutationTest(c client.Client, invConfig InventoryConfig, inventoryName, nam
 	By("destroy resources in opposite order")
 	destroyer := invConfig.DestroyerFactoryFunc()
 	options := apply.DestroyerOptions{InventoryPolicy: inventory.AdoptIfNoInventory}
-	destroyerEvents := runCollect(destroyer.Run(context.TODO(), inv, options))
+	destroyerEvents := runCollect(destroyer.Run(ctx, inv, options))
 
 	expEvents = []testutil.ExpEvent{
 		{
@@ -415,8 +415,8 @@ func mutationTest(c client.Client, invConfig InventoryConfig, inventoryName, nam
 	Expect(testutil.EventsToExpEvents(destroyerEvents)).To(testutil.Equal(expEvents))
 
 	By("verify podB deleted")
-	assertUnstructuredDoesNotExist(c, podBObj)
+	assertUnstructuredDoesNotExist(ctx, c, podBObj)
 
 	By("verify podA deleted")
-	assertUnstructuredDoesNotExist(c, podAObj)
+	assertUnstructuredDoesNotExist(ctx, c, podAObj)
 }

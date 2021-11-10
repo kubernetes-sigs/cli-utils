@@ -15,7 +15,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func applyWithExistingInvTest(c client.Client, invConfig InventoryConfig, inventoryName, namespaceName string) {
+func applyWithExistingInvTest(ctx context.Context, c client.Client, invConfig InventoryConfig, inventoryName, namespaceName string) {
 	By("Apply first set of resources")
 	applier := invConfig.ApplierFactoryFunc()
 	orgInventoryID := fmt.Sprintf("%s-%s", inventoryName, namespaceName)
@@ -26,19 +26,19 @@ func applyWithExistingInvTest(c client.Client, invConfig InventoryConfig, invent
 		withNamespace(manifestToUnstructured(deployment1), namespaceName),
 	}
 
-	runWithNoErr(applier.Run(context.TODO(), orgApplyInv, resources, apply.Options{
+	runWithNoErr(applier.Run(ctx, orgApplyInv, resources, apply.Options{
 		ReconcileTimeout: 2 * time.Minute,
 		EmitStatusEvents: true,
 	}))
 
 	By("Verify inventory")
-	invConfig.InvSizeVerifyFunc(c, inventoryName, namespaceName, orgInventoryID, 1)
+	invConfig.InvSizeVerifyFunc(ctx, c, inventoryName, namespaceName, orgInventoryID, 1)
 
 	By("Apply second set of resources, using same inventory name but different ID")
 	secondInventoryID := fmt.Sprintf("%s-%s-2", inventoryName, namespaceName)
 	secondApplyInv := invConfig.InvWrapperFunc(invConfig.InventoryFactoryFunc(inventoryName, namespaceName, secondInventoryID))
 
-	err := run(applier.Run(context.TODO(), secondApplyInv, resources, apply.Options{
+	err := run(applier.Run(ctx, secondApplyInv, resources, apply.Options{
 		ReconcileTimeout: 2 * time.Minute,
 		EmitStatusEvents: true,
 	}))

@@ -6,6 +6,7 @@ package e2e
 import (
 	"context"
 	"fmt"
+	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -34,8 +35,8 @@ type inventoryFactoryFunc func(name, namespace, id string) *unstructured.Unstruc
 type invWrapperFunc func(*unstructured.Unstructured) inventory.InventoryInfo
 type applierFactoryFunc func() *apply.Applier
 type destroyerFactoryFunc func() *apply.Destroyer
-type invSizeVerifyFunc func(c client.Client, name, namespace, id string, count int)
-type invCountVerifyFunc func(c client.Client, namespace string, count int)
+type invSizeVerifyFunc func(ctx context.Context, c client.Client, name, namespace, id string, count int)
+type invCountVerifyFunc func(ctx context.Context, c client.Client, namespace string, count int)
 
 type InventoryConfig struct {
 	InventoryStrategy    inventory.InventoryStrategy
@@ -82,6 +83,10 @@ func init() {
 	klog.SetOutput(GinkgoWriter)
 }
 
+var defaultTestTimeout = 5 * time.Minute
+var defaultBeforeTestTimeout = 30 * time.Second
+var defaultAfterTestTimeout = 30 * time.Second
+
 var _ = Describe("Applier", func() {
 
 	var c client.Client
@@ -102,11 +107,17 @@ var _ = Describe("Applier", func() {
 		})
 		Expect(err).NotTo(HaveOccurred())
 
-		createInventoryCRD(c)
+		ctx, cancel := context.WithTimeout(context.Background(), defaultBeforeTestTimeout)
+		defer cancel()
+		createInventoryCRD(ctx, c)
+		Expect(ctx.Err()).To(BeNil(), "BeforeSuite context cancelled or timed out")
 	})
 
 	AfterSuite(func() {
-		deleteInventoryCRD(c)
+		ctx, cancel := context.WithTimeout(context.Background(), defaultAfterTestTimeout)
+		defer cancel()
+		deleteInventoryCRD(ctx, c)
+		Expect(ctx.Err()).To(BeNil(), "AfterSuite context cancelled or timed out")
 	})
 
 	for name := range inventoryConfigs {
@@ -115,13 +126,21 @@ var _ = Describe("Applier", func() {
 			Context("Apply and destroy", func() {
 				var namespace *v1.Namespace
 				var inventoryName string
+				var ctx context.Context
+				var cancel context.CancelFunc
 
 				BeforeEach(func() {
+					ctx, cancel = context.WithTimeout(context.Background(), defaultTestTimeout)
 					inventoryName = randomString("test-inv-")
-					namespace = createRandomNamespace(c)
+					namespace = createRandomNamespace(ctx, c)
 				})
 
 				AfterEach(func() {
+					Expect(ctx.Err()).To(BeNil(), "test context cancelled or timed out")
+					cancel()
+					// new timeout for cleanup
+					ctx, cancel = context.WithTimeout(context.Background(), defaultAfterTestTimeout)
+					defer cancel()
 					// clean up resources created by the tests
 					objs := []*unstructured.Unstructured{
 						manifestToUnstructured(cr),
@@ -135,65 +154,74 @@ var _ = Describe("Applier", func() {
 						manifestToUnstructured(apiservice1),
 					}
 					for _, obj := range objs {
-						deleteUnstructuredIfExists(c, obj)
+						deleteUnstructuredIfExists(ctx, c, obj)
 					}
-					deleteNamespace(c, namespace)
+					deleteNamespace(ctx, c, namespace)
 				})
 
 				It("Apply and destroy", func() {
-					applyAndDestroyTest(c, invConfig, inventoryName, namespace.GetName())
+					applyAndDestroyTest(ctx, c, invConfig, inventoryName, namespace.GetName())
 				})
 
 				It("Deletion Prevention", func() {
-					deletionPreventionTest(c, invConfig, inventoryName, namespace.GetName())
+					deletionPreventionTest(ctx, c, invConfig, inventoryName, namespace.GetName())
 				})
 
 				It("Apply CRD and CR", func() {
-					crdTest(c, invConfig, inventoryName, namespace.GetName())
+					crdTest(ctx, c, invConfig, inventoryName, namespace.GetName())
 				})
 
 				It("Apply continues on error", func() {
-					continueOnErrorTest(c, invConfig, inventoryName, namespace.GetName())
+					continueOnErrorTest(ctx, c, invConfig, inventoryName, namespace.GetName())
 				})
 
 				It("Server-Side Apply", func() {
-					serversideApplyTest(c, invConfig, inventoryName, namespace.GetName())
+					serversideApplyTest(ctx, c, invConfig, inventoryName, namespace.GetName())
 				})
 
 				It("Implements depends-on apply ordering", func() {
-					dependsOnTest(c, invConfig, inventoryName, namespace.GetName())
+					dependsOnTest(ctx, c, invConfig, inventoryName, namespace.GetName())
 				})
 
 				It("Implements apply-time-mutation", func() {
-					mutationTest(c, invConfig, inventoryName, namespace.GetName())
+					mutationTest(ctx, c, invConfig, inventoryName, namespace.GetName())
 				})
 
 				It("Prune retrieval error correctly handled", func() {
-					pruneRetrieveErrorTest(c, invConfig, inventoryName, namespace.GetName())
+					pruneRetrieveErrorTest(ctx, c, invConfig, inventoryName, namespace.GetName())
 				})
 			})
 
 			Context("Inventory policy", func() {
 				var namespace *v1.Namespace
+				var ctx context.Context
+				var cancel context.CancelFunc
 
 				BeforeEach(func() {
-					namespace = createRandomNamespace(c)
+					ctx, cancel = context.WithTimeout(context.Background(), defaultTestTimeout)
+					namespace = createRandomNamespace(ctx, c)
 				})
 
 				AfterEach(func() {
-					deleteNamespace(c, namespace)
+					Expect(ctx.Err()).To(BeNil(), "test context cancelled or timed out")
+					cancel()
+					// new timeout for cleanup
+					ctx, cancel = context.WithTimeout(context.Background(), defaultAfterTestTimeout)
+					defer cancel()
+					deleteUnstructuredIfExists(ctx, c, withNamespace(manifestToUnstructured(deployment1), namespace.GetName()))
+					deleteNamespace(ctx, c, namespace)
 				})
 
 				It("MustMatch policy", func() {
-					inventoryPolicyMustMatchTest(c, invConfig, namespace.GetName())
+					inventoryPolicyMustMatchTest(ctx, c, invConfig, namespace.GetName())
 				})
 
 				It("AdoptIfNoInventory policy", func() {
-					inventoryPolicyAdoptIfNoInventoryTest(c, invConfig, namespace.GetName())
+					inventoryPolicyAdoptIfNoInventoryTest(ctx, c, invConfig, namespace.GetName())
 				})
 
 				It("AdoptAll policy", func() {
-					inventoryPolicyAdoptAllTest(c, invConfig, namespace.GetName())
+					inventoryPolicyAdoptAllTest(ctx, c, invConfig, namespace.GetName())
 				})
 			})
 		})
@@ -202,36 +230,45 @@ var _ = Describe("Applier", func() {
 	Context("InventoryStrategy: Name", func() {
 		var namespace *v1.Namespace
 		var inventoryName string
+		var ctx context.Context
+		var cancel context.CancelFunc
 
 		BeforeEach(func() {
+			ctx, cancel = context.WithTimeout(context.Background(), defaultTestTimeout)
 			inventoryName = randomString("test-inv-")
-			namespace = createRandomNamespace(c)
+			namespace = createRandomNamespace(ctx, c)
 		})
 
 		AfterEach(func() {
-			deleteNamespace(c, namespace)
+			Expect(ctx.Err()).To(BeNil(), "test context cancelled or timed out")
+			cancel()
+			// new timeout for cleanup
+			ctx, cancel = context.WithTimeout(context.Background(), defaultAfterTestTimeout)
+			defer cancel()
+			deleteUnstructuredIfExists(ctx, c, withNamespace(manifestToUnstructured(deployment1), namespace.GetName()))
+			deleteNamespace(ctx, c, namespace)
 		})
 
 		It("Apply with existing inventory", func() {
-			applyWithExistingInvTest(c, inventoryConfigs[CustomTypeInvConfig], inventoryName, namespace.GetName())
+			applyWithExistingInvTest(ctx, c, inventoryConfigs[CustomTypeInvConfig], inventoryName, namespace.GetName())
 		})
 	})
 })
 
-func createInventoryCRD(c client.Client) {
+func createInventoryCRD(ctx context.Context, c client.Client) {
 	invCRD := manifestToUnstructured(customprovider.InventoryCRD)
 	var u unstructured.Unstructured
 	u.SetGroupVersionKind(invCRD.GroupVersionKind())
-	err := c.Get(context.TODO(), types.NamespacedName{
+	err := c.Get(ctx, types.NamespacedName{
 		Name: invCRD.GetName(),
 	}, &u)
 	if apierrors.IsNotFound(err) {
-		err = c.Create(context.TODO(), invCRD)
+		err = c.Create(ctx, invCRD)
 	}
 	Expect(err).NotTo(HaveOccurred())
 }
 
-func createRandomNamespace(c client.Client) *v1.Namespace {
+func createRandomNamespace(ctx context.Context, c client.Client) *v1.Namespace {
 	namespaceName := randomString("e2e-test-")
 	namespace := &v1.Namespace{
 		TypeMeta: metav1.TypeMeta{
@@ -243,21 +280,21 @@ func createRandomNamespace(c client.Client) *v1.Namespace {
 		},
 	}
 
-	err := c.Create(context.TODO(), namespace)
+	err := c.Create(ctx, namespace)
 	Expect(err).ToNot(HaveOccurred())
 	return namespace
 }
 
-func deleteInventoryCRD(c client.Client) {
+func deleteInventoryCRD(ctx context.Context, c client.Client) {
 	invCRD := manifestToUnstructured(customprovider.InventoryCRD)
-	err := c.Delete(context.TODO(), invCRD)
+	err := c.Delete(ctx, invCRD)
 	if err != nil && !apierrors.IsNotFound(err) {
 		Expect(err).ToNot(HaveOccurred())
 	}
 }
 
-func deleteUnstructuredIfExists(c client.Client, obj *unstructured.Unstructured) {
-	err := c.Delete(context.TODO(), obj)
+func deleteUnstructuredIfExists(ctx context.Context, c client.Client, obj *unstructured.Unstructured) {
+	err := c.Delete(ctx, obj)
 	if err != nil {
 		Expect(err).To(Or(
 			BeAssignableToTypeOf(&meta.NoKindMatchError{}),
@@ -269,8 +306,8 @@ func deleteUnstructuredIfExists(c client.Client, obj *unstructured.Unstructured)
 	}
 }
 
-func deleteNamespace(c client.Client, namespace *v1.Namespace) {
-	err := c.Delete(context.TODO(), namespace)
+func deleteNamespace(ctx context.Context, c client.Client, namespace *v1.Namespace) {
+	err := c.Delete(ctx, namespace)
 	Expect(err).ToNot(HaveOccurred())
 }
 
@@ -282,9 +319,9 @@ func newDefaultInvDestroyer() *apply.Destroyer {
 	return newDestroyerFromInvFactory(inventory.ClusterInventoryClientFactory{})
 }
 
-func defaultInvSizeVerifyFunc(c client.Client, name, namespace, id string, count int) {
+func defaultInvSizeVerifyFunc(ctx context.Context, c client.Client, name, namespace, id string, count int) {
 	var cmList v1.ConfigMapList
-	err := c.List(context.TODO(), &cmList,
+	err := c.List(ctx, &cmList,
 		client.MatchingLabels(map[string]string{common.InventoryLabel: id}),
 		client.InNamespace(namespace))
 	Expect(err).ToNot(HaveOccurred())
@@ -297,9 +334,9 @@ func defaultInvSizeVerifyFunc(c client.Client, name, namespace, id string, count
 	Expect(len(data)).To(Equal(count))
 }
 
-func defaultInvCountVerifyFunc(c client.Client, namespace string, count int) {
+func defaultInvCountVerifyFunc(ctx context.Context, c client.Client, namespace string, count int) {
 	var cmList v1.ConfigMapList
-	err := c.List(context.TODO(), &cmList, client.InNamespace(namespace), client.HasLabels{common.InventoryLabel})
+	err := c.List(ctx, &cmList, client.InNamespace(namespace), client.HasLabels{common.InventoryLabel})
 	Expect(err).NotTo(HaveOccurred())
 	Expect(len(cmList.Items)).To(Equal(count))
 }
@@ -320,10 +357,10 @@ func newFactory() util.Factory {
 	return util.NewFactory(matchVersionKubeConfigFlags)
 }
 
-func customInvSizeVerifyFunc(c client.Client, name, namespace, _ string, count int) {
+func customInvSizeVerifyFunc(ctx context.Context, c client.Client, name, namespace, _ string, count int) {
 	var u unstructured.Unstructured
 	u.SetGroupVersionKind(customprovider.InventoryGVK)
-	err := c.Get(context.TODO(), types.NamespacedName{
+	err := c.Get(ctx, types.NamespacedName{
 		Name:      name,
 		Namespace: namespace,
 	}, &u)
@@ -340,10 +377,10 @@ func customInvSizeVerifyFunc(c client.Client, name, namespace, _ string, count i
 	Expect(len(s)).To(Equal(count))
 }
 
-func customInvCountVerifyFunc(c client.Client, namespace string, count int) {
+func customInvCountVerifyFunc(ctx context.Context, c client.Client, namespace string, count int) {
 	var u unstructured.UnstructuredList
 	u.SetGroupVersionKind(customprovider.InventoryGVK)
-	err := c.List(context.TODO(), &u, client.InNamespace(namespace))
+	err := c.List(ctx, &u, client.InNamespace(namespace))
 	Expect(err).NotTo(HaveOccurred())
 	Expect(len(u.Items)).To(Equal(count))
 }

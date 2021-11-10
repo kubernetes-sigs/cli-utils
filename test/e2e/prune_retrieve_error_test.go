@@ -18,7 +18,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func pruneRetrieveErrorTest(c client.Client, invConfig InventoryConfig, inventoryName, namespaceName string) {
+func pruneRetrieveErrorTest(ctx context.Context, c client.Client, invConfig InventoryConfig, inventoryName, namespaceName string) {
 	By("apply a single resource, which is referenced in the inventory")
 	applier := invConfig.ApplierFactoryFunc()
 
@@ -30,7 +30,7 @@ func pruneRetrieveErrorTest(c client.Client, invConfig InventoryConfig, inventor
 		withNamespace(manifestToUnstructured(pod1), namespaceName),
 	}
 
-	applierEvents := runCollect(applier.Run(context.TODO(), inv, resource1, apply.Options{
+	applierEvents := runCollect(applier.Run(ctx, inv, resource1, apply.Options{
 		EmitStatusEvents: false,
 	}))
 
@@ -127,22 +127,22 @@ func pruneRetrieveErrorTest(c client.Client, invConfig InventoryConfig, inventor
 	Expect(testutil.EventsToExpEvents(applierEvents)).To(testutil.Equal(expEvents))
 
 	By("Verify pod1 created")
-	assertUnstructuredExists(c, withNamespace(manifestToUnstructured(pod1), namespaceName))
+	assertUnstructuredExists(ctx, c, withNamespace(manifestToUnstructured(pod1), namespaceName))
 
 	// Delete the previously applied resource, which is referenced in the inventory.
 	By("delete resource, which is referenced in the inventory")
-	deleteUnstructuredAndWait(c, withNamespace(manifestToUnstructured(pod1), namespaceName))
+	deleteUnstructuredAndWait(ctx, c, withNamespace(manifestToUnstructured(pod1), namespaceName))
 
 	By("Verify inventory")
 	// The inventory should still have the previously deleted item.
-	invConfig.InvSizeVerifyFunc(c, inventoryName, namespaceName, inventoryID, 1)
+	invConfig.InvSizeVerifyFunc(ctx, c, inventoryName, namespaceName, inventoryID, 1)
 
 	By("apply a different resource, and validate the inventory accurately reflects only this object")
 	resource2 := []*unstructured.Unstructured{
 		withNamespace(manifestToUnstructured(pod2), namespaceName),
 	}
 
-	applierEvents2 := runCollect(applier.Run(context.TODO(), inv, resource2, apply.Options{
+	applierEvents2 := runCollect(applier.Run(ctx, inv, resource2, apply.Options{
 		EmitStatusEvents: false,
 	}))
 
@@ -241,20 +241,20 @@ func pruneRetrieveErrorTest(c client.Client, invConfig InventoryConfig, inventor
 
 	By("Wait for pod2 to be created")
 	// TODO: change behavior so the user doesn't need to code their own wait
-	waitForCreation(c, withNamespace(manifestToUnstructured(pod2), namespaceName))
+	waitForCreation(ctx, c, withNamespace(manifestToUnstructured(pod2), namespaceName))
 
 	By("Verify pod1 still deleted")
-	assertUnstructuredDoesNotExist(c, withNamespace(manifestToUnstructured(pod1), namespaceName))
+	assertUnstructuredDoesNotExist(ctx, c, withNamespace(manifestToUnstructured(pod1), namespaceName))
 
 	By("Verify inventory")
 	// The inventory should only have the currently applied item.
-	invConfig.InvSizeVerifyFunc(c, inventoryName, namespaceName, inventoryID, 1)
+	invConfig.InvSizeVerifyFunc(ctx, c, inventoryName, namespaceName, inventoryID, 1)
 
 	By("Destroy resources")
 	destroyer := invConfig.DestroyerFactoryFunc()
 
 	options := apply.DestroyerOptions{InventoryPolicy: inventory.AdoptIfNoInventory}
-	destroyerEvents := runCollect(destroyer.Run(context.TODO(), inv, options))
+	destroyerEvents := runCollect(destroyer.Run(ctx, inv, options))
 
 	expEvents3 := []testutil.ExpEvent{
 		{
@@ -331,9 +331,9 @@ func pruneRetrieveErrorTest(c client.Client, invConfig InventoryConfig, inventor
 	Expect(testutil.EventsToExpEvents(destroyerEvents)).To(testutil.Equal(expEvents3))
 
 	By("Verify pod1 is deleted")
-	assertUnstructuredDoesNotExist(c, withNamespace(manifestToUnstructured(pod1), namespaceName))
+	assertUnstructuredDoesNotExist(ctx, c, withNamespace(manifestToUnstructured(pod1), namespaceName))
 
 	By("Wait for pod2 to be deleted")
 	// TODO: change behavior so the user doesn't need to code their own wait
-	waitForDeletion(c, withNamespace(manifestToUnstructured(pod2), namespaceName))
+	waitForDeletion(ctx, c, withNamespace(manifestToUnstructured(pod2), namespaceName))
 }

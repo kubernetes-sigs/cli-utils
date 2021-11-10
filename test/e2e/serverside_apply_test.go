@@ -17,7 +17,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func serversideApplyTest(c client.Client, invConfig InventoryConfig, inventoryName, namespaceName string) {
+func serversideApplyTest(ctx context.Context, c client.Client, invConfig InventoryConfig, inventoryName, namespaceName string) {
 	By("Apply a Deployment and an APIService by server-side apply")
 	applier := invConfig.ApplierFactoryFunc()
 
@@ -27,7 +27,7 @@ func serversideApplyTest(c client.Client, invConfig InventoryConfig, inventoryNa
 		manifestToUnstructured(apiservice1),
 	}
 
-	runWithNoErr(applier.Run(context.TODO(), inv, firstResources, apply.Options{
+	runWithNoErr(applier.Run(ctx, inv, firstResources, apply.Options{
 		ReconcileTimeout: 2 * time.Minute,
 		EmitStatusEvents: true,
 		ServerSideOptions: common.ServerSideOptions{
@@ -38,7 +38,7 @@ func serversideApplyTest(c client.Client, invConfig InventoryConfig, inventoryNa
 	}))
 
 	By("Verify deployment is server-side applied")
-	result := assertUnstructuredExists(c, withNamespace(manifestToUnstructured(deployment1), namespaceName))
+	result := assertUnstructuredExists(ctx, c, withNamespace(manifestToUnstructured(deployment1), namespaceName))
 
 	// LastAppliedConfigAnnotation annotation is only set for client-side apply and we've server-side applied here.
 	_, found, err := testutil.NestedField(result.Object, "metadata", "annotations", v1.LastAppliedConfigAnnotation)
@@ -51,7 +51,7 @@ func serversideApplyTest(c client.Client, invConfig InventoryConfig, inventoryNa
 	Expect(manager).To(Equal("test"))
 
 	By("Verify APIService is server-side applied")
-	result = assertUnstructuredExists(c, manifestToUnstructured(apiservice1))
+	result = assertUnstructuredExists(ctx, c, manifestToUnstructured(apiservice1))
 
 	// LastAppliedConfigAnnotation annotation is only set for client-side apply and we've server-side applied here.
 	_, found, err = testutil.NestedField(result.Object, "metadata", "annotations", v1.LastAppliedConfigAnnotation)

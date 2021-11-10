@@ -18,7 +18,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func dependsOnTest(c client.Client, invConfig InventoryConfig, inventoryName, namespaceName string) {
+func dependsOnTest(ctx context.Context, c client.Client, invConfig InventoryConfig, inventoryName, namespaceName string) {
 	By("apply resources in order based on depends-on annotation")
 	applier := invConfig.ApplierFactoryFunc()
 
@@ -36,7 +36,7 @@ func dependsOnTest(c client.Client, invConfig InventoryConfig, inventoryName, na
 		pod3Obj,
 	}
 
-	applierEvents := runCollect(applier.Run(context.TODO(), inv, resources, apply.Options{
+	applierEvents := runCollect(applier.Run(ctx, inv, resources, apply.Options{
 		EmitStatusEvents: false,
 	}))
 
@@ -278,21 +278,21 @@ func dependsOnTest(c client.Client, invConfig InventoryConfig, inventoryName, na
 	Expect(testutil.EventsToExpEvents(applierEvents)).To(testutil.Equal(expEvents))
 
 	By("verify pod1 created and ready")
-	result := assertUnstructuredExists(c, pod1Obj)
+	result := assertUnstructuredExists(ctx, c, pod1Obj)
 	podIP, found, err := testutil.NestedField(result.Object, "status", "podIP")
 	Expect(err).NotTo(HaveOccurred())
 	Expect(found).To(BeTrue())
 	Expect(podIP).NotTo(BeEmpty()) // use podIP as proxy for readiness
 
 	By("verify pod2 created and ready")
-	result = assertUnstructuredExists(c, pod2Obj)
+	result = assertUnstructuredExists(ctx, c, pod2Obj)
 	podIP, found, err = testutil.NestedField(result.Object, "status", "podIP")
 	Expect(err).NotTo(HaveOccurred())
 	Expect(found).To(BeTrue())
 	Expect(podIP).NotTo(BeEmpty()) // use podIP as proxy for readiness
 
 	By("verify pod3 created and ready")
-	result = assertUnstructuredExists(c, pod3Obj)
+	result = assertUnstructuredExists(ctx, c, pod3Obj)
 	podIP, found, err = testutil.NestedField(result.Object, "status", "podIP")
 	Expect(err).NotTo(HaveOccurred())
 	Expect(found).To(BeTrue())
@@ -301,7 +301,7 @@ func dependsOnTest(c client.Client, invConfig InventoryConfig, inventoryName, na
 	By("destroy resources in opposite order")
 	destroyer := invConfig.DestroyerFactoryFunc()
 	options := apply.DestroyerOptions{InventoryPolicy: inventory.AdoptIfNoInventory}
-	destroyerEvents := runCollect(destroyer.Run(context.TODO(), inv, options))
+	destroyerEvents := runCollect(destroyer.Run(ctx, inv, options))
 
 	expEvents = []testutil.ExpEvent{
 		{
@@ -523,11 +523,11 @@ func dependsOnTest(c client.Client, invConfig InventoryConfig, inventoryName, na
 	Expect(testutil.EventsToExpEvents(destroyerEvents)).To(testutil.Equal(expEvents))
 
 	By("verify pod1 deleted")
-	assertUnstructuredDoesNotExist(c, pod1Obj)
+	assertUnstructuredDoesNotExist(ctx, c, pod1Obj)
 
 	By("verify pod2 deleted")
-	assertUnstructuredDoesNotExist(c, pod2Obj)
+	assertUnstructuredDoesNotExist(ctx, c, pod2Obj)
 
 	By("verify pod3 deleted")
-	assertUnstructuredDoesNotExist(c, pod3Obj)
+	assertUnstructuredDoesNotExist(ctx, c, pod3Obj)
 }

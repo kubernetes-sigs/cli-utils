@@ -20,7 +20,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func applyAndDestroyTest(c client.Client, invConfig InventoryConfig, inventoryName, namespaceName string) {
+func applyAndDestroyTest(ctx context.Context, c client.Client, invConfig InventoryConfig, inventoryName, namespaceName string) {
 	By("Apply resources")
 	applier := invConfig.ApplierFactoryFunc()
 	inventoryID := fmt.Sprintf("%s-%s", inventoryName, namespaceName)
@@ -32,7 +32,7 @@ func applyAndDestroyTest(c client.Client, invConfig InventoryConfig, inventoryNa
 		deployment1Obj,
 	}
 
-	applierEvents := runCollect(applier.Run(context.TODO(), inventoryInfo, resources, apply.Options{
+	applierEvents := runCollect(applier.Run(ctx, inventoryInfo, resources, apply.Options{
 		ReconcileTimeout: 2 * time.Minute,
 		EmitStatusEvents: true,
 	}))
@@ -184,16 +184,16 @@ func applyAndDestroyTest(c client.Client, invConfig InventoryConfig, inventoryNa
 	Expect(received).To(testutil.Equal(expEvents))
 
 	By("Verify deployment created")
-	assertUnstructuredExists(c, deployment1Obj)
+	assertUnstructuredExists(ctx, c, deployment1Obj)
 
 	By("Verify inventory")
-	invConfig.InvSizeVerifyFunc(c, inventoryName, namespaceName, inventoryID, 1)
+	invConfig.InvSizeVerifyFunc(ctx, c, inventoryName, namespaceName, inventoryID, 1)
 
 	By("Destroy resources")
 	destroyer := invConfig.DestroyerFactoryFunc()
 
 	options := apply.DestroyerOptions{InventoryPolicy: inventory.AdoptIfNoInventory}
-	destroyerEvents := runCollect(destroyer.Run(context.TODO(), inventoryInfo, options))
+	destroyerEvents := runCollect(destroyer.Run(ctx, inventoryInfo, options))
 
 	expEvents = []testutil.ExpEvent{
 		{
@@ -271,7 +271,7 @@ func applyAndDestroyTest(c client.Client, invConfig InventoryConfig, inventoryNa
 	Expect(testutil.EventsToExpEvents(destroyerEvents)).To(testutil.Equal(expEvents))
 
 	By("Verify deployment deleted")
-	assertUnstructuredDoesNotExist(c, deployment1Obj)
+	assertUnstructuredDoesNotExist(ctx, c, deployment1Obj)
 }
 
 func createInventoryInfo(invConfig InventoryConfig, inventoryName, namespaceName, inventoryID string) inventory.InventoryInfo {

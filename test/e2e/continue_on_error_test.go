@@ -19,7 +19,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func continueOnErrorTest(c client.Client, invConfig InventoryConfig, inventoryName, namespaceName string) {
+func continueOnErrorTest(ctx context.Context, c client.Client, invConfig InventoryConfig, inventoryName, namespaceName string) {
 	By("apply an invalid CRD")
 	applier := invConfig.ApplierFactoryFunc()
 
@@ -30,7 +30,7 @@ func continueOnErrorTest(c client.Client, invConfig InventoryConfig, inventoryNa
 		withNamespace(manifestToUnstructured(pod1), namespaceName),
 	}
 
-	applierEvents := runCollect(applier.Run(context.TODO(), inv, resources, apply.Options{}))
+	applierEvents := runCollect(applier.Run(ctx, inv, resources, apply.Options{}))
 
 	expEvents := []testutil.ExpEvent{
 		{
@@ -140,8 +140,8 @@ func continueOnErrorTest(c client.Client, invConfig InventoryConfig, inventoryNa
 	Expect(receivedEvents).To(testutil.Equal(expEvents))
 
 	By("Verify pod1 created")
-	assertUnstructuredExists(c, withNamespace(manifestToUnstructured(pod1), namespaceName))
+	assertUnstructuredExists(ctx, c, withNamespace(manifestToUnstructured(pod1), namespaceName))
 
 	By("Verify CRD not created")
-	assertUnstructuredDoesNotExist(c, manifestToUnstructured(invalidCrd))
+	assertUnstructuredDoesNotExist(ctx, c, manifestToUnstructured(invalidCrd))
 }
