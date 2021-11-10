@@ -52,7 +52,8 @@ func (p *PruneTask) Identifiers() object.ObjMetadataSet {
 // to signal to the taskrunner that the task has completed (or failed).
 func (p *PruneTask) Start(taskContext *taskrunner.TaskContext) {
 	go func() {
-		klog.V(2).Infof("prune task starting (objects: %d, name: %q)", len(p.Objects), p.Name())
+		klog.V(2).Infof("prune task starting (name: %q, objects: %d)",
+			p.Name(), len(p.Objects))
 		// Create filter to prevent deletion of currently applied
 		// objects. Must be done here to wait for applied UIDs.
 		uidFilter := filter.CurrentUIDFilter{
@@ -70,6 +71,7 @@ func (p *PruneTask) Start(taskContext *taskrunner.TaskContext) {
 				Destroy:           p.Destroy,
 			},
 		)
+		klog.V(2).Infof("prune task completing (name: %q)", p.Name())
 		taskContext.TaskChannel() <- taskrunner.TaskResult{
 			Err: err,
 		}

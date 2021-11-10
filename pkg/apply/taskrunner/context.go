@@ -53,6 +53,12 @@ func (tc *TaskContext) ResourceCache() cache.ResourceCache {
 	return tc.resourceCache
 }
 
+// SendEvent sends an event on the event channel
+func (tc *TaskContext) SendEvent(e event.Event) {
+	klog.V(5).Infof("sending event: %s", e)
+	tc.eventChannel <- e
+}
+
 // IsSuccessfulApply returns true if the object apply was successful
 func (tc *TaskContext) IsSuccessfulApply(id object.ObjMetadata) bool {
 	_, found := tc.successfulApplies[id]

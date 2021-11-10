@@ -20,7 +20,7 @@ type SendEventTask struct {
 // signal to the taskrunner that the task is completed.
 func (s *SendEventTask) Start(taskContext *taskrunner.TaskContext) {
 	go func() {
-		taskContext.EventChannel() <- s.Event
+		taskContext.SendEvent(s.Event)
 		taskContext.TaskChannel() <- taskrunner.TaskResult{}
 	}()
 }
