@@ -56,18 +56,18 @@ func withDependsOn(obj *unstructured.Unstructured, dep string) *unstructured.Uns
 	return obj
 }
 
-func deleteUnstructuredAndWait(c client.Client, obj *unstructured.Unstructured) {
+func deleteUnstructuredAndWait(ctx context.Context, c client.Client, obj *unstructured.Unstructured) {
 	ref := mutation.NewResourceReference(obj)
 
-	err := c.Delete(context.TODO(), obj,
+	err := c.Delete(ctx, obj,
 		client.PropagationPolicy(metav1.DeletePropagationForeground))
 	Expect(err).NotTo(HaveOccurred(),
 		"expected DELETE to not error (%s): %s", ref, err)
 
-	waitForDeletion(c, obj)
+	waitForDeletion(ctx, c, obj)
 }
 
-func waitForDeletion(c client.Client, obj *unstructured.Unstructured) {
+func waitForDeletion(ctx context.Context, c client.Client, obj *unstructured.Unstructured) {
 	ref := mutation.NewResourceReference(obj)
 	resultObj := ref.Unstructured()
 
@@ -84,7 +84,7 @@ func waitForDeletion(c client.Client, obj *unstructured.Unstructured) {
 			Fail("timed out waiting for resource to be fully deleted")
 			return
 		case <-s.C:
-			err := c.Get(context.TODO(), types.NamespacedName{
+			err := c.Get(ctx, types.NamespacedName{
 				Namespace: obj.GetNamespace(),
 				Name:      obj.GetName(),
 			}, resultObj)
@@ -98,7 +98,17 @@ func waitForDeletion(c client.Client, obj *unstructured.Unstructured) {
 	}
 }
 
-func waitForCreation(c client.Client, obj *unstructured.Unstructured) {
+func createUnstructuredAndWait(ctx context.Context, c client.Client, obj *unstructured.Unstructured) {
+	ref := mutation.NewResourceReference(obj)
+
+	err := c.Create(ctx, obj)
+	Expect(err).NotTo(HaveOccurred(),
+		"expected CREATE to not error (%s): %s", ref, err)
+
+	waitForCreation(ctx, c, obj)
+}
+
+func waitForCreation(ctx context.Context, c client.Client, obj *unstructured.Unstructured) {
 	ref := mutation.NewResourceReference(obj)
 	resultObj := ref.Unstructured()
 
@@ -115,7 +125,7 @@ func waitForCreation(c client.Client, obj *unstructured.Unstructured) {
 			Fail("timed out waiting for resource to be fully created")
 			return
 		case <-s.C:
-			err := c.Get(context.TODO(), types.NamespacedName{
+			err := c.Get(ctx, types.NamespacedName{
 				Namespace: obj.GetNamespace(),
 				Name:      obj.GetName(),
 			}, resultObj)
@@ -130,11 +140,11 @@ func waitForCreation(c client.Client, obj *unstructured.Unstructured) {
 	}
 }
 
-func assertUnstructuredExists(c client.Client, obj *unstructured.Unstructured) *unstructured.Unstructured {
+func assertUnstructuredExists(ctx context.Context, c client.Client, obj *unstructured.Unstructured) *unstructured.Unstructured {
 	ref := mutation.NewResourceReference(obj)
 	resultObj := ref.Unstructured()
 
-	err := c.Get(context.TODO(), types.NamespacedName{
+	err := c.Get(ctx, types.NamespacedName{
 		Namespace: obj.GetNamespace(),
 		Name:      obj.GetName(),
 	}, resultObj)
@@ -143,11 +153,11 @@ func assertUnstructuredExists(c client.Client, obj *unstructured.Unstructured) *
 	return resultObj
 }
 
-func assertUnstructuredDoesNotExist(c client.Client, obj *unstructured.Unstructured) {
+func assertUnstructuredDoesNotExist(ctx context.Context, c client.Client, obj *unstructured.Unstructured) {
 	ref := mutation.NewResourceReference(obj)
 	resultObj := ref.Unstructured()
 
-	err := c.Get(context.TODO(), types.NamespacedName{
+	err := c.Get(ctx, types.NamespacedName{
 		Namespace: obj.GetNamespace(),
 		Name:      obj.GetName(),
 	}, resultObj)

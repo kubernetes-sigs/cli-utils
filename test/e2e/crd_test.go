@@ -20,7 +20,7 @@ import (
 )
 
 //nolint:dupl // expEvents similar to mutation tests
-func crdTest(_ client.Client, invConfig InventoryConfig, inventoryName, namespaceName string) {
+func crdTest(ctx context.Context, _ client.Client, invConfig InventoryConfig, inventoryName, namespaceName string) {
 	By("apply a set of resources that includes both a crd and a cr")
 	applier := invConfig.ApplierFactoryFunc()
 
@@ -34,7 +34,7 @@ func crdTest(_ client.Client, invConfig InventoryConfig, inventoryName, namespac
 		crdObj,
 	}
 
-	applierEvents := runCollect(applier.Run(context.TODO(), inv, resources, apply.Options{
+	applierEvents := runCollect(applier.Run(ctx, inv, resources, apply.Options{
 		ReconcileTimeout: 2 * time.Minute,
 		EmitStatusEvents: false,
 	}))
@@ -215,7 +215,7 @@ func crdTest(_ client.Client, invConfig InventoryConfig, inventoryName, namespac
 	By("destroy the resources, including the crd")
 	destroyer := invConfig.DestroyerFactoryFunc()
 	options := apply.DestroyerOptions{InventoryPolicy: inventory.AdoptIfNoInventory}
-	destroyerEvents := runCollect(destroyer.Run(context.TODO(), inv, options))
+	destroyerEvents := runCollect(destroyer.Run(ctx, inv, options))
 
 	expEvents = []testutil.ExpEvent{
 		{
