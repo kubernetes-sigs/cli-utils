@@ -14,6 +14,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/onsi/gomega/format"
+	"github.com/stretchr/testify/assert"
 )
 
 // Equal returns a matcher for use with Gomega that uses go-cmp's cmp.Equal to
@@ -31,21 +32,21 @@ type cmpMatcher struct {
 }
 
 func (cm *cmpMatcher) Match(actual interface{}) (bool, error) {
-	match := cmp.Equal(actual, cm.expected, cmpopts.EquateErrors())
+	match := cmp.Equal(cm.expected, actual, cmpopts.EquateErrors())
 	if !match {
-		cm.explanation = errors.New(cmp.Diff(actual, cm.expected, cmpopts.EquateErrors()))
+		cm.explanation = errors.New(cmp.Diff(cm.expected, actual, cmpopts.EquateErrors()))
 	}
 	return match, nil
 }
 
 func (cm *cmpMatcher) FailureMessage(actual interface{}) string {
-	return format.Message(actual, "to deeply equal", cm.expected) +
-		"\nDiff:\n" + indent(cm.explanation.Error(), 1)
+	return "\n" + format.Message(actual, "to deeply equal", cm.expected) +
+		"\nDiff (- Expected, + Actual):\n" + indent(cm.explanation.Error(), 1)
 }
 
 func (cm *cmpMatcher) NegatedFailureMessage(actual interface{}) string {
-	return format.Message(actual, "not to deeply equal", cm.expected) +
-		"\nDiff:\n" + indent(cm.explanation.Error(), 1)
+	return "\n" + format.Message(actual, "not to deeply equal", cm.expected) +
+		"\nDiff (- Expected, + Actual):\n" + indent(cm.explanation.Error(), 1)
 }
 
 func indent(in string, indentation uint) string {
@@ -111,7 +112,7 @@ func (e equalErrorString) Is(err error) bool {
 
 // AssertEqual fails the test if the actual value does not deeply equal the
 // expected value. Prints a diff on failure.
-func AssertEqual(t *testing.T, actual, expected interface{}) {
+func AssertEqual(t *testing.T, expected, actual interface{}, msgAndArgs ...interface{}) {
 	t.Helper() // print the caller's file:line, instead of this func, on failure
 	matcher := Equal(expected)
 	match, err := matcher.Match(actual)
@@ -119,13 +120,13 @@ func AssertEqual(t *testing.T, actual, expected interface{}) {
 		t.Errorf("errored testing equality: %s", err)
 	}
 	if !match {
-		t.Error(matcher.FailureMessage(actual))
+		assert.Fail(t, matcher.FailureMessage(actual), msgAndArgs...)
 	}
 }
 
 // AssertNotEqual fails the test if the actual value deeply equals the
 // expected value. Prints a diff on failure.
-func AssertNotEqual(t *testing.T, actual, expected interface{}) {
+func AssertNotEqual(t *testing.T, expected, actual interface{}, msgAndArgs ...interface{}) {
 	t.Helper() // print the caller's file:line, instead of this func, on failure
 	matcher := Equal(expected)
 	match, err := matcher.Match(actual)
@@ -133,6 +134,6 @@ func AssertNotEqual(t *testing.T, actual, expected interface{}) {
 		t.Errorf("errored testing equality: %s", err)
 	}
 	if match {
-		t.Error(matcher.NegatedFailureMessage(actual))
+		assert.Fail(t, matcher.NegatedFailureMessage(actual), msgAndArgs...)
 	}
 }

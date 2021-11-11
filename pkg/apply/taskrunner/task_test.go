@@ -202,7 +202,9 @@ loop:
 			},
 		},
 	}
-	testutil.AssertEqual(t, receivedEvents, expectedEvents)
+	testutil.AssertEqual(t, expectedEvents, receivedEvents,
+		"Actual events (%d) do not match expected events (%d)",
+		len(receivedEvents), len(expectedEvents))
 }
 
 func TestWaitTask_Timeout(t *testing.T) {
@@ -327,7 +329,9 @@ loop:
 			},
 		},
 	}
-	testutil.AssertEqual(t, receivedEvents, expectedEvents)
+	testutil.AssertEqual(t, expectedEvents, receivedEvents,
+		"Actual events (%d) do not match expected events (%d)",
+		len(receivedEvents), len(expectedEvents))
 }
 
 func TestWaitTask_StartAndComplete(t *testing.T) {
@@ -390,7 +394,9 @@ loop:
 			},
 		},
 	}
-	testutil.AssertEqual(t, receivedEvents, expectedEvents)
+	testutil.AssertEqual(t, expectedEvents, receivedEvents,
+		"Actual events (%d) do not match expected events (%d)",
+		len(receivedEvents), len(expectedEvents))
 }
 
 func TestWaitTask_Cancel(t *testing.T) {
@@ -450,7 +456,9 @@ loop:
 			},
 		},
 	}
-	testutil.AssertEqual(t, receivedEvents, expectedEvents)
+	testutil.AssertEqual(t, expectedEvents, receivedEvents,
+		"Actual events (%d) do not match expected events (%d)",
+		len(receivedEvents), len(expectedEvents))
 }
 
 func TestWaitTask_SingleTaskResult(t *testing.T) {
@@ -531,7 +539,9 @@ loop:
 			},
 		},
 	}
-	testutil.AssertEqual(t, receivedEvents, expectedEvents)
+	testutil.AssertEqual(t, expectedEvents, receivedEvents,
+		"Actual events (%d) do not match expected events (%d)",
+		len(receivedEvents), len(expectedEvents))
 
 	expectedResults := []TaskResult{
 		{}, // Empty result means success

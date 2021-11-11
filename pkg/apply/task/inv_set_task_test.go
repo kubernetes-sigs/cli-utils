@@ -232,7 +232,9 @@ func TestInvSetTask(t *testing.T) {
 				t.Errorf("unexpected error running InvAddTask: %s", result.Err)
 			}
 			actual, _ := client.GetClusterObjs(nil, common.DryRunNone)
-			testutil.AssertEqual(t, actual, tc.expectedObjs)
+			testutil.AssertEqual(t, tc.expectedObjs, actual,
+				"Actual cluster objects (%d) do not match expected cluster objects (%d)",
+				len(actual), len(tc.expectedObjs))
 		})
 	}
 }
