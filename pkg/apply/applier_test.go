@@ -1258,7 +1258,9 @@ func TestApplier(t *testing.T) {
 			sort.Sort(testutil.GroupedEventsByID(receivedEvents))
 
 			// Validate the rest of the events
-			testutil.AssertEqual(t, receivedEvents, tc.expectedEvents)
+			testutil.AssertEqual(t, tc.expectedEvents, receivedEvents,
+				"Actual events (%d) do not match expected events (%d)",
+				len(receivedEvents), len(tc.expectedEvents))
 
 			// Validate that the expected timeout was the cause of the run completion.
 			// just in case something else cancelled the run
@@ -1690,7 +1692,9 @@ func TestApplierCancel(t *testing.T) {
 			}
 
 			// Validate the rest of the events
-			testutil.AssertEqual(t, receivedEvents, tc.expectedEvents)
+			testutil.AssertEqual(t, tc.expectedEvents, receivedEvents,
+				"Actual events (%d) do not match expected events (%d)",
+				len(receivedEvents), len(tc.expectedEvents))
 
 			// Validate that the expected timeout was the cause of the run completion.
 			// just in case something else cancelled the run
@@ -1819,8 +1823,13 @@ func TestReadAndPrepareObjects(t *testing.T) {
 			}
 			require.NoError(t, err)
 
-			testutil.AssertEqual(t, tc.applyObjs, applyObjs)
-			testutil.AssertEqual(t, tc.pruneObjs, pruneObjs)
+			testutil.AssertEqual(t, applyObjs, tc.applyObjs,
+				"Actual applied objects (%d) do not match expected applied objects (%d)",
+				len(applyObjs), len(tc.applyObjs))
+
+			testutil.AssertEqual(t, pruneObjs, tc.pruneObjs,
+				"Actual pruned objects (%d) do not match expected pruned objects (%d)",
+				len(pruneObjs), len(tc.pruneObjs))
 		})
 	}
 }

@@ -375,7 +375,9 @@ func TestDestroyerCancel(t *testing.T) {
 			}
 
 			// Validate the rest of the events
-			testutil.AssertEqual(t, receivedEvents, tc.expectedEvents)
+			testutil.AssertEqual(t, tc.expectedEvents, receivedEvents,
+				"Actual events (%d) do not match expected events (%d)",
+				len(receivedEvents), len(tc.expectedEvents))
 
 			// Validate that the expected timeout was the cause of the run completion.
 			// just in case something else cancelled the run
