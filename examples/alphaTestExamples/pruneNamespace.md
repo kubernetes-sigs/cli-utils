@@ -33,11 +33,18 @@ BASE=$DEMO_HOME/base
 mkdir -p $BASE
 OUTPUT=$DEMO_HOME/output
 mkdir -p $OUTPUT
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+NC='\033[0m' # No Color
 
 function expectedOutputLine() {
-  test 1 == \
-  $(grep "$@" $OUTPUT/status | wc -l); \
-  echo $?
+  if ! grep -q "$@" "$OUTPUT/status"; then
+    echo -e "${RED}Error: output line not found${NC}"
+    echo -e "${RED}Expected: $@${NC}"
+    exit 1
+  else
+    echo -e "${GREEN}Success: output line found${NC}"
+  fi
 }
 ```
 
@@ -100,7 +107,7 @@ Use the kapply init command to generate the inventory template. This contains
 the namespace and inventory id used by apply to create inventory objects. 
 <!-- @createInventoryTemplate @testE2EAgainstLatestRelease-->
 ```
-kapply init $BASE > $OUTPUT/status
+kapply init $BASE | tee $OUTPUT/status
 expectedOutputLine "namespace: default is used for inventory object"
 ```
 
@@ -108,7 +115,7 @@ Apply the "app" to the cluster. All the config maps should be created, and
 no resources should be pruned.
 <!-- @runApply @testE2EAgainstLatestRelease -->
 ```
-kapply apply $BASE --reconcile-timeout=1m > $OUTPUT/status
+kapply apply $BASE --reconcile-timeout=1m | tee $OUTPUT/status
 expectedOutputLine "namespace/test-namespace created"
 expectedOutputLine "configmap/cm-a created"
 expectedOutputLine "configmap/cm-b created"
@@ -116,25 +123,25 @@ expectedOutputLine "configmap/cm-c created"
 expectedOutputLine "4 resource(s) applied. 4 created, 0 unchanged, 0 configured"
 
 # There should be only one inventory object
-kubectl get cm --selector='cli-utils.sigs.k8s.io/inventory-id' --no-headers | wc -l > $OUTPUT/status
+kubectl get cm --selector='cli-utils.sigs.k8s.io/inventory-id' --no-headers | wc -l | tee $OUTPUT/status
 expectedOutputLine "1"
 # Capture the inventory object name for later testing
 invName=$(kubectl get cm --selector='cli-utils.sigs.k8s.io/inventory-id' --no-headers | awk '{print $1}')
 # There should be four config maps: one inventory in default, two in test-namespace, one in default namespace
-kubectl get cm --selector='cli-utils.sigs.k8s.io/inventory-id' --no-headers | wc -l > $OUTPUT/status
+kubectl get cm --selector='cli-utils.sigs.k8s.io/inventory-id' --no-headers | wc -l | tee $OUTPUT/status
 expectedOutputLine "1"
-kubectl get cm -n test-namespace --selector='name=test-config-map-label' --no-headers | wc -l > $OUTPUT/status
+kubectl get cm -n test-namespace --selector='name=test-config-map-label' --no-headers | wc -l | tee $OUTPUT/status
 expectedOutputLine "2"
-kubectl get cm --selector='name=test-config-map-label' --no-headers | wc -l > $OUTPUT/status
+kubectl get cm --selector='name=test-config-map-label' --no-headers | wc -l | tee $OUTPUT/status
 expectedOutputLine "1"
 # ConfigMap cm-a had been created in the cluster
-kubectl get configmap/cm-a -n test-namespace --no-headers | wc -l > $OUTPUT/status
+kubectl get configmap/cm-a -n test-namespace --no-headers | wc -l | tee $OUTPUT/status
 expectedOutputLine "1"
 # ConfigMap cm-b had been created in the cluster
-kubectl get configmap/cm-b --no-headers | wc -l > $OUTPUT/status
+kubectl get configmap/cm-b --no-headers | wc -l | tee $OUTPUT/status
 expectedOutputLine "1"
 # ConfigMap cm-c had been created in the cluster
-kubectl get configmap/cm-c -n test-namespace --no-headers | wc -l > $OUTPUT/status
+kubectl get configmap/cm-c -n test-namespace --no-headers | wc -l | tee $OUTPUT/status
 expectedOutputLine "1"
 ```
 
@@ -162,22 +169,22 @@ test-namespace should **not** be pruned.
 
 <!-- @applySecondTime @testE2EAgainstLatestRelease -->
 ```
-kapply apply $BASE --reconcile-timeout=1m > $OUTPUT/status
+kapply apply $BASE --reconcile-timeout=1m | tee $OUTPUT/status
 expectedOutputLine "configmap/cm-a pruned"
 expectedOutputLine "configmap/cm-b pruned"
 expectedOutputLine "configmap/cm-c unchanged"
 expectedOutputLine "2 resource(s) pruned, 1 skipped"
 
 # The test-namespace should not be pruned.
-kubectl get ns test-namespace --no-headers | wc -l > $OUTPUT/status
+kubectl get ns test-namespace --no-headers | wc -l | tee $OUTPUT/status
 expectedOutputLine "1"
 # Inventory object should have two items: namespace and cm-c.
-kubectl get cm --selector='cli-utils.sigs.k8s.io/inventory-id' --no-headers | awk '{print $2}'  > $OUTPUT/status
+kubectl get cm --selector='cli-utils.sigs.k8s.io/inventory-id' --no-headers | awk '{print $2}' | tee $OUTPUT/status
 expectedOutputLine "2"
 # The inventory object should have the same name
-kubectl get configmap/${invName} --no-headers > $OUTPUT/status
+kubectl get configmap/${invName} --no-headers | tee $OUTPUT/status
 expectedOutputLine "${invName}"
 # ConfigMap cm-c remains in the cluster.
-kubectl get configmap/cm-c -n test-namespace --no-headers | wc -l > $OUTPUT/status
+kubectl get configmap/cm-c -n test-namespace --no-headers | wc -l | tee $OUTPUT/status
 expectedOutputLine "1"
 ```

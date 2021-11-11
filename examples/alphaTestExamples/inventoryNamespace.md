@@ -27,11 +27,18 @@ BASE=$DEMO_HOME/base
 mkdir -p $BASE
 OUTPUT=$DEMO_HOME/output
 mkdir -p $OUTPUT
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+NC='\033[0m' # No Color
 
 function expectedOutputLine() {
-  test 1 == \
-  $(grep "$@" $OUTPUT/status | wc -l); \
-  echo $?
+  if ! grep -q "$@" "$OUTPUT/status"; then
+    echo -e "${RED}Error: output line not found${NC}"
+    echo -e "${RED}Expected: $@${NC}"
+    exit 1
+  else
+    echo -e "${GREEN}Success: output line found${NC}"
+  fi
 }
 ```
 
@@ -75,7 +82,7 @@ Use the kapply init command to generate the inventory template. This contains
 the namespace and inventory id used by apply to create inventory objects. 
 <!-- @createInventoryTemplate @testE2EAgainstLatestRelease-->
 ```
-kapply init --namespace=test-namespace $BASE > $OUTPUT/status
+kapply init --namespace=test-namespace $BASE | tee $OUTPUT/status
 expectedOutputLine "namespace: test-namespace is used for inventory object"
 ```
 
@@ -85,24 +92,24 @@ test-namespace is created first, so the following resources within the namespace
 (including the inventory object) will not fail.
 <!-- @runApply @testE2EAgainstLatestRelease -->
 ```
-kapply apply $BASE --reconcile-timeout=1m > $OUTPUT/status
+kapply apply $BASE --reconcile-timeout=1m | tee $OUTPUT/status
 expectedOutputLine "namespace/test-namespace unchanged"
 expectedOutputLine "configmap/cm-a created"
 expectedOutputLine "2 resource(s) applied. 1 created, 1 unchanged, 0 configured"
 
 # There should be only one inventory object
-kubectl get cm -n test-namespace --selector='cli-utils.sigs.k8s.io/inventory-id' --no-headers | wc -l > $OUTPUT/status
+kubectl get cm -n test-namespace --selector='cli-utils.sigs.k8s.io/inventory-id' --no-headers | wc -l | tee $OUTPUT/status
 expectedOutputLine "1"
 
 # Capture the inventory object name for later testing
 invName=$(kubectl get cm -n test-namespace --selector='cli-utils.sigs.k8s.io/inventory-id' --no-headers | awk '{print $1}')
 
 # There should be one config map that is not the inventory object
-kubectl get cm -n test-namespace --selector='name=test-config-map-label' --no-headers | wc -l > $OUTPUT/status
+kubectl get cm -n test-namespace --selector='name=test-config-map-label' --no-headers | wc -l | tee $OUTPUT/status
 expectedOutputLine "1"
 
 # ConfigMap cm-a had been created in the cluster
-kubectl get configmap/cm-a -n test-namespace --no-headers | wc -l > $OUTPUT/status
+kubectl get configmap/cm-a -n test-namespace --no-headers | wc -l | tee $OUTPUT/status
 expectedOutputLine "1"
 ```
 
@@ -111,15 +118,15 @@ that the subsequent apply does not prune this omitted namespace.
 <!-- @noPruneInventoryNamespace @testE2EAgainstLatestRelease -->
 ```
 rm -f $BASE/test-namespace.yaml
-kapply apply $BASE --reconcile-timeout=1m > $OUTPUT/status
+kapply apply $BASE --reconcile-timeout=1m | tee $OUTPUT/status
 expectedOutputLine "0 resource(s) pruned, 1 skipped"
 
 # Inventory namespace should still exist
-kubectl get ns test-namespace --no-headers | wc -l > $OUTPUT/status
+kubectl get ns test-namespace --no-headers | wc -l | tee $OUTPUT/status
 
 # Inventory object should still exist
-kubectl get cm/${invName} -n test-namespace --no-headers | wc -l > $OUTPUT/status
+kubectl get cm/${invName} -n test-namespace --no-headers | wc -l | tee $OUTPUT/status
 
 # ConfigMap cm-a should still exist
-kubectl get configmap/cm-a -n test-namespace --no-headers | wc -l > $OUTPUT/status
+kubectl get configmap/cm-a -n test-namespace --no-headers | wc -l | tee $OUTPUT/status
 expectedOutputLine "1"

@@ -26,11 +26,28 @@ BASE=$DEMO_HOME/base
 mkdir -p $BASE
 OUTPUT=$DEMO_HOME/output
 mkdir -p $OUTPUT
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+NC='\033[0m' # No Color
 
 function expectedOutputLine() {
-  test 1 == \
-  $(grep "$@" $OUTPUT/status | wc -l); \
-  echo $?
+  if ! grep -q "$@" "$OUTPUT/status"; then
+    echo -e "${RED}Error: output line not found${NC}"
+    echo -e "${RED}Expected: $@${NC}"
+    exit 1
+  else
+    echo -e "${GREEN}Success: output line found${NC}"
+  fi
+}
+
+function expectedNotFound() {
+  if grep -q "$@" $OUTPUT/status; then
+    echo -e "${RED}Error: output line found:${NC}"
+    echo -e "${RED}Found: $@${NC}"
+    exit 1
+  else
+    echo -e "${GREEN}Success: output line not found found${NC}"
+  fi
 }
 ```
 
@@ -107,7 +124,7 @@ Use the kapply init command to generate the inventory template. This contains
 the namespace and inventory id used by apply to create inventory objects. 
 <!-- @createInventoryTemplate @testE2EAgainstLatestRelease-->
 ```
-kapply init $BASE > $OUTPUT/status
+kapply init $BASE | tee $OUTPUT/status
 expectedOutputLine "namespace: default is used for inventory object"
 
 ```
@@ -115,7 +132,7 @@ expectedOutputLine "namespace: default is used for inventory object"
 Apply the three resources to the cluster.
 <!-- @runApply @testE2EAgainstLatestRelease -->
 ```
-kapply apply $BASE --reconcile-timeout=1m > $OUTPUT/status
+kapply apply $BASE --reconcile-timeout=1m | tee $OUTPUT/status
 ```
 
 Use the preview command to show what will happen if we run destroy. This should
@@ -123,7 +140,7 @@ show that secondmap and thirdmap will not be deleted even when using the destroy
 command.
 <!-- @runDestroyPreview @testE2EAgainstLatestRelease -->
 ```
-kapply preview --destroy $BASE > $OUTPUT/status
+kapply preview --destroy $BASE | tee $OUTPUT/status
 
 expectedOutputLine "configmap/firstmap deleted (preview)"
 
@@ -137,7 +154,7 @@ has been deleted, while the resources with the annotations (secondmap and thirdm
 cluster.
 <!-- @runDestroy @testE2EAgainstLatestRelease -->
 ```
-kapply destroy $BASE > $OUTPUT/status
+kapply destroy $BASE | tee $OUTPUT/status
 
 expectedOutputLine "configmap/firstmap deleted"
 
@@ -148,10 +165,10 @@ expectedOutputLine "configmap/thirdmap delete skipped"
 expectedOutputLine "1 resource(s) deleted, 2 skipped"
 expectedNotFound "resource(s) pruned"
 
-kubectl get cm --no-headers | awk '{print $1}' > $OUTPUT/status
+kubectl get cm --no-headers | awk '{print $1}' | tee $OUTPUT/status
 expectedOutputLine "secondmap"
 
-kubectl get cm --no-headers | awk '{print $1}' > $OUTPUT/status
+kubectl get cm --no-headers | awk '{print $1}' | tee $OUTPUT/status
 expectedOutputLine "thirdmap"
 ```
 
@@ -159,7 +176,7 @@ Apply the resources back to the cluster so we can demonstrate the lifecycle
 directive with pruning.
 <!-- @runApplyAgain @testE2EAgainstLatestRelease -->
 ```
-kapply apply $BASE --inventory-policy=adopt --reconcile-timeout=1m > $OUTPUT/status
+kapply apply $BASE --inventory-policy=adopt --reconcile-timeout=1m | tee $OUTPUT/status
 ```
 
 Delete the manifest for secondmap and thirdmap
@@ -174,7 +191,7 @@ Run preview to see that while secondmap and thirdmap would normally be pruned, t
 will instead be skipped due to the lifecycle directive.
 <!-- @runPreviewForPrune @testE2EAgainstLatestRelease -->
 ```
-kapply preview $BASE > $OUTPUT/status
+kapply preview $BASE | tee $OUTPUT/status
 
 expectedOutputLine "configmap/secondmap prune skipped (preview)"
 
@@ -184,16 +201,16 @@ expectedOutputLine "configmap/thirdmap prune skipped (preview)"
 Run apply and verify that secondmap and thirdmap are still in the cluster.
 <!-- @runApplyToPrune @testE2EAgainstLatestRelease -->
 ```
-kapply apply $BASE > $OUTPUT/status
+kapply apply $BASE | tee $OUTPUT/status
 
 expectedOutputLine "configmap/secondmap prune skipped"
 
 expectedOutputLine "configmap/thirdmap prune skipped"
 
-kubectl get cm --no-headers | awk '{print $1}' > $OUTPUT/status
+kubectl get cm --no-headers | awk '{print $1}' | tee $OUTPUT/status
 expectedOutputLine "secondmap"
 
-kubectl get cm --no-headers | awk '{print $1}' > $OUTPUT/status
+kubectl get cm --no-headers | awk '{print $1}' | tee $OUTPUT/status
 expectedOutputLine "thirdmap"
 
 kind delete cluster;

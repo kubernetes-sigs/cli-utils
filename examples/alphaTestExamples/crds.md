@@ -29,11 +29,18 @@ BASE=$DEMO_HOME/base
 mkdir -p $BASE
 OUTPUT=$DEMO_HOME/output
 mkdir -p $OUTPUT
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+NC='\033[0m' # No Color
 
 function expectedOutputLine() {
-  test 1 == \
-  $(grep "$@" $OUTPUT/status | wc -l); \
-  echo $?
+  if ! grep -q "$@" "$OUTPUT/status"; then
+    echo -e "${RED}Error: output line not found${NC}"
+    echo -e "${RED}Expected: $@${NC}"
+    exit 1
+  else
+    echo -e "${GREEN}Success: output line found${NC}"
+  fi
 }
 ```
 
@@ -115,21 +122,21 @@ the namespace and inventory id used by apply to create inventory objects.
 ```
 kapply init $BASE
 
-ls -1 $BASE > $OUTPUT/status
+ls -1 $BASE | tee $OUTPUT/status
 expectedOutputLine "inventory-template.yaml"
 ```
 
 Use the `kapply` binary in `MYGOBIN` to apply both the CRD and the CR.
 <!-- @runApply @testE2EAgainstLatestRelease -->
 ```
-kapply apply $BASE --reconcile-timeout=1m --status-events> $OUTPUT/status
+kapply apply $BASE --reconcile-timeout=1m --status-events | tee $OUTPUT/status
 
 expectedOutputLine "foo.custom.io/example-foo is Current: Resource is current"
 
-kubectl get crd --no-headers | awk '{print $1}' > $OUTPUT/status
+kubectl get crd --no-headers | awk '{print $1}' | tee $OUTPUT/status
 expectedOutputLine "foos.custom.io"
 
-kubectl get foos.custom.io --no-headers | awk '{print $1}' > $OUTPUT/status
+kubectl get foos.custom.io --no-headers | awk '{print $1}' | tee $OUTPUT/status
 expectedOutputLine "example-foo"
 
 kind delete cluster

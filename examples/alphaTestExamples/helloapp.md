@@ -33,17 +33,28 @@ BASE=$DEMO_HOME/base
 mkdir -p $BASE
 OUTPUT=$DEMO_HOME/output
 mkdir -p $OUTPUT
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+NC='\033[0m' # No Color
 
 function expectedOutputLine() {
-  test 1 == \
-  $(grep "$@" $OUTPUT/status | wc -l); \
-  echo $?
+  if ! grep -q "$@" "$OUTPUT/status"; then
+    echo -e "${RED}Error: output line not found${NC}"
+    echo -e "${RED}Expected: $@${NC}"
+    exit 1
+  else
+    echo -e "${GREEN}Success: output line found${NC}"
+  fi
 }
 
 function expectedNotFound() {
-  test 0 == \
-  $(grep "$@" $OUTPUT/status | wc -l); \
-  echo $?
+  if grep -q "$@" $OUTPUT/status; then
+    echo -e "${RED}Error: output line found:${NC}"
+    echo -e "${RED}Found: $@${NC}"
+    exit 1
+  else
+    echo -e "${GREEN}Success: output line not found found${NC}"
+  fi
 }
 ```
 
@@ -154,30 +165,30 @@ the namespace and inventory id used by apply to create inventory objects.
 ```
 kapply init $BASE
 
-ls -1 $BASE > $OUTPUT/status
+ls -1 $BASE | tee $OUTPUT/status
 expectedOutputLine "inventory-template.yaml"
 ```
 
 Run preview to check which commands will be executed
 <!-- @previewHelloApp @testE2EAgainstLatestRelease -->
 ```
-kapply preview $BASE > $OUTPUT/status
+kapply preview $BASE | tee $OUTPUT/status
 
 expectedOutputLine "3 resource(s) applied. 3 created, 0 unchanged, 0 configured, 0 failed (preview)"
 
-kapply preview $BASE --server-side > $OUTPUT/status
+kapply preview $BASE --server-side | tee $OUTPUT/status
 
 expectedOutputLine "3 resource(s) applied. 0 created, 0 unchanged, 0 configured, 0 failed, 3 serverside applied (preview-server)"
 
 # Verify that preview didn't create any resources.
-kubectl get all -n hellospace > $OUTPUT/status 2>&1
+kubectl get all -n hellospace 2>&1 | tee $OUTPUT/status
 expectedOutputLine "No resources found in hellospace namespace."
 ```
 
 Use the `kapply` binary in `MYGOBIN` to apply a deployment and verify it is successful.
 <!-- @runHelloApp @testE2EAgainstLatestRelease -->
 ```
-kapply apply $BASE --reconcile-timeout=1m --status-events > $OUTPUT/status
+kapply apply $BASE --reconcile-timeout=1m --status-events | tee $OUTPUT/status
 
 expectedOutputLine "deployment.apps/the-deployment is Current: Deployment is available. Replicas: 3"
 
@@ -186,7 +197,7 @@ expectedOutputLine "service/the-service is Current: Service is ready"
 expectedOutputLine "configmap/the-map1 is Current: Resource is always ready"
 
 # Verify that we have the pods running in the cluster
-kubectl get --no-headers pod -n hellospace | wc -l | xargs > $OUTPUT/status
+kubectl get --no-headers pod -n hellospace | wc -l | xargs | tee $OUTPUT/status
 expectedOutputLine "3"
 ```
 
@@ -207,14 +218,14 @@ EOF
 
 rm $BASE/configMap.yaml
 
-kapply apply $BASE --reconcile-timeout=120s --status-events > $OUTPUT/status;
+kapply apply $BASE --reconcile-timeout=120s --status-events | tee $OUTPUT/status
 
 expectedOutputLine "configmap/the-map2 is Current: Resource is always ready"
 
 expectedOutputLine "configmap/the-map1 pruned"
 
 # Verify that the new configmap has been created and the old one pruned.
-kubectl get cm -n hellospace --no-headers | awk '{print $1}' > $OUTPUT/status
+kubectl get cm -n hellospace --no-headers | awk '{print $1}' | tee $OUTPUT/status
 expectedOutputLine "the-map2"
 expectedNotFound "the-map1"
 ```
@@ -222,7 +233,7 @@ expectedNotFound "the-map1"
 Clean-up the cluster 
 <!-- @deleteKindCluster @testE2EAgainstLatestRelease -->
 ```
-kapply preview $BASE --destroy > $OUTPUT/status;
+kapply preview $BASE --destroy | tee $OUTPUT/status
 
 expectedOutputLine "deployment.apps/the-deployment deleted (preview)"
 
@@ -230,7 +241,7 @@ expectedOutputLine "configmap/the-map2 deleted (preview)"
 
 expectedOutputLine "service/the-service deleted (preview)"
 
-kapply preview $BASE --destroy --server-side > $OUTPUT/status;
+kapply preview $BASE --destroy --server-side | tee $OUTPUT/status
 
 expectedOutputLine "deployment.apps/the-deployment deleted (preview-server)"
 
@@ -239,10 +250,10 @@ expectedOutputLine "configmap/the-map2 deleted (preview-server)"
 expectedOutputLine "service/the-service deleted (preview-server)"
 
 # Verify that preview all resources are still there after running preview.
-kubectl get --no-headers all -n hellospace | wc -l | xargs > $OUTPUT/status
+kubectl get --no-headers all -n hellospace | wc -l | xargs | tee $OUTPUT/status
 expectedOutputLine "6"
 
-kapply destroy $BASE > $OUTPUT/status;
+kapply destroy $BASE | tee $OUTPUT/status;
 
 expectedOutputLine "deployment.apps/the-deployment deleted"
 
