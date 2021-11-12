@@ -183,7 +183,7 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 						testutil.ToIdentifier(t, resources["deployment"]),
 						testutil.ToIdentifier(t, resources["secret"]),
 					},
-					taskrunner.AllCurrent, 1*time.Second,
+					taskrunner.AllCurrent, 1*time.Minute,
 					testutil.NewFakeRESTMapper(),
 				),
 			},
@@ -429,6 +429,12 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 							expTsk.Ids, actWaitTask.Ids)
 					}
 					assert.Equal(t, taskrunner.AllCurrent, actWaitTask.Condition)
+					if tc.options.ReconcileTimeout != 0 {
+						assert.Equal(t, tc.options.ReconcileTimeout, expTsk.Timeout)
+						assert.Equal(t, expTsk.Timeout, actWaitTask.Timeout)
+					} else {
+						assert.Equal(t, tc.options.ReconcileTimeout, actWaitTask.Timeout)
+					}
 				}
 			}
 		})
@@ -746,7 +752,12 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 					}
 					assert.Equal(t, taskrunner.AllNotFound, actWaitTask.Condition)
 					// Validate the prune wait timeout.
-					assert.Equal(t, tc.options.PruneTimeout, actualTask.(*taskrunner.WaitTask).Timeout)
+					if tc.options.PruneTimeout != 0 {
+						assert.Equal(t, tc.options.PruneTimeout, expTsk.Timeout)
+						assert.Equal(t, expTsk.Timeout, actWaitTask.Timeout)
+					} else {
+						assert.Equal(t, tc.options.PruneTimeout, actWaitTask.Timeout)
+					}
 				}
 			}
 		})
