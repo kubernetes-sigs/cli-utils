@@ -25,11 +25,12 @@ type UnknownTypesError struct {
 }
 
 func (e *UnknownTypesError) Error() string {
-	var gks []string
-	for _, gk := range e.GroupVersionKinds {
-		gks = append(gks, gk.String())
+	var gvks []string
+	for _, gvk := range e.GroupVersionKinds {
+		gvks = append(gvks, fmt.Sprintf("%s/%s/%s",
+			gvk.Group, gvk.Version, gvk.Kind))
 	}
-	return fmt.Sprintf("unknown resource types: %s", strings.Join(gks, ","))
+	return fmt.Sprintf("unknown resource types: %s", strings.Join(gvks, ","))
 }
 
 // NamespaceMismatchError is returned if all resources must be in a specific
