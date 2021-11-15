@@ -95,23 +95,25 @@ spec:
     image: k8s.gcr.io/pause:2.0
 `))
 
-var podA = []byte(strings.TrimSpace(`
+var podATemplate = strings.TrimSpace(`
 kind: Pod
 apiVersion: v1
 metadata:
   name: pod-a
-  namespace: test
+  namespace: {{.Namespace}}
   annotations:
     config.kubernetes.io/apply-time-mutation: |
       - sourceRef:
           kind: Pod
           name: pod-b
+          namespace: {{.Namespace}}
         sourcePath: $.status.podIP
         targetPath: $.spec.containers[?(@.name=="nginx")].env[?(@.name=="SERVICE_HOST")].value
         token: ${pob-b-ip}
       - sourceRef:
           kind: Pod
           name: pod-b
+          namespace: {{.Namespace}}
         sourcePath: $.spec.containers[?(@.name=="nginx")].ports[?(@.name=="tcp")].containerPort
         targetPath: $.spec.containers[?(@.name=="nginx")].env[?(@.name=="SERVICE_HOST")].value
         token: ${pob-b-port}
@@ -125,7 +127,7 @@ spec:
     env:
     - name: SERVICE_HOST
       value: "${pob-b-ip}:${pob-b-port}"
-`))
+`)
 
 var podB = []byte(strings.TrimSpace(`
 kind: Pod

@@ -4,8 +4,10 @@
 package e2e
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"html/template"
 	"strings"
 	"time"
 
@@ -244,9 +246,22 @@ func manifestToUnstructured(manifest []byte) *unstructured.Unstructured {
 	u := make(map[string]interface{})
 	err := yaml.Unmarshal(manifest, &u)
 	if err != nil {
-		panic(err)
+		panic(fmt.Errorf("failed to parse manifest yaml: %w", err))
 	}
 	return &unstructured.Unstructured{
 		Object: u,
 	}
+}
+
+func templateToUnstructured(tmpl string, data interface{}) *unstructured.Unstructured {
+	t, err := template.New("manifest").Parse(tmpl)
+	if err != nil {
+		panic(fmt.Errorf("failed to parse manifest go-template: %w", err))
+	}
+	var buffer bytes.Buffer
+	err = t.Execute(&buffer, data)
+	if err != nil {
+		panic(fmt.Errorf("failed to execute manifest go-template: %w", err))
+	}
+	return manifestToUnstructured(buffer.Bytes())
 }

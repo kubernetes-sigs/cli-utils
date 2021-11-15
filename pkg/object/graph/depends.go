@@ -83,20 +83,27 @@ func ReverseSortObjs(objs object.UnstructuredSet) ([]object.UnstructuredSet, err
 // addApplyTimeMutationEdges updates the graph with edges from objects
 // with an explicit "apply-time-mutation" annotation.
 func addApplyTimeMutationEdges(g *Graph, objs object.UnstructuredSet) {
-	for _, obj := range objs {
-		id := object.UnstructuredToObjMetaOrDie(obj)
+	ids := object.ObjMetadataSet(object.UnstructuredsToObjMetasOrDie(objs))
+	for i, obj := range objs {
+		id := ids[i]
 		klog.V(3).Infof("adding vertex: %s", id)
 		g.AddVertex(id)
 		if mutation.HasAnnotation(obj) {
 			subs, err := mutation.ReadAnnotation(obj)
 			if err != nil {
-				// TODO: fail task if parse errors?
-				klog.V(3).Infof("failed to add edges from: %s: %s", id, err)
+				klog.Warningf("warning: failed to sort explicit dependency: %v",
+					err)
 				return
 			}
 			for _, sub := range subs {
-				// TODO: fail task if it's not in the inventory?
 				dep := sub.SourceRef.ObjMetadata()
+				if !ids.Contains(dep) {
+					klog.Warningf("warning: failed to sort explicit dependency: "+
+						"object %q has invalid dependency: "+
+						"object %q not found in resource set",
+						id, dep)
+					continue
+				}
 				klog.V(3).Infof("adding edge from: %s, to: %s", id, dep)
 				g.AddEdge(id, dep)
 			}
@@ -107,18 +114,25 @@ func addApplyTimeMutationEdges(g *Graph, objs object.UnstructuredSet) {
 // addDependsOnEdges updates the graph with edges from objects
 // with an explicit "depends-on" annotation.
 func addDependsOnEdges(g *Graph, objs object.UnstructuredSet) {
-	for _, obj := range objs {
-		id := object.UnstructuredToObjMetaOrDie(obj)
+	ids := object.ObjMetadataSet(object.UnstructuredsToObjMetasOrDie(objs))
+	for i, obj := range objs {
+		id := ids[i]
 		klog.V(3).Infof("adding vertex: %s", id)
 		g.AddVertex(id)
 		deps, err := dependson.ReadAnnotation(obj)
 		if err != nil {
-			// TODO: fail if annotation fails to parse?
-			klog.V(3).Infof("failed to add edges from: %s: %s", id, err)
+			klog.Warningf("warning: failed to sort explicit dependency: %v",
+				err)
 			continue
 		}
 		for _, dep := range deps {
-			// TODO: fail if depe is not in the inventory?
+			if !ids.Contains(dep) {
+				klog.Warningf("warning: failed to sort explicit dependency: "+
+					"object %q has invalid dependency: "+
+					"object %q not found in resource set",
+					id, dep)
+				continue
+			}
 			klog.V(3).Infof("adding edge from: %s, to: %s", id, dep)
 			g.AddEdge(id, dep)
 		}

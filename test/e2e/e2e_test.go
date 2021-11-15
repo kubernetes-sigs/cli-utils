@@ -148,7 +148,7 @@ var _ = Describe("Applier", func() {
 						withNamespace(manifestToUnstructured(pod1), namespace.GetName()),
 						withNamespace(manifestToUnstructured(pod2), namespace.GetName()),
 						withNamespace(manifestToUnstructured(pod3), namespace.GetName()),
-						withNamespace(manifestToUnstructured(podA), namespace.GetName()),
+						templateToUnstructured(podATemplate, struct{ Namespace string }{Namespace: namespace.GetName()}),
 						withNamespace(manifestToUnstructured(podB), namespace.GetName()),
 						withNamespace(manifestToUnstructured(deployment1), namespace.GetName()),
 						manifestToUnstructured(apiservice1),

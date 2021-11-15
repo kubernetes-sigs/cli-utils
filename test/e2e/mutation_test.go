@@ -38,7 +38,7 @@ func mutationTest(ctx context.Context, c client.Client, invConfig InventoryConfi
 
 	inv := invConfig.InvWrapperFunc(invConfig.InventoryFactoryFunc(inventoryName, namespaceName, "test"))
 
-	podAObj := withNamespace(manifestToUnstructured(podA), namespaceName)
+	podAObj := templateToUnstructured(podATemplate, struct{ Namespace string }{Namespace: namespaceName})
 	podBObj := withNamespace(manifestToUnstructured(podB), namespaceName)
 
 	// Dependency order: podA -> podB

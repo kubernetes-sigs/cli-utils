@@ -216,6 +216,23 @@ data:
   slogan: we need to go deeper
 `
 
+// missing namespace
+var configmap5y = `
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: map4-name
+  namespace: map-namespace
+  annotations:
+    config.kubernetes.io/apply-time-mutation: |
+      - sourceRef:
+          kind: ConfigMap
+          name: map4-name
+        sourcePath: $.data
+        targetPath: $.data
+data: {}
+`
+
 var ingress2y = `
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -378,6 +395,7 @@ func TestMutate(t *testing.T) {
 	configmap2 := ktestutil.YamlToUnstructured(t, configmap2y)
 	configmap3 := ktestutil.YamlToUnstructured(t, configmap3y)
 	configmap4 := ktestutil.YamlToUnstructured(t, configmap4y)
+	configmap5 := ktestutil.YamlToUnstructured(t, configmap5y)
 	ingress2 := ktestutil.YamlToUnstructured(t, ingress2y)
 	service1 := ktestutil.YamlToUnstructured(t, service1y)
 	deployment1 := ktestutil.YamlToUnstructured(t, deployment1y)
@@ -410,7 +428,7 @@ func TestMutate(t *testing.T) {
 			reason:  "",
 			// exact error message isn't very important. Feel free to update if the error text changes.
 			errMsg: `failed to read annotation in resource (v1/namespaces/map-namespace/ConfigMap/map3-name): ` +
-				`failed to parse apply-time-mutation annotation: "not a valid substitution list": ` +
+				`failed to parse annotation "config.kubernetes.io/apply-time-mutation" on object "v1/namespaces/map-namespace/ConfigMap/map3-name": ` +
 				`error unmarshaling JSON: ` +
 				`while decoding JSON: ` +
 				`json: cannot unmarshal string into Go value of type mutation.ApplyTimeMutation`,
@@ -560,6 +578,14 @@ func TestMutate(t *testing.T) {
 					Value: "bob@example.com",
 				},
 			},
+		},
+		"missing namespace": {
+			target:  configmap5,
+			sources: []*unstructured.Unstructured{configmap4},
+			mutated: false,
+			reason:  "",
+			// exact error message isn't very important. Feel free to update if the error text changes.
+			errMsg: `invalid source reference (/ConfigMap/map4-name): missing required namespace`,
 		},
 	}
 

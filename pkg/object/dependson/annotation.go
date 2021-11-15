@@ -10,6 +10,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/klog/v2"
+	"sigs.k8s.io/cli-utils/pkg/object/mutation"
 )
 
 const (
@@ -28,21 +29,22 @@ func HasAnnotation(u *unstructured.Unstructured) bool {
 
 // ReadAnnotation reads the depends-on annotation and parses the the set of
 // object references.
-func ReadAnnotation(u *unstructured.Unstructured) (DependencySet, error) {
+func ReadAnnotation(obj *unstructured.Unstructured) (DependencySet, error) {
 	depSet := DependencySet{}
-	if u == nil {
+	if obj == nil {
 		return depSet, nil
 	}
-	depSetStr, found := u.GetAnnotations()[Annotation]
+	depSetStr, found := obj.GetAnnotations()[Annotation]
 	if !found {
 		return depSet, nil
 	}
-	klog.V(5).Infof("depends-on annotation found for %s/%s: %q",
-		u.GetNamespace(), u.GetName(), depSetStr)
+	objRef := mutation.NewResourceReference(obj)
+	klog.V(5).Infof("parsing annotation %q on object %q", Annotation, objRef)
 
 	depSet, err := ParseDependencySet(depSetStr)
 	if err != nil {
-		return depSet, fmt.Errorf("failed to parse dependency set: %w", err)
+		return depSet, fmt.Errorf("failed to parse annotation %q on object %q: %w",
+			Annotation, objRef, err)
 	}
 	return depSet, nil
 }
@@ -61,7 +63,9 @@ func WriteAnnotation(obj *unstructured.Unstructured, depSet DependencySet) error
 
 	depSetStr, err := FormatDependencySet(depSet)
 	if err != nil {
-		return fmt.Errorf("failed to format dependency set: %w", err)
+		objRef := mutation.NewResourceReference(obj)
+		return fmt.Errorf("failed to format annotation %q on object %q: %w",
+			Annotation, objRef, err)
 	}
 
 	a := obj.GetAnnotations()

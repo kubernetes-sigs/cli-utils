@@ -150,7 +150,7 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 			err = a.mutate(ctx, obj)
 			if err != nil {
 				if klog.V(5).Enabled() {
-					klog.Errorf("error mutating: %w", err)
+					klog.Errorf("error mutating: %v", err)
 				}
 				taskContext.SendEvent(a.createApplyFailedEvent(id, err))
 				taskContext.AddFailedApply(id)

@@ -35,13 +35,13 @@ func ReadAnnotation(obj *unstructured.Unstructured) (ApplyTimeMutation, error) {
 	if !found {
 		return mutation, nil
 	}
-	if klog.V(5).Enabled() {
-		klog.Infof("resource (%v) has apply-time-mutation annotation:\n%s", NewResourceReference(obj), mutationYaml)
-	}
+	objRef := NewResourceReference(obj)
+	klog.V(5).Infof("parsing annotation %q on object %q", Annotation, objRef)
 
 	err := yaml.Unmarshal([]byte(mutationYaml), &mutation)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse apply-time-mutation annotation: %q: %v", mutationYaml, err)
+		return nil, fmt.Errorf("failed to parse annotation %q on object %q: %v",
+			Annotation, objRef, err)
 	}
 	return mutation, nil
 }
@@ -57,7 +57,9 @@ func WriteAnnotation(obj *unstructured.Unstructured, mutation ApplyTimeMutation)
 	}
 	yamlBytes, err := yaml.Marshal(mutation)
 	if err != nil {
-		return fmt.Errorf("failed to format apply-time-mutation annotation: %#v: %v", mutation, err)
+		objRef := NewResourceReference(obj)
+		return fmt.Errorf("failed to format annotation %q on object %q: %v",
+			Annotation, objRef, err)
 	}
 	a := obj.GetAnnotations()
 	if a == nil {
