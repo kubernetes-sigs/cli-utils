@@ -30,9 +30,7 @@ func deletionPreventionTest(ctx context.Context, c client.Client, invConfig Inve
 		withAnnotation(withNamespace(manifestToUnstructured(pod2), namespaceName), common.LifecycleDeleteAnnotation, common.PreventDeletion),
 	}
 
-	runCollect(applier.Run(ctx, inventoryInfo, resources, apply.Options{
-		ReconcileTimeout: 2 * time.Minute,
-	}))
+	applier.Run(ctx, inventoryInfo, resources, apply.ReconcileTimeout(2*time.Minute))
 
 	By("Verify deployment created")
 	obj := assertUnstructuredExists(ctx, c, withNamespace(manifestToUnstructured(deployment1), namespaceName))
@@ -54,11 +52,10 @@ func deletionPreventionTest(ctx context.Context, c client.Client, invConfig Inve
 		withNamespace(manifestToUnstructured(deployment1), namespaceName),
 	}
 
-	runCollect(applier.Run(ctx, inventoryInfo, resources, apply.Options{
-		ReconcileTimeout: 2 * time.Minute,
-		DryRunStrategy:   common.DryRunClient,
-	}))
-
+	applier.Run(ctx, inventoryInfo, resources,
+		apply.ReconcileTimeout(2*time.Minute),
+		apply.DryRunStrategy(common.DryRunClient),
+	)
 	By("Verify deployment still exists and has the config.k8s.io/owning-inventory annotation")
 	obj = assertUnstructuredExists(ctx, c, withNamespace(manifestToUnstructured(deployment1), namespaceName))
 	Expect(obj.GetAnnotations()[inventory.OwningInventoryKey]).To(Equal(inventoryInfo.ID()))
@@ -79,9 +76,7 @@ func deletionPreventionTest(ctx context.Context, c client.Client, invConfig Inve
 		withNamespace(manifestToUnstructured(deployment1), namespaceName),
 	}
 
-	runCollect(applier.Run(ctx, inventoryInfo, resources, apply.Options{
-		ReconcileTimeout: 2 * time.Minute,
-	}))
+	applier.Run(ctx, inventoryInfo, resources, apply.ReconcileTimeout(2*time.Minute))
 
 	By("Verify deployment still exists and has the config.k8s.io/owning-inventory annotation")
 	obj = assertUnstructuredExists(ctx, c, withNamespace(manifestToUnstructured(deployment1), namespaceName))

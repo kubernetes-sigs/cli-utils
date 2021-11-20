@@ -31,10 +31,13 @@ func inventoryPolicyMustMatchTest(ctx context.Context, c client.Client, invConfi
 		deployment1Obj,
 	}
 
-	runWithNoErr(applier.Run(ctx, firstInv, firstResources, apply.Options{
-		ReconcileTimeout: 2 * time.Minute,
-		EmitStatusEvents: true,
-	}))
+	var err error
+	applier.Run(ctx, firstInv, firstResources,
+		apply.ReconcileTimeout(2*time.Minute),
+		apply.EmitStatusEvents(true),
+		apply.CollectErrorInto(&err),
+	)
+	Expect(err).NotTo(HaveOccurred())
 
 	By("Apply second set of resources")
 	secondInvName := randomString("second-inv-")
@@ -44,11 +47,13 @@ func inventoryPolicyMustMatchTest(ctx context.Context, c client.Client, invConfi
 		withReplicas(deployment1Obj, 6),
 	}
 
-	applierEvents := runCollect(applier.Run(ctx, secondInv, secondResources, apply.Options{
-		ReconcileTimeout: 2 * time.Minute,
-		EmitStatusEvents: true,
-		InventoryPolicy:  inventory.InventoryPolicyMustMatch,
-	}))
+	var applierEvents []event.Event
+	applier.Run(ctx, secondInv, secondResources,
+		apply.ReconcileTimeout(2*time.Minute),
+		apply.EmitStatusEvents(true),
+		apply.InventoryPolicy(inventory.InventoryPolicyMustMatch),
+		apply.CollectEventsInto(&applierEvents),
+	)
 
 	By("Verify the events")
 	expEvents := []testutil.ExpEvent{
@@ -202,11 +207,13 @@ func inventoryPolicyAdoptIfNoInventoryTest(ctx context.Context, c client.Client,
 		withReplicas(deployment1Obj, 6),
 	}
 
-	applierEvents := runCollect(applier.Run(ctx, inv, resources, apply.Options{
-		ReconcileTimeout: 2 * time.Minute,
-		EmitStatusEvents: true,
-		InventoryPolicy:  inventory.AdoptIfNoInventory,
-	}))
+	var applierEvents []event.Event
+	applier.Run(ctx, inv, resources,
+		apply.ReconcileTimeout(2*time.Minute),
+		apply.EmitStatusEvents(true),
+		apply.InventoryPolicy(inventory.AdoptIfNoInventory),
+		apply.CollectEventsInto(&applierEvents),
+	)
 
 	By("Verify the events")
 	expEvents := []testutil.ExpEvent{
@@ -371,10 +378,13 @@ func inventoryPolicyAdoptAllTest(ctx context.Context, c client.Client, invConfig
 		deployment1Obj,
 	}
 
-	runWithNoErr(applier.Run(ctx, firstInv, firstResources, apply.Options{
-		ReconcileTimeout: 2 * time.Minute,
-		EmitStatusEvents: true,
-	}))
+	var err error
+	applier.Run(ctx, firstInv, firstResources,
+		apply.ReconcileTimeout(2*time.Minute),
+		apply.EmitStatusEvents(true),
+		apply.CollectErrorInto(&err),
+	)
+	Expect(err).NotTo(HaveOccurred())
 
 	By("Apply resources")
 	secondInvName := randomString("test-inv-")
@@ -384,11 +394,13 @@ func inventoryPolicyAdoptAllTest(ctx context.Context, c client.Client, invConfig
 		withReplicas(deployment1Obj, 6),
 	}
 
-	applierEvents := runCollect(applier.Run(ctx, secondInv, secondResources, apply.Options{
-		ReconcileTimeout: 2 * time.Minute,
-		EmitStatusEvents: true,
-		InventoryPolicy:  inventory.AdoptAll,
-	}))
+	var applierEvents []event.Event
+	applier.Run(ctx, secondInv, secondResources,
+		apply.ReconcileTimeout(2*time.Minute),
+		apply.EmitStatusEvents(true),
+		apply.InventoryPolicy(inventory.AdoptAll),
+		apply.CollectEventsInto(&applierEvents),
+	)
 
 	By("Verify the events")
 	expEvents := []testutil.ExpEvent{

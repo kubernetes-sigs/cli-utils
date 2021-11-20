@@ -27,15 +27,18 @@ func serversideApplyTest(ctx context.Context, c client.Client, invConfig Invento
 		manifestToUnstructured(apiservice1),
 	}
 
-	runWithNoErr(applier.Run(ctx, inv, firstResources, apply.Options{
-		ReconcileTimeout: 2 * time.Minute,
-		EmitStatusEvents: true,
-		ServerSideOptions: common.ServerSideOptions{
+	var err error
+	applier.Run(ctx, inv, firstResources,
+		apply.ReconcileTimeout(2*time.Minute),
+		apply.EmitStatusEvents(true),
+		apply.ServerSideOptions(common.ServerSideOptions{
 			ServerSideApply: true,
 			ForceConflicts:  true,
 			FieldManager:    "test",
-		},
-	}))
+		}),
+		apply.CollectErrorInto(&err),
+	)
+	Expect(err).NotTo(HaveOccurred())
 
 	By("Verify deployment is server-side applied")
 	result := assertUnstructuredExists(ctx, c, withNamespace(manifestToUnstructured(deployment1), namespaceName))

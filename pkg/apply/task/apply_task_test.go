@@ -15,7 +15,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/cli-runtime/pkg/resource"
-	"k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/dynamic"
 	"sigs.k8s.io/cli-utils/pkg/apply/cache"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
@@ -86,8 +87,9 @@ func TestApplyTask_BasicAppliedObjects(t *testing.T) {
 			objs := toUnstructureds(tc.applied)
 
 			oldAO := applyOptionsFactoryFunc
-			applyOptionsFactoryFunc = func(string, chan event.Event, common.ServerSideOptions, common.DryRunStrategy, util.Factory) (applyOptions, error) {
-				return &fakeApplyOptions{}, nil
+			applyOptionsFactoryFunc = func(string, chan<- event.Event, common.ServerSideOptions, common.DryRunStrategy,
+				dynamic.Interface, discovery.OpenAPISchemaInterface) applyOptions {
+				return &fakeApplyOptions{}
 			}
 			defer func() { applyOptionsFactoryFunc = oldAO }()
 
@@ -177,8 +179,9 @@ func TestApplyTask_FetchGeneration(t *testing.T) {
 			objs := toUnstructureds(tc.rss)
 
 			oldAO := applyOptionsFactoryFunc
-			applyOptionsFactoryFunc = func(string, chan event.Event, common.ServerSideOptions, common.DryRunStrategy, util.Factory) (applyOptions, error) {
-				return &fakeApplyOptions{}, nil
+			applyOptionsFactoryFunc = func(string, chan<- event.Event, common.ServerSideOptions, common.DryRunStrategy,
+				dynamic.Interface, discovery.OpenAPISchemaInterface) applyOptions {
+				return &fakeApplyOptions{}
 			}
 			defer func() { applyOptionsFactoryFunc = oldAO }()
 			applyTask := &ApplyTask{
@@ -298,8 +301,9 @@ func TestApplyTask_DryRun(t *testing.T) {
 
 				ao := &fakeApplyOptions{}
 				oldAO := applyOptionsFactoryFunc
-				applyOptionsFactoryFunc = func(string, chan event.Event, common.ServerSideOptions, common.DryRunStrategy, util.Factory) (applyOptions, error) {
-					return ao, nil
+				applyOptionsFactoryFunc = func(string, chan<- event.Event, common.ServerSideOptions, common.DryRunStrategy,
+					dynamic.Interface, discovery.OpenAPISchemaInterface) applyOptions {
+					return ao
 				}
 				defer func() { applyOptionsFactoryFunc = oldAO }()
 
@@ -445,8 +449,9 @@ func TestApplyTaskWithError(t *testing.T) {
 
 			ao := &fakeApplyOptions{}
 			oldAO := applyOptionsFactoryFunc
-			applyOptionsFactoryFunc = func(string, chan event.Event, common.ServerSideOptions, common.DryRunStrategy, util.Factory) (applyOptions, error) {
-				return ao, nil
+			applyOptionsFactoryFunc = func(string, chan<- event.Event, common.ServerSideOptions, common.DryRunStrategy,
+				dynamic.Interface, discovery.OpenAPISchemaInterface) applyOptions {
+				return ao
 			}
 			defer func() { applyOptionsFactoryFunc = oldAO }()
 

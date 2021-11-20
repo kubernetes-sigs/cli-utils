@@ -7,12 +7,12 @@ import (
 	"context"
 	"fmt"
 	"sort"
-	"time"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/klog/v2"
-	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/cli-utils/pkg/apply/cache"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/filter"
@@ -26,29 +26,26 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/ordering"
-	statusfactory "sigs.k8s.io/cli-utils/pkg/util/factory"
 )
 
 // NewApplier returns a new Applier.
-func NewApplier(factory cmdutil.Factory, invClient inventory.InventoryClient) (*Applier, error) {
-	pruner, err := prune.NewPruner(factory, invClient)
-	if err != nil {
-		return nil, err
-	}
-	statusPoller, err := statusfactory.NewStatusPoller(factory)
-	if err != nil {
-		return nil, err
-	}
-	mapper, err := factory.ToRESTMapper()
+func NewApplier(opts ...ApplierOption) (*Applier, error) {
+	cfg, err := constructApplierConfig(opts)
 	if err != nil {
 		return nil, err
 	}
 	return &Applier{
-		pruner:       pruner,
-		StatusPoller: statusPoller,
-		factory:      factory,
-		invClient:    invClient,
-		infoHelper:   info.NewInfoHelper(mapper, factory),
+		pruner: &prune.Pruner{
+			InvClient: cfg.invClient,
+			Client:    cfg.client,
+			Mapper:    cfg.mapper,
+		},
+		statusPoller:  cfg.statusPoller,
+		invClient:     cfg.invClient,
+		client:        cfg.client,
+		openAPIGetter: cfg.discoClient,
+		mapper:        cfg.mapper,
+		infoHelper:    info.NewInfoHelper(cfg.mapper, cfg.unstructuredClientForMapping),
 	}, nil
 }
 
@@ -63,17 +60,19 @@ func NewApplier(factory cmdutil.Factory, invClient inventory.InventoryClient) (*
 // parameters and/or the set of resources that needs to be applied to the
 // cluster, different sets of tasks might be needed.
 type Applier struct {
-	pruner       *prune.Pruner
-	StatusPoller poller.Poller
-	factory      cmdutil.Factory
-	invClient    inventory.InventoryClient
-	infoHelper   info.InfoHelper
+	pruner        *prune.Pruner
+	statusPoller  poller.Poller
+	invClient     inventory.InventoryClient
+	client        dynamic.Interface
+	openAPIGetter discovery.OpenAPISchemaInterface
+	mapper        meta.RESTMapper
+	infoHelper    info.InfoHelper
 }
 
 // prepareObjects returns the set of objects to apply and to prune or
 // an error if one occurred.
 func (a *Applier) prepareObjects(localInv inventory.InventoryInfo, localObjs object.UnstructuredSet,
-	o Options) (object.UnstructuredSet, object.UnstructuredSet, error) {
+	cfg *applierRunConfig) (object.UnstructuredSet, object.UnstructuredSet, error) {
 	if localInv == nil {
 		return nil, nil, fmt.Errorf("the local inventory can't be nil")
 	}
@@ -105,7 +104,7 @@ func (a *Applier) prepareObjects(localInv inventory.InventoryInfo, localObjs obj
 		}
 	}
 	pruneObjs, err := a.pruner.GetPruneObjs(localInv, localObjs, prune.Options{
-		DryRunStrategy: o.DryRunStrategy,
+		DryRunStrategy: cfg.dryRunStrategy,
 	})
 	if err != nil {
 		return nil, nil, err
@@ -114,192 +113,139 @@ func (a *Applier) prepareObjects(localInv inventory.InventoryInfo, localObjs obj
 	return localObjs, pruneObjs, nil
 }
 
-// Run performs the Apply step. This happens asynchronously with updates
-// on progress and any errors are reported back on the event channel.
+// Run performs the Apply step. This synchronously with updates
+// on progress and any errors reported back via callbacks.
 // Cancelling the operation or setting timeout on how long to Wait
 // for it complete can be done with the passed in context.
 // Note: There isn't currently any way to interrupt the operation
 // before all the given resources have been applied to the cluster. Any
 // cancellation or timeout will only affect how long we Wait for the
 // resources to become current.
-func (a *Applier) Run(ctx context.Context, invInfo inventory.InventoryInfo, objects object.UnstructuredSet, options Options) <-chan event.Event {
+func (a *Applier) Run(ctx context.Context, invInfo inventory.InventoryInfo, objects object.UnstructuredSet, opts ...ApplierRunOption) {
 	klog.V(4).Infof("apply run for %d objects", len(objects))
+	cfg := constructApplierRunConfig(opts)
+	// Validate the resources to make sure we catch those problems early
+	// before anything has been updated in the cluster.
+	if err := (&object.Validator{
+		Mapper: a.mapper,
+	}).Validate(objects); err != nil {
+		postErrorEvent(cfg, err)
+		return
+	}
+
+	applyObjs, pruneObjs, err := a.prepareObjects(invInfo, objects, cfg)
+	if err != nil {
+		postErrorEvent(cfg, err)
+		return
+	}
+	klog.V(4).Infof("calculated %d apply objs; %d prune objs", len(applyObjs), len(pruneObjs))
+
+	// Fetch the queue (channel) of tasks that should be executed.
+	klog.V(4).Infoln("applier building task queue...")
+	taskBuilder := &solver.TaskQueueBuilder{
+		Pruner:        a.pruner,
+		DynamicClient: a.client,
+		OpenAPIGetter: a.openAPIGetter,
+		InfoHelper:    a.infoHelper,
+		Mapper:        a.mapper,
+		InvClient:     a.invClient,
+		Destroy:       false,
+	}
+	solverOpts := solver.Options{
+		ServerSideOptions:      cfg.serverSideOptions,
+		ReconcileTimeout:       cfg.reconcileTimeout,
+		Prune:                  cfg.prune,
+		DryRunStrategy:         cfg.dryRunStrategy,
+		PrunePropagationPolicy: cfg.prunePropagationPolicy,
+		PruneTimeout:           cfg.pruneTimeout,
+		InventoryPolicy:        cfg.inventoryPolicy,
+	}
+	// Build list of apply validation filters.
+	var applyFilters []filter.ValidationFilter
+	if cfg.inventoryPolicy != inventory.AdoptAll {
+		applyFilters = append(applyFilters, filter.InventoryPolicyApplyFilter{
+			Client:    a.client,
+			Mapper:    a.mapper,
+			Inv:       invInfo,
+			InvPolicy: cfg.inventoryPolicy,
+		})
+	}
+
+	// Build list of prune validation filters.
+	pruneFilters := []filter.ValidationFilter{
+		filter.PreventRemoveFilter{},
+		filter.InventoryPolicyFilter{
+			Inv:       invInfo,
+			InvPolicy: cfg.inventoryPolicy,
+		},
+		filter.LocalNamespacesFilter{
+			LocalNamespaces: localNamespaces(invInfo, object.UnstructuredsToObjMetasOrDie(objects)),
+		},
+	}
+	// Build list of apply mutators.
+	// Share a thread-safe cache with the status poller.
+	resourceCache := cache.NewResourceCacheMap()
+	applyMutators := []mutator.Interface{
+		&mutator.ApplyTimeMutator{
+			Client:        a.client,
+			Mapper:        a.mapper,
+			ResourceCache: resourceCache,
+		},
+	}
+	// Build the task queue by appending tasks in the proper order.
+	taskQueue, err := taskBuilder.
+		AppendInvAddTask(invInfo, applyObjs, cfg.dryRunStrategy).
+		AppendApplyWaitTasks(applyObjs, applyFilters, applyMutators, solverOpts).
+		AppendPruneWaitTasks(pruneObjs, pruneFilters, solverOpts).
+		AppendInvSetTask(invInfo, cfg.dryRunStrategy).
+		Build()
+	if err != nil {
+		postErrorEvent(cfg, err)
+		return
+	}
+	// Send event to inform the caller about the resources that
+	// will be applied/pruned.
+	postEvent(cfg, event.Event{
+		Type: event.InitType,
+		InitEvent: event.InitEvent{
+			ActionGroups: taskQueue.ToActionGroups(),
+		},
+	})
+	// Create a new TaskStatusRunner to execute the taskQueue.
+	klog.V(4).Infoln("applier building TaskStatusRunner...")
+	allIds := object.UnstructuredsToObjMetasOrDie(append(applyObjs, pruneObjs...))
+	runner := taskrunner.NewTaskStatusRunner(allIds, a.statusPoller, resourceCache)
+	klog.V(4).Infoln("applier running TaskStatusRunner...")
 	eventChannel := make(chan event.Event)
-	setDefaults(&options)
 	go func() {
 		defer close(eventChannel)
-
-		client, err := a.factory.DynamicClient()
-		if err != nil {
-			handleError(eventChannel, err)
-			return
-		}
-		mapper, err := a.factory.ToRESTMapper()
-		if err != nil {
-			handleError(eventChannel, err)
-			return
-		}
-
-		// Validate the resources to make sure we catch those problems early
-		// before anything has been updated in the cluster.
-		if err := (&object.Validator{
-			Mapper: mapper,
-		}).Validate(objects); err != nil {
-			handleError(eventChannel, err)
-			return
-		}
-
-		applyObjs, pruneObjs, err := a.prepareObjects(invInfo, objects, options)
-		if err != nil {
-			handleError(eventChannel, err)
-			return
-		}
-		klog.V(4).Infof("calculated %d apply objs; %d prune objs", len(applyObjs), len(pruneObjs))
-
-		// Fetch the queue (channel) of tasks that should be executed.
-		klog.V(4).Infoln("applier building task queue...")
-		taskBuilder := &solver.TaskQueueBuilder{
-			Pruner:     a.pruner,
-			Factory:    a.factory,
-			InfoHelper: a.infoHelper,
-			Mapper:     mapper,
-			InvClient:  a.invClient,
-			Destroy:    false,
-		}
-		opts := solver.Options{
-			ServerSideOptions:      options.ServerSideOptions,
-			ReconcileTimeout:       options.ReconcileTimeout,
-			Prune:                  !options.NoPrune,
-			DryRunStrategy:         options.DryRunStrategy,
-			PrunePropagationPolicy: options.PrunePropagationPolicy,
-			PruneTimeout:           options.PruneTimeout,
-			InventoryPolicy:        options.InventoryPolicy,
-		}
-		// Build list of apply validation filters.
-		applyFilters := []filter.ValidationFilter{}
-		if options.InventoryPolicy != inventory.AdoptAll {
-			applyFilters = append(applyFilters, filter.InventoryPolicyApplyFilter{
-				Client:    client,
-				Mapper:    mapper,
-				Inv:       invInfo,
-				InvPolicy: options.InventoryPolicy,
-			})
-		}
-
-		// Build list of prune validation filters.
-		pruneFilters := []filter.ValidationFilter{
-			filter.PreventRemoveFilter{},
-			filter.InventoryPolicyFilter{
-				Inv:       invInfo,
-				InvPolicy: options.InventoryPolicy,
-			},
-			filter.LocalNamespacesFilter{
-				LocalNamespaces: localNamespaces(invInfo, object.UnstructuredsToObjMetasOrDie(objects)),
-			},
-		}
-		// Build list of apply mutators.
-		// Share a thread-safe cache with the status poller.
-		resourceCache := cache.NewResourceCacheMap()
-		applyMutators := []mutator.Interface{
-			&mutator.ApplyTimeMutator{
-				Client:        client,
-				Mapper:        mapper,
-				ResourceCache: resourceCache,
-			},
-		}
-		// Build the task queue by appending tasks in the proper order.
-		taskQueue, err := taskBuilder.
-			AppendInvAddTask(invInfo, applyObjs, options.DryRunStrategy).
-			AppendApplyWaitTasks(applyObjs, applyFilters, applyMutators, opts).
-			AppendPruneWaitTasks(pruneObjs, pruneFilters, opts).
-			AppendInvSetTask(invInfo, options.DryRunStrategy).
-			Build()
-		if err != nil {
-			handleError(eventChannel, err)
-			return
-		}
-		// Send event to inform the caller about the resources that
-		// will be applied/pruned.
-		eventChannel <- event.Event{
-			Type: event.InitType,
-			InitEvent: event.InitEvent{
-				ActionGroups: taskQueue.ToActionGroups(),
-			},
-		}
-		// Create a new TaskStatusRunner to execute the taskQueue.
-		klog.V(4).Infoln("applier building TaskStatusRunner...")
-		allIds := object.UnstructuredsToObjMetasOrDie(append(applyObjs, pruneObjs...))
-		runner := taskrunner.NewTaskStatusRunner(allIds, a.StatusPoller, resourceCache)
-		klog.V(4).Infoln("applier running TaskStatusRunner...")
 		err = runner.Run(ctx, taskQueue.ToChannel(), eventChannel, taskrunner.Options{
-			PollInterval:     options.PollInterval,
+			PollInterval:     cfg.pollInterval,
 			UseCache:         true,
-			EmitStatusEvents: options.EmitStatusEvents,
+			EmitStatusEvents: cfg.emitStatusEvents,
 		})
-		if err != nil {
-			handleError(eventChannel, err)
-			return
-		}
 	}()
-	return eventChannel
-}
-
-type Options struct {
-	// Encapsulates the fields for server-side apply.
-	ServerSideOptions common.ServerSideOptions
-
-	// ReconcileTimeout defines whether the applier should wait
-	// until all applied resources have been reconciled, and if so,
-	// how long to wait.
-	ReconcileTimeout time.Duration
-
-	// PollInterval defines how often we should poll for the status
-	// of resources.
-	PollInterval time.Duration
-
-	// EmitStatusEvents defines whether status events should be
-	// emitted on the eventChannel to the caller.
-	EmitStatusEvents bool
-
-	// NoPrune defines whether pruning of previously applied
-	// objects should happen after apply.
-	NoPrune bool
-
-	// DryRunStrategy defines whether changes should actually be performed,
-	// or if it is just talk and no action.
-	DryRunStrategy common.DryRunStrategy
-
-	// PrunePropagationPolicy defines the deletion propagation policy
-	// that should be used for pruning. If this is not provided, the
-	// default is to use the Background policy.
-	PrunePropagationPolicy metav1.DeletionPropagation
-
-	// PruneTimeout defines whether we should wait for all resources
-	// to be fully deleted after pruning, and if so, how long we should
-	// wait.
-	PruneTimeout time.Duration
-
-	// InventoryPolicy defines the inventory policy of apply.
-	InventoryPolicy inventory.InventoryPolicy
-}
-
-// setDefaults set the options to the default values if they
-// have not been provided.
-func setDefaults(o *Options) {
-	if o.PollInterval == time.Duration(0) {
-		o.PollInterval = poller.DefaultPollInterval
+	for e := range eventChannel {
+		postEvent(cfg, e)
 	}
-	if o.PrunePropagationPolicy == "" {
-		o.PrunePropagationPolicy = metav1.DeletePropagationBackground
+	if err != nil {
+		postErrorEvent(cfg, err)
+		return
 	}
 }
 
-func handleError(eventChannel chan event.Event, err error) {
-	eventChannel <- event.Event{
+func postErrorEvent(cfg *applierRunConfig, err error) {
+	postEvent(cfg, event.Event{
 		Type: event.ErrorType,
 		ErrorEvent: event.ErrorEvent{
 			Err: err,
 		},
+	})
+}
+
+func postEvent(cfg *applierRunConfig, event event.Event) {
+	for _, listener := range cfg.eventListeners {
+		listener(event)
 	}
 }
 

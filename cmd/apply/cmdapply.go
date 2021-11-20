@@ -15,6 +15,7 @@ import (
 	"k8s.io/kubectl/pkg/util/i18n"
 	"sigs.k8s.io/cli-utils/cmd/flagutils"
 	"sigs.k8s.io/cli-utils/pkg/apply"
+	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/manifestreader"
@@ -137,7 +138,10 @@ func (r *ApplyRunner) RunE(cmd *cobra.Command, args []string) error {
 
 	// Run the applier. It will return a channel where we can receive updates
 	// to keep track of progress and any issues.
-	a, err := apply.NewApplier(r.factory, invClient)
+	a, err := apply.NewApplier(
+		apply.WithFactory(r.factory),
+		apply.WithInventoryClient(invClient),
+	)
 	if err != nil {
 		return err
 	}
@@ -147,20 +151,24 @@ func (r *ApplyRunner) RunE(cmd *cobra.Command, args []string) error {
 		r.printStatusEvents = true
 	}
 
-	ch := a.Run(ctx, inv, objs, apply.Options{
-		ServerSideOptions: r.serverSideOptions,
-		PollInterval:      r.period,
-		ReconcileTimeout:  r.reconcileTimeout,
-		// If we are not waiting for status, tell the applier to not
-		// emit the events.
-		EmitStatusEvents:       r.printStatusEvents,
-		NoPrune:                r.noPrune,
-		DryRunStrategy:         common.DryRunNone,
-		PrunePropagationPolicy: prunePropPolicy,
-		PruneTimeout:           r.pruneTimeout,
-		InventoryPolicy:        inventoryPolicy,
-	})
-
+	ch := make(chan event.Event)
+	go func() {
+		defer close(ch)
+		a.Run(ctx, inv, objs,
+			apply.ServerSideOptions(r.serverSideOptions),
+			apply.PollInterval(r.period),
+			apply.ReconcileTimeout(r.reconcileTimeout),
+			// If we are not waiting for status, tell the applier to not
+			// emit the events.
+			apply.EmitStatusEvents(r.printStatusEvents),
+			apply.Prune(!r.noPrune),
+			apply.DryRunStrategy(common.DryRunNone),
+			apply.PrunePropagationPolicy(prunePropPolicy),
+			apply.PruneTimeout(r.pruneTimeout),
+			apply.InventoryPolicy(inventoryPolicy),
+			apply.EventChannelListener(ch),
+		)
+	}()
 	// The printer will print updates from the channel. It will block
 	// until the channel is closed.
 	printer := printers.GetPrinter(r.output, r.ioStreams)

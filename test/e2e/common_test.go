@@ -172,32 +172,10 @@ func randomString(prefix string) string {
 	return fmt.Sprintf("%s%s", prefix, randomSuffix)
 }
 
-func run(ch <-chan event.Event) error {
-	var err error
-	for e := range ch {
-		if e.Type == event.ErrorType {
-			err = e.ErrorEvent.Err
-		}
-	}
-	return err
-}
-
-func runWithNoErr(ch <-chan event.Event) {
-	runCollectNoErr(ch)
-}
-
 func runCollect(ch <-chan event.Event) []event.Event {
 	var events []event.Event
 	for e := range ch {
 		events = append(events, e)
-	}
-	return events
-}
-
-func runCollectNoErr(ch <-chan event.Event) []event.Event {
-	events := runCollect(ch)
-	for _, e := range events {
-		Expect(e.Type).NotTo(Equal(event.ErrorType))
 	}
 	return events
 }

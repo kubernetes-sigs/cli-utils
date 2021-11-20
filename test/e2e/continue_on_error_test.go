@@ -32,7 +32,8 @@ func continueOnErrorTest(ctx context.Context, c client.Client, invConfig Invento
 		pod1Obj,
 	}
 
-	applierEvents := runCollect(applier.Run(ctx, inv, resources, apply.Options{}))
+	var applierEvents []event.Event
+	applier.Run(ctx, inv, resources, apply.CollectEventsInto(&applierEvents))
 
 	expEvents := []testutil.ExpEvent{
 		{

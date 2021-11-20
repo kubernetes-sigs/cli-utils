@@ -32,10 +32,12 @@ func applyAndDestroyTest(ctx context.Context, c client.Client, invConfig Invento
 		deployment1Obj,
 	}
 
-	applierEvents := runCollect(applier.Run(ctx, inventoryInfo, resources, apply.Options{
-		ReconcileTimeout: 2 * time.Minute,
-		EmitStatusEvents: true,
-	}))
+	var applierEvents []event.Event
+	applier.Run(ctx, inventoryInfo, resources,
+		apply.ReconcileTimeout(2*time.Minute),
+		apply.EmitStatusEvents(true),
+		apply.CollectEventsInto(&applierEvents),
+	)
 
 	expEvents := []testutil.ExpEvent{
 		{

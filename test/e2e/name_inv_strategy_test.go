@@ -26,10 +26,13 @@ func applyWithExistingInvTest(ctx context.Context, c client.Client, invConfig In
 		withNamespace(manifestToUnstructured(deployment1), namespaceName),
 	}
 
-	runWithNoErr(applier.Run(ctx, orgApplyInv, resources, apply.Options{
-		ReconcileTimeout: 2 * time.Minute,
-		EmitStatusEvents: true,
-	}))
+	var err error
+	applier.Run(ctx, orgApplyInv, resources,
+		apply.ReconcileTimeout(2*time.Minute),
+		apply.EmitStatusEvents(true),
+		apply.CollectErrorInto(&err),
+	)
+	Expect(err).NotTo(HaveOccurred())
 
 	By("Verify inventory")
 	invConfig.InvSizeVerifyFunc(ctx, c, inventoryName, namespaceName, orgInventoryID, 1)
@@ -38,10 +41,11 @@ func applyWithExistingInvTest(ctx context.Context, c client.Client, invConfig In
 	secondInventoryID := fmt.Sprintf("%s-%s-2", inventoryName, namespaceName)
 	secondApplyInv := invConfig.InvWrapperFunc(invConfig.InventoryFactoryFunc(inventoryName, namespaceName, secondInventoryID))
 
-	err := run(applier.Run(ctx, secondApplyInv, resources, apply.Options{
-		ReconcileTimeout: 2 * time.Minute,
-		EmitStatusEvents: true,
-	}))
+	applier.Run(ctx, secondApplyInv, resources,
+		apply.ReconcileTimeout(2*time.Minute),
+		apply.EmitStatusEvents(true),
+		apply.CollectErrorInto(&err),
+	)
 
 	By("Verify that we get the correct error")
 	Expect(err).To(HaveOccurred())

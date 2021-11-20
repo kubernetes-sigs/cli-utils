@@ -94,7 +94,7 @@ func TestApplier(t *testing.T) {
 		// objects in the cluster
 		clusterObjs object.UnstructuredSet
 		// options input to applier.Run
-		options Options
+		options []ApplierRunOption
 		// fake input events from the status poller
 		statusEvents []pollevent.Event
 		// expected output status events (async)
@@ -117,9 +117,9 @@ func TestApplier(t *testing.T) {
 				id:        "test",
 			},
 			clusterObjs: object.UnstructuredSet{},
-			options: Options{
-				NoPrune:         true,
-				InventoryPolicy: inventory.InventoryPolicyMustMatch,
+			options: []ApplierRunOption{
+				Prune(false),
+				InventoryPolicy(inventory.InventoryPolicyMustMatch),
 			},
 			expectedEvents: []testutil.ExpEvent{
 				{
@@ -224,10 +224,10 @@ func TestApplier(t *testing.T) {
 				id:        "test",
 			},
 			clusterObjs: object.UnstructuredSet{},
-			options: Options{
-				ReconcileTimeout: time.Minute,
-				InventoryPolicy:  inventory.InventoryPolicyMustMatch,
-				EmitStatusEvents: true,
+			options: []ApplierRunOption{
+				ReconcileTimeout(time.Minute),
+				InventoryPolicy(inventory.InventoryPolicyMustMatch),
+				EmitStatusEvents(true),
 			},
 			statusEvents: []pollevent.Event{
 				{
@@ -420,10 +420,10 @@ func TestApplier(t *testing.T) {
 			clusterObjs: object.UnstructuredSet{
 				testutil.Unstructured(t, resources["deployment"]),
 			},
-			options: Options{
-				ReconcileTimeout: time.Minute,
-				InventoryPolicy:  inventory.AdoptIfNoInventory,
-				EmitStatusEvents: true,
+			options: []ApplierRunOption{
+				ReconcileTimeout(time.Minute),
+				InventoryPolicy(inventory.AdoptIfNoInventory),
+				EmitStatusEvents(true),
 			},
 			statusEvents: []pollevent.Event{
 				{
@@ -602,9 +602,9 @@ func TestApplier(t *testing.T) {
 				testutil.Unstructured(t, resources["deployment"], testutil.AddOwningInv(t, "test")),
 				testutil.Unstructured(t, resources["secret"], testutil.AddOwningInv(t, "test")),
 			},
-			options: Options{
-				InventoryPolicy:  inventory.InventoryPolicyMustMatch,
-				EmitStatusEvents: true,
+			options: []ApplierRunOption{
+				InventoryPolicy(inventory.InventoryPolicyMustMatch),
+				EmitStatusEvents(true),
 			},
 			statusEvents: []pollevent.Event{
 				{
@@ -801,10 +801,10 @@ func TestApplier(t *testing.T) {
 			clusterObjs: object.UnstructuredSet{
 				testutil.Unstructured(t, resources["deployment"], testutil.AddOwningInv(t, "unmatched")),
 			},
-			options: Options{
-				ReconcileTimeout: time.Minute,
-				InventoryPolicy:  inventory.InventoryPolicyMustMatch,
-				EmitStatusEvents: true,
+			options: []ApplierRunOption{
+				ReconcileTimeout(time.Minute),
+				InventoryPolicy(inventory.InventoryPolicyMustMatch),
+				EmitStatusEvents(true),
 			},
 			statusEvents: []pollevent.Event{
 				{
@@ -941,9 +941,9 @@ func TestApplier(t *testing.T) {
 			clusterObjs: object.UnstructuredSet{
 				testutil.Unstructured(t, resources["deployment"], testutil.AddOwningInv(t, "unmatched")),
 			},
-			options: Options{
-				InventoryPolicy:  inventory.InventoryPolicyMustMatch,
-				EmitStatusEvents: true,
+			options: []ApplierRunOption{
+				InventoryPolicy(inventory.InventoryPolicyMustMatch),
+				EmitStatusEvents(true),
 			},
 			expectedEvents: []testutil.ExpEvent{
 				{
@@ -1048,9 +1048,9 @@ func TestApplier(t *testing.T) {
 			clusterObjs: object.UnstructuredSet{
 				testutil.Unstructured(t, resources["deployment"], testutil.AddOwningInv(t, "test")),
 			},
-			options: Options{
-				InventoryPolicy:  inventory.InventoryPolicyMustMatch,
-				EmitStatusEvents: true,
+			options: []ApplierRunOption{
+				InventoryPolicy(inventory.InventoryPolicyMustMatch),
+				EmitStatusEvents(true),
 			},
 			statusEvents: []pollevent.Event{
 				{
@@ -1192,54 +1192,52 @@ func TestApplier(t *testing.T) {
 				poller,
 			)
 
+			// only start sending events once
+			var once sync.Once
+			var events []event.Event
+			var wg sync.WaitGroup
+			defer wg.Wait() // must be called after all context cancellations
+
 			// Context for Applier.Run
 			runCtx, runCancel := context.WithCancel(context.Background())
 			defer runCancel() // cleanup
 
-			// Context for this test (in case Applier.Run never closes the event channel)
+			// Context for this test (in case Applier.Run never finishes)
 			testTimeout := 10 * time.Second
 			testCtx, testCancel := context.WithTimeout(context.Background(), testTimeout)
 			defer testCancel() // cleanup
 
-			eventChannel := applier.Run(runCtx, tc.invInfo.toWrapped(), tc.resources, tc.options)
-
-			// only start sending events once
-			var once sync.Once
-
-			var events []event.Event
-
-		loop:
-			for {
-				select {
-				case <-testCtx.Done():
-					// Test timed out
-					runCancel()
-					if tc.expectTestTimeout {
-						assert.Equal(t, context.DeadlineExceeded, testCtx.Err(), "Applier.Run failed to exit, but not because of expected timeout")
-					} else {
-						t.Errorf("Applier.Run failed to exit (timeout: %s)", testTimeout)
+			tc.options = append(tc.options, EventListener(func(e event.Event) {
+				events = append(events, e)
+				if e.Type == event.ActionGroupType &&
+					e.ActionGroupEvent.Type == event.Finished {
+					// Send events after the first apply/prune task ends
+					if e.ActionGroupEvent.Action == event.ApplyAction ||
+						e.ActionGroupEvent.Action == event.PruneAction {
+						once.Do(func() {
+							// start events
+							poller.Start()
+						})
 					}
-					break loop
-
-				case e, ok := <-eventChannel:
-					if !ok {
-						// Event channel closed
-						testCancel()
-						break loop
-					}
-					if e.Type == event.ActionGroupType &&
-						e.ActionGroupEvent.Type == event.Finished {
-						// Send events after the first apply/prune task ends
-						if e.ActionGroupEvent.Action == event.ApplyAction ||
-							e.ActionGroupEvent.Action == event.PruneAction {
-							once.Do(func() {
-								// start events
-								poller.Start()
-							})
-						}
-					}
-					events = append(events, e)
 				}
+			}))
+			runDone := make(chan struct{})
+			wg.Add(1)
+			go func() {
+				defer close(runDone)
+				defer wg.Done()
+				applier.Run(runCtx, tc.invInfo.toWrapped(), tc.resources, tc.options...)
+			}()
+			select {
+			case <-testCtx.Done():
+				// Test timed out
+				if tc.expectTestTimeout {
+					assert.Equal(t, context.DeadlineExceeded, testCtx.Err(), "Applier.Run failed to exit, but not because of expected timeout")
+				} else {
+					t.Errorf("Applier.Run failed to exit (timeout: %s)", testTimeout)
+				}
+				return
+			case <-runDone:
 			}
 
 			// Convert events to test events for comparison
@@ -1285,7 +1283,7 @@ func TestApplierCancel(t *testing.T) {
 		// objects in the cluster
 		clusterObjs object.UnstructuredSet
 		// options input to applier.Run
-		options Options
+		options []ApplierRunOption
 		// timeout for applier.Run
 		runTimeout time.Duration
 		// timeout for the test
@@ -1312,13 +1310,13 @@ func TestApplierCancel(t *testing.T) {
 				id:        "test",
 			},
 			clusterObjs: object.UnstructuredSet{},
-			options: Options{
+			options: []ApplierRunOption{
 				// EmitStatusEvents required to test event output
-				EmitStatusEvents: true,
-				NoPrune:          true,
-				InventoryPolicy:  inventory.InventoryPolicyMustMatch,
+				EmitStatusEvents(true),
+				Prune(false),
+				InventoryPolicy(inventory.InventoryPolicyMustMatch),
 				// ReconcileTimeout required to enable WaitTasks
-				ReconcileTimeout: 1 * time.Minute,
+				ReconcileTimeout(1 * time.Minute),
 			},
 			statusEvents: []pollevent.Event{
 				{
@@ -1470,13 +1468,13 @@ func TestApplierCancel(t *testing.T) {
 				id:        "test",
 			},
 			clusterObjs: object.UnstructuredSet{},
-			options: Options{
+			options: []ApplierRunOption{
 				// EmitStatusEvents required to test event output
-				EmitStatusEvents: true,
-				NoPrune:          true,
-				InventoryPolicy:  inventory.InventoryPolicyMustMatch,
+				EmitStatusEvents(true),
+				Prune(false),
+				InventoryPolicy(inventory.InventoryPolicyMustMatch),
 				// ReconcileTimeout required to enable WaitTasks
-				ReconcileTimeout: 1 * time.Minute,
+				ReconcileTimeout(1 * time.Minute),
 			},
 			statusEvents: []pollevent.Event{
 				{
@@ -1633,50 +1631,48 @@ func TestApplierCancel(t *testing.T) {
 				poller,
 			)
 
+			// only start sending events once
+			var once sync.Once
+			var events []event.Event
+			var wg sync.WaitGroup
+			defer wg.Wait() // must be called after all context cancellations
+
 			// Context for Applier.Run
 			runCtx, runCancel := context.WithTimeout(context.Background(), tc.runTimeout)
 			defer runCancel() // cleanup
 
-			// Context for this test (in case Applier.Run never closes the event channel)
+			// Context for this test (in case Applier.Run never finishes)
 			testCtx, testCancel := context.WithTimeout(context.Background(), tc.testTimeout)
 			defer testCancel() // cleanup
 
-			eventChannel := applier.Run(runCtx, tc.invInfo.toWrapped(), tc.resources, tc.options)
+			tc.options = append(tc.options, EventListener(func(e event.Event) {
+				events = append(events, e)
 
-			// only start sending events once
-			var once sync.Once
-
-			var events []event.Event
-
-		loop:
-			for {
-				select {
-				case <-testCtx.Done():
-					// Test timed out
-					runCancel()
-					t.Errorf("Applier.Run failed to respond to cancellation (expected: %s, timeout: %s)", tc.runTimeout, tc.testTimeout)
-					break loop
-
-				case e, ok := <-eventChannel:
-					if !ok {
-						// Event channel closed
-						testCancel()
-						break loop
-					}
-					events = append(events, e)
-
-					if e.Type == event.ActionGroupType &&
-						e.ActionGroupEvent.Type == event.Finished {
-						// Send events after the first apply/prune task ends
-						if e.ActionGroupEvent.Action == event.ApplyAction ||
-							e.ActionGroupEvent.Action == event.PruneAction {
-							once.Do(func() {
-								// start events
-								poller.Start()
-							})
-						}
+				if e.Type == event.ActionGroupType &&
+					e.ActionGroupEvent.Type == event.Finished {
+					// Send events after the first apply/prune task ends
+					if e.ActionGroupEvent.Action == event.ApplyAction ||
+						e.ActionGroupEvent.Action == event.PruneAction {
+						once.Do(func() {
+							// start events
+							poller.Start()
+						})
 					}
 				}
+			}))
+			runDone := make(chan struct{})
+			wg.Add(1)
+			go func() {
+				defer close(runDone)
+				defer wg.Done()
+				applier.Run(runCtx, tc.invInfo.toWrapped(), tc.resources, tc.options...)
+			}()
+			select {
+			case <-testCtx.Done():
+				// Test timed out
+				t.Errorf("Applier.Run failed to respond to cancellation (expected: %s, timeout: %s)", tc.runTimeout, tc.testTimeout)
+				return
+			case <-runDone:
 			}
 
 			// Convert events to test events for comparison
@@ -1701,7 +1697,7 @@ func TestApplierCancel(t *testing.T) {
 			if tc.expectRunTimeout {
 				assert.Equal(t, context.DeadlineExceeded, runCtx.Err(), "Applier.Run exited, but not by expected timeout")
 			} else {
-				assert.Nil(t, runCtx.Err(), "Applier.Run exited, but not by expected timeout")
+				assert.NoError(t, runCtx.Err(), "Applier.Run exited, but not by expected timeout")
 			}
 		})
 	}
@@ -1709,7 +1705,7 @@ func TestApplierCancel(t *testing.T) {
 
 func TestReadAndPrepareObjectsNilInv(t *testing.T) {
 	applier := Applier{}
-	_, _, err := applier.prepareObjects(nil, object.UnstructuredSet{}, Options{})
+	_, _, err := applier.prepareObjects(nil, object.UnstructuredSet{}, &applierRunConfig{})
 	assert.Error(t, err)
 }
 
@@ -1816,7 +1812,7 @@ func TestReadAndPrepareObjects(t *testing.T) {
 				newFakePoller([]pollevent.Event{}),
 			)
 
-			applyObjs, pruneObjs, err := applier.prepareObjects(tc.invInfo.toWrapped(), tc.resources, Options{})
+			applyObjs, pruneObjs, err := applier.prepareObjects(tc.invInfo.toWrapped(), tc.resources, &applierRunConfig{})
 			if tc.isError {
 				assert.Error(t, err)
 				return
