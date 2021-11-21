@@ -15,6 +15,7 @@ import (
 	"k8s.io/client-go/restmapper"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
+	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
@@ -69,6 +70,9 @@ type WaitTask struct {
 	cancelFunc context.CancelFunc
 	// pending is the set of resources that we are still waiting for.
 	pending object.ObjMetadataSet
+	// failed is the set of resources that we are waiting for, but is considered
+	// failed, i.e. unlikely to successfully reconcile.
+	failed object.ObjMetadataSet
 	// mu protects the pending ObjMetadataSet
 	mu sync.RWMutex
 }
@@ -198,6 +202,12 @@ func (w *WaitTask) skipped(taskContext *TaskContext, id object.ObjMetadata) bool
 	return false
 }
 
+// failedByID returns true if the resource is failed.
+func (w *WaitTask) failedByID(taskContext *TaskContext, id object.ObjMetadata) bool {
+	cached := taskContext.ResourceCache().Get(id)
+	return cached.Status == status.FailedStatus
+}
+
 // Cancel exits early with a timeout error
 func (w *WaitTask) Cancel(_ *TaskContext) {
 	w.cancelFunc()
@@ -217,12 +227,18 @@ func (w *WaitTask) StatusUpdate(taskContext *TaskContext, id object.ObjMetadata)
 
 	switch {
 	case w.pending.Contains(id):
+		switch {
 		// pending - check if reconciled
-		if w.reconciledByID(taskContext, id) {
+		case w.reconciledByID(taskContext, id):
 			// reconciled - remove from pending & send event
 			w.pending = w.pending.Remove(id)
 			w.sendEvent(taskContext, id, event.Reconciled)
-		} else {
+		case w.failedByID(taskContext, id):
+			// failed - remove from pending & send event
+			w.pending = w.pending.Remove(id)
+			w.failed = append(w.failed, id)
+			w.sendEvent(taskContext, id, event.ReconcileFailed)
+		default:
 			// can't be all reconciled now, so don't bother checking
 			return
 		}
@@ -231,6 +247,24 @@ func (w *WaitTask) StatusUpdate(taskContext *TaskContext, id object.ObjMetadata)
 		return
 	case w.skipped(taskContext, id):
 		// skipped - ignore
+		return
+	case w.failed.Contains(id):
+		// If a failed resource becomes current before other
+		// resources have completed/timed out, we consider it
+		// current.
+		if w.reconciledByID(taskContext, id) {
+			w.failed = w.failed.Remove(id)
+			w.sendEvent(taskContext, id, event.Reconciled)
+		} else if !w.failedByID(taskContext, id) {
+			// If a resource is no longer reported as Failed and is not Reconciled,
+			// they should just go back to InProgress.
+			w.failed = w.failed.Remove(id)
+			w.pending = append(w.pending, id)
+			w.sendEvent(taskContext, id, event.ReconcilePending)
+		}
+		// can't be all reconciled, so don't bother checking. A failed
+		// resource doesn't prevent a WaitTask from completing, so there
+		// must be at least one InProgress resource we are still waiting for.
 		return
 	default:
 		// reconciled - check if unreconciled
@@ -243,10 +277,10 @@ func (w *WaitTask) StatusUpdate(taskContext *TaskContext, id object.ObjMetadata)
 		}
 	}
 
-	// if all conditions are met, complete the wait task
-	if conditionMet(taskContext, w.pending, w.Condition) {
-		// all reconciled - clear pending and exit
-		w.pending = object.ObjMetadataSet{}
+	// If we no longer have any pending resources, the WaitTask
+	// can be completed.
+	if len(w.pending) == 0 {
+		// all reconciled, so exit
 		klog.V(3).Infof("all objects reconciled or skipped (name: %q)", w.name)
 		w.cancelFunc()
 	}

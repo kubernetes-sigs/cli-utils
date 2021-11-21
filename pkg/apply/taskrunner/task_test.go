@@ -548,3 +548,343 @@ loop:
 	}
 	assert.Equal(t, expectedResults, receivedResults)
 }
+
+func TestWaitTask_Failed(t *testing.T) {
+	taskName := "wait-1"
+	testDeployment1ID := testutil.ToIdentifier(t, testDeployment1YAML)
+	testDeployment1 := testutil.Unstructured(t, testDeployment1YAML)
+	testDeployment2ID := testutil.ToIdentifier(t, testDeployment2YAML)
+	testDeployment2 := testutil.Unstructured(t, testDeployment2YAML)
+
+	testCases := map[string]struct {
+		configureTaskContextFunc func(taskContext *TaskContext)
+		eventsFunc               func(*cache.ResourceCacheMap, *WaitTask, *TaskContext)
+		waitTimeout              time.Duration
+		expectedEvents           []event.Event
+	}{
+		"continue on failed if others InProgress": {
+			configureTaskContextFunc: func(taskContext *TaskContext) {
+				taskContext.AddSuccessfulApply(testDeployment1ID, "unused", 1)
+				taskContext.AddSuccessfulApply(testDeployment2ID, "unused", 1)
+			},
+			eventsFunc: func(resourceCache *cache.ResourceCacheMap, task *WaitTask, taskContext *TaskContext) {
+				resourceCache.Put(testDeployment1ID, cache.ResourceStatus{
+					Resource: testDeployment1,
+					Status:   status.FailedStatus,
+				})
+				task.StatusUpdate(taskContext, testDeployment1ID)
+
+				resourceCache.Put(testDeployment2ID, cache.ResourceStatus{
+					Resource: testDeployment2,
+					Status:   status.InProgressStatus,
+				})
+				task.StatusUpdate(taskContext, testDeployment2ID)
+
+				resourceCache.Put(testDeployment2ID, cache.ResourceStatus{
+					Resource: testDeployment2,
+					Status:   status.CurrentStatus,
+				})
+				task.StatusUpdate(taskContext, testDeployment2ID)
+			},
+			waitTimeout: 2 * time.Second,
+			expectedEvents: []event.Event{
+				// deployment1 pending
+				{
+					Type: event.WaitType,
+					WaitEvent: event.WaitEvent{
+						GroupName:  taskName,
+						Identifier: testDeployment1ID,
+						Operation:  event.ReconcilePending,
+					},
+				},
+				// deployment2 pending
+				{
+					Type: event.WaitType,
+					WaitEvent: event.WaitEvent{
+						GroupName:  taskName,
+						Identifier: testDeployment2ID,
+						Operation:  event.ReconcilePending,
+					},
+				},
+				// deployment1 is failed
+				{
+					Type: event.WaitType,
+					WaitEvent: event.WaitEvent{
+						GroupName:  taskName,
+						Identifier: testDeployment1ID,
+						Operation:  event.ReconcileFailed,
+					},
+				},
+				// deployment2 current
+				{
+					Type: event.WaitType,
+					WaitEvent: event.WaitEvent{
+						GroupName:  taskName,
+						Identifier: testDeployment2ID,
+						Operation:  event.Reconciled,
+					},
+				},
+			},
+		},
+		"complete wait task is last resource becomes failed": {
+			configureTaskContextFunc: func(taskContext *TaskContext) {
+				taskContext.AddSuccessfulApply(testDeployment1ID, "unused", 1)
+				taskContext.AddSuccessfulApply(testDeployment2ID, "unused", 1)
+			},
+			eventsFunc: func(resourceCache *cache.ResourceCacheMap, task *WaitTask, taskContext *TaskContext) {
+				resourceCache.Put(testDeployment2ID, cache.ResourceStatus{
+					Resource: testDeployment2,
+					Status:   status.CurrentStatus,
+				})
+				task.StatusUpdate(taskContext, testDeployment2ID)
+
+				resourceCache.Put(testDeployment1ID, cache.ResourceStatus{
+					Resource: testDeployment1,
+					Status:   status.FailedStatus,
+				})
+				task.StatusUpdate(taskContext, testDeployment1ID)
+			},
+			waitTimeout: 2 * time.Second,
+			expectedEvents: []event.Event{
+				// deployment1 pending
+				{
+					Type: event.WaitType,
+					WaitEvent: event.WaitEvent{
+						GroupName:  taskName,
+						Identifier: testDeployment1ID,
+						Operation:  event.ReconcilePending,
+					},
+				},
+				// deployment2 pending
+				{
+					Type: event.WaitType,
+					WaitEvent: event.WaitEvent{
+						GroupName:  taskName,
+						Identifier: testDeployment2ID,
+						Operation:  event.ReconcilePending,
+					},
+				},
+				// deployment2 current
+				{
+					Type: event.WaitType,
+					WaitEvent: event.WaitEvent{
+						GroupName:  taskName,
+						Identifier: testDeployment2ID,
+						Operation:  event.Reconciled,
+					},
+				},
+				// deployment1 is failed
+				{
+					Type: event.WaitType,
+					WaitEvent: event.WaitEvent{
+						GroupName:  taskName,
+						Identifier: testDeployment1ID,
+						Operation:  event.ReconcileFailed,
+					},
+				},
+			},
+		},
+		"failed resource can become current": {
+			configureTaskContextFunc: func(taskContext *TaskContext) {
+				taskContext.AddSuccessfulApply(testDeployment1ID, "unused", 1)
+				taskContext.AddSuccessfulApply(testDeployment2ID, "unused", 1)
+			},
+			eventsFunc: func(resourceCache *cache.ResourceCacheMap, task *WaitTask, taskContext *TaskContext) {
+				resourceCache.Put(testDeployment1ID, cache.ResourceStatus{
+					Resource: testDeployment1,
+					Status:   status.FailedStatus,
+				})
+				task.StatusUpdate(taskContext, testDeployment1ID)
+
+				resourceCache.Put(testDeployment1ID, cache.ResourceStatus{
+					Resource: testDeployment1,
+					Status:   status.CurrentStatus,
+				})
+				task.StatusUpdate(taskContext, testDeployment1ID)
+
+				resourceCache.Put(testDeployment2ID, cache.ResourceStatus{
+					Resource: testDeployment2,
+					Status:   status.CurrentStatus,
+				})
+				task.StatusUpdate(taskContext, testDeployment2ID)
+			},
+			waitTimeout: 2 * time.Second,
+			expectedEvents: []event.Event{
+				// deployment1 pending
+				{
+					Type: event.WaitType,
+					WaitEvent: event.WaitEvent{
+						GroupName:  taskName,
+						Identifier: testDeployment1ID,
+						Operation:  event.ReconcilePending,
+					},
+				},
+				// deployment2 pending
+				{
+					Type: event.WaitType,
+					WaitEvent: event.WaitEvent{
+						GroupName:  taskName,
+						Identifier: testDeployment2ID,
+						Operation:  event.ReconcilePending,
+					},
+				},
+				// deployment1 is failed
+				{
+					Type: event.WaitType,
+					WaitEvent: event.WaitEvent{
+						GroupName:  taskName,
+						Identifier: testDeployment1ID,
+						Operation:  event.ReconcileFailed,
+					},
+				},
+				// deployment1 is current
+				{
+					Type: event.WaitType,
+					WaitEvent: event.WaitEvent{
+						GroupName:  taskName,
+						Identifier: testDeployment1ID,
+						Operation:  event.Reconciled,
+					},
+				},
+				// deployment2 current
+				{
+					Type: event.WaitType,
+					WaitEvent: event.WaitEvent{
+						GroupName:  taskName,
+						Identifier: testDeployment2ID,
+						Operation:  event.Reconciled,
+					},
+				},
+			},
+		},
+		"failed resource can become InProgress": {
+			configureTaskContextFunc: func(taskContext *TaskContext) {
+				taskContext.AddSuccessfulApply(testDeployment1ID, "unused", 1)
+				taskContext.AddSuccessfulApply(testDeployment2ID, "unused", 1)
+			},
+			eventsFunc: func(resourceCache *cache.ResourceCacheMap, task *WaitTask, taskContext *TaskContext) {
+				resourceCache.Put(testDeployment1ID, cache.ResourceStatus{
+					Resource: testDeployment1,
+					Status:   status.FailedStatus,
+				})
+				task.StatusUpdate(taskContext, testDeployment1ID)
+
+				resourceCache.Put(testDeployment1ID, cache.ResourceStatus{
+					Resource: testDeployment1,
+					Status:   status.InProgressStatus,
+				})
+				task.StatusUpdate(taskContext, testDeployment1ID)
+
+				resourceCache.Put(testDeployment2ID, cache.ResourceStatus{
+					Resource: testDeployment2,
+					Status:   status.CurrentStatus,
+				})
+				task.StatusUpdate(taskContext, testDeployment2ID)
+			},
+			waitTimeout: 2 * time.Second,
+			expectedEvents: []event.Event{
+				// deployment1 pending
+				{
+					Type: event.WaitType,
+					WaitEvent: event.WaitEvent{
+						GroupName:  taskName,
+						Identifier: testDeployment1ID,
+						Operation:  event.ReconcilePending,
+					},
+				},
+				// deployment2 pending
+				{
+					Type: event.WaitType,
+					WaitEvent: event.WaitEvent{
+						GroupName:  taskName,
+						Identifier: testDeployment2ID,
+						Operation:  event.ReconcilePending,
+					},
+				},
+				// deployment1 is failed
+				{
+					Type: event.WaitType,
+					WaitEvent: event.WaitEvent{
+						GroupName:  taskName,
+						Identifier: testDeployment1ID,
+						Operation:  event.ReconcileFailed,
+					},
+				},
+				// deployment1 pending
+				{
+					Type: event.WaitType,
+					WaitEvent: event.WaitEvent{
+						GroupName:  taskName,
+						Identifier: testDeployment1ID,
+						Operation:  event.ReconcilePending,
+					},
+				},
+				// deployment2 current
+				{
+					Type: event.WaitType,
+					WaitEvent: event.WaitEvent{
+						GroupName:  taskName,
+						Identifier: testDeployment2ID,
+						Operation:  event.Reconciled,
+					},
+				},
+				// deployment1 timed out
+				{
+					Type: event.WaitType,
+					WaitEvent: event.WaitEvent{
+						GroupName:  taskName,
+						Identifier: testDeployment1ID,
+						Operation:  event.ReconcileTimeout,
+					},
+				},
+			},
+		},
+	}
+
+	for tn, tc := range testCases {
+		t.Run(tn, func(t *testing.T) {
+			ids := object.ObjMetadataSet{
+				testDeployment1ID,
+				testDeployment2ID,
+			}
+			task := NewWaitTask(taskName, ids, AllCurrent,
+				tc.waitTimeout, testutil.NewFakeRESTMapper())
+
+			eventChannel := make(chan event.Event)
+			resourceCache := cache.NewResourceCacheMap()
+			taskContext := NewTaskContext(eventChannel, resourceCache)
+			defer close(eventChannel)
+
+			tc.configureTaskContextFunc(taskContext)
+
+			// run task async, to let the test collect events
+			go func() {
+				// start the task
+				task.Start(taskContext)
+
+				tc.eventsFunc(resourceCache, task, taskContext)
+			}()
+
+			// wait for task result
+			timer := time.NewTimer(5 * time.Second)
+			receivedEvents := []event.Event{}
+		loop:
+			for {
+				select {
+				case e := <-taskContext.EventChannel():
+					receivedEvents = append(receivedEvents, e)
+				case res := <-taskContext.TaskChannel():
+					timer.Stop()
+					assert.NoError(t, res.Err)
+					break loop
+				case <-timer.C:
+					t.Fatalf("timed out waiting for TaskResult")
+				}
+			}
+
+			testutil.AssertEqual(t, tc.expectedEvents, receivedEvents,
+				"Actual events (%d) do not match expected events (%d)",
+				len(receivedEvents), len(tc.expectedEvents))
+		})
+	}
+}

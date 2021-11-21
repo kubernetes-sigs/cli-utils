@@ -12,11 +12,12 @@ func _() {
 	_ = x[Reconciled-1]
 	_ = x[ReconcileSkipped-2]
 	_ = x[ReconcileTimeout-3]
+	_ = x[ReconcileFailed-4]
 }
 
-const _WaitEventOperation_name = "PendingReconciledSkippedTimeout"
+const _WaitEventOperation_name = "PendingReconciledSkippedTimeoutFailed"
 
-var _WaitEventOperation_index = [...]uint8{0, 7, 17, 24, 31}
+var _WaitEventOperation_index = [...]uint8{0, 7, 17, 24, 31, 37}
 
 func (i WaitEventOperation) String() string {
 	if i < 0 || i >= WaitEventOperation(len(_WaitEventOperation_index)-1) {

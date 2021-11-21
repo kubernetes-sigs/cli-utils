@@ -160,6 +160,7 @@ const (
 	Reconciled
 	ReconcileSkipped // Skipped
 	ReconcileTimeout // Timeout
+	ReconcileFailed  // Failed
 )
 
 type WaitEvent struct {
