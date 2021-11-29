@@ -22,9 +22,9 @@ type StatusReader interface {
 	// from the cluster and return an ResourceStatus that will contain
 	// information about the latest state of the resource, its computed status
 	// and information about any generated resources.
-	ReadStatus(ctx context.Context, resource object.ObjMetadata) *event.ResourceStatus
+	ReadStatus(ctx context.Context, reader ClusterReader, resource object.ObjMetadata) *event.ResourceStatus
 
 	// ReadStatusForObject is similar to ReadStatus, but instead of looking up the
 	// resource based on an identifier, it will use the passed-in resource.
-	ReadStatusForObject(ctx context.Context, object *unstructured.Unstructured) *event.ResourceStatus
+	ReadStatusForObject(ctx context.Context, reader ClusterReader, object *unstructured.Unstructured) *event.ResourceStatus
 }

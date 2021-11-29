@@ -21,11 +21,17 @@ import (
 
 // NewStatusPoller creates a new StatusPoller using the given clusterreader and mapper. The StatusPoller
 // will use the client for all calls to the cluster.
-func NewStatusPoller(reader client.Reader, mapper meta.RESTMapper) *StatusPoller {
+func NewStatusPoller(reader client.Reader, mapper meta.RESTMapper, customStatusReaders map[schema.GroupKind]engine.StatusReader) *StatusPoller {
+	statusReaders, defaultStatusReader := createStatusReaders(mapper)
+	for gk, sr := range customStatusReaders {
+		statusReaders[gk] = sr
+	}
 	return &StatusPoller{
 		engine: &engine.PollerEngine{
-			Reader: reader,
-			Mapper: mapper,
+			Reader:              reader,
+			Mapper:              mapper,
+			DefaultStatusReader: defaultStatusReader,
+			StatusReaders:       statusReaders,
 		},
 	}
 }
@@ -39,20 +45,9 @@ type StatusPoller struct {
 // back on the event channel returned. The statusPollerRunner can be cancelled at any time by cancelling the
 // context passed in.
 func (s *StatusPoller) Poll(ctx context.Context, identifiers object.ObjMetadataSet, options Options) <-chan event.Event {
-	statusReaderFactory := createStatusReaders
-	if options.CustomStatusReadersFactoryFunc != nil {
-		statusReaderFactory = func(reader engine.ClusterReader, mapper meta.RESTMapper) (map[schema.GroupKind]engine.StatusReader, engine.StatusReader) {
-			readers, defaultReader := createStatusReaders(reader, mapper)
-			for gk, r := range options.CustomStatusReadersFactoryFunc(reader, mapper) {
-				readers[gk] = r
-			}
-			return readers, defaultReader
-		}
-	}
 	return s.engine.Poll(ctx, identifiers, engine.Options{
 		PollInterval:             options.PollInterval,
 		ClusterReaderFactoryFunc: clusterReaderFactoryFunc(options.UseCache),
-		StatusReadersFactoryFunc: statusReaderFactory,
 	})
 }
 
@@ -67,12 +62,6 @@ type Options struct {
 	// all needed resources before each polling cycle. If this is set to false,
 	// then each resource will be fetched when needed with GET calls.
 	UseCache bool
-
-	// CustomStatusReadersFactoryFunc, when called, provides the StatusPoller with a map of custom
-	// StatusReaders for the given GroupKinds. These will be used along with the StatusReaders shipped with this
-	// library. However, it can also be used to override these with custom StatusReaders if the returned map
-	// has a key for the given GroupKinds, e.g. apps/deployments.
-	CustomStatusReadersFactoryFunc func(engine.ClusterReader, meta.RESTMapper) map[schema.GroupKind]engine.StatusReader
 }
 
 // createStatusReaders creates an instance of all the statusreaders. This includes a set of statusreaders for
@@ -80,12 +69,12 @@ type Options struct {
 // a specific statusreaders.
 // TODO: We should consider making the registration more automatic instead of having to create each of them
 // here. Also, it might be worth creating them on demand.
-func createStatusReaders(reader engine.ClusterReader, mapper meta.RESTMapper) (map[schema.GroupKind]engine.StatusReader, engine.StatusReader) {
-	defaultStatusReader := statusreaders.NewGenericStatusReader(reader, mapper, status.Compute)
+func createStatusReaders(mapper meta.RESTMapper) (map[schema.GroupKind]engine.StatusReader, engine.StatusReader) {
+	defaultStatusReader := statusreaders.NewGenericStatusReader(mapper, status.Compute)
 
-	replicaSetStatusReader := statusreaders.NewReplicaSetStatusReader(reader, mapper, defaultStatusReader)
-	deploymentStatusReader := statusreaders.NewDeploymentResourceReader(reader, mapper, replicaSetStatusReader)
-	statefulSetStatusReader := statusreaders.NewStatefulSetResourceReader(reader, mapper, defaultStatusReader)
+	replicaSetStatusReader := statusreaders.NewReplicaSetStatusReader(mapper, defaultStatusReader)
+	deploymentStatusReader := statusreaders.NewDeploymentResourceReader(mapper, replicaSetStatusReader)
+	statefulSetStatusReader := statusreaders.NewStatefulSetResourceReader(mapper, defaultStatusReader)
 
 	statusReaders := map[schema.GroupKind]engine.StatusReader{
 		appsv1.SchemeGroupVersion.WithKind("Deployment").GroupKind():  deploymentStatusReader,

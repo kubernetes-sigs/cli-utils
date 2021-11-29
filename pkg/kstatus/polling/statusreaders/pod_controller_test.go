@@ -81,7 +81,6 @@ func TestPodControllerStatusReader(t *testing.T) {
 			fakeReader := testutil.NewNoopClusterReader()
 			fakeMapper := fakemapper.NewFakeRESTMapper()
 			podControllerStatusReader := &podControllerStatusReader{
-				reader: fakeReader,
 				mapper: fakeMapper,
 				statusFunc: func(u *unstructured.Unstructured) (*status.Result, error) {
 					return tc.computeStatusResult, tc.computeStatusErr
@@ -94,7 +93,7 @@ func TestPodControllerStatusReader(t *testing.T) {
 			rs.SetName(name)
 			rs.SetNamespace(namespace)
 
-			resourceStatus := podControllerStatusReader.readStatus(context.Background(), rs)
+			resourceStatus := podControllerStatusReader.readStatus(context.Background(), fakeReader, rs)
 
 			assert.Equal(t, tc.expectedIdentifier, resourceStatus.Identifier)
 			assert.Equal(t, tc.expectedStatus, resourceStatus.Status)

@@ -62,7 +62,6 @@ func TestGenericStatusReader(t *testing.T) {
 			fakeReader := testutil.NewNoopClusterReader()
 			fakeMapper := fakemapper.NewFakeRESTMapper()
 			resourceStatusReader := &genericStatusReader{
-				reader: fakeReader,
 				mapper: fakeMapper,
 				statusFunc: func(u *unstructured.Unstructured) (*status.Result, error) {
 					return tc.result, tc.err
@@ -74,7 +73,7 @@ func TestGenericStatusReader(t *testing.T) {
 			o.SetName(name)
 			o.SetNamespace(namespace)
 
-			resourceStatus := resourceStatusReader.ReadStatusForObject(context.Background(), o)
+			resourceStatus := resourceStatusReader.ReadStatusForObject(context.Background(), fakeReader, o)
 
 			assert.Equal(t, tc.expectedIdentifier, resourceStatus.Identifier)
 			assert.Equal(t, tc.expectedStatus, resourceStatus.Status)

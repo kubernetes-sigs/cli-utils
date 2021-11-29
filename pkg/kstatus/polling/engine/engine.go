@@ -20,15 +20,12 @@ import (
 type ClusterReaderFactoryFunc func(reader client.Reader, mapper meta.RESTMapper,
 	identifiers object.ObjMetadataSet) (ClusterReader, error)
 
-// StatusReadersFactoryFunc defines the signature for the function the PollerEngine will use to
-// create the resource statusReaders and the default engine for each statusPollerRunner.
-type StatusReadersFactoryFunc func(reader ClusterReader, mapper meta.RESTMapper) (
-	statusReaders map[schema.GroupKind]StatusReader, defaultStatusReader StatusReader)
-
 // PollerEngine provides functionality for polling a cluster for status of a set of resources.
 type PollerEngine struct {
-	Reader client.Reader
-	Mapper meta.RESTMapper
+	Reader              client.Reader
+	Mapper              meta.RESTMapper
+	StatusReaders       map[schema.GroupKind]StatusReader
+	DefaultStatusReader StatusReader
 }
 
 // Poll will create a new statusPollerRunner that will poll all the resources provided and report their status
@@ -59,13 +56,12 @@ func (s *PollerEngine) Poll(ctx context.Context, identifiers object.ObjMetadataS
 			handleError(eventChannel, fmt.Errorf("error creating new ClusterReader: %w", err))
 			return
 		}
-		statusReaders, defaultStatusReader := options.StatusReadersFactoryFunc(clusterReader, s.Mapper)
 
 		runner := &statusPollerRunner{
 			ctx:                      ctx,
 			clusterReader:            clusterReader,
-			statusReaders:            statusReaders,
-			defaultStatusReader:      defaultStatusReader,
+			statusReaders:            s.StatusReaders,
+			defaultStatusReader:      s.DefaultStatusReader,
 			identifiers:              identifiers,
 			previousResourceStatuses: make(map[object.ObjMetadata]*event.ResourceStatus),
 			eventChannel:             eventChannel,
@@ -88,9 +84,6 @@ func handleError(eventChannel chan event.Event, err error) {
 func (s *PollerEngine) validate(options Options) error {
 	if options.ClusterReaderFactoryFunc == nil {
 		return fmt.Errorf("clusterReaderFactoryFunc must be specified")
-	}
-	if options.StatusReadersFactoryFunc == nil {
-		return fmt.Errorf("statusReadersFactoryFunc must be specified")
 	}
 	return nil
 }
@@ -130,11 +123,6 @@ type Options struct {
 	// StatusReaders. Since these can be stateful, every call to Poll will create a new
 	// ClusterReader.
 	ClusterReaderFactoryFunc ClusterReaderFactoryFunc
-
-	// StatusReadersFactoryFunc provides the PollerEngine with a factory function for creating new status
-	// clusterReader. Each statusPollerRunner has a separate set of statusReaders, so this will be called
-	// for every call to Poll.
-	StatusReadersFactoryFunc StatusReadersFactoryFunc
 }
 
 // statusPollerRunner is responsible for polling of a set of resources. Each call to Poll will create
@@ -237,7 +225,7 @@ func (r *statusPollerRunner) pollStatusForAllResources() {
 	for _, id := range r.identifiers {
 		gk := id.GroupKind
 		statusReader := r.statusReaderForGroupKind(gk)
-		resourceStatus := statusReader.ReadStatus(r.ctx, id)
+		resourceStatus := statusReader.ReadStatus(r.ctx, r.clusterReader, id)
 		if r.isUpdatedResourceStatus(resourceStatus) {
 			r.previousResourceStatuses[id] = resourceStatus
 			r.eventChannel <- event.Event{
