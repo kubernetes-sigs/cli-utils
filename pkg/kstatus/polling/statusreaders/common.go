@@ -30,10 +30,6 @@ import (
 // implementation of the resourceTypeStatusReader interface and therefore each
 // of the instances will be able to handle different resource types.
 type baseStatusReader struct {
-	// reader is an implementation of the ClusterReader interface. It provides a
-	// way for the StatusReader to fetch resources from the cluster.
-	reader engine.ClusterReader
-
 	// mapper provides a way to look up the resource types that are available
 	// in the cluster.
 	mapper meta.RESTMapper
@@ -48,30 +44,30 @@ type baseStatusReader struct {
 // resourceTypeStatusReader is an interface that can be implemented differently
 // for each resource type.
 type resourceTypeStatusReader interface {
-	ReadStatusForObject(ctx context.Context, object *unstructured.Unstructured) *event.ResourceStatus
+	ReadStatusForObject(ctx context.Context, reader engine.ClusterReader, object *unstructured.Unstructured) *event.ResourceStatus
 }
 
 // ReadStatus reads the object identified by the passed-in identifier and computes it's status. It reads
 // the resource here, but computing status is delegated to the ReadStatusForObject function.
-func (b *baseStatusReader) ReadStatus(ctx context.Context, identifier object.ObjMetadata) *event.ResourceStatus {
-	object, err := b.lookupResource(ctx, identifier)
+func (b *baseStatusReader) ReadStatus(ctx context.Context, reader engine.ClusterReader, identifier object.ObjMetadata) *event.ResourceStatus {
+	object, err := b.lookupResource(ctx, reader, identifier)
 	if err != nil {
 		return handleResourceStatusError(identifier, err)
 	}
-	return b.resourceStatusReader.ReadStatusForObject(ctx, object)
+	return b.resourceStatusReader.ReadStatusForObject(ctx, reader, object)
 }
 
 // ReadStatusForObject computes the status for the passed-in object. Since this is specific for each
 // resource type, the actual work is delegated to the implementation of the resourceTypeStatusReader interface.
-func (b *baseStatusReader) ReadStatusForObject(ctx context.Context, object *unstructured.Unstructured) *event.ResourceStatus {
-	return b.resourceStatusReader.ReadStatusForObject(ctx, object)
+func (b *baseStatusReader) ReadStatusForObject(ctx context.Context, reader engine.ClusterReader, object *unstructured.Unstructured) *event.ResourceStatus {
+	return b.resourceStatusReader.ReadStatusForObject(ctx, reader, object)
 }
 
 // lookupResource looks up a resource with the given identifier. It will use the rest mapper to resolve
 // the version of the GroupKind given in the identifier.
 // If the resource is found, it is returned. If it is not found or something
 // went wrong, the function will return an error.
-func (b *baseStatusReader) lookupResource(ctx context.Context, identifier object.ObjMetadata) (*unstructured.Unstructured, error) {
+func (b *baseStatusReader) lookupResource(ctx context.Context, reader engine.ClusterReader, identifier object.ObjMetadata) (*unstructured.Unstructured, error) {
 	GVK, err := gvk(identifier.GroupKind, b.mapper)
 	if err != nil {
 		return nil, err
@@ -83,7 +79,7 @@ func (b *baseStatusReader) lookupResource(ctx context.Context, identifier object
 		Name:      identifier.Name,
 		Namespace: identifier.Namespace,
 	}
-	err = b.reader.Get(ctx, key, &u)
+	err = reader.Get(ctx, key, &u)
 	if err != nil {
 		return nil, err
 	}
@@ -120,7 +116,7 @@ func statusForGeneratedResources(ctx context.Context, mapper meta.RESTMapper, re
 	var resourceStatuses event.ResourceStatuses
 	for i := range objectList.Items {
 		generatedObject := objectList.Items[i]
-		resourceStatus := statusReader.ReadStatusForObject(ctx, &generatedObject)
+		resourceStatus := statusReader.ReadStatusForObject(ctx, reader, &generatedObject)
 		resourceStatuses = append(resourceStatuses, resourceStatus)
 	}
 	sort.Sort(resourceStatuses)

@@ -77,11 +77,10 @@ func TestLookupResource(t *testing.T) {
 			fakeMapper := fakemapper.NewFakeRESTMapper(deploymentGVK)
 
 			statusReader := &baseStatusReader{
-				reader: fakeReader,
 				mapper: fakeMapper,
 			}
 
-			u, err := statusReader.lookupResource(context.Background(), tc.identifier)
+			u, err := statusReader.lookupResource(context.Background(), fakeReader, tc.identifier)
 
 			if tc.expectErr {
 				if err == nil {

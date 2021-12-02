@@ -12,12 +12,10 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 )
 
-func NewStatefulSetResourceReader(reader engine.ClusterReader, mapper meta.RESTMapper, podResourceReader resourceTypeStatusReader) engine.StatusReader {
+func NewStatefulSetResourceReader(mapper meta.RESTMapper, podResourceReader resourceTypeStatusReader) engine.StatusReader {
 	return &baseStatusReader{
-		reader: reader,
 		mapper: mapper,
 		resourceStatusReader: &statefulSetResourceReader{
-			reader:            reader,
 			mapper:            mapper,
 			podResourceReader: podResourceReader,
 		},
@@ -28,7 +26,6 @@ func NewStatefulSetResourceReader(reader engine.ClusterReader, mapper meta.RESTM
 // that can fetch StatefulSet resources from the cluster, knows how to find any
 // Pods belonging to the StatefulSet, and compute status for the StatefulSet.
 type statefulSetResourceReader struct {
-	reader engine.ClusterReader
 	mapper meta.RESTMapper
 
 	podResourceReader resourceTypeStatusReader
@@ -36,6 +33,6 @@ type statefulSetResourceReader struct {
 
 var _ resourceTypeStatusReader = &statefulSetResourceReader{}
 
-func (s *statefulSetResourceReader) ReadStatusForObject(ctx context.Context, statefulSet *unstructured.Unstructured) *event.ResourceStatus {
-	return newPodControllerStatusReader(s.reader, s.mapper, s.podResourceReader).readStatus(ctx, statefulSet)
+func (s *statefulSetResourceReader) ReadStatusForObject(ctx context.Context, reader engine.ClusterReader, statefulSet *unstructured.Unstructured) *event.ResourceStatus {
+	return newPodControllerStatusReader(s.mapper, s.podResourceReader).readStatus(ctx, reader, statefulSet)
 }

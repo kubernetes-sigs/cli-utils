@@ -109,7 +109,9 @@ func TestStatusPollerRunner(t *testing.T) {
 			)
 
 			engine := PollerEngine{
-				Mapper: fakeMapper,
+				Mapper:              fakeMapper,
+				DefaultStatusReader: tc.defaultStatusReader,
+				StatusReaders:       map[schema.GroupKind]StatusReader{},
 			}
 
 			options := Options{
@@ -117,10 +119,6 @@ func TestStatusPollerRunner(t *testing.T) {
 				ClusterReaderFactoryFunc: func(_ client.Reader, _ meta.RESTMapper, _ object.ObjMetadataSet) (
 					ClusterReader, error) {
 					return testutil.NewNoopClusterReader(), nil
-				},
-				StatusReadersFactoryFunc: func(_ ClusterReader, _ meta.RESTMapper) (
-					statusReaders map[schema.GroupKind]StatusReader, defaultStatusReader StatusReader) {
-					return make(map[schema.GroupKind]StatusReader), tc.defaultStatusReader
 				},
 			}
 
@@ -154,10 +152,6 @@ func TestNewStatusPollerRunnerCancellation(t *testing.T) {
 		ClusterReaderFactoryFunc: func(_ client.Reader, _ meta.RESTMapper, _ object.ObjMetadataSet) (
 			ClusterReader, error) {
 			return testutil.NewNoopClusterReader(), nil
-		},
-		StatusReadersFactoryFunc: func(_ ClusterReader, _ meta.RESTMapper) (
-			statusReaders map[schema.GroupKind]StatusReader, defaultStatusReader StatusReader) {
-			return make(map[schema.GroupKind]StatusReader), nil
 		},
 	}
 
@@ -197,10 +191,6 @@ func TestNewStatusPollerRunnerIdentifierValidation(t *testing.T) {
 			ClusterReader, error) {
 			return testutil.NewNoopClusterReader(), nil
 		},
-		StatusReadersFactoryFunc: func(_ ClusterReader, _ meta.RESTMapper) (
-			statusReaders map[schema.GroupKind]StatusReader, defaultStatusReader StatusReader) {
-			return make(map[schema.GroupKind]StatusReader), nil
-		},
 	})
 
 	timer := time.NewTimer(3 * time.Second)
@@ -226,7 +216,7 @@ type fakeStatusReader struct {
 	resourceStatusCount map[schema.GroupKind]int
 }
 
-func (f *fakeStatusReader) ReadStatus(_ context.Context, identifier object.ObjMetadata) *event.ResourceStatus {
+func (f *fakeStatusReader) ReadStatus(_ context.Context, _ ClusterReader, identifier object.ObjMetadata) *event.ResourceStatus {
 	count := f.resourceStatusCount[identifier.GroupKind]
 	resourceStatusSlice := f.resourceStatuses[identifier.GroupKind]
 	var resourceStatus status.Status
@@ -242,6 +232,6 @@ func (f *fakeStatusReader) ReadStatus(_ context.Context, identifier object.ObjMe
 	}
 }
 
-func (f *fakeStatusReader) ReadStatusForObject(_ context.Context, _ *unstructured.Unstructured) *event.ResourceStatus {
+func (f *fakeStatusReader) ReadStatusForObject(_ context.Context, _ ClusterReader, _ *unstructured.Unstructured) *event.ResourceStatus {
 	return nil
 }
