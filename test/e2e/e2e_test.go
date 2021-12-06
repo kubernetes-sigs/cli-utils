@@ -190,6 +190,14 @@ var _ = Describe("Applier", func() {
 				It("Prune retrieval error correctly handled", func() {
 					pruneRetrieveErrorTest(ctx, c, invConfig, inventoryName, namespace.GetName())
 				})
+
+				It("Reconciliation failure and timeout", func() {
+					reconciliationFailed(ctx, invConfig, inventoryName, namespace.GetName())
+				})
+
+				It("Reconciliation timeout", func() {
+					reconciliationTimeout(ctx, invConfig, inventoryName, namespace.GetName())
+				})
 			})
 
 			Context("Inventory policy", func() {
