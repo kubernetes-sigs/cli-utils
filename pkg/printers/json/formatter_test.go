@@ -439,6 +439,24 @@ func TestFormatter_FormatWaitEvent(t *testing.T) {
 				"type":      "wait",
 			},
 		},
+		"resource reconcile failed": {
+			previewStrategy: common.DryRunNone,
+			event: event.WaitEvent{
+				GroupName:  "wait-1",
+				Operation:  event.ReconcileFailed,
+				Identifier: createIdentifier("apps", "Deployment", "default", "my-dep"),
+			},
+			expected: map[string]interface{}{
+				"eventType": "resourceReconciled",
+				"group":     "apps",
+				"kind":      "Deployment",
+				"name":      "my-dep",
+				"namespace": "default",
+				"operation": "Failed",
+				"timestamp": "",
+				"type":      "wait",
+			},
+		},
 	}
 
 	for tn, tc := range testCases {
