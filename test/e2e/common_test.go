@@ -36,6 +36,40 @@ func withNamespace(obj *unstructured.Unstructured, namespace string) *unstructur
 	return obj
 }
 
+func podWithImage(obj *unstructured.Unstructured, containerName, image string) *unstructured.Unstructured {
+	containers, found, err := unstructured.NestedSlice(obj.Object, "spec", "containers")
+	Expect(err).NotTo(HaveOccurred())
+	Expect(found).To(BeTrue())
+
+	containerFound := false
+	for i := range containers {
+		container := containers[i].(map[string]interface{})
+		name := container["name"].(string)
+		if name != containerName {
+			continue
+		}
+		containerFound = true
+		container["image"] = image
+	}
+	Expect(containerFound).To(BeTrue())
+	err = unstructured.SetNestedSlice(obj.Object, containers, "spec", "containers")
+	Expect(err).NotTo(HaveOccurred())
+	return obj
+}
+
+func withNodeSelector(obj *unstructured.Unstructured, key, value string) *unstructured.Unstructured {
+	selectors, found, err := unstructured.NestedMap(obj.Object, "spec", "nodeSelector")
+	Expect(err).NotTo(HaveOccurred())
+
+	if !found {
+		selectors = make(map[string]interface{})
+	}
+	selectors[key] = value
+	err = unstructured.SetNestedMap(obj.Object, selectors, "spec", "nodeSelector")
+	Expect(err).NotTo(HaveOccurred())
+	return obj
+}
+
 func withAnnotation(obj *unstructured.Unstructured, key, value string) *unstructured.Unstructured {
 	annotations := obj.GetAnnotations()
 	if annotations == nil {
