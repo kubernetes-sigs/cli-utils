@@ -7,14 +7,9 @@ import (
 	"fmt"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
-	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
-	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
 func TestTextForError(t *testing.T) {
@@ -51,39 +46,6 @@ func TestTextForError(t *testing.T) {
 			err:         sliceError{},
 			cmdNameBase: "kapply",
 			expectFound: false,
-		},
-		"timeout error": {
-			err: &taskrunner.TimeoutError{
-				Timeout: 2 * time.Second,
-				Identifiers: object.ObjMetadataSet{
-					{
-						GroupKind: schema.GroupKind{
-							Kind:  "Deployment",
-							Group: "apps",
-						},
-						Name: "foo",
-					},
-				},
-				Condition: taskrunner.AllCurrent,
-				TimedOutResources: []taskrunner.TimedOutResource{
-					{
-						Identifier: object.ObjMetadata{
-							GroupKind: schema.GroupKind{
-								Kind:  "Deployment",
-								Group: "apps",
-							},
-							Name: "foo",
-						},
-						Status: status.InProgressStatus,
-					},
-				},
-			},
-			cmdNameBase: "kapply",
-			expectFound: true,
-			expectedErrText: `
-Timeout after 2 seconds waiting for 1 out of 1 resources to reach condition AllCurrent:
-Deployment/foo InProgress
-`,
 		},
 	}
 

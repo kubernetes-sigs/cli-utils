@@ -13,14 +13,12 @@ import (
 	"text/template"
 
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/manifestreader"
 )
 
 const (
 	DefaultErrorExitCode = 1
-	TimeoutErrorExitCode = 3
 )
 
 var errorMsgForType map[reflect.Type]string
@@ -43,14 +41,6 @@ Package has multiple inventory object templates.
 
 The package should have one and only one inventory object template.
 `
-	//nolint:lll
-	errorMsgForType[reflect.TypeOf(taskrunner.TimeoutError{})] = `
-Timeout after {{printf "%.0f" .err.Timeout.Seconds}} seconds waiting for {{printf "%d" (len .err.TimedOutResources)}} out of {{printf "%d" (len .err.Identifiers)}} resources to reach condition {{ .err.Condition}}:
-
-{{- range .err.TimedOutResources}}
-{{printf "%s/%s %s %s" .Identifier.GroupKind.Kind .Identifier.Name .Status .Message }}
-{{- end}}
-`
 
 	errorMsgForType[reflect.TypeOf(manifestreader.UnknownTypesError{})] = `
 Unknown type(s) encountered. Every type must either be already installed in the cluster or the CRD must be among the applied manifests.
@@ -61,7 +51,6 @@ Unknown type(s) encountered. Every type must either be already installed in the 
 `
 
 	statusCodeForType = make(map[reflect.Type]int)
-	statusCodeForType[reflect.TypeOf(taskrunner.TimeoutError{})] = TimeoutErrorExitCode
 }
 
 // CheckErr looks up the appropriate error message and exit status for known

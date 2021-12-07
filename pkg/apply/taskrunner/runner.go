@@ -6,7 +6,6 @@ package taskrunner
 import (
 	"context"
 	"fmt"
-	"sort"
 	"time"
 
 	"sigs.k8s.io/cli-utils/pkg/apply/cache"
@@ -14,7 +13,6 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/apply/poller"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling"
 	pollevent "sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
-	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
@@ -291,47 +289,4 @@ func (b *baseRunner) nextTask(taskQueue chan Task,
 // set.
 type TaskResult struct {
 	Err error
-}
-
-// TimeoutError is a special error used by tasks when they have
-// timed out.
-type TimeoutError struct {
-	// Identifiers contains the identifiers of all resources that the
-	// WaitTask was waiting for.
-	Identifiers object.ObjMetadataSet
-
-	// Timeout is the amount of time it took before it timed out.
-	Timeout time.Duration
-
-	// Condition defines the criteria for which the task was waiting.
-	Condition Condition
-
-	TimedOutResources []TimedOutResource
-}
-
-type TimedOutResource struct {
-	Identifier object.ObjMetadata
-
-	Status status.Status
-
-	Message string
-}
-
-func (te TimeoutError) Error() string {
-	ids := []string{}
-	for _, id := range te.Identifiers {
-		ids = append(ids, id.String())
-	}
-	sort.Strings(ids)
-	return fmt.Sprintf("timeout after %.0f seconds waiting for %d resources (%v) to reach condition %s",
-		te.Timeout.Seconds(), len(te.Identifiers), ids, te.Condition)
-}
-
-// IsTimeoutError checks whether a given error is
-// a TimeoutError.
-func IsTimeoutError(err error) (*TimeoutError, bool) {
-	if e, ok := err.(*TimeoutError); ok {
-		return e, true
-	}
-	return &TimeoutError{}, false
 }
