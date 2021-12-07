@@ -19,6 +19,11 @@ func newResourceStateCollector(resourceGroups []event.ActionGroup) *ResourceStat
 	resourceInfos := make(map[object.ObjMetadata]*ResourceInfo)
 	for _, group := range resourceGroups {
 		action := group.Action
+		// Keep the action that describes the operation for the resource
+		// rather than that we will wait for it.
+		if action == event.WaitAction {
+			continue
+		}
 		for _, identifier := range group.Identifiers {
 			resourceInfos[identifier] = &ResourceInfo{
 				identifier: identifier,
