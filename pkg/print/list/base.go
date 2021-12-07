@@ -106,6 +106,7 @@ func (d *DeleteStats) incFailed() {
 type WaitStats struct {
 	Reconciled int
 	Timeout    int
+	Failed     int
 	Skipped    int
 }
 
@@ -115,6 +116,10 @@ func (w *WaitStats) incReconciled() {
 
 func (w *WaitStats) incTimeout() {
 	w.Timeout++
+}
+
+func (w *WaitStats) incFailed() {
+	w.Failed++
 }
 
 func (w *WaitStats) incSkipped() {
@@ -208,6 +213,8 @@ func (b *BaseListPrinter) Print(ch <-chan event.Event, previewStrategy common.Dr
 				waitStats.incSkipped()
 			case event.ReconcileTimeout:
 				waitStats.incTimeout()
+			case event.ReconcileFailed:
+				waitStats.incFailed()
 			}
 			if err := formatter.FormatWaitEvent(e.WaitEvent); err != nil {
 				return err
@@ -226,16 +233,17 @@ func (b *BaseListPrinter) Print(ch <-chan event.Event, previewStrategy common.Dr
 			}
 		}
 	}
-	failedSum := applyStats.Failed + pruneStats.Failed + deleteStats.Failed
+	failedActuateSum := applyStats.Failed + pruneStats.Failed + deleteStats.Failed
+	failedReconcileSum := waitStats.Timeout + waitStats.Failed
 	switch {
-	case failedSum > 0 && waitStats.Timeout > 0:
+	case failedActuateSum > 0 && failedReconcileSum > 0:
 		return fmt.Errorf("%d resources failed, %d resources failed to reconcile before timeout",
-			failedSum, waitStats.Timeout)
-	case failedSum > 0:
-		return fmt.Errorf("%d resources failed", failedSum)
-	case waitStats.Timeout > 0:
+			failedActuateSum, failedReconcileSum)
+	case failedActuateSum > 0:
+		return fmt.Errorf("%d resources failed", failedActuateSum)
+	case failedReconcileSum > 0:
 		return fmt.Errorf("%d resources failed to reconcile before timeout",
-			waitStats.Timeout)
+			failedReconcileSum)
 	default:
 		return nil
 	}

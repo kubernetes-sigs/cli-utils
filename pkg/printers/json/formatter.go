@@ -138,6 +138,7 @@ func (jf *formatter) FormatActionGroupEvent(
 			"reconciled": ws.Reconciled,
 			"skipped":    ws.Skipped,
 			"timeout":    ws.Timeout,
+			"failed":     ws.Failed,
 		})
 	}
 

@@ -304,6 +304,15 @@ func TestFormatter_FormatWaitEvent(t *testing.T) {
 			},
 			expected: "deployment.apps/my-dep reconcile skipped (preview-server)",
 		},
+		"resource reconcile failed": {
+			previewStrategy: common.DryRunNone,
+			event: event.WaitEvent{
+				GroupName:  "wait-1",
+				Operation:  event.ReconcileFailed,
+				Identifier: createIdentifier("apps", "Deployment", "default", "my-dep"),
+			},
+			expected: "deployment.apps/my-dep reconcile failed",
+		},
 	}
 
 	for tn, tc := range testCases {

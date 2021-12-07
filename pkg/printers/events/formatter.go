@@ -95,6 +95,8 @@ func (ef *formatter) FormatWaitEvent(we event.WaitEvent) error {
 		ef.print("%s reconcile skipped", resourceIDToString(gk, name))
 	case event.ReconcileTimeout:
 		ef.print("%s reconcile timeout", resourceIDToString(gk, name))
+	case event.ReconcileFailed:
+		ef.print("%s reconcile failed", resourceIDToString(gk, name))
 	}
 	return nil
 }
