@@ -94,6 +94,11 @@ func (r *DestroyRunner) RunE(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+
+	if found := printers.ValidatePrinterType(r.output); !found {
+		return fmt.Errorf("unknown output type %q", r.output)
+	}
+
 	// Retrieve the inventory object.
 	reader, err := r.loader.ManifestReader(cmd.InOrStdin(), flagutils.PathFromArgs(args))
 	if err != nil {
