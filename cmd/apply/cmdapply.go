@@ -109,6 +109,10 @@ func (r *ApplyRunner) RunE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	if found := printers.ValidatePrinterType(r.output); !found {
+		return fmt.Errorf("unknown output type %q", r.output)
+	}
+
 	// TODO: Fix DemandOneDirectory to no longer return FileNameFlags
 	// since we are no longer using them.
 	_, err = common.DemandOneDirectory(args)

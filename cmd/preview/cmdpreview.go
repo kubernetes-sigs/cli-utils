@@ -110,6 +110,11 @@ func (r *PreviewRunner) RunE(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+
+	if found := printers.ValidatePrinterType(r.output); !found {
+		return fmt.Errorf("unknown output type %q", r.output)
+	}
+
 	objs, err := reader.Read()
 	if err != nil {
 		return err
