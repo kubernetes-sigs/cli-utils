@@ -24,7 +24,7 @@ type ClusterReaderFactoryFunc func(reader client.Reader, mapper meta.RESTMapper,
 type PollerEngine struct {
 	Reader              client.Reader
 	Mapper              meta.RESTMapper
-	StatusReaders       map[schema.GroupKind]StatusReader
+	StatusReaders       []StatusReader
 	DefaultStatusReader StatusReader
 }
 
@@ -144,7 +144,7 @@ type statusPollerRunner struct {
 	// statusReaders contains the resource specific statusReaders. These will contain logic for how to
 	// compute status for specific GroupKinds. These will use an ClusterReader to fetch
 	// status of a resource and any generated resources.
-	statusReaders map[schema.GroupKind]StatusReader
+	statusReaders []StatusReader
 
 	// defaultStatusReader is the generic engine that is used for all GroupKinds that
 	// doesn't have a specific engine in the statusReaders map.
@@ -237,11 +237,12 @@ func (r *statusPollerRunner) pollStatusForAllResources() {
 }
 
 func (r *statusPollerRunner) statusReaderForGroupKind(gk schema.GroupKind) StatusReader {
-	statusReader, ok := r.statusReaders[gk]
-	if !ok {
-		return r.defaultStatusReader
+	for _, sr := range r.statusReaders {
+		if sr.Supports(gk) {
+			return sr
+		}
 	}
-	return statusReader
+	return r.defaultStatusReader
 }
 
 func (r *statusPollerRunner) isUpdatedResourceStatus(resourceStatus *event.ResourceStatus) bool {

@@ -111,7 +111,7 @@ func TestStatusPollerRunner(t *testing.T) {
 			engine := PollerEngine{
 				Mapper:              fakeMapper,
 				DefaultStatusReader: tc.defaultStatusReader,
-				StatusReaders:       map[schema.GroupKind]StatusReader{},
+				StatusReaders:       []StatusReader{},
 			}
 
 			options := Options{
@@ -214,6 +214,10 @@ func TestNewStatusPollerRunnerIdentifierValidation(t *testing.T) {
 type fakeStatusReader struct {
 	resourceStatuses    map[schema.GroupKind][]status.Status
 	resourceStatusCount map[schema.GroupKind]int
+}
+
+func (f *fakeStatusReader) Supports(schema.GroupKind) bool {
+	return true
 }
 
 func (f *fakeStatusReader) ReadStatus(_ context.Context, _ ClusterReader, identifier object.ObjMetadata) *event.ResourceStatus {

@@ -6,7 +6,6 @@ package factory
 import (
 	"fmt"
 
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling"
@@ -32,5 +31,5 @@ func NewStatusPoller(f cmdutil.Factory) (*polling.StatusPoller, error) {
 		return nil, fmt.Errorf("error creating client: %w", err)
 	}
 
-	return polling.NewStatusPoller(c, mapper, map[schema.GroupKind]engine.StatusReader{}), nil
+	return polling.NewStatusPoller(c, mapper, []engine.StatusReader{}), nil
 }

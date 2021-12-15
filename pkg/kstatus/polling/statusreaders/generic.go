@@ -8,6 +8,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/engine"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
@@ -42,6 +43,10 @@ type genericStatusReader struct {
 }
 
 var _ resourceTypeStatusReader = &genericStatusReader{}
+
+func (g *genericStatusReader) Supports(schema.GroupKind) bool {
+	return true
+}
 
 func (g *genericStatusReader) ReadStatusForObject(_ context.Context, _ engine.ClusterReader, resource *unstructured.Unstructured) *event.ResourceStatus {
 	identifier := object.UnstructuredToObjMetaOrDie(resource)

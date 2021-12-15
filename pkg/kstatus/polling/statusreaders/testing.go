@@ -43,6 +43,10 @@ func (f *fakeClusterReader) ListNamespaceScoped(_ context.Context, list *unstruc
 
 type fakeStatusReader struct{}
 
+func (f *fakeStatusReader) Supports(schema.GroupKind) bool {
+	return true
+}
+
 func (f *fakeStatusReader) ReadStatus(_ context.Context, _ engine.ClusterReader, _ object.ObjMetadata) *event.ResourceStatus {
 	return nil
 }

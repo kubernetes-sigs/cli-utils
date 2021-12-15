@@ -7,9 +7,7 @@ import (
 	"context"
 	"time"
 
-	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/clusterreader"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/engine"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
@@ -21,11 +19,14 @@ import (
 
 // NewStatusPoller creates a new StatusPoller using the given clusterreader and mapper. The StatusPoller
 // will use the client for all calls to the cluster.
-func NewStatusPoller(reader client.Reader, mapper meta.RESTMapper, customStatusReaders map[schema.GroupKind]engine.StatusReader) *StatusPoller {
-	statusReaders, defaultStatusReader := createStatusReaders(mapper)
-	for gk, sr := range customStatusReaders {
-		statusReaders[gk] = sr
-	}
+func NewStatusPoller(reader client.Reader, mapper meta.RESTMapper, customStatusReaders []engine.StatusReader) *StatusPoller {
+	var statusReaders []engine.StatusReader
+
+	statusReaders = append(statusReaders, customStatusReaders...)
+
+	srs, defaultStatusReader := createStatusReaders(mapper)
+	statusReaders = append(statusReaders, srs...)
+
 	return &StatusPoller{
 		engine: &engine.PollerEngine{
 			Reader:              reader,
@@ -69,17 +70,17 @@ type Options struct {
 // a specific statusreaders.
 // TODO: We should consider making the registration more automatic instead of having to create each of them
 // here. Also, it might be worth creating them on demand.
-func createStatusReaders(mapper meta.RESTMapper) (map[schema.GroupKind]engine.StatusReader, engine.StatusReader) {
+func createStatusReaders(mapper meta.RESTMapper) ([]engine.StatusReader, engine.StatusReader) {
 	defaultStatusReader := statusreaders.NewGenericStatusReader(mapper, status.Compute)
 
 	replicaSetStatusReader := statusreaders.NewReplicaSetStatusReader(mapper, defaultStatusReader)
 	deploymentStatusReader := statusreaders.NewDeploymentResourceReader(mapper, replicaSetStatusReader)
 	statefulSetStatusReader := statusreaders.NewStatefulSetResourceReader(mapper, defaultStatusReader)
 
-	statusReaders := map[schema.GroupKind]engine.StatusReader{
-		appsv1.SchemeGroupVersion.WithKind("Deployment").GroupKind():  deploymentStatusReader,
-		appsv1.SchemeGroupVersion.WithKind("StatefulSet").GroupKind(): statefulSetStatusReader,
-		appsv1.SchemeGroupVersion.WithKind("ReplicaSet").GroupKind():  replicaSetStatusReader,
+	statusReaders := []engine.StatusReader{
+		deploymentStatusReader,
+		statefulSetStatusReader,
+		replicaSetStatusReader,
 	}
 
 	return statusReaders, defaultStatusReader
