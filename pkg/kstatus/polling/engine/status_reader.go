@@ -7,6 +7,7 @@ import (
 	"context"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
@@ -18,6 +19,10 @@ import (
 // how to identify these generated resources and how to compute status for
 // these generated resources.
 type StatusReader interface {
+	// Supports tells the caller whether the StatusReader can compute status for
+	// the provided GroupKind.
+	Supports(schema.GroupKind) bool
+
 	// ReadStatus will fetch the resource identified by the given identifier
 	// from the cluster and return an ResourceStatus that will contain
 	// information about the latest state of the resource, its computed status

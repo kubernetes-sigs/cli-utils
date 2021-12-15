@@ -6,8 +6,10 @@ package statusreaders
 import (
 	"context"
 
+	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/engine"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 )
@@ -32,6 +34,10 @@ type statefulSetResourceReader struct {
 }
 
 var _ resourceTypeStatusReader = &statefulSetResourceReader{}
+
+func (s *statefulSetResourceReader) Supports(gk schema.GroupKind) bool {
+	return gk == appsv1.SchemeGroupVersion.WithKind("StatefulSet").GroupKind()
+}
 
 func (s *statefulSetResourceReader) ReadStatusForObject(ctx context.Context, reader engine.ClusterReader, statefulSet *unstructured.Unstructured) *event.ResourceStatus {
 	return newPodControllerStatusReader(s.mapper, s.podResourceReader).readStatus(ctx, reader, statefulSet)

@@ -6,8 +6,10 @@ package statusreaders
 import (
 	"context"
 
+	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/engine"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 )
@@ -32,6 +34,10 @@ type replicaSetStatusReader struct {
 }
 
 var _ resourceTypeStatusReader = &replicaSetStatusReader{}
+
+func (r *replicaSetStatusReader) Supports(gk schema.GroupKind) bool {
+	return gk == appsv1.SchemeGroupVersion.WithKind("ReplicaSet").GroupKind()
+}
 
 func (r *replicaSetStatusReader) ReadStatusForObject(ctx context.Context, reader engine.ClusterReader, rs *unstructured.Unstructured) *event.ResourceStatus {
 	return newPodControllerStatusReader(r.mapper, r.podStatusReader).readStatus(ctx, reader, rs)

@@ -9,6 +9,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/engine"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
@@ -37,6 +38,10 @@ type deploymentResourceReader struct {
 }
 
 var _ resourceTypeStatusReader = &deploymentResourceReader{}
+
+func (d *deploymentResourceReader) Supports(gk schema.GroupKind) bool {
+	return gk == appsv1.SchemeGroupVersion.WithKind("Deployment").GroupKind()
+}
 
 func (d *deploymentResourceReader) ReadStatusForObject(ctx context.Context, reader engine.ClusterReader, deployment *unstructured.Unstructured) *event.ResourceStatus {
 	identifier := object.UnstructuredToObjMetaOrDie(deployment)

@@ -44,7 +44,12 @@ type baseStatusReader struct {
 // resourceTypeStatusReader is an interface that can be implemented differently
 // for each resource type.
 type resourceTypeStatusReader interface {
+	Supports(gk schema.GroupKind) bool
 	ReadStatusForObject(ctx context.Context, reader engine.ClusterReader, object *unstructured.Unstructured) *event.ResourceStatus
+}
+
+func (b *baseStatusReader) Supports(gk schema.GroupKind) bool {
+	return b.resourceStatusReader.Supports(gk)
 }
 
 // ReadStatus reads the object identified by the passed-in identifier and computes it's status. It reads
