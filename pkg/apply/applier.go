@@ -24,9 +24,10 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
+	"sigs.k8s.io/cli-utils/pkg/kstatus/polling"
+	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/engine"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/ordering"
-	statusfactory "sigs.k8s.io/cli-utils/pkg/util/factory"
 )
 
 // NewApplier returns a new Applier.
@@ -35,7 +36,7 @@ func NewApplier(factory cmdutil.Factory, invClient inventory.InventoryClient) (*
 	if err != nil {
 		return nil, err
 	}
-	statusPoller, err := statusfactory.NewStatusPoller(factory)
+	statusPoller, err := polling.NewStatusPollerFromFactory(factory, []engine.StatusReader{})
 	if err != nil {
 		return nil, err
 	}

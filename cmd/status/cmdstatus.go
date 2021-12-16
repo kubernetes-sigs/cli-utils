@@ -19,10 +19,10 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/aggregator"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/collector"
+	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/engine"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
 	"sigs.k8s.io/cli-utils/pkg/manifestreader"
-	"sigs.k8s.io/cli-utils/pkg/util/factory"
 )
 
 func GetStatusRunner(factory cmdutil.Factory, invFactory inventory.InventoryClientFactory, loader manifestreader.ManifestLoader) *StatusRunner {
@@ -193,5 +193,5 @@ func allKnownNotifierFunc(cancelFunc context.CancelFunc) collector.ObserverFunc 
 }
 
 func pollerFactoryFunc(f cmdutil.Factory) (poller.Poller, error) {
-	return factory.NewStatusPoller(f)
+	return polling.NewStatusPollerFromFactory(f, []engine.StatusReader{})
 }

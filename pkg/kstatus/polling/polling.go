@@ -5,9 +5,12 @@ package polling
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/scheme"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/clusterreader"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/engine"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
@@ -35,6 +38,27 @@ func NewStatusPoller(reader client.Reader, mapper meta.RESTMapper, customStatusR
 			StatusReaders:       statusReaders,
 		},
 	}
+}
+
+// NewStatusPollerFromFactory creates a new StatusPoller instance from the
+// passed in factory.
+func NewStatusPollerFromFactory(f cmdutil.Factory, statusReaders []engine.StatusReader) (*StatusPoller, error) {
+	config, err := f.ToRESTConfig()
+	if err != nil {
+		return nil, fmt.Errorf("error getting RESTConfig: %w", err)
+	}
+
+	mapper, err := f.ToRESTMapper()
+	if err != nil {
+		return nil, fmt.Errorf("error getting RESTMapper: %w", err)
+	}
+
+	c, err := client.New(config, client.Options{Scheme: scheme.Scheme, Mapper: mapper})
+	if err != nil {
+		return nil, fmt.Errorf("error creating client: %w", err)
+	}
+
+	return NewStatusPoller(c, mapper, statusReaders), nil
 }
 
 // StatusPoller provides functionality for polling a cluster for status for a set of resources.

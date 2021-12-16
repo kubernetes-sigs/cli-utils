@@ -20,8 +20,9 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
+	"sigs.k8s.io/cli-utils/pkg/kstatus/polling"
+	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/engine"
 	"sigs.k8s.io/cli-utils/pkg/object"
-	statusfactory "sigs.k8s.io/cli-utils/pkg/util/factory"
 )
 
 // NewDestroyer returns a new destroyer. It will set up the ApplyOptions and
@@ -35,7 +36,7 @@ func NewDestroyer(factory cmdutil.Factory, invClient inventory.InventoryClient) 
 	if err != nil {
 		return nil, fmt.Errorf("error setting up PruneOptions: %w", err)
 	}
-	statusPoller, err := statusfactory.NewStatusPoller(factory)
+	statusPoller, err := polling.NewStatusPollerFromFactory(factory, []engine.StatusReader{})
 	if err != nil {
 		return nil, err
 	}
