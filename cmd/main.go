@@ -10,15 +10,14 @@ import (
 
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/component-base/cli"
 	"k8s.io/kubectl/pkg/cmd/util"
-	"k8s.io/kubectl/pkg/util/logs"
 	"sigs.k8s.io/cli-utils/cmd/apply"
 	"sigs.k8s.io/cli-utils/cmd/destroy"
 	"sigs.k8s.io/cli-utils/cmd/diff"
 	"sigs.k8s.io/cli-utils/cmd/initcmd"
 	"sigs.k8s.io/cli-utils/cmd/preview"
 	"sigs.k8s.io/cli-utils/cmd/status"
-	"sigs.k8s.io/cli-utils/pkg/errors"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/manifestreader"
 	"sigs.k8s.io/cli-utils/pkg/util/factory"
@@ -28,17 +27,17 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 )
 
-var cmd = &cobra.Command{
-	Use:   "kapply",
-	Short: "Perform cluster operations using declarative configuration",
-	Long:  "Perform cluster operations using declarative configuration",
-	// We silence error reporting from Cobra here since we want to improve
-	// the error messages coming from the commands.
-	SilenceErrors: true,
-	SilenceUsage:  true,
-}
-
 func main() {
+	cmd := &cobra.Command{
+		Use:   "kapply",
+		Short: "Perform cluster operations using declarative configuration",
+		Long:  "Perform cluster operations using declarative configuration",
+		// We silence error reporting from Cobra here since we want to improve
+		// the error messages coming from the commands.
+		SilenceErrors: true,
+		SilenceUsage:  true,
+	}
+
 	// configure kubectl dependencies and flags
 	flags := cmd.PersistentFlags()
 	kubeConfigFlags := genericclioptions.NewConfigFlags(true).WithDeprecatedPasswordFlag()
@@ -46,8 +45,8 @@ func main() {
 	matchVersionKubeConfigFlags := util.NewMatchVersionFlags(&factory.CachingRESTClientGetter{
 		Delegate: kubeConfigFlags,
 	})
-	matchVersionKubeConfigFlags.AddFlags(cmd.PersistentFlags())
-	cmd.PersistentFlags().AddGoFlagSet(flag.CommandLine)
+	matchVersionKubeConfigFlags.AddFlags(flags)
+	flags.AddGoFlagSet(flag.CommandLine)
 	f := util.NewFactory(matchVersionKubeConfigFlags)
 
 	ioStreams := genericclioptions.IOStreams{
@@ -74,12 +73,8 @@ func main() {
 
 	cmd.AddCommand(initCmd, applyCmd, diffCmd, destroyCmd, previewCmd, statusCmd)
 
-	logs.InitLogs()
-	defer logs.FlushLogs()
-
-	if err := cmd.Execute(); err != nil {
-		errors.CheckErr(cmd.ErrOrStderr(), err, "kapply")
-	}
+	code := cli.Run(cmd)
+	os.Exit(code)
 }
 
 // updateHelp replaces `kubectl` help messaging with `kapply` help messaging
