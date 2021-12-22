@@ -117,22 +117,6 @@ func (jf *formatter) FormatActionGroupEvent(
 		})
 	}
 
-	if age.Action == event.WaitAction && age.Type == event.Started {
-		ag, found := list.ActionGroupByName(age.GroupName, ags)
-		if !found {
-			panic(fmt.Errorf("unknown action group name %q", age.GroupName))
-		}
-		for id, se := range c.LatestStatus() {
-			// Only print information about objects that we actually care about
-			// for this wait task.
-			if found := ag.Identifiers.Contains(id); found {
-				if err := jf.printResourceStatus(se); err != nil {
-					return err
-				}
-			}
-		}
-	}
-
 	if age.Action == event.WaitAction && age.Type == event.Finished {
 		return jf.printEvent("wait", "completed", map[string]interface{}{
 			"reconciled": ws.Reconciled,
