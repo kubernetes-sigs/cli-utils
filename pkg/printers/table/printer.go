@@ -12,13 +12,20 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/print/table"
+	"sigs.k8s.io/cli-utils/pkg/printers/printer"
 )
 
 type Printer struct {
 	IOStreams genericclioptions.IOStreams
 }
 
-func (t *Printer) Print(ch <-chan event.Event, _ common.DryRunStrategy, printStatus bool) error {
+func NewPrinter(ioStreams genericclioptions.IOStreams) printer.Printer {
+	return &Printer{
+		IOStreams: ioStreams,
+	}
+}
+
+func (t *Printer) Print(ch <-chan event.Event, _ common.DryRunStrategy, _ bool) error {
 	// Wait for the init event that will give us the set of
 	// resources.
 	var initEvent event.InitEvent

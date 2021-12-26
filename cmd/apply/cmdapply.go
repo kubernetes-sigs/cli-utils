@@ -19,6 +19,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/manifestreader"
 	"sigs.k8s.io/cli-utils/pkg/printers"
+	"sigs.k8s.io/cli-utils/pkg/printers/printer"
 )
 
 func GetApplyRunner(factory cmdutil.Factory, invFactory inventory.InventoryClientFactory,
@@ -167,6 +168,6 @@ func (r *ApplyRunner) RunE(cmd *cobra.Command, args []string) error {
 
 	// The printer will print updates from the channel. It will block
 	// until the channel is closed.
-	printer := printers.GetPrinter(r.output, r.ioStreams)
-	return printer.Print(ch, common.DryRunNone, r.printStatusEvents)
+	pr := printers.GetPrinter(r.output, r.ioStreams, printer.PreviewStringer{})
+	return pr.Print(ch, common.DryRunNone, r.printStatusEvents)
 }

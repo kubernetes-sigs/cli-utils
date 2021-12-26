@@ -14,12 +14,13 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/print/list"
+	"sigs.k8s.io/cli-utils/pkg/printers/printer"
 )
 
 func NewFormatter(ioStreams genericclioptions.IOStreams,
-	previewStrategy common.DryRunStrategy) list.Formatter {
+	previewStrategy common.DryRunStrategy, drs printer.DryRunStringer) list.Formatter {
 	return &formatter{
-		print: getPrintFunc(ioStreams.Out, previewStrategy),
+		print: getPrintFunc(ioStreams.Out, previewStrategy, drs),
 	}
 }
 
@@ -159,13 +160,9 @@ func resourceIDToString(gk schema.GroupKind, name string) string {
 
 type printFunc func(format string, a ...interface{})
 
-func getPrintFunc(w io.Writer, previewStrategy common.DryRunStrategy) printFunc {
+func getPrintFunc(w io.Writer, previewStrategy common.DryRunStrategy, drs printer.DryRunStringer) printFunc {
 	return func(format string, a ...interface{}) {
-		if previewStrategy.ClientDryRun() {
-			format += " (preview)"
-		} else if previewStrategy.ServerDryRun() {
-			format += " (preview-server)"
-		}
+		format += drs.String(previewStrategy)
 		fmt.Fprintf(w, format+"\n", a...)
 	}
 }

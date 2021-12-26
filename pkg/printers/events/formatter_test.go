@@ -18,6 +18,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/print/list"
+	"sigs.k8s.io/cli-utils/pkg/printers/printer"
 )
 
 func TestFormatter_FormatApplyEvent(t *testing.T) {
@@ -65,7 +66,7 @@ func TestFormatter_FormatApplyEvent(t *testing.T) {
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
 			ioStreams, _, out, _ := genericclioptions.NewTestIOStreams() //nolint:dogsled
-			formatter := NewFormatter(ioStreams, tc.previewStrategy)
+			formatter := NewFormatter(ioStreams, tc.previewStrategy, printer.PreviewStringer{})
 			err := formatter.FormatApplyEvent(tc.event)
 			assert.NoError(t, err)
 
@@ -112,7 +113,7 @@ func TestFormatter_FormatStatusEvent(t *testing.T) {
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
 			ioStreams, _, out, _ := genericclioptions.NewTestIOStreams() //nolint:dogsled
-			formatter := NewFormatter(ioStreams, tc.previewStrategy)
+			formatter := NewFormatter(ioStreams, tc.previewStrategy, printer.PreviewStringer{})
 			err := formatter.FormatStatusEvent(tc.event)
 			assert.NoError(t, err)
 
@@ -157,7 +158,7 @@ func TestFormatter_FormatPruneEvent(t *testing.T) {
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
 			ioStreams, _, out, _ := genericclioptions.NewTestIOStreams() //nolint:dogsled
-			formatter := NewFormatter(ioStreams, tc.previewStrategy)
+			formatter := NewFormatter(ioStreams, tc.previewStrategy, printer.PreviewStringer{})
 			err := formatter.FormatPruneEvent(tc.event)
 			assert.NoError(t, err)
 
@@ -206,7 +207,7 @@ func TestFormatter_FormatDeleteEvent(t *testing.T) {
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
 			ioStreams, _, out, _ := genericclioptions.NewTestIOStreams() //nolint:dogsled
-			formatter := NewFormatter(ioStreams, tc.previewStrategy)
+			formatter := NewFormatter(ioStreams, tc.previewStrategy, printer.PreviewStringer{})
 			err := formatter.FormatDeleteEvent(tc.event)
 			assert.NoError(t, err)
 
@@ -318,13 +319,72 @@ func TestFormatter_FormatWaitEvent(t *testing.T) {
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
 			ioStreams, _, out, _ := genericclioptions.NewTestIOStreams() //nolint:dogsled
-			formatter := NewFormatter(ioStreams, tc.previewStrategy)
+			formatter := NewFormatter(ioStreams, tc.previewStrategy, printer.PreviewStringer{})
 			err := formatter.FormatWaitEvent(tc.event)
 			assert.NoError(t, err)
 
 			assert.Equal(t, tc.expected, strings.TrimSpace(out.String()))
 		})
 	}
+}
+
+func TestCustomDryRunStringer(t *testing.T) {
+	testCases := map[string]struct {
+		previewStrategy common.DryRunStrategy
+		format          func(formatter list.Formatter) error
+		expected        string
+	}{
+		"Apply event with DryRunServer": {
+			previewStrategy: common.DryRunServer,
+			format: func(formatter list.Formatter) error {
+				return formatter.FormatApplyEvent(event.ApplyEvent{
+					Operation:  event.Configured,
+					Identifier: createIdentifier("apps", "Deployment", "", "my-dep"),
+				})
+			},
+			expected: "deployment.apps/my-dep configured -- DRYRUNSERVER",
+		},
+		"Prune event with DryRunNone": {
+			previewStrategy: common.DryRunNone,
+			format: func(formatter list.Formatter) error {
+				return formatter.FormatPruneEvent(event.PruneEvent{
+					Operation:  event.Pruned,
+					Identifier: createIdentifier("apps", "Deployment", "", "my-dep"),
+				})
+			},
+			expected: "deployment.apps/my-dep pruned",
+		},
+		"Wait event with DryRunClient": {
+			previewStrategy: common.DryRunClient,
+			format: func(formatter list.Formatter) error {
+				return formatter.FormatWaitEvent(event.WaitEvent{
+					Operation:  event.ReconcileFailed,
+					Identifier: createIdentifier("apps", "Deployment", "", "my-dep"),
+				})
+			},
+			expected: "deployment.apps/my-dep reconcile failed -- DRYRUNCLIENT",
+		},
+	}
+
+	for tn, tc := range testCases {
+		t.Run(tn, func(t *testing.T) {
+			ioStreams, _, out, _ := genericclioptions.NewTestIOStreams() //nolint:dogsled
+			formatter := NewFormatter(ioStreams, tc.previewStrategy, allCapsStringer{})
+			err := tc.format(formatter)
+			assert.NoError(t, err)
+
+			assert.Equal(t, tc.expected, strings.TrimSpace(out.String()))
+		})
+	}
+}
+
+type allCapsStringer struct{}
+
+func (a allCapsStringer) String(strategy common.DryRunStrategy) string {
+	if strategy.ClientOrServerDryRun() {
+		return fmt.Sprintf(" -- %s", strings.ToUpper(strategy.String()))
+	}
+	return ""
 }
 
 func createObject(group, kind, namespace, name string) *unstructured.Unstructured {

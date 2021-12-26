@@ -10,10 +10,10 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/printers/printer"
 )
 
-func NewPrinter(ioStreams genericclioptions.IOStreams) printer.Printer {
+func NewPrinter(ioStreams genericclioptions.IOStreams, drs printer.DryRunStringer) printer.Printer {
 	return &list.BaseListPrinter{
 		FormatterFactory: func(previewStrategy common.DryRunStrategy) list.Formatter {
-			return NewFormatter(ioStreams, previewStrategy)
+			return NewFormatter(ioStreams, previewStrategy, drs)
 		},
 	}
 }

@@ -19,6 +19,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/manifestreader"
 	"sigs.k8s.io/cli-utils/pkg/printers"
+	"sigs.k8s.io/cli-utils/pkg/printers/printer"
 )
 
 // GetDestroyRunner creates and returns the DestroyRunner which stores the cobra command.
@@ -139,6 +140,6 @@ func (r *DestroyRunner) RunE(cmd *cobra.Command, args []string) error {
 
 	// The printer will print updates from the channel. It will block
 	// until the channel is closed.
-	printer := printers.GetPrinter(r.output, r.ioStreams)
-	return printer.Print(ch, common.DryRunNone, r.printStatusEvents)
+	pr := printers.GetPrinter(r.output, r.ioStreams, printer.PreviewStringer{})
+	return pr.Print(ch, common.DryRunNone, r.printStatusEvents)
 }

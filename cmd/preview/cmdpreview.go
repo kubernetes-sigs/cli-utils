@@ -20,6 +20,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/manifestreader"
 	"sigs.k8s.io/cli-utils/pkg/printers"
+	"sigs.k8s.io/cli-utils/pkg/printers/printer"
 )
 
 var (
@@ -165,6 +166,6 @@ func (r *PreviewRunner) RunE(cmd *cobra.Command, args []string) error {
 
 	// The printer will print updates from the channel. It will block
 	// until the channel is closed.
-	printer := printers.GetPrinter(r.output, r.ioStreams)
-	return printer.Print(ch, drs, false) // Do not print status
+	pr := printers.GetPrinter(r.output, r.ioStreams, printer.PreviewStringer{})
+	return pr.Print(ch, drs, false) // Do not print status
 }
