@@ -26,7 +26,7 @@ func applyWithExistingInvTest(ctx context.Context, c client.Client, invConfig In
 		withNamespace(manifestToUnstructured(deployment1), namespaceName),
 	}
 
-	runWithNoErr(applier.Run(ctx, orgApplyInv, resources, apply.Options{
+	runWithNoErr(applier.Run(ctx, orgApplyInv, resources, apply.ApplierOptions{
 		ReconcileTimeout: 2 * time.Minute,
 		EmitStatusEvents: true,
 	}))
@@ -38,7 +38,7 @@ func applyWithExistingInvTest(ctx context.Context, c client.Client, invConfig In
 	secondInventoryID := fmt.Sprintf("%s-%s-2", inventoryName, namespaceName)
 	secondApplyInv := invConfig.InvWrapperFunc(invConfig.InventoryFactoryFunc(inventoryName, namespaceName, secondInventoryID))
 
-	err := run(applier.Run(ctx, secondApplyInv, resources, apply.Options{
+	err := run(applier.Run(ctx, secondApplyInv, resources, apply.ApplierOptions{
 		ReconcileTimeout: 2 * time.Minute,
 		EmitStatusEvents: true,
 	}))

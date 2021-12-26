@@ -30,7 +30,7 @@ func deletionPreventionTest(ctx context.Context, c client.Client, invConfig Inve
 		withAnnotation(withNamespace(manifestToUnstructured(pod2), namespaceName), common.LifecycleDeleteAnnotation, common.PreventDeletion),
 	}
 
-	runCollect(applier.Run(ctx, inventoryInfo, resources, apply.Options{
+	runCollect(applier.Run(ctx, inventoryInfo, resources, apply.ApplierOptions{
 		ReconcileTimeout: 2 * time.Minute,
 	}))
 
@@ -54,7 +54,7 @@ func deletionPreventionTest(ctx context.Context, c client.Client, invConfig Inve
 		withNamespace(manifestToUnstructured(deployment1), namespaceName),
 	}
 
-	runCollect(applier.Run(ctx, inventoryInfo, resources, apply.Options{
+	runCollect(applier.Run(ctx, inventoryInfo, resources, apply.ApplierOptions{
 		ReconcileTimeout: 2 * time.Minute,
 		DryRunStrategy:   common.DryRunClient,
 	}))
@@ -79,7 +79,7 @@ func deletionPreventionTest(ctx context.Context, c client.Client, invConfig Inve
 		withNamespace(manifestToUnstructured(deployment1), namespaceName),
 	}
 
-	runCollect(applier.Run(ctx, inventoryInfo, resources, apply.Options{
+	runCollect(applier.Run(ctx, inventoryInfo, resources, apply.ApplierOptions{
 		ReconcileTimeout: 2 * time.Minute,
 	}))
 

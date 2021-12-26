@@ -7,7 +7,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/cli-runtime/pkg/resource"
-	"k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
@@ -21,16 +20,16 @@ type InfoHelper interface {
 	BuildInfo(obj *unstructured.Unstructured) (*resource.Info, error)
 }
 
-func NewInfoHelper(mapper meta.RESTMapper, factory util.Factory) *infoHelper {
+func NewInfoHelper(mapper meta.RESTMapper, unstructuredClientForMapping func(*meta.RESTMapping) (resource.RESTClient, error)) *infoHelper {
 	return &infoHelper{
-		mapper:  mapper,
-		factory: factory,
+		mapper:                       mapper,
+		unstructuredClientForMapping: unstructuredClientForMapping,
 	}
 }
 
 type infoHelper struct {
-	mapper  meta.RESTMapper
-	factory util.Factory
+	mapper                       meta.RESTMapper
+	unstructuredClientForMapping func(*meta.RESTMapping) (resource.RESTClient, error)
 }
 
 func (ih *infoHelper) UpdateInfo(info *resource.Info) error {
@@ -41,7 +40,7 @@ func (ih *infoHelper) UpdateInfo(info *resource.Info) error {
 	}
 	info.Mapping = mapping
 
-	c, err := ih.factory.UnstructuredClientForMapping(mapping)
+	c, err := ih.unstructuredClientForMapping(mapping)
 	if err != nil {
 		return err
 	}
