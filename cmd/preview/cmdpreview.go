@@ -163,6 +163,15 @@ func (r *PreviewRunner) RunE(cmd *cobra.Command, args []string) error {
 		})
 	}
 
+	// Print the preview strategy unless the output format is json.
+	if r.output != printers.JSONPrinter {
+		if drs.ServerDryRun() {
+			fmt.Println("Preview strategy: server")
+		} else {
+			fmt.Println("Preview strategy: client")
+		}
+	}
+
 	// The printer will print updates from the channel. It will block
 	// until the channel is closed.
 	printer := printers.GetPrinter(r.output, r.ioStreams)
