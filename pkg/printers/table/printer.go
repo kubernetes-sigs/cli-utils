@@ -11,6 +11,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/common"
+	printcommon "sigs.k8s.io/cli-utils/pkg/print/common"
 	"sigs.k8s.io/cli-utils/pkg/print/table"
 )
 
@@ -18,7 +19,7 @@ type Printer struct {
 	IOStreams genericclioptions.IOStreams
 }
 
-func (t *Printer) Print(ch <-chan event.Event, _ common.DryRunStrategy, printStatus bool) error {
+func (t *Printer) Print(ch <-chan event.Event, _ common.DryRunStrategy, _ bool) error {
 	// Wait for the init event that will give us the set of
 	// resources.
 	var initEvent event.InitEvent
@@ -61,7 +62,13 @@ func (t *Printer) Print(ch <-chan event.Event, _ common.DryRunStrategy, printSta
 	// the printer has updated the UI with the latest state and
 	// exited from the goroutine.
 	<-printCompleted
-	return err
+
+	if err != nil {
+		return err
+	}
+	// If no fatal errors happened, we will return a ResultError if
+	// one or more resources failed to apply/prune or reconcile.
+	return printcommon.ResultErrorFromStats(coll.Stats())
 }
 
 // columns defines the columns we want to print

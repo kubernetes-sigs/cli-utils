@@ -13,6 +13,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/print/list"
+	"sigs.k8s.io/cli-utils/pkg/print/stats"
 )
 
 func NewFormatter(ioStreams genericclioptions.IOStreams,
@@ -82,14 +83,12 @@ func (jf *formatter) FormatErrorEvent(ee event.ErrorEvent) error {
 func (jf *formatter) FormatActionGroupEvent(
 	age event.ActionGroupEvent,
 	ags []event.ActionGroup,
-	as *list.ApplyStats,
-	ps *list.PruneStats,
-	ds *list.DeleteStats,
-	ws *list.WaitStats,
+	s stats.Stats,
 	_ list.Collector,
 ) error {
 	if age.Action == event.ApplyAction && age.Type == event.Finished &&
 		list.IsLastActionGroup(age, ags) {
+		as := s.ApplyStats
 		if err := jf.printEvent("apply", "completed", map[string]interface{}{
 			"count":           as.Sum(),
 			"createdCount":    as.Created,
@@ -104,22 +103,27 @@ func (jf *formatter) FormatActionGroupEvent(
 
 	if age.Action == event.PruneAction && age.Type == event.Finished &&
 		list.IsLastActionGroup(age, ags) {
+		ps := s.PruneStats
 		return jf.printEvent("prune", "completed", map[string]interface{}{
 			"pruned":  ps.Pruned,
 			"skipped": ps.Skipped,
+			"failed":  ps.Failed,
 		})
 	}
 
 	if age.Action == event.DeleteAction && age.Type == event.Finished &&
 		list.IsLastActionGroup(age, ags) {
+		ds := s.DeleteStats
 		return jf.printEvent("delete", "completed", map[string]interface{}{
 			"deleted": ds.Deleted,
 			"skipped": ds.Skipped,
+			"failed":  ds.Failed,
 		})
 	}
 
 	if age.Action == event.WaitAction && age.Type == event.Finished &&
 		list.IsLastActionGroup(age, ags) {
+		ws := s.WaitStats
 		return jf.printEvent("wait", "completed", map[string]interface{}{
 			"reconciled": ws.Reconciled,
 			"skipped":    ws.Skipped,
