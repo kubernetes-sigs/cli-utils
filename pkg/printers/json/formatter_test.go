@@ -183,7 +183,6 @@ func TestFormatter_FormatPruneEvent(t *testing.T) {
 	testCases := map[string]struct {
 		previewStrategy common.DryRunStrategy
 		event           event.PruneEvent
-		pruneStats      *list.PruneStats
 		expected        map[string]interface{}
 	}{
 		"resource pruned without dryrun": {
@@ -255,7 +254,6 @@ func TestFormatter_FormatDeleteEvent(t *testing.T) {
 	testCases := map[string]struct {
 		previewStrategy common.DryRunStrategy
 		event           event.DeleteEvent
-		deleteStats     *list.DeleteStats
 		statusCollector list.Collector
 		expected        map[string]interface{}
 	}{

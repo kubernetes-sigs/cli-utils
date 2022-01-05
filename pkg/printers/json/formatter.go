@@ -13,6 +13,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/print/list"
+	"sigs.k8s.io/cli-utils/pkg/stats"
 )
 
 func NewFormatter(ioStreams genericclioptions.IOStreams,
@@ -84,20 +85,17 @@ func (jf *formatter) FormatErrorEvent(ee event.ErrorEvent) error {
 func (jf *formatter) FormatActionGroupEvent(
 	age event.ActionGroupEvent,
 	ags []event.ActionGroup,
-	as *list.ApplyStats,
-	ps *list.PruneStats,
-	ds *list.DeleteStats,
-	ws *list.WaitStats,
+	s stats.Stats,
 	c list.Collector,
 ) error {
 	if age.Action == event.ApplyAction && age.Type == event.Finished {
 		if err := jf.printEvent("apply", "completed", map[string]interface{}{
-			"count":           as.Sum(),
-			"createdCount":    as.Created,
-			"unchangedCount":  as.Unchanged,
-			"configuredCount": as.Configured,
-			"serverSideCount": as.ServersideApplied,
-			"failedCount":     as.Failed,
+			"count":           s.ApplyStats.Sum(),
+			"createdCount":    s.ApplyStats.Created,
+			"unchangedCount":  s.ApplyStats.Unchanged,
+			"configuredCount": s.ApplyStats.Configured,
+			"serverSideCount": s.ApplyStats.ServersideApplied,
+			"failedCount":     s.ApplyStats.Failed,
 		}); err != nil {
 			return err
 		}
@@ -105,24 +103,26 @@ func (jf *formatter) FormatActionGroupEvent(
 
 	if age.Action == event.PruneAction && age.Type == event.Finished {
 		return jf.printEvent("prune", "completed", map[string]interface{}{
-			"pruned":  ps.Pruned,
-			"skipped": ps.Skipped,
+			"pruned":  s.PruneStats.Pruned,
+			"skipped": s.PruneStats.Skipped,
+			"failed":  s.PruneStats.Failed,
 		})
 	}
 
 	if age.Action == event.DeleteAction && age.Type == event.Finished {
 		return jf.printEvent("delete", "completed", map[string]interface{}{
-			"deleted": ds.Deleted,
-			"skipped": ds.Skipped,
+			"deleted": s.DeleteStats.Deleted,
+			"skipped": s.DeleteStats.Skipped,
+			"failed":  s.DeleteStats.Failed,
 		})
 	}
 
 	if age.Action == event.WaitAction && age.Type == event.Finished {
 		return jf.printEvent("wait", "completed", map[string]interface{}{
-			"reconciled": ws.Reconciled,
-			"skipped":    ws.Skipped,
-			"timeout":    ws.Timeout,
-			"failed":     ws.Failed,
+			"reconciled": s.WaitStats.Reconciled,
+			"skipped":    s.WaitStats.Skipped,
+			"timeout":    s.WaitStats.Timeout,
+			"failed":     s.WaitStats.Failed,
 		})
 	}
 

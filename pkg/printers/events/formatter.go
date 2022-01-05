@@ -14,6 +14,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/print/list"
+	"sigs.k8s.io/cli-utils/pkg/stats"
 )
 
 func NewFormatter(ioStreams genericclioptions.IOStreams,
@@ -108,21 +109,18 @@ func (ef *formatter) FormatErrorEvent(_ event.ErrorEvent) error {
 func (ef *formatter) FormatActionGroupEvent(
 	age event.ActionGroupEvent,
 	ags []event.ActionGroup,
-	as *list.ApplyStats,
-	ps *list.PruneStats,
-	ds *list.DeleteStats,
-	ws *list.WaitStats,
+	s stats.Stats,
 	c list.Collector,
 ) error {
 	if age.Action == event.ApplyAction &&
 		age.Type == event.Finished &&
 		list.IsLastActionGroup(age, ags) {
 		output := fmt.Sprintf("%d resource(s) applied. %d created, %d unchanged, %d configured, %d failed",
-			as.Sum(), as.Created, as.Unchanged, as.Configured, as.Failed)
+			s.ApplyStats.Sum(), s.ApplyStats.Created, s.ApplyStats.Unchanged, s.ApplyStats.Configured, s.ApplyStats.Failed)
 		// Only print information about serverside apply if some of the
 		// resources actually were applied serverside.
-		if as.ServersideApplied > 0 {
-			output += fmt.Sprintf(", %d serverside applied", as.ServersideApplied)
+		if s.ApplyStats.ServersideApplied > 0 {
+			output += fmt.Sprintf(", %d serverside applied", s.ApplyStats.ServersideApplied)
 		}
 		ef.print(output)
 	}
@@ -130,19 +128,22 @@ func (ef *formatter) FormatActionGroupEvent(
 	if age.Action == event.PruneAction &&
 		age.Type == event.Finished &&
 		list.IsLastActionGroup(age, ags) {
-		ef.print("%d resource(s) pruned, %d skipped, %d failed", ps.Pruned, ps.Skipped, ps.Failed)
+		ef.print("%d resource(s) pruned, %d skipped, %d failed", s.PruneStats.Pruned, s.PruneStats.Skipped,
+			s.PruneStats.Failed)
 	}
 
 	if age.Action == event.DeleteAction &&
 		age.Type == event.Finished &&
 		list.IsLastActionGroup(age, ags) {
-		ef.print("%d resource(s) deleted, %d skipped", ds.Deleted, ds.Skipped)
+		ef.print("%d resource(s) deleted, %d skipped", s.DeleteStats.Deleted, s.DeleteStats.Skipped,
+			s.DeleteStats.Failed)
 	}
 
 	if age.Action == event.WaitAction &&
 		age.Type == event.Finished &&
 		list.IsLastActionGroup(age, ags) {
-		ef.print("%d resource(s) reconciled, %d skipped", ws.Reconciled, ds.Skipped)
+		ef.print("%d resource(s) reconciled, %d skipped, %d failed, %d timed out", s.WaitStats.Reconciled,
+			s.WaitStats.Skipped, s.WaitStats.Failed, s.WaitStats.Timeout)
 	}
 	return nil
 }
