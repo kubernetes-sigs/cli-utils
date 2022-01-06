@@ -9,6 +9,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/klog/v2"
+	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/yaml"
 )
 
@@ -41,7 +42,10 @@ func ReadAnnotation(obj *unstructured.Unstructured) (ApplyTimeMutation, error) {
 
 	err := yaml.Unmarshal([]byte(mutationYaml), &mutation)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse apply-time-mutation annotation: %v", err)
+		return mutation, object.InvalidAnnotationError{
+			Annotation: Annotation,
+			Cause:      err,
+		}
 	}
 	return mutation, nil
 }

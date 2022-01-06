@@ -12,6 +12,7 @@ import (
 )
 
 type Formatter interface {
+	FormatValidationEvent(ve event.ValidationEvent) error
 	FormatApplyEvent(ae event.ApplyEvent) error
 	FormatStatusEvent(se event.StatusEvent) error
 	FormatPruneEvent(pe event.PruneEvent) error
@@ -68,6 +69,10 @@ func (b *BaseListPrinter) Print(ch <-chan event.Event, previewStrategy common.Dr
 		case event.ErrorType:
 			_ = formatter.FormatErrorEvent(e.ErrorEvent)
 			return e.ErrorEvent.Err
+		case event.ValidationType:
+			if err := formatter.FormatValidationEvent(e.ValidationEvent); err != nil {
+				return err
+			}
 		case event.ApplyType:
 			if err := formatter.FormatApplyEvent(e.ApplyEvent); err != nil {
 				return err

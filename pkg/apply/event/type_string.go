@@ -16,11 +16,12 @@ func _() {
 	_ = x[PruneType-5]
 	_ = x[DeleteType-6]
 	_ = x[WaitType-7]
+	_ = x[ValidationType-8]
 }
 
-const _Type_name = "InitTypeErrorTypeActionGroupTypeApplyTypeStatusTypePruneTypeDeleteTypeWaitType"
+const _Type_name = "InitTypeErrorTypeActionGroupTypeApplyTypeStatusTypePruneTypeDeleteTypeWaitTypeValidationType"
 
-var _Type_index = [...]uint8{0, 8, 17, 32, 41, 51, 60, 70, 78}
+var _Type_index = [...]uint8{0, 8, 17, 32, 41, 51, 60, 70, 78, 92}
 
 func (i Type) String() string {
 	if i < 0 || i >= Type(len(_Type_index)-1) {

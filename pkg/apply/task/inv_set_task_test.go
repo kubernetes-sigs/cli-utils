@@ -6,6 +6,7 @@ package task
 import (
 	"testing"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/cli-utils/pkg/apply/cache"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
@@ -14,10 +15,18 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/testutil"
 )
 
+var objInvalid = &unstructured.Unstructured{
+	Object: map[string]interface{}{
+		"apiVersion": "apps/v1",
+		"kind":       "Deployment",
+	},
+}
+
 func TestInvSetTask(t *testing.T) {
 	id1 := object.UnstructuredToObjMetadata(obj1)
 	id2 := object.UnstructuredToObjMetadata(obj2)
 	id3 := object.UnstructuredToObjMetadata(obj3)
+	idInvalid := object.UnstructuredToObjMetadata(objInvalid)
 
 	tests := map[string]struct {
 		prevInventory  object.ObjMetadataSet
@@ -27,28 +36,23 @@ func TestInvSetTask(t *testing.T) {
 		skippedApplies object.ObjMetadataSet
 		skippedDeletes object.ObjMetadataSet
 		abandonedObjs  object.ObjMetadataSet
+		invalidObjs    object.ObjMetadataSet
 		expectedObjs   object.ObjMetadataSet
 	}{
 		"no apply objs, no prune failures; no inventory": {
-			appliedObjs:   object.ObjMetadataSet{},
-			failedDeletes: object.ObjMetadataSet{},
-			expectedObjs:  object.ObjMetadataSet{},
+			expectedObjs: object.ObjMetadataSet{},
 		},
 		"one apply objs, no prune failures; one inventory": {
-			appliedObjs:   object.ObjMetadataSet{id1},
-			failedDeletes: object.ObjMetadataSet{},
-			expectedObjs:  object.ObjMetadataSet{id1},
+			appliedObjs:  object.ObjMetadataSet{id1},
+			expectedObjs: object.ObjMetadataSet{id1},
 		},
 		"no apply objs, one prune failure, in prev inventory; one inventory": {
 			prevInventory: object.ObjMetadataSet{id1},
-			appliedObjs:   object.ObjMetadataSet{},
 			failedDeletes: object.ObjMetadataSet{id1},
 			expectedObjs:  object.ObjMetadataSet{id1},
 		},
 		"no apply objs, one prune failure, not in prev inventory; no inventory": {
 			// aritifical use case: prunes come from the inventory
-			prevInventory: object.ObjMetadataSet{},
-			appliedObjs:   object.ObjMetadataSet{},
 			failedDeletes: object.ObjMetadataSet{id1},
 			expectedObjs:  object.ObjMetadataSet{},
 		},
@@ -66,128 +70,94 @@ func TestInvSetTask(t *testing.T) {
 			expectedObjs:  object.ObjMetadataSet{id1, id2, id3},
 		},
 		"no apply objs, no apply failures, no prune failures; no inventory": {
-			appliedObjs:   object.ObjMetadataSet{},
 			failedApplies: object.ObjMetadataSet{id3},
-			prevInventory: object.ObjMetadataSet{},
-			failedDeletes: object.ObjMetadataSet{},
 			expectedObjs:  object.ObjMetadataSet{},
 		},
 		"one apply failure not in prev inventory; no inventory": {
-			appliedObjs:   object.ObjMetadataSet{},
 			failedApplies: object.ObjMetadataSet{id3},
-			prevInventory: object.ObjMetadataSet{},
-			failedDeletes: object.ObjMetadataSet{},
 			expectedObjs:  object.ObjMetadataSet{},
 		},
 		"one apply obj, one apply failure not in prev inventory; one inventory": {
 			appliedObjs:   object.ObjMetadataSet{id2},
 			failedApplies: object.ObjMetadataSet{id3},
-			prevInventory: object.ObjMetadataSet{},
-			failedDeletes: object.ObjMetadataSet{},
 			expectedObjs:  object.ObjMetadataSet{id2},
 		},
 		"one apply obj, one apply failure in prev inventory; one inventory": {
 			appliedObjs:   object.ObjMetadataSet{id2},
 			failedApplies: object.ObjMetadataSet{id3},
 			prevInventory: object.ObjMetadataSet{id3},
-			failedDeletes: object.ObjMetadataSet{},
 			expectedObjs:  object.ObjMetadataSet{id2, id3},
 		},
 		"one apply obj, two apply failures with one in prev inventory; two inventory": {
 			appliedObjs:   object.ObjMetadataSet{id2},
 			failedApplies: object.ObjMetadataSet{id1, id3},
 			prevInventory: object.ObjMetadataSet{id3},
-			failedDeletes: object.ObjMetadataSet{},
 			expectedObjs:  object.ObjMetadataSet{id2, id3},
 		},
 		"three apply failures with two in prev inventory; two inventory": {
-			appliedObjs:   object.ObjMetadataSet{},
 			failedApplies: object.ObjMetadataSet{id1, id2, id3},
 			prevInventory: object.ObjMetadataSet{id2, id3},
-			failedDeletes: object.ObjMetadataSet{},
 			expectedObjs:  object.ObjMetadataSet{id2, id3},
 		},
 		"three apply failures with three in prev inventory; three inventory": {
-			appliedObjs:   object.ObjMetadataSet{},
 			failedApplies: object.ObjMetadataSet{id1, id2, id3},
 			prevInventory: object.ObjMetadataSet{id2, id3, id1},
-			failedDeletes: object.ObjMetadataSet{},
 			expectedObjs:  object.ObjMetadataSet{id2, id1, id3},
 		},
 		"one skipped apply from prev inventory; one inventory": {
 			prevInventory:  object.ObjMetadataSet{id1},
-			appliedObjs:    object.ObjMetadataSet{},
-			failedApplies:  object.ObjMetadataSet{},
-			failedDeletes:  object.ObjMetadataSet{},
 			skippedApplies: object.ObjMetadataSet{id1},
-			skippedDeletes: object.ObjMetadataSet{},
-			abandonedObjs:  object.ObjMetadataSet{},
 			expectedObjs:   object.ObjMetadataSet{id1},
 		},
 		"one skipped apply, no prev inventory; no inventory": {
-			prevInventory:  object.ObjMetadataSet{},
-			appliedObjs:    object.ObjMetadataSet{},
-			failedApplies:  object.ObjMetadataSet{},
-			failedDeletes:  object.ObjMetadataSet{},
 			skippedApplies: object.ObjMetadataSet{id1},
-			skippedDeletes: object.ObjMetadataSet{},
-			abandonedObjs:  object.ObjMetadataSet{},
 			expectedObjs:   object.ObjMetadataSet{},
 		},
 		"one apply obj, one skipped apply, two prev inventory; two inventory": {
 			prevInventory:  object.ObjMetadataSet{id1, id2},
 			appliedObjs:    object.ObjMetadataSet{id2},
-			failedApplies:  object.ObjMetadataSet{},
-			failedDeletes:  object.ObjMetadataSet{},
 			skippedApplies: object.ObjMetadataSet{id1},
-			skippedDeletes: object.ObjMetadataSet{},
-			abandonedObjs:  object.ObjMetadataSet{},
 			expectedObjs:   object.ObjMetadataSet{id1, id2},
 		},
 		"one skipped delete from prev inventory; one inventory": {
 			prevInventory:  object.ObjMetadataSet{id1},
-			appliedObjs:    object.ObjMetadataSet{},
-			failedApplies:  object.ObjMetadataSet{},
-			failedDeletes:  object.ObjMetadataSet{},
-			skippedApplies: object.ObjMetadataSet{},
 			skippedDeletes: object.ObjMetadataSet{id1},
-			abandonedObjs:  object.ObjMetadataSet{},
 			expectedObjs:   object.ObjMetadataSet{id1},
 		},
 		"one apply obj, one skipped delete, two prev inventory; two inventory": {
 			prevInventory:  object.ObjMetadataSet{id1, id2},
 			appliedObjs:    object.ObjMetadataSet{id2},
-			failedApplies:  object.ObjMetadataSet{},
-			failedDeletes:  object.ObjMetadataSet{},
-			skippedApplies: object.ObjMetadataSet{},
 			skippedDeletes: object.ObjMetadataSet{id1},
-			abandonedObjs:  object.ObjMetadataSet{},
 			expectedObjs:   object.ObjMetadataSet{id1, id2},
 		},
 		"two apply obj, one abandoned, three in prev inventory; two inventory": {
 			prevInventory: object.ObjMetadataSet{id1, id2, id3},
 			appliedObjs:   object.ObjMetadataSet{id1, id2},
-			failedApplies: object.ObjMetadataSet{},
-			failedDeletes: object.ObjMetadataSet{},
 			abandonedObjs: object.ObjMetadataSet{id3},
 			expectedObjs:  object.ObjMetadataSet{id1, id2},
 		},
 		"two abandoned, two in prev inventory; no inventory": {
 			prevInventory: object.ObjMetadataSet{id2, id3},
-			appliedObjs:   object.ObjMetadataSet{},
-			failedApplies: object.ObjMetadataSet{},
-			failedDeletes: object.ObjMetadataSet{},
 			abandonedObjs: object.ObjMetadataSet{id2, id3},
 			expectedObjs:  object.ObjMetadataSet{},
 		},
 		"same obj skipped delete and abandoned, one in prev inventory; no inventory": {
 			prevInventory:  object.ObjMetadataSet{id3},
-			appliedObjs:    object.ObjMetadataSet{},
-			failedApplies:  object.ObjMetadataSet{},
-			failedDeletes:  object.ObjMetadataSet{},
 			skippedDeletes: object.ObjMetadataSet{id3},
 			abandonedObjs:  object.ObjMetadataSet{id3},
 			expectedObjs:   object.ObjMetadataSet{},
+		},
+		"preserve invalid objects in the inventory": {
+			prevInventory: object.ObjMetadataSet{id3, idInvalid},
+			appliedObjs:   object.ObjMetadataSet{id3},
+			invalidObjs:   object.ObjMetadataSet{idInvalid},
+			expectedObjs:  object.ObjMetadataSet{id3, idInvalid},
+		},
+		"ignore invalid objects not in the inventory": {
+			prevInventory: object.ObjMetadataSet{id3},
+			appliedObjs:   object.ObjMetadataSet{id3},
+			invalidObjs:   object.ObjMetadataSet{idInvalid},
+			expectedObjs:  object.ObjMetadataSet{id3},
 		},
 	}
 
@@ -221,6 +191,9 @@ func TestInvSetTask(t *testing.T) {
 			}
 			for _, abandonedObj := range tc.abandonedObjs {
 				context.AddAbandonedObject(abandonedObj)
+			}
+			for _, invalidObj := range tc.invalidObjs {
+				context.AddInvalidObject(invalidObj)
 			}
 			if taskName != task.Name() {
 				t.Errorf("expected task name (%s), got (%s)", taskName, task.Name())

@@ -24,6 +24,7 @@ func NewTaskContext(eventChannel chan event.Event, resourceCache cache.ResourceC
 		skippedApplies:    make(map[object.ObjMetadata]struct{}),
 		skippedDeletes:    make(map[object.ObjMetadata]struct{}),
 		abandonedObjects:  make(map[object.ObjMetadata]struct{}),
+		invalidObjects:    make(map[object.ObjMetadata]struct{}),
 	}
 }
 
@@ -39,6 +40,7 @@ type TaskContext struct {
 	skippedApplies    map[object.ObjMetadata]struct{}
 	skippedDeletes    map[object.ObjMetadata]struct{}
 	abandonedObjects  map[object.ObjMetadata]struct{}
+	invalidObjects    map[object.ObjMetadata]struct{}
 }
 
 func (tc *TaskContext) TaskChannel() chan TaskResult {
@@ -209,6 +211,22 @@ func (tc *TaskContext) AddAbandonedObject(id object.ObjMetadata) {
 // AbandonedObjects returns all the abandoned objects
 func (tc *TaskContext) AbandonedObjects() object.ObjMetadataSet {
 	return object.ObjMetadataSetFromMap(tc.abandonedObjects)
+}
+
+// IsInvalidObject returns true if the object is abandoned
+func (tc *TaskContext) IsInvalidObject(id object.ObjMetadata) bool {
+	_, found := tc.invalidObjects[id]
+	return found
+}
+
+// AddInvalidObject registers that the object is abandoned
+func (tc *TaskContext) AddInvalidObject(id object.ObjMetadata) {
+	tc.invalidObjects[id] = struct{}{}
+}
+
+// InvalidObjects returns all the abandoned objects
+func (tc *TaskContext) InvalidObjects() object.ObjMetadataSet {
+	return object.ObjMetadataSetFromMap(tc.invalidObjects)
 }
 
 // applyInfo captures information about resources that have been

@@ -422,19 +422,22 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 
 			applyIds := object.UnstructuredSetToObjMetadataSet(tc.applyObjs)
 			fakeInvClient := inventory.NewFakeInventoryClient(applyIds)
+			vCollector := &validation.Collector{}
 			tqb := TaskQueueBuilder{
 				Pruner:    pruner,
 				Mapper:    mapper,
 				InvClient: fakeInvClient,
+				Collector: vCollector,
 			}
 			var filters []filter.ValidationFilter
 			var mutators []mutator.Interface
-			tq, err := tqb.AppendApplyWaitTasks(
+			tq := tqb.AppendApplyWaitTasks(
 				tc.applyObjs,
 				filters,
 				mutators,
 				tc.options,
 			).Build()
+			err := vCollector.ToError()
 			if tc.expectedError != nil {
 				assert.EqualError(t, err, tc.expectedError.Error())
 				return
@@ -699,7 +702,7 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 				},
 			},
 		},
-		"cyclic dependency returns error": {
+		"cyclic dependency": {
 			pruneObjs: []*unstructured.Unstructured{
 				testutil.Unstructured(t, resources["deployment"],
 					testutil.AddDependsOn(t, testutil.ToIdentifier(t, resources["secret"]))),
@@ -708,6 +711,48 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 			},
 			options:       Options{Prune: true},
 			expectedTasks: []taskrunner.Task{},
+			expectedError: validation.NewError(
+				graph.CyclicDependencyError{
+					Edges: []graph.Edge{
+						{
+							From: testutil.ToIdentifier(t, resources["secret"]),
+							To:   testutil.ToIdentifier(t, resources["deployment"]),
+						},
+						{
+							From: testutil.ToIdentifier(t, resources["deployment"]),
+							To:   testutil.ToIdentifier(t, resources["secret"]),
+						},
+					},
+				},
+				testutil.ToIdentifier(t, resources["secret"]),
+				testutil.ToIdentifier(t, resources["deployment"]),
+			),
+		},
+		"cyclic dependency and valid": {
+			pruneObjs: []*unstructured.Unstructured{
+				testutil.Unstructured(t, resources["deployment"],
+					testutil.AddDependsOn(t, testutil.ToIdentifier(t, resources["secret"]))),
+				testutil.Unstructured(t, resources["secret"],
+					testutil.AddDependsOn(t, testutil.ToIdentifier(t, resources["deployment"]))),
+				testutil.Unstructured(t, resources["pod"]),
+			},
+			options: Options{Prune: true},
+			expectedTasks: []taskrunner.Task{
+				&task.PruneTask{
+					TaskName: "prune-0",
+					Objects: []*unstructured.Unstructured{
+						testutil.Unstructured(t, resources["pod"]),
+					},
+				},
+				taskrunner.NewWaitTask(
+					"wait-0",
+					object.ObjMetadataSet{
+						testutil.ToIdentifier(t, resources["pod"]),
+					},
+					taskrunner.AllCurrent, 1*time.Second,
+					testutil.NewFakeRESTMapper(),
+				),
+			},
 			expectedError: validation.NewError(
 				graph.CyclicDependencyError{
 					Edges: []graph.Edge{
@@ -742,13 +787,16 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 
 			pruneIds := object.UnstructuredSetToObjMetadataSet(tc.pruneObjs)
 			fakeInvClient := inventory.NewFakeInventoryClient(pruneIds)
+			vCollector := &validation.Collector{}
 			tqb := TaskQueueBuilder{
 				Pruner:    pruner,
 				Mapper:    mapper,
 				InvClient: fakeInvClient,
+				Collector: vCollector,
 			}
 			var emptyPruneFilters []filter.ValidationFilter
-			tq, err := tqb.AppendPruneWaitTasks(tc.pruneObjs, emptyPruneFilters, tc.options).Build()
+			tq := tqb.AppendPruneWaitTasks(tc.pruneObjs, emptyPruneFilters, tc.options).Build()
+			err := vCollector.ToError()
 			if tc.expectedError != nil {
 				assert.EqualError(t, err, tc.expectedError.Error())
 				return

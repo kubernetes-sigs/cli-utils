@@ -4,6 +4,7 @@
 package table
 
 import (
+	"fmt"
 	"sort"
 	"sync"
 
@@ -12,9 +13,12 @@ import (
 	pe "sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
 	"sigs.k8s.io/cli-utils/pkg/object"
+	"sigs.k8s.io/cli-utils/pkg/object/validation"
 	"sigs.k8s.io/cli-utils/pkg/print/stats"
 	"sigs.k8s.io/cli-utils/pkg/print/table"
 )
+
+const InvalidStatus status.Status = "Invalid"
 
 func newResourceStateCollector(resourceGroups []event.ActionGroup) *ResourceStateCollector {
 	resourceInfos := make(map[object.ObjMetadata]*ResourceInfo)
@@ -181,6 +185,8 @@ func (r *ResourceStateCollector) processEvent(ev event.Event) error {
 	r.mux.Lock()
 	defer r.mux.Unlock()
 	switch ev.Type {
+	case event.ValidationType:
+		return r.processValidationEvent(ev.ValidationEvent)
 	case event.StatusType:
 		r.processStatusEvent(ev.StatusEvent)
 	case event.ApplyType:
@@ -191,6 +197,34 @@ func (r *ResourceStateCollector) processEvent(ev event.Event) error {
 		r.processWaitEvent(ev.WaitEvent)
 	case event.ErrorType:
 		return ev.ErrorEvent.Err
+	}
+	return nil
+}
+
+// processValidationEvent handles events pertaining to a validation error
+// for a resource.
+func (r *ResourceStateCollector) processValidationEvent(e event.ValidationEvent) error {
+	klog.V(7).Infoln("processing validation event")
+	// unwrap validation errors
+	err := e.Error
+	if vErr, ok := err.(*validation.Error); ok {
+		err = vErr.Unwrap()
+	}
+	if len(e.Identifiers) == 0 {
+		// no objects, invalid event
+		return fmt.Errorf("invalid validation event: no identifiers: %w", err)
+	}
+	for _, id := range e.Identifiers {
+		previous, found := r.resourceInfos[id]
+		if !found {
+			klog.V(4).Infof("%s status event not found in ResourceInfos; no processing", id)
+			continue
+		}
+		previous.resourceStatus = &pe.ResourceStatus{
+			Identifier: id,
+			Status:     InvalidStatus,
+			Message:    e.Error.Error(),
+		}
 	}
 	return nil
 }

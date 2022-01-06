@@ -260,10 +260,13 @@ metadata:
 				crdGV.WithResource("customresourcedefinition"), meta.RESTScopeRoot)
 			mapper = meta.MultiRESTMapper([]meta.RESTMapper{mapper, crdMapper})
 
+			vCollector := &validation.Collector{}
 			validator := &validation.Validator{
-				Mapper: mapper,
+				Mapper:    mapper,
+				Collector: vCollector,
 			}
-			err = validator.Validate(tc.resources)
+			validator.Validate(tc.resources)
+			err = vCollector.ToError()
 			if tc.expectedError == nil {
 				assert.NoError(t, err)
 				return

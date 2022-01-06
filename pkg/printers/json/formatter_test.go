@@ -11,12 +11,15 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	pollevent "sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
 	"sigs.k8s.io/cli-utils/pkg/object"
+	"sigs.k8s.io/cli-utils/pkg/object/graph"
+	"sigs.k8s.io/cli-utils/pkg/object/validation"
 	"sigs.k8s.io/cli-utils/pkg/print/list"
 	"sigs.k8s.io/cli-utils/pkg/print/stats"
 )
@@ -560,6 +563,181 @@ func TestFormatter_FormatActionGroupEvent(t *testing.T) {
 			err := formatter.FormatActionGroupEvent(tc.event, tc.actionGroups, tc.statsCollector, tc.statusCollector)
 			assert.NoError(t, err)
 
+			assertOutput(t, tc.expected, out.String())
+		})
+	}
+}
+
+func TestFormatter_FormatValidationEvent(t *testing.T) {
+	testCases := map[string]struct {
+		previewStrategy common.DryRunStrategy
+		event           event.ValidationEvent
+		expected        map[string]interface{}
+		expectedError   error
+	}{
+		"zero objects, return error": {
+			previewStrategy: common.DryRunNone,
+			event: event.ValidationEvent{
+				Identifiers: object.ObjMetadataSet{},
+				Error:       errors.New("unexpected"),
+			},
+			expectedError: errors.New("invalid validation event: no identifiers: unexpected"),
+		},
+		"one object, missing namespace": {
+			previewStrategy: common.DryRunNone,
+			event: event.ValidationEvent{
+				Identifiers: object.ObjMetadataSet{
+					{
+						GroupKind: schema.GroupKind{
+							Group: "apps",
+							Kind:  "Deployment",
+						},
+						Namespace: "foo",
+						Name:      "bar",
+					},
+				},
+				Error: validation.NewError(
+					field.Required(field.NewPath("metadata", "namespace"), "namespace is required"),
+					object.ObjMetadata{
+						GroupKind: schema.GroupKind{
+							Group: "apps",
+							Kind:  "Deployment",
+						},
+						Namespace: "foo",
+						Name:      "bar",
+					},
+				),
+			},
+			expected: map[string]interface{}{
+				"eventType": "validation",
+				"type":      "validation",
+				"timestamp": "",
+				"objects": []interface{}{
+					map[string]interface{}{
+						"group":     "apps",
+						"kind":      "Deployment",
+						"name":      "bar",
+						"namespace": "foo",
+					},
+				},
+				"error": "metadata.namespace: Required value: namespace is required",
+			},
+		},
+		"two objects, cyclic dependency": {
+			previewStrategy: common.DryRunNone,
+			event: event.ValidationEvent{
+				Identifiers: object.ObjMetadataSet{
+					{
+						GroupKind: schema.GroupKind{
+							Group: "apps",
+							Kind:  "Deployment",
+						},
+						Namespace: "default",
+						Name:      "bar",
+					},
+					{
+						GroupKind: schema.GroupKind{
+							Group: "apps",
+							Kind:  "Deployment",
+						},
+						Namespace: "default",
+						Name:      "foo",
+					},
+				},
+				Error: validation.NewError(
+					graph.CyclicDependencyError{
+						Edges: []graph.Edge{
+							{
+								From: object.ObjMetadata{
+									GroupKind: schema.GroupKind{
+										Group: "apps",
+										Kind:  "Deployment",
+									},
+									Namespace: "default",
+									Name:      "bar",
+								},
+								To: object.ObjMetadata{
+									GroupKind: schema.GroupKind{
+										Group: "apps",
+										Kind:  "Deployment",
+									},
+									Namespace: "default",
+									Name:      "foo",
+								},
+							},
+							{
+								From: object.ObjMetadata{
+									GroupKind: schema.GroupKind{
+										Group: "apps",
+										Kind:  "Deployment",
+									},
+									Namespace: "default",
+									Name:      "foo",
+								},
+								To: object.ObjMetadata{
+									GroupKind: schema.GroupKind{
+										Group: "apps",
+										Kind:  "Deployment",
+									},
+									Namespace: "default",
+									Name:      "bar",
+								},
+							},
+						},
+					},
+					object.ObjMetadata{
+						GroupKind: schema.GroupKind{
+							Group: "apps",
+							Kind:  "Deployment",
+						},
+						Namespace: "default",
+						Name:      "bar",
+					},
+					object.ObjMetadata{
+						GroupKind: schema.GroupKind{
+							Group: "apps",
+							Kind:  "Deployment",
+						},
+						Namespace: "default",
+						Name:      "foo",
+					},
+				),
+			},
+			expected: map[string]interface{}{
+				"eventType": "validation",
+				"type":      "validation",
+				"timestamp": "",
+				"objects": []interface{}{
+					map[string]interface{}{
+						"group":     "apps",
+						"kind":      "Deployment",
+						"name":      "bar",
+						"namespace": "default",
+					},
+					map[string]interface{}{
+						"group":     "apps",
+						"kind":      "Deployment",
+						"name":      "foo",
+						"namespace": "default",
+					},
+				},
+				"error": `cyclic dependency:
+- apps/namespaces/default/Deployment/bar -> apps/namespaces/default/Deployment/foo
+- apps/namespaces/default/Deployment/foo -> apps/namespaces/default/Deployment/bar`,
+			},
+		},
+	}
+
+	for tn, tc := range testCases {
+		t.Run(tn, func(t *testing.T) {
+			ioStreams, _, out, _ := genericclioptions.NewTestIOStreams() //nolint:dogsled
+			formatter := NewFormatter(ioStreams, tc.previewStrategy)
+			err := formatter.FormatValidationEvent(tc.event)
+			if tc.expectedError != nil {
+				assert.EqualError(t, err, tc.expectedError.Error())
+				return
+			}
+			assert.NoError(t, err)
 			assertOutput(t, tc.expected, out.String())
 		})
 	}

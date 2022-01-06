@@ -12,6 +12,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/object"
+	"sigs.k8s.io/cli-utils/pkg/object/validation"
 	"sigs.k8s.io/cli-utils/pkg/print/list"
 	"sigs.k8s.io/cli-utils/pkg/print/stats"
 )
@@ -25,6 +26,26 @@ func NewFormatter(ioStreams genericclioptions.IOStreams,
 
 type formatter struct {
 	ioStreams genericclioptions.IOStreams
+}
+
+func (jf *formatter) FormatValidationEvent(ve event.ValidationEvent) error {
+	// unwrap validation errors
+	err := ve.Error
+	if vErr, ok := err.(*validation.Error); ok {
+		err = vErr.Unwrap()
+	}
+	if len(ve.Identifiers) == 0 {
+		// no objects, invalid event
+		return fmt.Errorf("invalid validation event: no identifiers: %w", err)
+	}
+	objects := make([]interface{}, len(ve.Identifiers))
+	for i, id := range ve.Identifiers {
+		objects[i] = jf.baseResourceEvent(id)
+	}
+	return jf.printEvent("validation", "validation", map[string]interface{}{
+		"objects": objects,
+		"error":   err.Error(),
+	})
 }
 
 func (jf *formatter) FormatApplyEvent(ae event.ApplyEvent) error {

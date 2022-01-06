@@ -199,6 +199,14 @@ var _ = Describe("Applier", func() {
 				It("Reconciliation timeout", func() {
 					reconciliationTimeout(ctx, invConfig, inventoryName, namespace.GetName())
 				})
+
+				It("SkipInvalid", func() {
+					skipInvalidTest(ctx, c, invConfig, inventoryName, namespace.GetName())
+				})
+
+				It("ExitEarly", func() {
+					exitEarlyTest(ctx, c, invConfig, inventoryName, namespace.GetName())
+				})
 			})
 
 			Context("Inventory policy", func() {

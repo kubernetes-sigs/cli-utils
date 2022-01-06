@@ -25,6 +25,7 @@ const (
 	PruneType
 	DeleteType
 	WaitType
+	ValidationType
 )
 
 // Event is the type of the objects that will be returned through
@@ -65,6 +66,9 @@ type Event struct {
 
 	// WaitEvent contains information about any errors encountered in a WaitTask.
 	WaitEvent WaitEvent
+
+	// ValidationEvent contains information about validation errors.
+	ValidationEvent ValidationEvent
 }
 
 // String returns a string suitable for logging
@@ -88,6 +92,8 @@ func (e Event) String() string {
 		sb.WriteString(e.DeleteEvent.String())
 	case WaitType:
 		sb.WriteString(e.WaitEvent.String())
+	case ValidationType:
+		sb.WriteString(e.ValidationEvent.String())
 	}
 	sb.WriteString(" }")
 	return sb.String()
@@ -289,4 +295,15 @@ type DeleteEvent struct {
 func (de DeleteEvent) String() string {
 	return fmt.Sprintf("DeleteEvent{ GroupName: %q, Operation: %q, Identifier: %q, Reason: %q, Error: %q }",
 		de.GroupName, de.Operation, de.Identifier, de.Reason, de.Error)
+}
+
+type ValidationEvent struct {
+	Identifiers object.ObjMetadataSet
+	Error       error
+}
+
+// String returns a string suitable for logging
+func (ve ValidationEvent) String() string {
+	return fmt.Sprintf("ValidationEvent{ Identifiers: %+v, Error: %q }",
+		ve.Identifiers, ve.Error)
 }

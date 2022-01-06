@@ -30,6 +30,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/apply/poller"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
+	"sigs.k8s.io/cli-utils/pkg/jsonpath"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling"
 	pollevent "sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/object"
@@ -516,4 +517,16 @@ func toJSONBytes(t *testing.T, obj runtime.Object) []byte {
 		t.Fatal(err)
 	}
 	return objBytes
+}
+
+type JSONPathSetter struct {
+	Path  string
+	Value interface{}
+}
+
+func (jps JSONPathSetter) Mutate(u *unstructured.Unstructured) {
+	_, err := jsonpath.Set(u.Object, jps.Path, jps.Value)
+	if err != nil {
+		panic(fmt.Sprintf("failed to mutate unstructured object: %v", err))
+	}
 }

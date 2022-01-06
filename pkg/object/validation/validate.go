@@ -15,14 +15,14 @@ import (
 // to being used by the Apply functionality. This imposes some constraint not
 // always required, such as namespaced resources must have the namespace set.
 type Validator struct {
-	Mapper meta.RESTMapper
+	Mapper    meta.RESTMapper
+	Collector *Collector
 }
 
 // Validate validates the provided resources. A RESTMapper will be used
 // to fetch type information from the live cluster.
-func (v *Validator) Validate(objs []*unstructured.Unstructured) error {
+func (v *Validator) Validate(objs []*unstructured.Unstructured) {
 	crds := findCRDs(objs)
-	var errs []error
 	for _, obj := range objs {
 		var objErrors []error
 		if err := v.validateKind(obj); err != nil {
@@ -35,14 +35,13 @@ func (v *Validator) Validate(objs []*unstructured.Unstructured) error {
 			objErrors = append(objErrors, err)
 		}
 		if len(objErrors) > 0 {
-			errs = append(errs, NewError(multierror.Wrap(objErrors...),
-				object.UnstructuredToObjMetadata(obj)))
+			// one error per object
+			v.Collector.Collect(NewError(
+				multierror.Wrap(objErrors...),
+				object.UnstructuredToObjMetadata(obj),
+			))
 		}
 	}
-	if len(errs) > 0 {
-		return multierror.Wrap(errs...)
-	}
-	return nil
 }
 
 // findCRDs looks through the provided resources and returns a slice with

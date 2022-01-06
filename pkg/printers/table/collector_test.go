@@ -4,13 +4,17 @@
 package table
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	pe "sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/object"
+	"sigs.k8s.io/cli-utils/pkg/object/graph"
+	"sigs.k8s.io/cli-utils/pkg/object/validation"
 )
 
 var (
@@ -19,8 +23,16 @@ var (
 			Group: "apps",
 			Kind:  "Deployment",
 		},
-		Name:      "Foo",
-		Namespace: "Bar",
+		Name:      "foo",
+		Namespace: "default",
+	}
+	depID2 = object.ObjMetadata{
+		GroupKind: schema.GroupKind{
+			Group: "apps",
+			Kind:  "Deployment",
+		},
+		Name:      "bar",
+		Namespace: "default",
 	}
 	customID = object.ObjMetadata{
 		GroupKind: schema.GroupKind{
@@ -178,6 +190,79 @@ func TestResourceStateCollector_ProcessStatusEvent(t *testing.T) {
 					if resourceInfo.resourceStatus != tc.statusEvent.PollResourceInfo {
 						t.Errorf("status event not processed for %s", id)
 					}
+				}
+			}
+		})
+	}
+}
+
+func TestResourceStateCollector_ProcessValidationEvent(t *testing.T) {
+	testCases := map[string]struct {
+		resourceGroups []event.ActionGroup
+		event          event.ValidationEvent
+		expectedError  error
+	}{
+		"zero objects, return error": {
+			event: event.ValidationEvent{
+				Identifiers: object.ObjMetadataSet{},
+				Error:       errors.New("unexpected"),
+			},
+			expectedError: errors.New("invalid validation event: no identifiers: unexpected"),
+		},
+		"one object, missing namespace": {
+			resourceGroups: []event.ActionGroup{
+				{
+					Action:      event.ApplyAction,
+					Identifiers: object.ObjMetadataSet{depID},
+				},
+			},
+			event: event.ValidationEvent{
+				Identifiers: object.ObjMetadataSet{depID},
+				Error: validation.NewError(
+					field.Required(field.NewPath("metadata", "namespace"), "namespace is required"),
+					depID,
+				),
+			},
+		},
+		"two objects, cyclic dependency": {
+			event: event.ValidationEvent{
+				Identifiers: object.ObjMetadataSet{depID, depID2},
+				Error: validation.NewError(
+					graph.CyclicDependencyError{
+						Edges: []graph.Edge{
+							{
+								From: depID,
+								To:   depID2,
+							},
+							{
+								From: depID2,
+								To:   depID,
+							},
+						},
+					},
+					depID,
+					depID2,
+				),
+			},
+		},
+	}
+
+	for tn, tc := range testCases {
+		t.Run(tn, func(t *testing.T) {
+			rsc := newResourceStateCollector(tc.resourceGroups)
+			err := rsc.processValidationEvent(tc.event)
+			if tc.expectedError != nil {
+				assert.EqualError(t, err, tc.expectedError.Error())
+				return
+			}
+			for _, id := range tc.event.Identifiers {
+				resourceInfo, found := rsc.resourceInfos[id]
+				if found {
+					assert.Equal(t, &pe.ResourceStatus{
+						Identifier: id,
+						Status:     InvalidStatus,
+						Message:    tc.event.Error.Error(),
+					}, resourceInfo.resourceStatus)
 				}
 			}
 		})
