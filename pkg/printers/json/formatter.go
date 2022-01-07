@@ -16,16 +16,14 @@ import (
 )
 
 func NewFormatter(ioStreams genericclioptions.IOStreams,
-	previewStrategy common.DryRunStrategy) list.Formatter {
+	_ common.DryRunStrategy) list.Formatter {
 	return &formatter{
-		ioStreams:       ioStreams,
-		previewStrategy: previewStrategy,
+		ioStreams: ioStreams,
 	}
 }
 
 type formatter struct {
-	previewStrategy common.DryRunStrategy
-	ioStreams       genericclioptions.IOStreams
+	ioStreams genericclioptions.IOStreams
 }
 
 func (jf *formatter) FormatApplyEvent(ae event.ApplyEvent) error {
@@ -88,7 +86,7 @@ func (jf *formatter) FormatActionGroupEvent(
 	ps *list.PruneStats,
 	ds *list.DeleteStats,
 	ws *list.WaitStats,
-	c list.Collector,
+	_ list.Collector,
 ) error {
 	if age.Action == event.ApplyAction && age.Type == event.Finished &&
 		list.IsLastActionGroup(age, ags) {

@@ -174,11 +174,11 @@ Run preview to check which commands will be executed
 ```
 kapply preview $BASE | tee $OUTPUT/status
 
-expectedOutputLine "3 resource(s) applied. 3 created, 0 unchanged, 0 configured, 0 failed (preview)"
+expectedOutputLine "3 resource(s) applied. 3 created, 0 unchanged, 0 configured, 0 failed"
 
 kapply preview $BASE --server-side | tee $OUTPUT/status
 
-expectedOutputLine "3 resource(s) applied. 0 created, 0 unchanged, 0 configured, 0 failed, 3 serverside applied (preview-server)"
+expectedOutputLine "3 resource(s) applied. 0 created, 0 unchanged, 0 configured, 0 failed, 3 serverside applied"
 
 # Verify that preview didn't create any resources.
 kubectl get all -n hellospace 2>&1 | tee $OUTPUT/status
@@ -235,19 +235,19 @@ Clean-up the cluster
 ```
 kapply preview $BASE --destroy | tee $OUTPUT/status
 
-expectedOutputLine "deployment.apps/the-deployment deleted (preview)"
+expectedOutputLine "deployment.apps/the-deployment deleted"
 
-expectedOutputLine "configmap/the-map2 deleted (preview)"
+expectedOutputLine "configmap/the-map2 deleted"
 
-expectedOutputLine "service/the-service deleted (preview)"
+expectedOutputLine "service/the-service deleted"
 
 kapply preview $BASE --destroy --server-side | tee $OUTPUT/status
 
-expectedOutputLine "deployment.apps/the-deployment deleted (preview-server)"
+expectedOutputLine "deployment.apps/the-deployment deleted"
 
-expectedOutputLine "configmap/the-map2 deleted (preview-server)"
+expectedOutputLine "configmap/the-map2 deleted"
 
-expectedOutputLine "service/the-service deleted (preview-server)"
+expectedOutputLine "service/the-service deleted"
 
 # Verify that preview all resources are still there after running preview.
 kubectl get --no-headers all -n hellospace | wc -l | xargs | tee $OUTPUT/status

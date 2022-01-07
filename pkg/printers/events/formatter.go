@@ -5,7 +5,6 @@ package events
 
 import (
 	"fmt"
-	"io"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -17,14 +16,14 @@ import (
 )
 
 func NewFormatter(ioStreams genericclioptions.IOStreams,
-	previewStrategy common.DryRunStrategy) list.Formatter {
+	_ common.DryRunStrategy) list.Formatter {
 	return &formatter{
-		print: getPrintFunc(ioStreams.Out, previewStrategy),
+		ioStreams: ioStreams,
 	}
 }
 
 type formatter struct {
-	print printFunc
+	ioStreams genericclioptions.IOStreams
 }
 
 func (ef *formatter) FormatApplyEvent(ae event.ApplyEvent) error {
@@ -112,7 +111,7 @@ func (ef *formatter) FormatActionGroupEvent(
 	ps *list.PruneStats,
 	ds *list.DeleteStats,
 	ws *list.WaitStats,
-	c list.Collector,
+	_ list.Collector,
 ) error {
 	if age.Action == event.ApplyAction &&
 		age.Type == event.Finished &&
@@ -152,20 +151,11 @@ func (ef *formatter) printResourceStatus(id object.ObjMetadata, se event.StatusE
 		se.PollResourceInfo.Status.String(), se.PollResourceInfo.Message)
 }
 
+func (ef *formatter) print(format string, a ...interface{}) {
+	_, _ = fmt.Fprintf(ef.ioStreams.Out, format+"\n", a...)
+}
+
 // resourceIDToString returns the string representation of a GroupKind and a resource name.
 func resourceIDToString(gk schema.GroupKind, name string) string {
 	return fmt.Sprintf("%s/%s", strings.ToLower(gk.String()), name)
-}
-
-type printFunc func(format string, a ...interface{})
-
-func getPrintFunc(w io.Writer, previewStrategy common.DryRunStrategy) printFunc {
-	return func(format string, a ...interface{}) {
-		if previewStrategy.ClientDryRun() {
-			format += " (preview)"
-		} else if previewStrategy.ServerDryRun() {
-			format += " (preview-server)"
-		}
-		fmt.Fprintf(w, format+"\n", a...)
-	}
 }

@@ -142,11 +142,11 @@ command.
 ```
 kapply preview --destroy $BASE | tee $OUTPUT/status
 
-expectedOutputLine "configmap/firstmap deleted (preview)"
+expectedOutputLine "configmap/firstmap deleted"
 
-expectedOutputLine "configmap/secondmap delete skipped (preview)"
+expectedOutputLine "configmap/secondmap delete skipped"
 
-expectedOutputLine "configmap/thirdmap delete skipped (preview)"
+expectedOutputLine "configmap/thirdmap delete skipped"
 ```
 
 We run the destroy command and see that the resource without the annotations (firstmap)
@@ -193,9 +193,9 @@ will instead be skipped due to the lifecycle directive.
 ```
 kapply preview $BASE | tee $OUTPUT/status
 
-expectedOutputLine "configmap/secondmap prune skipped (preview)"
+expectedOutputLine "configmap/secondmap prune skipped"
 
-expectedOutputLine "configmap/thirdmap prune skipped (preview)"
+expectedOutputLine "configmap/thirdmap prune skipped"
 ```
 
 Run apply and verify that secondmap and thirdmap are still in the cluster.

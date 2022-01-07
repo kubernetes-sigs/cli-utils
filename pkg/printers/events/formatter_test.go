@@ -42,7 +42,7 @@ func TestFormatter_FormatApplyEvent(t *testing.T) {
 				Operation:  event.Configured,
 				Identifier: createIdentifier("apps", "Deployment", "", "my-dep"),
 			},
-			expected: "deployment.apps/my-dep configured (preview)",
+			expected: "deployment.apps/my-dep configured",
 		},
 		"resource updated with server dryrun": {
 			previewStrategy: common.DryRunServer,
@@ -50,7 +50,7 @@ func TestFormatter_FormatApplyEvent(t *testing.T) {
 				Operation:  event.Configured,
 				Identifier: createIdentifier("batch", "CronJob", "foo", "my-cron"),
 			},
-			expected: "cronjob.batch/my-cron configured (preview-server)",
+			expected: "cronjob.batch/my-cron configured",
 		},
 		"apply event with error should display the error": {
 			previewStrategy: common.DryRunServer,
@@ -58,7 +58,7 @@ func TestFormatter_FormatApplyEvent(t *testing.T) {
 				Identifier: createIdentifier("apps", "Deployment", "", "my-dep"),
 				Error:      fmt.Errorf("this is a test error"),
 			},
-			expected: "deployment.apps/my-dep apply failed: this is a test error (preview-server)",
+			expected: "deployment.apps/my-dep apply failed: this is a test error",
 		},
 	}
 
@@ -142,7 +142,7 @@ func TestFormatter_FormatPruneEvent(t *testing.T) {
 				Operation:  event.PruneSkipped,
 				Identifier: createIdentifier("apps", "Deployment", "", "my-dep"),
 			},
-			expected: "deployment.apps/my-dep prune skipped (preview)",
+			expected: "deployment.apps/my-dep prune skipped",
 		},
 		"resource with prune error": {
 			previewStrategy: common.DryRunNone,
@@ -190,7 +190,7 @@ func TestFormatter_FormatDeleteEvent(t *testing.T) {
 				Identifier: createIdentifier("apps", "Deployment", "", "my-dep"),
 				Object:     createObject("apps", "Deployment", "", "my-dep"),
 			},
-			expected: "deployment.apps/my-dep delete skipped (preview)",
+			expected: "deployment.apps/my-dep delete skipped",
 		},
 		"resource with delete error": {
 			previewStrategy: common.DryRunServer,
@@ -199,7 +199,7 @@ func TestFormatter_FormatDeleteEvent(t *testing.T) {
 				Identifier: createIdentifier("apps", "Deployment", "", "my-dep"),
 				Error:      fmt.Errorf("this is a test"),
 			},
-			expected: "deployment.apps/my-dep deletion failed: this is a test (preview-server)",
+			expected: "deployment.apps/my-dep deletion failed: this is a test",
 		},
 	}
 
@@ -239,7 +239,7 @@ func TestFormatter_FormatWaitEvent(t *testing.T) {
 				Operation:  event.Reconciled,
 				Identifier: createIdentifier("apps", "Deployment", "default", "my-dep"),
 			},
-			expected: "deployment.apps/my-dep reconciled (preview)",
+			expected: "deployment.apps/my-dep reconciled",
 		},
 		"resource reconciled (server-side dry-run)": {
 			previewStrategy: common.DryRunServer,
@@ -248,7 +248,7 @@ func TestFormatter_FormatWaitEvent(t *testing.T) {
 				Operation:  event.Reconciled,
 				Identifier: createIdentifier("apps", "Deployment", "default", "my-dep"),
 			},
-			expected: "deployment.apps/my-dep reconciled (preview-server)",
+			expected: "deployment.apps/my-dep reconciled",
 		},
 		"resource reconcile timeout": {
 			previewStrategy: common.DryRunNone,
@@ -266,7 +266,7 @@ func TestFormatter_FormatWaitEvent(t *testing.T) {
 				Identifier: createIdentifier("apps", "Deployment", "default", "my-dep"),
 				Operation:  event.ReconcileTimeout,
 			},
-			expected: "deployment.apps/my-dep reconcile timeout (preview)",
+			expected: "deployment.apps/my-dep reconcile timeout",
 		},
 		"resource reconcile timeout (server-side dry-run)": {
 			previewStrategy: common.DryRunServer,
@@ -275,7 +275,7 @@ func TestFormatter_FormatWaitEvent(t *testing.T) {
 				Identifier: createIdentifier("apps", "Deployment", "default", "my-dep"),
 				Operation:  event.ReconcileTimeout,
 			},
-			expected: "deployment.apps/my-dep reconcile timeout (preview-server)",
+			expected: "deployment.apps/my-dep reconcile timeout",
 		},
 		"resource reconcile skipped": {
 			previewStrategy: common.DryRunNone,
@@ -293,7 +293,7 @@ func TestFormatter_FormatWaitEvent(t *testing.T) {
 				Operation:  event.ReconcileSkipped,
 				Identifier: createIdentifier("apps", "Deployment", "default", "my-dep"),
 			},
-			expected: "deployment.apps/my-dep reconcile skipped (preview)",
+			expected: "deployment.apps/my-dep reconcile skipped",
 		},
 		"resource reconcile skipped (server-side dry-run)": {
 			previewStrategy: common.DryRunServer,
@@ -302,7 +302,7 @@ func TestFormatter_FormatWaitEvent(t *testing.T) {
 				Operation:  event.ReconcileSkipped,
 				Identifier: createIdentifier("apps", "Deployment", "default", "my-dep"),
 			},
-			expected: "deployment.apps/my-dep reconcile skipped (preview-server)",
+			expected: "deployment.apps/my-dep reconcile skipped",
 		},
 		"resource reconcile failed": {
 			previewStrategy: common.DryRunNone,
