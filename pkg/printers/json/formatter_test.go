@@ -471,8 +471,109 @@ func TestFormatter_FormatWaitEvent(t *testing.T) {
 	}
 }
 
+func TestFormatter_FormatActionGroupEvent(t *testing.T) {
+	testCases := map[string]struct {
+		previewStrategy common.DryRunStrategy
+		event           event.ActionGroupEvent
+		actionGroups    []event.ActionGroup
+		applyStats      *list.ApplyStats
+		pruneStats      *list.PruneStats
+		deleteStats     *list.DeleteStats
+		waitStats       *list.WaitStats
+		statusCollector list.Collector
+		expected        map[string]interface{}
+	}{
+		"not the last apply action group finished": {
+			previewStrategy: common.DryRunNone,
+			event: event.ActionGroupEvent{
+				GroupName: "age-1",
+				Action:    event.ApplyAction,
+				Type:      event.Finished,
+			},
+			actionGroups: []event.ActionGroup{
+				{
+					Name:   "age-1",
+					Action: event.ApplyAction,
+				},
+				{
+					Name:   "age-2",
+					Action: event.ApplyAction,
+				},
+			},
+			expected: map[string]interface{}{},
+		},
+		"the last apply action group finished": {
+			previewStrategy: common.DryRunNone,
+			event: event.ActionGroupEvent{
+				GroupName: "age-2",
+				Action:    event.ApplyAction,
+				Type:      event.Finished,
+			},
+			actionGroups: []event.ActionGroup{
+				{
+					Name:   "age-1",
+					Action: event.ApplyAction,
+				},
+				{
+					Name:   "age-2",
+					Action: event.ApplyAction,
+				},
+			},
+			applyStats: &list.ApplyStats{
+				ServersideApplied: 42,
+			},
+			expected: map[string]interface{}{
+				"eventType":       "completed",
+				"configuredCount": 0,
+				"count":           42,
+				"createdCount":    0,
+				"failedCount":     0,
+				"serverSideCount": 42,
+				"timestamp":       "2022-01-06T05:22:48Z",
+				"type":            "apply",
+				"unchangedCount":  0,
+			},
+		},
+		"last prune action group started": {
+			previewStrategy: common.DryRunNone,
+			event: event.ActionGroupEvent{
+				GroupName: "age-2",
+				Action:    event.PruneAction,
+				Type:      event.Started,
+			},
+			actionGroups: []event.ActionGroup{
+				{
+					Name:   "age-1",
+					Action: event.PruneAction,
+				},
+				{
+					Name:   "age-2",
+					Action: event.PruneAction,
+				},
+			},
+			expected: map[string]interface{}{},
+		},
+	}
+
+	for tn, tc := range testCases {
+		t.Run(tn, func(t *testing.T) {
+			ioStreams, _, out, _ := genericclioptions.NewTestIOStreams() //nolint:dogsled
+			formatter := NewFormatter(ioStreams, tc.previewStrategy)
+			err := formatter.FormatActionGroupEvent(tc.event, tc.actionGroups, tc.applyStats, tc.pruneStats,
+				tc.deleteStats, tc.waitStats, tc.statusCollector)
+			assert.NoError(t, err)
+
+			assertOutput(t, tc.expected, out.String())
+		})
+	}
+}
+
 // nolint:unparam
 func assertOutput(t *testing.T, expectedMap map[string]interface{}, actual string) bool {
+	if len(expectedMap) == 0 {
+		return assert.Empty(t, actual)
+	}
+
 	var m map[string]interface{}
 	err := json.Unmarshal([]byte(actual), &m)
 	if !assert.NoError(t, err) {

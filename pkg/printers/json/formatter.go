@@ -90,7 +90,8 @@ func (jf *formatter) FormatActionGroupEvent(
 	ws *list.WaitStats,
 	c list.Collector,
 ) error {
-	if age.Action == event.ApplyAction && age.Type == event.Finished {
+	if age.Action == event.ApplyAction && age.Type == event.Finished &&
+		list.IsLastActionGroup(age, ags) {
 		if err := jf.printEvent("apply", "completed", map[string]interface{}{
 			"count":           as.Sum(),
 			"createdCount":    as.Created,
@@ -103,21 +104,24 @@ func (jf *formatter) FormatActionGroupEvent(
 		}
 	}
 
-	if age.Action == event.PruneAction && age.Type == event.Finished {
+	if age.Action == event.PruneAction && age.Type == event.Finished &&
+		list.IsLastActionGroup(age, ags) {
 		return jf.printEvent("prune", "completed", map[string]interface{}{
 			"pruned":  ps.Pruned,
 			"skipped": ps.Skipped,
 		})
 	}
 
-	if age.Action == event.DeleteAction && age.Type == event.Finished {
+	if age.Action == event.DeleteAction && age.Type == event.Finished &&
+		list.IsLastActionGroup(age, ags) {
 		return jf.printEvent("delete", "completed", map[string]interface{}{
 			"deleted": ds.Deleted,
 			"skipped": ds.Skipped,
 		})
 	}
 
-	if age.Action == event.WaitAction && age.Type == event.Finished {
+	if age.Action == event.WaitAction && age.Type == event.Finished &&
+		list.IsLastActionGroup(age, ags) {
 		return jf.printEvent("wait", "completed", map[string]interface{}{
 			"reconciled": ws.Reconciled,
 			"skipped":    ws.Skipped,
