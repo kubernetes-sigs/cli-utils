@@ -22,6 +22,40 @@ func TestValidate(t *testing.T) {
 		resources     []*unstructured.Unstructured
 		expectedError error
 	}{
+		"missing kind": {
+			resources: []*unstructured.Unstructured{
+				{
+					Object: map[string]interface{}{
+						"apiVersion": "apps/v1",
+						"metadata": map[string]interface{}{
+							"name":      "foo",
+							"namespace": "default",
+						},
+					},
+				},
+			},
+			expectedError: &object.MultiValidationError{
+				Errors: []*object.ValidationError{
+					{
+						GroupVersionKind: schema.GroupVersionKind{
+							Group:   "apps",
+							Version: "v1",
+							Kind:    "",
+						},
+						Name:      "foo",
+						Namespace: "default",
+						FieldErrors: []*field.Error{
+							{
+								Type:     field.ErrorTypeRequired,
+								Field:    "kind",
+								BadValue: "",
+								Detail:   "kind is required",
+							},
+						},
+					},
+				},
+			},
+		},
 		"errors are reported for resources": {
 			resources: []*unstructured.Unstructured{
 				testutil.Unstructured(t, `
@@ -241,17 +275,15 @@ metadata:
 				crdGV.WithResource("customresourcedefinition"), meta.RESTScopeRoot)
 			mapper = meta.MultiRESTMapper([]meta.RESTMapper{mapper, crdMapper})
 
-			err = (&object.Validator{
+			validator := &object.Validator{
 				Mapper: mapper,
-			}).Validate(tc.resources)
-
+			}
+			err = validator.Validate(tc.resources)
 			if tc.expectedError == nil {
 				assert.NoError(t, err)
 				return
 			}
-
-			require.Error(t, err)
-			assert.Equal(t, tc.expectedError, err)
+			require.EqualError(t, err, tc.expectedError.Error())
 		})
 	}
 }

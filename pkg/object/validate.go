@@ -58,6 +58,13 @@ func (v *Validator) Validate(resources []*unstructured.Unstructured) error {
 	var errs []*ValidationError
 	for _, r := range resources {
 		var errList field.ErrorList
+		if err := v.validateKind(r); err != nil {
+			if fieldErr, ok := isFieldError(err); ok {
+				errList = append(errList, fieldErr)
+			} else {
+				return err
+			}
+		}
 		if err := v.validateName(r); err != nil {
 			if fieldErr, ok := isFieldError(err); ok {
 				errList = append(errList, fieldErr)
@@ -112,6 +119,14 @@ func findCRDs(us []*unstructured.Unstructured) []*unstructured.Unstructured {
 	return crds
 }
 
+// validateKind validates the value of the kind field of the resource.
+func (v *Validator) validateKind(u *unstructured.Unstructured) error {
+	if u.GetKind() == "" {
+		return field.Required(field.NewPath("kind"), "kind is required")
+	}
+	return nil
+}
+
 // validateName validates the value of the name field of the resource.
 func (v *Validator) validateName(u *unstructured.Unstructured) error {
 	if u.GetName() == "" {
@@ -122,6 +137,10 @@ func (v *Validator) validateName(u *unstructured.Unstructured) error {
 
 // validateNamespace validates the value of the namespace field of the resource.
 func (v *Validator) validateNamespace(u *unstructured.Unstructured, crds []*unstructured.Unstructured) error {
+	// skip namespace validation if kind is missing (avoid redundant error)
+	if u.GetKind() == "" {
+		return nil
+	}
 	scope, err := LookupResourceScope(u, crds, v.Mapper)
 	if err != nil {
 		return err

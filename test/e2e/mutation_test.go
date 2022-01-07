@@ -228,12 +228,12 @@ func mutationTest(ctx context.Context, c client.Client, invConfig InventoryConfi
 	By("verify podB is created and ready")
 	result := assertUnstructuredExists(ctx, c, podBObj)
 
-	podIP, found, err := testutil.NestedField(result.Object, "status", "podIP")
+	podIP, found, err := object.NestedField(result.Object, "status", "podIP")
 	Expect(err).NotTo(HaveOccurred())
 	Expect(found).To(BeTrue())
 	Expect(podIP).NotTo(BeEmpty()) // use podIP as proxy for readiness
 
-	containerPort, found, err := testutil.NestedField(result.Object, "spec", "containers", 0, "ports", 0, "containerPort")
+	containerPort, found, err := object.NestedField(result.Object, "spec", "containers", 0, "ports", 0, "containerPort")
 	Expect(err).NotTo(HaveOccurred())
 	Expect(found).To(BeTrue())
 	Expect(containerPort).To(Equal(int64(80)))
@@ -243,12 +243,12 @@ func mutationTest(ctx context.Context, c client.Client, invConfig InventoryConfi
 	By("verify podA is mutated, created, and ready")
 	result = assertUnstructuredExists(ctx, c, podAObj)
 
-	podIP, found, err = testutil.NestedField(result.Object, "status", "podIP")
+	podIP, found, err = object.NestedField(result.Object, "status", "podIP")
 	Expect(err).NotTo(HaveOccurred())
 	Expect(found).To(BeTrue())
 	Expect(podIP).NotTo(BeEmpty()) // use podIP as proxy for readiness
 
-	envValue, found, err := testutil.NestedField(result.Object, "spec", "containers", 0, "env", 0, "value")
+	envValue, found, err := object.NestedField(result.Object, "spec", "containers", 0, "env", 0, "value")
 	Expect(err).NotTo(HaveOccurred())
 	Expect(found).To(BeTrue())
 	Expect(envValue).To(Equal(host))

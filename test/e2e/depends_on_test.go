@@ -279,21 +279,21 @@ func dependsOnTest(ctx context.Context, c client.Client, invConfig InventoryConf
 
 	By("verify pod1 created and ready")
 	result := assertUnstructuredExists(ctx, c, pod1Obj)
-	podIP, found, err := testutil.NestedField(result.Object, "status", "podIP")
+	podIP, found, err := object.NestedField(result.Object, "status", "podIP")
 	Expect(err).NotTo(HaveOccurred())
 	Expect(found).To(BeTrue())
 	Expect(podIP).NotTo(BeEmpty()) // use podIP as proxy for readiness
 
 	By("verify pod2 created and ready")
 	result = assertUnstructuredExists(ctx, c, pod2Obj)
-	podIP, found, err = testutil.NestedField(result.Object, "status", "podIP")
+	podIP, found, err = object.NestedField(result.Object, "status", "podIP")
 	Expect(err).NotTo(HaveOccurred())
 	Expect(found).To(BeTrue())
 	Expect(podIP).NotTo(BeEmpty()) // use podIP as proxy for readiness
 
 	By("verify pod3 created and ready")
 	result = assertUnstructuredExists(ctx, c, pod3Obj)
-	podIP, found, err = testutil.NestedField(result.Object, "status", "podIP")
+	podIP, found, err = object.NestedField(result.Object, "status", "podIP")
 	Expect(err).NotTo(HaveOccurred())
 	Expect(found).To(BeTrue())
 	Expect(podIP).NotTo(BeEmpty()) // use podIP as proxy for readiness

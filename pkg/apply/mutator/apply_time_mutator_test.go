@@ -17,7 +17,7 @@ import (
 	"k8s.io/kubectl/pkg/scheme"
 	"sigs.k8s.io/cli-utils/pkg/apply/cache"
 	ktestutil "sigs.k8s.io/cli-utils/pkg/kstatus/polling/testutil"
-	"sigs.k8s.io/cli-utils/pkg/testutil"
+	"sigs.k8s.io/cli-utils/pkg/object"
 
 	// Using gopkg.in/yaml.v3 instead of sigs.k8s.io/yaml on purpose.
 	// yaml.v3 correctly parses ints:
@@ -597,7 +597,7 @@ func TestMutate(t *testing.T) {
 			require.Equal(t, tc.reason, reason, "unexpected mutated reason")
 
 			for _, efv := range tc.expected {
-				received, found, err := testutil.NestedField(tc.target.Object, efv.Field...)
+				received, found, err := object.NestedField(tc.target.Object, efv.Field...)
 				require.NoError(t, err)
 				require.True(t, found, "target field not found")
 				require.Equal(t, efv.Value, received, "unexpected target field value")
