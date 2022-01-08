@@ -49,7 +49,7 @@ func (g *genericStatusReader) Supports(schema.GroupKind) bool {
 }
 
 func (g *genericStatusReader) ReadStatusForObject(_ context.Context, _ engine.ClusterReader, resource *unstructured.Unstructured) *event.ResourceStatus {
-	identifier := object.UnstructuredToObjMetaOrDie(resource)
+	identifier := object.UnstructuredToObjMetadata(resource)
 
 	res, err := g.statusFunc(resource)
 	if err != nil {

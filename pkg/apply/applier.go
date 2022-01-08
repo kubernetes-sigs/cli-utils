@@ -195,7 +195,7 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.InventoryInfo, obje
 				InvPolicy: options.InventoryPolicy,
 			},
 			filter.LocalNamespacesFilter{
-				LocalNamespaces: localNamespaces(invInfo, object.UnstructuredsToObjMetasOrDie(objects)),
+				LocalNamespaces: localNamespaces(invInfo, object.UnstructuredSetToObjMetadataSet(objects)),
 			},
 		}
 		// Build list of apply mutators.
@@ -229,7 +229,7 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.InventoryInfo, obje
 		}
 		// Create a new TaskStatusRunner to execute the taskQueue.
 		klog.V(4).Infoln("applier building TaskStatusRunner...")
-		allIds := object.UnstructuredsToObjMetasOrDie(append(applyObjs, pruneObjs...))
+		allIds := object.UnstructuredSetToObjMetadataSet(append(applyObjs, pruneObjs...))
 		runner := taskrunner.NewTaskStatusRunner(allIds, a.StatusPoller, resourceCache)
 		klog.V(4).Infoln("applier running TaskStatusRunner...")
 		err = runner.Run(ctx, taskQueue.ToChannel(), eventChannel, taskrunner.Options{

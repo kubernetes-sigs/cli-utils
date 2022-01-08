@@ -97,7 +97,7 @@ func (p *Pruner) Prune(
 	// Iterate through objects to prune (delete). If an object is not pruned
 	// and we need to keep it in the inventory, we must capture the prune failure.
 	for _, obj := range objs {
-		id := object.UnstructuredToObjMetaOrDie(obj)
+		id := object.UnstructuredToObjMetadata(obj)
 		klog.V(5).Infof("evaluating prune filters (object: %q)", id)
 		// Check filters to see if we're prevented from pruning/deleting object.
 		var filtered bool
@@ -167,7 +167,7 @@ func (p *Pruner) removeInventoryAnnotation(obj *unstructured.Unstructured) (*uns
 	// Make a copy of the input object to avoid modifying the input.
 	// This prevents race conditions when writing to the underlying map.
 	obj = obj.DeepCopy()
-	id := object.UnstructuredToObjMetaOrDie(obj)
+	id := object.UnstructuredToObjMetadata(obj)
 	annotations := obj.GetAnnotations()
 	if annotations != nil {
 		if _, ok := annotations[inventory.OwningInventoryKey]; ok {
@@ -194,7 +194,7 @@ func (p *Pruner) GetPruneObjs(
 	objs object.UnstructuredSet,
 	opts Options,
 ) (object.UnstructuredSet, error) {
-	ids := object.UnstructuredsToObjMetasOrDie(objs)
+	ids := object.UnstructuredSetToObjMetadataSet(objs)
 	invIDs, err := p.InvClient.GetClusterObjs(inv, opts.DryRunStrategy)
 	if err != nil {
 		return nil, err

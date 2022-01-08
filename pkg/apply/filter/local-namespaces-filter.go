@@ -33,7 +33,7 @@ func (lnf LocalNamespacesFilter) Name() string {
 // returns false. This filter should not be added to the list of filters
 // for "destroying", since every object is being delete. Never returns an error.
 func (lnf LocalNamespacesFilter) Filter(obj *unstructured.Unstructured) (bool, string, error) {
-	id := object.UnstructuredToObjMetaOrDie(obj)
+	id := object.UnstructuredToObjMetadata(obj)
 	if id.GroupKind == namespaceGK &&
 		lnf.LocalNamespaces.Has(id.Name) {
 		reason := fmt.Sprintf("namespace still in use (namespace: %q)", id.Name)

@@ -125,7 +125,7 @@ metadata:
 func createInventoryInfo(children ...*unstructured.Unstructured) inventory.InventoryInfo {
 	inventoryObjCopy := inventoryObj.DeepCopy()
 	wrappedInv := inventory.WrapInventoryObj(inventoryObjCopy)
-	objs := object.UnstructuredsToObjMetasOrDie(children)
+	objs := object.UnstructuredSetToObjMetadataSet(children)
 	if err := wrappedInv.Store(objs); err != nil {
 		return nil
 	}
@@ -315,7 +315,7 @@ func TestPrune(t *testing.T) {
 				},
 			},
 			expectedSkipped: object.ObjMetadataSet{
-				object.UnstructuredToObjMetaOrDie(pod),
+				object.UnstructuredToObjMetadata(pod),
 			},
 		},
 		"UID match for only one object one pruned, one skipped": {
@@ -342,7 +342,7 @@ func TestPrune(t *testing.T) {
 				},
 			},
 			expectedSkipped: object.ObjMetadataSet{
-				object.UnstructuredToObjMetaOrDie(pod),
+				object.UnstructuredToObjMetadata(pod),
 			},
 		},
 		"Prevent delete annotation equals prune skipped": {
@@ -364,11 +364,11 @@ func TestPrune(t *testing.T) {
 				},
 			},
 			expectedSkipped: object.ObjMetadataSet{
-				object.UnstructuredToObjMetaOrDie(podDeletionPrevention),
+				object.UnstructuredToObjMetadata(podDeletionPrevention),
 				testutil.ToIdentifier(t, pdbDeletePreventionManifest),
 			},
 			expectedAbandoned: object.ObjMetadataSet{
-				object.UnstructuredToObjMetaOrDie(podDeletionPrevention),
+				object.UnstructuredToObjMetadata(podDeletionPrevention),
 				testutil.ToIdentifier(t, pdbDeletePreventionManifest),
 			},
 		},
@@ -391,11 +391,11 @@ func TestPrune(t *testing.T) {
 				},
 			},
 			expectedSkipped: object.ObjMetadataSet{
-				object.UnstructuredToObjMetaOrDie(podDeletionPrevention),
+				object.UnstructuredToObjMetadata(podDeletionPrevention),
 				testutil.ToIdentifier(t, pdbDeletePreventionManifest),
 			},
 			expectedAbandoned: object.ObjMetadataSet{
-				object.UnstructuredToObjMetaOrDie(podDeletionPrevention),
+				object.UnstructuredToObjMetadata(podDeletionPrevention),
 				testutil.ToIdentifier(t, pdbDeletePreventionManifest),
 			},
 		},
@@ -418,10 +418,10 @@ func TestPrune(t *testing.T) {
 				},
 			},
 			expectedSkipped: object.ObjMetadataSet{
-				object.UnstructuredToObjMetaOrDie(podDeletionPrevention),
+				object.UnstructuredToObjMetadata(podDeletionPrevention),
 			},
 			expectedAbandoned: object.ObjMetadataSet{
-				object.UnstructuredToObjMetaOrDie(podDeletionPrevention),
+				object.UnstructuredToObjMetadata(podDeletionPrevention),
 			},
 		},
 		"Namespace prune skipped": {
@@ -441,7 +441,7 @@ func TestPrune(t *testing.T) {
 				},
 			},
 			expectedSkipped: object.ObjMetadataSet{
-				object.UnstructuredToObjMetaOrDie(namespace),
+				object.UnstructuredToObjMetadata(namespace),
 			},
 		},
 	}
@@ -453,9 +453,7 @@ func TestPrune(t *testing.T) {
 			for _, obj := range tc.pruneObjs {
 				objs = append(objs, obj)
 			}
-			pruneIds, err := object.UnstructuredsToObjMetas(tc.pruneObjs)
-			require.NoError(t, err)
-
+			pruneIds := object.UnstructuredSetToObjMetadataSet(tc.pruneObjs)
 			po := Pruner{
 				InvClient: inventory.NewFakeInventoryClient(pruneIds),
 				Client:    fake.NewSimpleDynamicClient(scheme.Scheme, objs...),
@@ -467,7 +465,7 @@ func TestPrune(t *testing.T) {
 			eventChannel := make(chan event.Event, len(tc.pruneObjs)+1)
 			resourceCache := cache.NewResourceCacheMap()
 			taskContext := taskrunner.NewTaskContext(eventChannel, resourceCache)
-			err = func() error {
+			err := func() error {
 				defer close(eventChannel)
 				// Run the prune and validate.
 				return po.Prune(tc.pruneObjs, tc.pruneFilters, taskContext, "test-0", tc.options)
@@ -488,21 +486,21 @@ func TestPrune(t *testing.T) {
 			for _, id := range tc.expectedFailed {
 				assert.Truef(t, taskContext.IsFailedDelete(id), "Prune() should mark object as failed: %s", id)
 			}
-			for _, id := range object.ObjMetadataSet(pruneIds).Diff(tc.expectedFailed) {
+			for _, id := range pruneIds.Diff(tc.expectedFailed) {
 				assert.Falsef(t, taskContext.IsFailedDelete(id), "Prune() should NOT mark object as failed: %s", id)
 			}
 			// validate record of skipped prunes
 			for _, id := range tc.expectedSkipped {
 				assert.Truef(t, taskContext.IsSkippedDelete(id), "Prune() should mark object as skipped: %s", id)
 			}
-			for _, id := range object.ObjMetadataSet(pruneIds).Diff(tc.expectedSkipped) {
+			for _, id := range pruneIds.Diff(tc.expectedSkipped) {
 				assert.Falsef(t, taskContext.IsSkippedDelete(id), "Prune() should NOT mark object as skipped: %s", id)
 			}
 			// validate record of abandoned objects
 			for _, id := range tc.expectedAbandoned {
 				assert.Truef(t, taskContext.IsAbandonedObject(id), "Prune() should mark object as abandoned: %s", id)
 			}
-			for _, id := range object.ObjMetadataSet(pruneIds).Diff(tc.expectedAbandoned) {
+			for _, id := range pruneIds.Diff(tc.expectedAbandoned) {
 				assert.Falsef(t, taskContext.IsAbandonedObject(id), "Prune() should NOT mark object as abandoned: %s", id)
 			}
 		})
@@ -533,9 +531,7 @@ func TestPruneDeletionPrevention(t *testing.T) {
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			pruneID, err := object.UnstructuredToObjMeta(tc.pruneObj)
-			require.NoError(t, err)
-
+			pruneID := object.UnstructuredToObjMetadata(tc.pruneObj)
 			po := Pruner{
 				InvClient: inventory.NewFakeInventoryClient(object.ObjMetadataSet{pruneID}),
 				Client:    fake.NewSimpleDynamicClient(scheme.Scheme, tc.pruneObj),
@@ -547,7 +543,7 @@ func TestPruneDeletionPrevention(t *testing.T) {
 			eventChannel := make(chan event.Event, 2)
 			resourceCache := cache.NewResourceCacheMap()
 			taskContext := taskrunner.NewTaskContext(eventChannel, resourceCache)
-			err = func() error {
+			err := func() error {
 				defer close(eventChannel)
 				// Run the prune and validate.
 				return po.Prune([]*unstructured.Unstructured{tc.pruneObj}, []filter.ValidationFilter{filter.PreventRemoveFilter{}}, taskContext, "test-0", tc.options)
@@ -605,7 +601,7 @@ func TestPruneWithErrors(t *testing.T) {
 				{
 					EventType: event.PruneType,
 					PruneEvent: &testutil.ExpPruneEvent{
-						Identifier: object.UnstructuredToObjMetaOrDie(pdbDeleteFailure),
+						Identifier: object.UnstructuredToObjMetadata(pdbDeleteFailure),
 						Error:      fmt.Errorf("expected delete error"),
 					},
 				},
@@ -618,7 +614,7 @@ func TestPruneWithErrors(t *testing.T) {
 				{
 					EventType: event.DeleteType,
 					DeleteEvent: &testutil.ExpDeleteEvent{
-						Identifier: object.UnstructuredToObjMetaOrDie(pdbDeleteFailure),
+						Identifier: object.UnstructuredToObjMetadata(pdbDeleteFailure),
 						Error:      fmt.Errorf("expected delete error"),
 					},
 				},
@@ -627,8 +623,7 @@ func TestPruneWithErrors(t *testing.T) {
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			pruneIds, err := object.UnstructuredsToObjMetas(tc.pruneObjs)
-			require.NoError(t, err)
+			pruneIds := object.UnstructuredSetToObjMetadataSet(tc.pruneObjs)
 			po := Pruner{
 				InvClient: inventory.NewFakeInventoryClient(pruneIds),
 				// Set up the fake dynamic client to recognize all objects, and the RESTMapper.
@@ -643,7 +638,7 @@ func TestPruneWithErrors(t *testing.T) {
 			eventChannel := make(chan event.Event, len(tc.pruneObjs))
 			resourceCache := cache.NewResourceCacheMap()
 			taskContext := taskrunner.NewTaskContext(eventChannel, resourceCache)
-			err = func() error {
+			err := func() error {
 				defer close(eventChannel)
 				var opts Options
 				if tc.destroy {
@@ -721,7 +716,7 @@ func TestGetPruneObjs(t *testing.T) {
 				objs = append(objs, obj)
 			}
 			po := Pruner{
-				InvClient: inventory.NewFakeInventoryClient(object.UnstructuredsToObjMetasOrDie(tc.prevInventory)),
+				InvClient: inventory.NewFakeInventoryClient(object.UnstructuredSetToObjMetadataSet(tc.prevInventory)),
 				Client:    fake.NewSimpleDynamicClient(scheme.Scheme, objs...),
 				Mapper: testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme,
 					scheme.Scheme.PrioritizedVersionsAllGroups()...),
@@ -734,12 +729,8 @@ func TestGetPruneObjs(t *testing.T) {
 			if len(tc.expectedObjs) != len(actualObjs) {
 				t.Fatalf("expected %d prune objs, got %d", len(tc.expectedObjs), len(actualObjs))
 			}
-			actualIds, err := object.UnstructuredsToObjMetas(actualObjs)
-			require.NoError(t, err)
-
-			expectedIds, err := object.UnstructuredsToObjMetas(tc.expectedObjs)
-			require.NoError(t, err)
-
+			actualIds := object.UnstructuredSetToObjMetadataSet(actualObjs)
+			expectedIds := object.UnstructuredSetToObjMetadataSet(tc.expectedObjs)
 			if !object.ObjMetadataSetEquals(expectedIds, actualIds) {
 				t.Errorf("expected prune objects (%v), got (%v)", expectedIds, actualIds)
 			}
@@ -768,11 +759,8 @@ func TestGetObject_NotFoundError(t *testing.T) {
 		Mapper: testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme,
 			scheme.Scheme.PrioritizedVersionsAllGroups()...),
 	}
-	objMeta, err := object.UnstructuredToObjMeta(pdb)
-	if err != nil {
-		t.Fatalf("unexpected error %s returned", err)
-	}
-	_, err = po.getObject(objMeta)
+	id := object.UnstructuredToObjMetadata(pdb)
+	_, err := po.getObject(id)
 	if err == nil {
 		t.Fatalf("expected GetObject() to return a NotFound error, got nil")
 	}

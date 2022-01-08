@@ -44,7 +44,7 @@ func (pef PruneEventFactory) CreateSuccessEvent(obj *unstructured.Unstructured) 
 			GroupName:  pef.groupName,
 			Operation:  event.Pruned,
 			Object:     obj,
-			Identifier: object.UnstructuredToObjMetaOrDie(obj),
+			Identifier: object.UnstructuredToObjMetadata(obj),
 		},
 	}
 }
@@ -56,7 +56,7 @@ func (pef PruneEventFactory) CreateSkippedEvent(obj *unstructured.Unstructured, 
 			GroupName:  pef.groupName,
 			Operation:  event.PruneSkipped,
 			Object:     obj,
-			Identifier: object.UnstructuredToObjMetaOrDie(obj),
+			Identifier: object.UnstructuredToObjMetadata(obj),
 			Reason:     reason,
 		},
 	}
@@ -86,7 +86,7 @@ func (def DeleteEventFactory) CreateSuccessEvent(obj *unstructured.Unstructured)
 			GroupName:  def.groupName,
 			Operation:  event.Deleted,
 			Object:     obj,
-			Identifier: object.UnstructuredToObjMetaOrDie(obj),
+			Identifier: object.UnstructuredToObjMetadata(obj),
 		},
 	}
 }
@@ -98,7 +98,7 @@ func (def DeleteEventFactory) CreateSkippedEvent(obj *unstructured.Unstructured,
 			GroupName:  def.groupName,
 			Operation:  event.DeleteSkipped,
 			Object:     obj,
-			Identifier: object.UnstructuredToObjMetaOrDie(obj),
+			Identifier: object.UnstructuredToObjMetadata(obj),
 			Reason:     reason,
 		},
 	}

@@ -6,7 +6,6 @@ package prune
 import (
 	"testing"
 
-	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/object"
@@ -32,8 +31,7 @@ func TestEventFactory(t *testing.T) {
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			id, err := object.UnstructuredToObjMeta(tc.obj)
-			require.NoError(t, err)
+			id := object.UnstructuredToObjMetadata(tc.obj)
 			eventFactory := CreateEventFactory(tc.destroy, "task-0")
 			// Validate the "success" event"
 			actualEvent := eventFactory.CreateSuccessEvent(tc.obj)
@@ -42,6 +40,7 @@ func TestEventFactory(t *testing.T) {
 					tc.expectedType, actualEvent.Type)
 			}
 			var actualObj *unstructured.Unstructured
+			var err error
 			if tc.expectedType == event.PruneType {
 				if event.Pruned != actualEvent.PruneEvent.Operation {
 					t.Errorf("success event expected operation (Pruned), got (%s)",

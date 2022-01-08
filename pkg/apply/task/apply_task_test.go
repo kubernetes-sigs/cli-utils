@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -112,9 +111,7 @@ func TestApplyTask_BasicAppliedObjects(t *testing.T) {
 
 			// The applied resources should be stored in the TaskContext
 			// for the final inventory.
-			expectedIDs, err := object.UnstructuredsToObjMetas(objs)
-			require.NoError(t, err)
-
+			expectedIDs := object.UnstructuredSetToObjMetadataSet(objs)
 			actual := taskContext.SuccessfulApplies()
 			if !actual.Equal(expectedIDs) {
 				t.Errorf("expected (%s) inventory resources, got (%s)", expectedIDs, actual)
@@ -487,21 +484,20 @@ func TestApplyTaskWithError(t *testing.T) {
 				assert.Equal(t, tc.expectedEvents[i].ApplyEvent.Error.Error(), e.ApplyEvent.Error.Error())
 			}
 
-			applyIds, err := object.UnstructuredsToObjMetas(tc.objs)
-			require.NoError(t, err)
+			applyIds := object.UnstructuredSetToObjMetadataSet(tc.objs)
 
 			// validate record of failed prunes
 			for _, id := range tc.expectedFailed {
 				assert.Truef(t, taskContext.IsFailedApply(id), "ApplyTask should mark object as failed: %s", id)
 			}
-			for _, id := range object.ObjMetadataSet(applyIds).Diff(tc.expectedFailed) {
+			for _, id := range applyIds.Diff(tc.expectedFailed) {
 				assert.Falsef(t, taskContext.IsFailedApply(id), "ApplyTask should NOT mark object as failed: %s", id)
 			}
 			// validate record of skipped prunes
 			for _, id := range tc.expectedSkipped {
 				assert.Truef(t, taskContext.IsSkippedApply(id), "ApplyTask should mark object as skipped: %s", id)
 			}
-			for _, id := range object.ObjMetadataSet(applyIds).Diff(tc.expectedSkipped) {
+			for _, id := range applyIds.Diff(tc.expectedSkipped) {
 				assert.Falsef(t, taskContext.IsSkippedApply(id), "ApplyTask should NOT mark object as skipped: %s", id)
 			}
 		})

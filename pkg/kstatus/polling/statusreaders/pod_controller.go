@@ -43,7 +43,7 @@ type podControllerStatusReader struct {
 }
 
 func (p *podControllerStatusReader) readStatus(ctx context.Context, reader engine.ClusterReader, obj *unstructured.Unstructured) *event.ResourceStatus {
-	identifier := object.UnstructuredToObjMetaOrDie(obj)
+	identifier := object.UnstructuredToObjMetadata(obj)
 
 	podResourceStatuses, err := p.statusForGenResourcesFunc(ctx, p.mapper, reader, p.podStatusReader, obj,
 		p.groupKind, "spec", "selector")

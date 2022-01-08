@@ -52,7 +52,7 @@ func (f *fakeStatusReader) ReadStatus(_ context.Context, _ engine.ClusterReader,
 }
 
 func (f *fakeStatusReader) ReadStatusForObject(_ context.Context, _ engine.ClusterReader, obj *unstructured.Unstructured) *event.ResourceStatus {
-	identifier := object.UnstructuredToObjMetaOrDie(obj)
+	identifier := object.UnstructuredToObjMetadata(obj)
 	return &event.ResourceStatus{
 		Identifier: identifier,
 	}

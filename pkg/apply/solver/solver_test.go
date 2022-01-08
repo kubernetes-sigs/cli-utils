@@ -390,7 +390,7 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
-			applyIds := object.UnstructuredsToObjMetasOrDie(tc.applyObjs)
+			applyIds := object.UnstructuredSetToObjMetadataSet(tc.applyObjs)
 			fakeInvClient := inventory.NewFakeInventoryClient(applyIds)
 			tqb := TaskQueueBuilder{
 				Pruner:    pruner,
@@ -712,7 +712,7 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
-			pruneIds := object.UnstructuredsToObjMetasOrDie(tc.pruneObjs)
+			pruneIds := object.UnstructuredSetToObjMetadataSet(tc.pruneObjs)
 			fakeInvClient := inventory.NewFakeInventoryClient(pruneIds)
 			tqb := TaskQueueBuilder{
 				Pruner:    pruner,
@@ -769,8 +769,8 @@ func verifyObjSets(t *testing.T, expected []*unstructured.Unstructured, actual [
 // containsObj returns true if the passed object is within the passed
 // slice of objects; false otherwise.
 func containsObj(objs []*unstructured.Unstructured, obj *unstructured.Unstructured) bool {
-	ids := object.UnstructuredsToObjMetasOrDie(objs)
-	id := object.UnstructuredToObjMetaOrDie(obj)
+	ids := object.UnstructuredSetToObjMetadataSet(objs)
+	id := object.UnstructuredToObjMetadata(obj)
 	for _, i := range ids {
 		if i == id {
 			return true

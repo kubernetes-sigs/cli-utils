@@ -131,9 +131,13 @@ func ParseObjMetadata(objStr string) (object.ObjMetadata, error) {
 		name = fields[4]
 	}
 
-	obj, err := object.CreateObjMetadata(namespace, name, schema.GroupKind{Group: group, Kind: kind})
-	if err != nil {
-		return obj, err
+	id := object.ObjMetadata{
+		Namespace: namespace,
+		Name:      name,
+		GroupKind: schema.GroupKind{
+			Group: group,
+			Kind:  kind,
+		},
 	}
-	return obj, nil
+	return id, nil
 }

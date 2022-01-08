@@ -741,8 +741,8 @@ func verifyObjSets(t *testing.T, expected []object.UnstructuredSet, actual []obj
 // containsUnstructured returns true if the passed object is within the passed
 // slice of objects; false otherwise. Order is not important.
 func containsObjs(objs []*unstructured.Unstructured, obj *unstructured.Unstructured) bool {
-	ids := object.UnstructuredsToObjMetasOrDie(objs)
-	id := object.UnstructuredToObjMetaOrDie(obj)
+	ids := object.UnstructuredSetToObjMetadataSet(objs)
+	id := object.UnstructuredToObjMetadata(obj)
 	for _, i := range ids {
 		if i == id {
 			return true

@@ -121,7 +121,7 @@ func TestUnstructuredToObjMeta(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			actual := UnstructuredToObjMetaOrDie(tc.obj)
+			actual := UnstructuredToObjMetadata(tc.obj)
 			if tc.expected != actual {
 				t.Errorf("expected ObjMetadata (%s), got (%s)", tc.expected, actual)
 			}

@@ -57,9 +57,9 @@ func withGeneration(obj *unstructured.Unstructured, gen int64) *unstructured.Uns
 
 func TestCollector_ConditionMet(t *testing.T) {
 	deployment1 := ktestutil.YamlToUnstructured(t, deployment1y)
-	deployment1Meta := object.UnstructuredToObjMetaOrDie(deployment1)
+	deployment1Meta := object.UnstructuredToObjMetadata(deployment1)
 	custom1 := ktestutil.YamlToUnstructured(t, custom1y)
-	custom1Meta := object.UnstructuredToObjMetaOrDie(custom1)
+	custom1Meta := object.UnstructuredToObjMetadata(custom1)
 
 	testCases := map[string]struct {
 		cacheContents  []cache.ResourceStatus
@@ -150,8 +150,7 @@ func TestCollector_ConditionMet(t *testing.T) {
 		t.Run(tn, func(t *testing.T) {
 			resourceCache := cache.NewResourceCacheMap()
 			if tc.cacheContents != nil {
-				err := resourceCache.Load(tc.cacheContents...)
-				assert.NoError(t, err)
+				resourceCache.Load(tc.cacheContents...)
 			}
 
 			taskContext := NewTaskContext(nil, resourceCache)

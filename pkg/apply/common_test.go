@@ -139,14 +139,14 @@ func newTestFactory(
 
 	objMap := make(map[object.ObjMetadata]resourceInfo)
 	for _, r := range resourceSet {
-		objMeta := object.UnstructuredToObjMetaOrDie(r)
+		objMeta := object.UnstructuredToObjMetadata(r)
 		objMap[objMeta] = resourceInfo{
 			resource: r,
 			exists:   false,
 		}
 	}
 	for _, r := range clusterObjs {
-		objMeta := object.UnstructuredToObjMetaOrDie(r)
+		objMeta := object.UnstructuredToObjMetadata(r)
 		objMap[objMeta] = resourceInfo{
 			resource: r,
 			exists:   true,

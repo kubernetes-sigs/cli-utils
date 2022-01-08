@@ -143,14 +143,15 @@ func (i InventoryCustomType) Load() (object.ObjMetadataSet, error) {
 		name, _, _ := unstructured.NestedString(m, "name")
 		group, _, _ := unstructured.NestedString(m, "group")
 		kind, _, _ := unstructured.NestedString(m, "kind")
-		obj, err := object.CreateObjMetadata(namespace, name, schema.GroupKind{
-			Group: group,
-			Kind:  kind,
-		})
-		if err != nil {
-			return inv, err
+		id := object.ObjMetadata{
+			Namespace: namespace,
+			Name:      name,
+			GroupKind: schema.GroupKind{
+				Group: group,
+				Kind:  kind,
+			},
 		}
-		inv = append(inv, obj)
+		inv = append(inv, id)
 	}
 	return inv, nil
 }
