@@ -146,7 +146,7 @@ func pruneRetrieveErrorTest(ctx context.Context, c client.Client, invConfig Inve
 
 	By("Verify pod1 created and ready")
 	result := assertUnstructuredExists(ctx, c, pod1Obj)
-	podIP, found, err := testutil.NestedField(result.Object, "status", "podIP")
+	podIP, found, err := object.NestedField(result.Object, "status", "podIP")
 	Expect(err).NotTo(HaveOccurred())
 	Expect(found).To(BeTrue())
 	Expect(podIP).NotTo(BeEmpty()) // use podIP as proxy for readiness
@@ -281,7 +281,7 @@ func pruneRetrieveErrorTest(ctx context.Context, c client.Client, invConfig Inve
 
 	By("Verify pod2 created and ready")
 	result = assertUnstructuredExists(ctx, c, pod2Obj)
-	podIP, found, err = testutil.NestedField(result.Object, "status", "podIP")
+	podIP, found, err = object.NestedField(result.Object, "status", "podIP")
 	Expect(err).NotTo(HaveOccurred())
 	Expect(found).To(BeTrue())
 	Expect(podIP).NotTo(BeEmpty()) // use podIP as proxy for readiness

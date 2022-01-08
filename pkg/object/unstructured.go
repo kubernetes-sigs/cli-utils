@@ -5,7 +5,6 @@
 package object
 
 import (
-	"errors"
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -142,19 +141,19 @@ func LookupResourceScope(u *unstructured.Unstructured, crds []*unstructured.Unst
 	// If we couldn't find the type in the cluster, check if we find a
 	// match in any of the provided CRDs.
 	for _, crd := range crds {
-		group, found, err := unstructured.NestedString(crd.Object, "spec", "group")
+		group, found, err := NestedField(crd.Object, "spec", "group")
 		if err != nil {
-			return nil, fmt.Errorf("spec.group: %v", err)
+			return nil, err
 		}
 		if !found || group == "" {
-			return nil, errors.New("spec.group not found")
+			return nil, NotFound([]interface{}{"spec", "group"}, group)
 		}
-		kind, found, err := unstructured.NestedString(crd.Object, "spec", "names", "kind")
+		kind, found, err := NestedField(crd.Object, "spec", "names", "kind")
 		if err != nil {
-			return nil, fmt.Errorf("spec.kind: %v", err)
+			return nil, err
 		}
 		if !found || kind == "" {
-			return nil, errors.New("spec.kind not found")
+			return nil, NotFound([]interface{}{"spec", "kind"}, group)
 		}
 		if gvk.Kind != kind || gvk.Group != group {
 			continue
@@ -168,9 +167,9 @@ func LookupResourceScope(u *unstructured.Unstructured, crds []*unstructured.Unst
 				GroupVersionKind: gvk,
 			}
 		}
-		scopeName, _, err := unstructured.NestedString(crd.Object, "spec", "scope")
+		scopeName, _, err := NestedField(crd.Object, "spec", "scope")
 		if err != nil {
-			return nil, fmt.Errorf("spec.scope: %v", err)
+			return nil, err
 		}
 		switch scopeName {
 		case "Namespaced":
@@ -178,7 +177,8 @@ func LookupResourceScope(u *unstructured.Unstructured, crds []*unstructured.Unst
 		case "Cluster":
 			return meta.RESTScopeRoot, nil
 		default:
-			return nil, fmt.Errorf("unknown scope %q", scopeName)
+			return nil, Invalid([]interface{}{"spec", "scope"}, scopeName,
+				"expected Namespaced or Cluster")
 		}
 	}
 	return nil, &UnknownTypeError{
@@ -187,24 +187,27 @@ func LookupResourceScope(u *unstructured.Unstructured, crds []*unstructured.Unst
 }
 
 func crdDefinesVersion(crd *unstructured.Unstructured, version string) (bool, error) {
-	versionsSlice, found, err := unstructured.NestedSlice(crd.Object, "spec", "versions")
+	versions, found, err := NestedField(crd.Object, "spec", "versions")
 	if err != nil {
-		return false, fmt.Errorf("spec.versions: %v", err)
+		return false, err
 	}
-	if !found || len(versionsSlice) == 0 {
-		return false, errors.New("spec.versions not found")
+	if !found {
+		return false, NotFound([]interface{}{"spec", "versions"}, versions)
 	}
-	for i, ver := range versionsSlice {
-		verObj, ok := ver.(map[string]interface{})
-		if !ok {
-			return false, fmt.Errorf("spec.versions[%d]: expecting map, got: %T", i, ver)
-		}
-		name, found, err := unstructured.NestedString(verObj, "name")
+	versionsSlice, ok := versions.([]interface{})
+	if !ok {
+		return false, InvalidType([]interface{}{"spec", "versions"}, versions, "[]interface{}")
+	}
+	if len(versionsSlice) == 0 {
+		return false, Invalid([]interface{}{"spec", "versions"}, versionsSlice, "must not be empty")
+	}
+	for i := range versionsSlice {
+		name, found, err := NestedField(crd.Object, "spec", "versions", i, "name")
 		if err != nil {
-			return false, fmt.Errorf("spec.versions[%d].name: %w", i, err)
+			return false, err
 		}
 		if !found {
-			return false, fmt.Errorf("spec.versions[%d].name not found", i)
+			return false, NotFound([]interface{}{"spec", "versions", i, "name"}, name)
 		}
 		if name == version {
 			return true, nil

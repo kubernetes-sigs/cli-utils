@@ -179,7 +179,7 @@ func inventoryPolicyMustMatchTest(ctx context.Context, c client.Client, invConfi
 
 	By("Verify resource wasn't updated")
 	result := assertUnstructuredExists(ctx, c, deployment1Obj)
-	replicas, found, err := testutil.NestedField(result.Object, "spec", "replicas")
+	replicas, found, err := object.NestedField(result.Object, "spec", "replicas")
 	Expect(err).NotTo(HaveOccurred())
 	Expect(found).To(BeTrue())
 	Expect(replicas).To(Equal(int64(4)))
@@ -346,12 +346,12 @@ func inventoryPolicyAdoptIfNoInventoryTest(ctx context.Context, c client.Client,
 	By("Verify resource was updated and added to inventory")
 	result := assertUnstructuredExists(ctx, c, deployment1Obj)
 
-	replicas, found, err := testutil.NestedField(result.Object, "spec", "replicas")
+	replicas, found, err := object.NestedField(result.Object, "spec", "replicas")
 	Expect(err).NotTo(HaveOccurred())
 	Expect(found).To(BeTrue())
 	Expect(replicas).To(Equal(int64(6)))
 
-	value, found, err := testutil.NestedField(result.Object, "metadata", "annotations", "config.k8s.io/owning-inventory")
+	value, found, err := object.NestedField(result.Object, "metadata", "annotations", "config.k8s.io/owning-inventory")
 	Expect(err).NotTo(HaveOccurred())
 	Expect(found).To(BeTrue())
 	Expect(value).To(Equal(invName))
@@ -528,12 +528,12 @@ func inventoryPolicyAdoptAllTest(ctx context.Context, c client.Client, invConfig
 	By("Verify resource was updated and added to inventory")
 	result := assertUnstructuredExists(ctx, c, deployment1Obj)
 
-	replicas, found, err := testutil.NestedField(result.Object, "spec", "replicas")
+	replicas, found, err := object.NestedField(result.Object, "spec", "replicas")
 	Expect(err).NotTo(HaveOccurred())
 	Expect(found).To(BeTrue())
 	Expect(replicas).To(Equal(int64(6)))
 
-	value, found, err := testutil.NestedField(result.Object, "metadata", "annotations", "config.k8s.io/owning-inventory")
+	value, found, err := object.NestedField(result.Object, "metadata", "annotations", "config.k8s.io/owning-inventory")
 	Expect(err).NotTo(HaveOccurred())
 	Expect(found).To(BeTrue())
 	Expect(value).To(Equal(secondInvName))
