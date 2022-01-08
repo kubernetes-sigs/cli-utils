@@ -6,6 +6,7 @@ package object
 import (
 	"fmt"
 	"regexp"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
@@ -76,25 +77,30 @@ func NotFound(fieldPath []interface{}, value interface{}) *field.Error {
 	}
 }
 
-// Simplistic jsonpath formatter, just for NestedField errors.
+// FieldPath formats a list of KRM field keys as a JSONPath expression.
+// The only valid field keys in KRM are strings (map keys) and ints (list keys).
+// Simple strings (see isSimpleString) will be delimited with a period.
+// Complex strings will be wrapped with square brackets and double quotes.
+// Integers will be wrapped with square brackets.
+// All other types will be formatted best-effort within square brackets.
 func FieldPath(fieldPath []interface{}) string {
-	path := ""
+	var sb strings.Builder
 	for _, field := range fieldPath {
 		switch typedField := field.(type) {
 		case string:
 			if isSimpleString(typedField) {
-				path += fmt.Sprintf(".%s", typedField)
+				_, _ = fmt.Fprintf(&sb, ".%s", typedField)
 			} else {
-				path += fmt.Sprintf("[%q]", typedField)
+				_, _ = fmt.Fprintf(&sb, "[%q]", typedField)
 			}
 		case int:
-			path += fmt.Sprintf("[%d]", typedField)
+			_, _ = fmt.Fprintf(&sb, "[%d]", typedField)
 		default:
-			// invalid. try anyway...
-			path += fmt.Sprintf(".%v", typedField)
+			// invalid type. try anyway...
+			_, _ = fmt.Fprintf(&sb, "[%#v]", typedField)
 		}
 	}
-	return path
+	return sb.String()
 }
 
 var simpleStringRegex = regexp.MustCompile(`^[a-zA-Z]([a-zA-Z0-9_-]*[a-zA-Z0-9])?$`)

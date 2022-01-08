@@ -78,6 +78,15 @@ func TestFieldPath(t *testing.T) {
 			fieldPath: []interface{}{"spec", "abc\n123"},
 			expected:  `.spec["abc\n123"]`,
 		},
+		// result from invalid input doesn't matter, as long as it doesn't panic
+		"invalid type: float": {
+			fieldPath: []interface{}{"spec", float64(-1.0)},
+			expected:  `.spec[-1]`,
+		},
+		"invalid type: struct": {
+			fieldPath: []interface{}{"spec", struct{ Field string }{Field: "value"}},
+			expected:  `.spec[struct { Field string }{Field:"value"}]`,
+		},
 	}
 
 	for name, tc := range tests {
