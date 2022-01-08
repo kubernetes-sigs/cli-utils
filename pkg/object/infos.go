@@ -31,9 +31,12 @@ func InfoToObjMeta(info *resource.Info) (ObjMetadata, error) {
 	if info == nil || info.Object == nil {
 		return ObjMetadata{}, fmt.Errorf("attempting to transform info, but it is empty")
 	}
-	obj := info.Object
-	gk := obj.GetObjectKind().GroupVersionKind().GroupKind()
-	return CreateObjMetadata(info.Namespace, info.Name, gk)
+	id := ObjMetadata{
+		Namespace: info.Namespace,
+		Name:      info.Name,
+		GroupKind: info.Object.GetObjectKind().GroupVersionKind().GroupKind(),
+	}
+	return id, nil
 }
 
 // InfoToUnstructured transforms the passed info object into unstructured format.

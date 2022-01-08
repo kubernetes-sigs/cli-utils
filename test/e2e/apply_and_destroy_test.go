@@ -76,7 +76,7 @@ func applyAndDestroyTest(ctx context.Context, c client.Client, invConfig Invento
 			ApplyEvent: &testutil.ExpApplyEvent{
 				GroupName:  "apply-0",
 				Operation:  event.Created,
-				Identifier: object.UnstructuredToObjMetaOrDie(deployment1Obj),
+				Identifier: object.UnstructuredToObjMetadata(deployment1Obj),
 				Error:      nil,
 			},
 		},
@@ -104,7 +104,7 @@ func applyAndDestroyTest(ctx context.Context, c client.Client, invConfig Invento
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-0",
 				Operation:  event.ReconcilePending,
-				Identifier: object.UnstructuredToObjMetaOrDie(deployment1Obj),
+				Identifier: object.UnstructuredToObjMetadata(deployment1Obj),
 			},
 		},
 		{
@@ -113,7 +113,7 @@ func applyAndDestroyTest(ctx context.Context, c client.Client, invConfig Invento
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-0",
 				Operation:  event.Reconciled,
-				Identifier: object.UnstructuredToObjMetaOrDie(deployment1Obj),
+				Identifier: object.UnstructuredToObjMetadata(deployment1Obj),
 			},
 		},
 		{
@@ -150,7 +150,7 @@ func applyAndDestroyTest(ctx context.Context, c client.Client, invConfig Invento
 	expected := testutil.ExpEvent{
 		EventType: event.StatusType,
 		StatusEvent: &testutil.ExpStatusEvent{
-			Identifier: object.UnstructuredToObjMetaOrDie(deployment1Obj),
+			Identifier: object.UnstructuredToObjMetadata(deployment1Obj),
 			Status:     status.NotFoundStatus,
 			Error:      nil,
 		},
@@ -162,7 +162,7 @@ func applyAndDestroyTest(ctx context.Context, c client.Client, invConfig Invento
 	expected = testutil.ExpEvent{
 		EventType: event.StatusType,
 		StatusEvent: &testutil.ExpStatusEvent{
-			Identifier: object.UnstructuredToObjMetaOrDie(deployment1Obj),
+			Identifier: object.UnstructuredToObjMetadata(deployment1Obj),
 			Status:     status.InProgressStatus,
 			Error:      nil,
 		},
@@ -173,7 +173,7 @@ func applyAndDestroyTest(ctx context.Context, c client.Client, invConfig Invento
 	expected = testutil.ExpEvent{
 		EventType: event.StatusType,
 		StatusEvent: &testutil.ExpStatusEvent{
-			Identifier: object.UnstructuredToObjMetaOrDie(deployment1Obj),
+			Identifier: object.UnstructuredToObjMetadata(deployment1Obj),
 			Status:     status.CurrentStatus,
 			Error:      nil,
 		},
@@ -216,7 +216,7 @@ func applyAndDestroyTest(ctx context.Context, c client.Client, invConfig Invento
 			DeleteEvent: &testutil.ExpDeleteEvent{
 				GroupName:  "prune-0",
 				Operation:  event.Deleted,
-				Identifier: object.UnstructuredToObjMetaOrDie(deployment1Obj),
+				Identifier: object.UnstructuredToObjMetadata(deployment1Obj),
 				Error:      nil,
 			},
 		},
@@ -244,7 +244,7 @@ func applyAndDestroyTest(ctx context.Context, c client.Client, invConfig Invento
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-0",
 				Operation:  event.ReconcilePending,
-				Identifier: object.UnstructuredToObjMetaOrDie(deployment1Obj),
+				Identifier: object.UnstructuredToObjMetadata(deployment1Obj),
 			},
 		},
 		{
@@ -253,7 +253,7 @@ func applyAndDestroyTest(ctx context.Context, c client.Client, invConfig Invento
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-0",
 				Operation:  event.Reconciled,
-				Identifier: object.UnstructuredToObjMetaOrDie(deployment1Obj),
+				Identifier: object.UnstructuredToObjMetadata(deployment1Obj),
 			},
 		},
 		{

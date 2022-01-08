@@ -72,7 +72,7 @@ func continueOnErrorTest(ctx context.Context, c client.Client, invConfig Invento
 			EventType: event.ApplyType,
 			ApplyEvent: &testutil.ExpApplyEvent{
 				GroupName:  "apply-0",
-				Identifier: object.UnstructuredToObjMetaOrDie(invalidCrdObj),
+				Identifier: object.UnstructuredToObjMetadata(invalidCrdObj),
 				Error: testutil.EqualErrorType(
 					applyerror.NewApplyRunError(errors.New("failed to apply")),
 				),
@@ -84,7 +84,7 @@ func continueOnErrorTest(ctx context.Context, c client.Client, invConfig Invento
 			ApplyEvent: &testutil.ExpApplyEvent{
 				GroupName:  "apply-0",
 				Operation:  event.Created,
-				Identifier: object.UnstructuredToObjMetaOrDie(pod1Obj),
+				Identifier: object.UnstructuredToObjMetadata(pod1Obj),
 				Error:      nil,
 			},
 		},
@@ -112,7 +112,7 @@ func continueOnErrorTest(ctx context.Context, c client.Client, invConfig Invento
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-0",
 				Operation:  event.ReconcileSkipped,
-				Identifier: object.UnstructuredToObjMetaOrDie(invalidCrdObj),
+				Identifier: object.UnstructuredToObjMetadata(invalidCrdObj),
 			},
 		},
 		{
@@ -121,7 +121,7 @@ func continueOnErrorTest(ctx context.Context, c client.Client, invConfig Invento
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-0",
 				Operation:  event.ReconcilePending,
-				Identifier: object.UnstructuredToObjMetaOrDie(pod1Obj),
+				Identifier: object.UnstructuredToObjMetadata(pod1Obj),
 			},
 		},
 		{
@@ -130,7 +130,7 @@ func continueOnErrorTest(ctx context.Context, c client.Client, invConfig Invento
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-0",
 				Operation:  event.Reconciled,
-				Identifier: object.UnstructuredToObjMetaOrDie(pod1Obj),
+				Identifier: object.UnstructuredToObjMetadata(pod1Obj),
 			},
 		},
 		{

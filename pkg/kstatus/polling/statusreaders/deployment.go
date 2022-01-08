@@ -44,7 +44,7 @@ func (d *deploymentResourceReader) Supports(gk schema.GroupKind) bool {
 }
 
 func (d *deploymentResourceReader) ReadStatusForObject(ctx context.Context, reader engine.ClusterReader, deployment *unstructured.Unstructured) *event.ResourceStatus {
-	identifier := object.UnstructuredToObjMetaOrDie(deployment)
+	identifier := object.UnstructuredToObjMetadata(deployment)
 
 	replicaSetStatuses, err := statusForGeneratedResources(ctx, d.mapper, reader, d.rsStatusReader, deployment,
 		appsv1.SchemeGroupVersion.WithKind("ReplicaSet").GroupKind(), "spec", "selector")

@@ -155,7 +155,7 @@ func (d *Destroyer) Run(ctx context.Context, inv inventory.InventoryInfo, option
 		}
 		// Create a new TaskStatusRunner to execute the taskQueue.
 		klog.V(4).Infoln("destroyer building TaskStatusRunner...")
-		deleteIds := object.UnstructuredsToObjMetasOrDie(deleteObjs)
+		deleteIds := object.UnstructuredSetToObjMetadataSet(deleteObjs)
 		resourceCache := cache.NewResourceCacheMap()
 		runner := taskrunner.NewTaskStatusRunner(deleteIds, d.StatusPoller, resourceCache)
 		klog.V(4).Infoln("destroyer running TaskStatusRunner...")

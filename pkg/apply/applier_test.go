@@ -412,7 +412,7 @@ func TestApplier(t *testing.T) {
 				namespace: "default",
 				id:        "test",
 				set: object.ObjMetadataSet{
-					object.UnstructuredToObjMetaOrDie(
+					object.UnstructuredToObjMetadata(
 						testutil.Unstructured(t, resources["deployment"]),
 					),
 				},
@@ -590,10 +590,10 @@ func TestApplier(t *testing.T) {
 				namespace: "default",
 				id:        "test",
 				set: object.ObjMetadataSet{
-					object.UnstructuredToObjMetaOrDie(
+					object.UnstructuredToObjMetadata(
 						testutil.Unstructured(t, resources["deployment"]),
 					),
-					object.UnstructuredToObjMetaOrDie(
+					object.UnstructuredToObjMetadata(
 						testutil.Unstructured(t, resources["secret"]),
 					),
 				},
@@ -933,7 +933,7 @@ func TestApplier(t *testing.T) {
 				namespace: "default",
 				id:        "test",
 				set: object.ObjMetadataSet{
-					object.UnstructuredToObjMetaOrDie(
+					object.UnstructuredToObjMetadata(
 						testutil.Unstructured(t, resources["deployment"]),
 					),
 				},
@@ -1040,7 +1040,7 @@ func TestApplier(t *testing.T) {
 				namespace: "default",
 				id:        "test",
 				set: object.ObjMetadataSet{
-					object.UnstructuredToObjMetaOrDie(
+					object.UnstructuredToObjMetadata(
 						testutil.Unstructured(t, resources["deployment"]),
 					),
 				},
@@ -1758,7 +1758,7 @@ func TestReadAndPrepareObjects(t *testing.T) {
 				namespace: inventory.Namespace(),
 				id:        inventory.ID(),
 				set: object.ObjMetadataSet{
-					object.UnstructuredToObjMetaOrDie(obj1),
+					object.UnstructuredToObjMetadata(obj1),
 				},
 			},
 			pruneObjs: object.UnstructuredSet{obj1},
@@ -1769,8 +1769,8 @@ func TestReadAndPrepareObjects(t *testing.T) {
 				namespace: inventory.Namespace(),
 				id:        inventory.ID(),
 				set: object.ObjMetadataSet{
-					object.UnstructuredToObjMetaOrDie(obj1),
-					object.UnstructuredToObjMetaOrDie(clusterScopedObj),
+					object.UnstructuredToObjMetadata(obj1),
+					object.UnstructuredToObjMetadata(clusterScopedObj),
 				},
 			},
 			resources: object.UnstructuredSet{obj1, clusterScopedObj},
@@ -1783,7 +1783,7 @@ func TestReadAndPrepareObjects(t *testing.T) {
 				namespace: inventory.Namespace(),
 				id:        inventory.ID(),
 				set: object.ObjMetadataSet{
-					object.UnstructuredToObjMetaOrDie(obj2),
+					object.UnstructuredToObjMetadata(obj2),
 				},
 			},
 			resources: object.UnstructuredSet{obj1, clusterScopedObj},
@@ -1797,7 +1797,7 @@ func TestReadAndPrepareObjects(t *testing.T) {
 				namespace: inventory.Namespace(),
 				id:        inventory.ID(),
 				set: object.ObjMetadataSet{
-					object.UnstructuredToObjMetaOrDie(obj2),
+					object.UnstructuredToObjMetadata(obj2),
 				},
 			},
 			resources: object.UnstructuredSet{obj1, obj2, clusterScopedObj},

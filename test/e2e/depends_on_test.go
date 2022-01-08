@@ -79,7 +79,7 @@ func dependsOnTest(ctx context.Context, c client.Client, invConfig InventoryConf
 			ApplyEvent: &testutil.ExpApplyEvent{
 				GroupName:  "apply-0",
 				Operation:  event.Created,
-				Identifier: object.UnstructuredToObjMetaOrDie(pod2Obj),
+				Identifier: object.UnstructuredToObjMetadata(pod2Obj),
 				Error:      nil,
 			},
 		},
@@ -107,7 +107,7 @@ func dependsOnTest(ctx context.Context, c client.Client, invConfig InventoryConf
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-0",
 				Operation:  event.ReconcilePending,
-				Identifier: object.UnstructuredToObjMetaOrDie(pod2Obj),
+				Identifier: object.UnstructuredToObjMetadata(pod2Obj),
 			},
 		},
 		{
@@ -116,7 +116,7 @@ func dependsOnTest(ctx context.Context, c client.Client, invConfig InventoryConf
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-0",
 				Operation:  event.Reconciled,
-				Identifier: object.UnstructuredToObjMetaOrDie(pod2Obj),
+				Identifier: object.UnstructuredToObjMetadata(pod2Obj),
 			},
 		},
 		{
@@ -143,7 +143,7 @@ func dependsOnTest(ctx context.Context, c client.Client, invConfig InventoryConf
 			ApplyEvent: &testutil.ExpApplyEvent{
 				GroupName:  "apply-1",
 				Operation:  event.Created,
-				Identifier: object.UnstructuredToObjMetaOrDie(pod3Obj),
+				Identifier: object.UnstructuredToObjMetadata(pod3Obj),
 				Error:      nil,
 			},
 		},
@@ -171,7 +171,7 @@ func dependsOnTest(ctx context.Context, c client.Client, invConfig InventoryConf
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-1",
 				Operation:  event.ReconcilePending,
-				Identifier: object.UnstructuredToObjMetaOrDie(pod3Obj),
+				Identifier: object.UnstructuredToObjMetadata(pod3Obj),
 			},
 		},
 		{
@@ -180,7 +180,7 @@ func dependsOnTest(ctx context.Context, c client.Client, invConfig InventoryConf
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-1",
 				Operation:  event.Reconciled,
-				Identifier: object.UnstructuredToObjMetaOrDie(pod3Obj),
+				Identifier: object.UnstructuredToObjMetadata(pod3Obj),
 			},
 		},
 		{
@@ -207,7 +207,7 @@ func dependsOnTest(ctx context.Context, c client.Client, invConfig InventoryConf
 			ApplyEvent: &testutil.ExpApplyEvent{
 				GroupName:  "apply-2",
 				Operation:  event.Created,
-				Identifier: object.UnstructuredToObjMetaOrDie(pod1Obj),
+				Identifier: object.UnstructuredToObjMetadata(pod1Obj),
 				Error:      nil,
 			},
 		},
@@ -235,7 +235,7 @@ func dependsOnTest(ctx context.Context, c client.Client, invConfig InventoryConf
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-2",
 				Operation:  event.ReconcilePending,
-				Identifier: object.UnstructuredToObjMetaOrDie(pod1Obj),
+				Identifier: object.UnstructuredToObjMetadata(pod1Obj),
 			},
 		},
 		{
@@ -244,7 +244,7 @@ func dependsOnTest(ctx context.Context, c client.Client, invConfig InventoryConf
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-2",
 				Operation:  event.Reconciled,
-				Identifier: object.UnstructuredToObjMetaOrDie(pod1Obj),
+				Identifier: object.UnstructuredToObjMetadata(pod1Obj),
 			},
 		},
 		{
@@ -324,7 +324,7 @@ func dependsOnTest(ctx context.Context, c client.Client, invConfig InventoryConf
 			DeleteEvent: &testutil.ExpDeleteEvent{
 				GroupName:  "prune-0",
 				Operation:  event.Deleted,
-				Identifier: object.UnstructuredToObjMetaOrDie(pod1Obj),
+				Identifier: object.UnstructuredToObjMetadata(pod1Obj),
 				Error:      nil,
 			},
 		},
@@ -352,7 +352,7 @@ func dependsOnTest(ctx context.Context, c client.Client, invConfig InventoryConf
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-0",
 				Operation:  event.ReconcilePending,
-				Identifier: object.UnstructuredToObjMetaOrDie(pod1Obj),
+				Identifier: object.UnstructuredToObjMetadata(pod1Obj),
 			},
 		},
 		{
@@ -361,7 +361,7 @@ func dependsOnTest(ctx context.Context, c client.Client, invConfig InventoryConf
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-0",
 				Operation:  event.Reconciled,
-				Identifier: object.UnstructuredToObjMetaOrDie(pod1Obj),
+				Identifier: object.UnstructuredToObjMetadata(pod1Obj),
 			},
 		},
 		{
@@ -388,7 +388,7 @@ func dependsOnTest(ctx context.Context, c client.Client, invConfig InventoryConf
 			DeleteEvent: &testutil.ExpDeleteEvent{
 				GroupName:  "prune-1",
 				Operation:  event.Deleted,
-				Identifier: object.UnstructuredToObjMetaOrDie(pod3Obj),
+				Identifier: object.UnstructuredToObjMetadata(pod3Obj),
 				Error:      nil,
 			},
 		},
@@ -416,7 +416,7 @@ func dependsOnTest(ctx context.Context, c client.Client, invConfig InventoryConf
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-1",
 				Operation:  event.ReconcilePending,
-				Identifier: object.UnstructuredToObjMetaOrDie(pod3Obj),
+				Identifier: object.UnstructuredToObjMetadata(pod3Obj),
 			},
 		},
 		{
@@ -425,7 +425,7 @@ func dependsOnTest(ctx context.Context, c client.Client, invConfig InventoryConf
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-1",
 				Operation:  event.Reconciled,
-				Identifier: object.UnstructuredToObjMetaOrDie(pod3Obj),
+				Identifier: object.UnstructuredToObjMetadata(pod3Obj),
 			},
 		},
 		{
@@ -452,7 +452,7 @@ func dependsOnTest(ctx context.Context, c client.Client, invConfig InventoryConf
 			DeleteEvent: &testutil.ExpDeleteEvent{
 				GroupName:  "prune-2",
 				Operation:  event.Deleted,
-				Identifier: object.UnstructuredToObjMetaOrDie(pod2Obj),
+				Identifier: object.UnstructuredToObjMetadata(pod2Obj),
 				Error:      nil,
 			},
 		},
@@ -480,7 +480,7 @@ func dependsOnTest(ctx context.Context, c client.Client, invConfig InventoryConf
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-2",
 				Operation:  event.ReconcilePending,
-				Identifier: object.UnstructuredToObjMetaOrDie(pod2Obj),
+				Identifier: object.UnstructuredToObjMetadata(pod2Obj),
 			},
 		},
 		{
@@ -489,7 +489,7 @@ func dependsOnTest(ctx context.Context, c client.Client, invConfig InventoryConf
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-2",
 				Operation:  event.Reconciled,
-				Identifier: object.UnstructuredToObjMetaOrDie(pod2Obj),
+				Identifier: object.UnstructuredToObjMetadata(pod2Obj),
 			},
 		},
 		{

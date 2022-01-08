@@ -17,49 +17,23 @@ var (
 	crdGK       = schema.GroupKind{Group: "apiextensions.k8s.io", Kind: "CustomResourceDefinition"}
 )
 
-// UnstructuredsToObjMetas converts a slice of unstructureds to a slice of
-// ObjMetadata. If the values for any of the unstructured objects doesn't
-// pass validation, an error will be returned.
-func UnstructuredsToObjMetas(objs []*unstructured.Unstructured) ([]ObjMetadata, error) {
-	objMetas := make([]ObjMetadata, 0, len(objs))
-	for _, obj := range objs {
-		objMeta, err := UnstructuredToObjMeta(obj)
-		if err != nil {
-			return nil, err
-		}
-		objMetas = append(objMetas, objMeta)
-	}
-	return objMetas, nil
-}
-
-// UnstructuredsToObjMetasOrDie converts a slice of unstructureds to a slice of
-// ObjMetadata. If the values for any of the unstructured objects doesn't
-// pass validation, the function will panic.
-func UnstructuredsToObjMetasOrDie(objs []*unstructured.Unstructured) []ObjMetadata {
-	objMetas, err := UnstructuredsToObjMetas(objs)
-	if err != nil {
-		panic(err)
+// UnstructuredSetToObjMetadataSet converts a UnstructuredSet to a ObjMetadataSet.
+func UnstructuredSetToObjMetadataSet(objs UnstructuredSet) ObjMetadataSet {
+	objMetas := make([]ObjMetadata, len(objs))
+	for i, obj := range objs {
+		objMetas[i] = UnstructuredToObjMetadata(obj)
 	}
 	return objMetas
 }
 
-// UnstructuredToObjMeta extracts the identifying information from an
-// Unstructured object and returns it as Objmetadata. If the values doesn't
-// pass validation, an error will be returned.
-func UnstructuredToObjMeta(obj *unstructured.Unstructured) (ObjMetadata, error) {
-	return CreateObjMetadata(obj.GetNamespace(), obj.GetName(),
-		obj.GroupVersionKind().GroupKind())
-}
-
-// UnstructuredToObjMetaOrDie extracts the identifying information from an
-// Unstructured object and returns it as Objmetadata. If the values doesn't
-// pass validation, the function will panic.
-func UnstructuredToObjMetaOrDie(obj *unstructured.Unstructured) ObjMetadata {
-	objMeta, err := UnstructuredToObjMeta(obj)
-	if err != nil {
-		panic(err)
+// UnstructuredToObjMetadata extracts the identifying information from an
+// Unstructured object and returns it as ObjMetadata object.
+func UnstructuredToObjMetadata(obj *unstructured.Unstructured) ObjMetadata {
+	return ObjMetadata{
+		Namespace: obj.GetNamespace(),
+		Name:      obj.GetName(),
+		GroupKind: obj.GroupVersionKind().GroupKind(),
 	}
-	return objMeta
 }
 
 // IsKindNamespace returns true if the passed Unstructured object is

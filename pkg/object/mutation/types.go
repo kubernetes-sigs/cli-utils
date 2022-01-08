@@ -124,16 +124,26 @@ func (r ResourceReference) ObjMetadata() object.ObjMetadata {
 	}
 }
 
-// Unstructured returns the name, namespace, group, version, and kind of the
+// ToUnstructured returns the name, namespace, group, version, and kind of the
 // ResourceReference, wrapped in a new Unstructured object.
 // This is useful for performing operations with
 // sigs.k8s.io/controller-runtime/pkg/client's unstructured Client.
-func (r ResourceReference) Unstructured() *unstructured.Unstructured {
+func (r ResourceReference) ToUnstructured() *unstructured.Unstructured {
 	obj := &unstructured.Unstructured{}
 	obj.SetName(r.Name)
 	obj.SetNamespace(r.Namespace)
 	obj.SetGroupVersionKind(r.GroupVersionKind())
 	return obj
+}
+
+// ToUnstructured returns the name, namespace, group, and kind of the
+// ResourceReference, wrapped in a new ObjMetadata object.
+func (r ResourceReference) ToObjMetadata() object.ObjMetadata {
+	return object.ObjMetadata{
+		Namespace: r.Namespace,
+		Name:      r.Name,
+		GroupKind: r.GroupVersionKind().GroupKind(),
+	}
 }
 
 // String returns the format GROUP[/VERSION][/namespaces/NAMESPACE]/KIND/NAME
@@ -154,11 +164,4 @@ func (r ResourceReference) Equal(b ResourceReference) bool {
 	return r.GroupVersionKind().GroupKind() == b.GroupVersionKind().GroupKind() &&
 		r.Name == b.Name &&
 		r.Namespace == b.Namespace
-}
-
-// ResourceReferenceToObjMeta extracts the identifying information from a
-// ResourceReference and returns it as Objmetadata. If the values don't
-// pass validation, an error will be returned.
-func ResourceReferenceToObjMeta(ref ResourceReference) (object.ObjMetadata, error) {
-	return object.CreateObjMetadata(ref.Namespace, ref.Name, ref.GroupVersionKind().GroupKind())
 }

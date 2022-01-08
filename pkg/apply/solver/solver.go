@@ -219,7 +219,7 @@ func (t *TaskQueueBuilder) AppendApplyWaitTasks(applyObjs object.UnstructuredSet
 		t.AppendApplyTask(applySet, applyFilters, applyMutators, o)
 		// dry-run skips wait tasks
 		if !o.DryRunStrategy.ClientOrServerDryRun() {
-			applyIds := object.UnstructuredsToObjMetasOrDie(applySet)
+			applyIds := object.UnstructuredSetToObjMetadataSet(applySet)
 			t.AppendWaitTask(applyIds, taskrunner.AllCurrent, o.ReconcileTimeout)
 		}
 	}
@@ -242,7 +242,7 @@ func (t *TaskQueueBuilder) AppendPruneWaitTasks(pruneObjs object.UnstructuredSet
 			t.AppendPruneTask(pruneSet, pruneFilters, o)
 			// dry-run skips wait tasks
 			if !o.DryRunStrategy.ClientOrServerDryRun() {
-				pruneIds := object.UnstructuredsToObjMetasOrDie(pruneSet)
+				pruneIds := object.UnstructuredSetToObjMetadataSet(pruneSet)
 				t.AppendWaitTask(pruneIds, taskrunner.AllNotFound, o.PruneTimeout)
 			}
 		}

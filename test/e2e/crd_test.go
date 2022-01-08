@@ -78,7 +78,7 @@ func crdTest(ctx context.Context, _ client.Client, invConfig InventoryConfig, in
 			ApplyEvent: &testutil.ExpApplyEvent{
 				GroupName:  "apply-0",
 				Operation:  event.Created,
-				Identifier: object.UnstructuredToObjMetaOrDie(crdObj),
+				Identifier: object.UnstructuredToObjMetadata(crdObj),
 				Error:      nil,
 			},
 		},
@@ -106,7 +106,7 @@ func crdTest(ctx context.Context, _ client.Client, invConfig InventoryConfig, in
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-0",
 				Operation:  event.ReconcilePending,
-				Identifier: object.UnstructuredToObjMetaOrDie(crdObj),
+				Identifier: object.UnstructuredToObjMetadata(crdObj),
 			},
 		},
 		{
@@ -115,7 +115,7 @@ func crdTest(ctx context.Context, _ client.Client, invConfig InventoryConfig, in
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-0",
 				Operation:  event.Reconciled,
-				Identifier: object.UnstructuredToObjMetaOrDie(crdObj),
+				Identifier: object.UnstructuredToObjMetadata(crdObj),
 			},
 		},
 		{
@@ -142,7 +142,7 @@ func crdTest(ctx context.Context, _ client.Client, invConfig InventoryConfig, in
 			ApplyEvent: &testutil.ExpApplyEvent{
 				GroupName:  "apply-1",
 				Operation:  event.Created,
-				Identifier: object.UnstructuredToObjMetaOrDie(crObj),
+				Identifier: object.UnstructuredToObjMetadata(crObj),
 				Error:      nil,
 			},
 		},
@@ -170,7 +170,7 @@ func crdTest(ctx context.Context, _ client.Client, invConfig InventoryConfig, in
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-1",
 				Operation:  event.ReconcilePending,
-				Identifier: object.UnstructuredToObjMetaOrDie(crObj),
+				Identifier: object.UnstructuredToObjMetadata(crObj),
 			},
 		},
 		{
@@ -179,7 +179,7 @@ func crdTest(ctx context.Context, _ client.Client, invConfig InventoryConfig, in
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-1",
 				Operation:  event.Reconciled,
-				Identifier: object.UnstructuredToObjMetaOrDie(crObj),
+				Identifier: object.UnstructuredToObjMetadata(crObj),
 			},
 		},
 		{
@@ -238,7 +238,7 @@ func crdTest(ctx context.Context, _ client.Client, invConfig InventoryConfig, in
 			DeleteEvent: &testutil.ExpDeleteEvent{
 				GroupName:  "prune-0",
 				Operation:  event.Deleted,
-				Identifier: object.UnstructuredToObjMetaOrDie(crObj),
+				Identifier: object.UnstructuredToObjMetadata(crObj),
 				Error:      nil,
 			},
 		},
@@ -266,7 +266,7 @@ func crdTest(ctx context.Context, _ client.Client, invConfig InventoryConfig, in
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-0",
 				Operation:  event.ReconcilePending,
-				Identifier: object.UnstructuredToObjMetaOrDie(crObj),
+				Identifier: object.UnstructuredToObjMetadata(crObj),
 			},
 		},
 		{
@@ -275,7 +275,7 @@ func crdTest(ctx context.Context, _ client.Client, invConfig InventoryConfig, in
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-0",
 				Operation:  event.Reconciled,
-				Identifier: object.UnstructuredToObjMetaOrDie(crObj),
+				Identifier: object.UnstructuredToObjMetadata(crObj),
 			},
 		},
 		{
@@ -302,7 +302,7 @@ func crdTest(ctx context.Context, _ client.Client, invConfig InventoryConfig, in
 			DeleteEvent: &testutil.ExpDeleteEvent{
 				GroupName:  "prune-1",
 				Operation:  event.Deleted,
-				Identifier: object.UnstructuredToObjMetaOrDie(crdObj),
+				Identifier: object.UnstructuredToObjMetadata(crdObj),
 				Error:      nil,
 			},
 		},
@@ -330,7 +330,7 @@ func crdTest(ctx context.Context, _ client.Client, invConfig InventoryConfig, in
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-1",
 				Operation:  event.ReconcilePending,
-				Identifier: object.UnstructuredToObjMetaOrDie(crdObj),
+				Identifier: object.UnstructuredToObjMetadata(crdObj),
 			},
 		},
 		{
@@ -339,7 +339,7 @@ func crdTest(ctx context.Context, _ client.Client, invConfig InventoryConfig, in
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-1",
 				Operation:  event.Reconciled,
-				Identifier: object.UnstructuredToObjMetaOrDie(crdObj),
+				Identifier: object.UnstructuredToObjMetadata(crdObj),
 			},
 		},
 		{

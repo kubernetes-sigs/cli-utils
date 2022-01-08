@@ -69,7 +69,7 @@ func (a *ApplyTask) Action() event.ResourceAction {
 }
 
 func (a *ApplyTask) Identifiers() object.ObjMetadataSet {
-	return object.UnstructuredsToObjMetasOrDie(a.Objects)
+	return object.UnstructuredSetToObjMetadataSet(a.Objects)
 }
 
 // Start creates a new goroutine that will invoke
@@ -106,7 +106,7 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 			// BuildInfo strips path annotations.
 			// Use modified object for filters, mutations, and events.
 			obj = info.Object.(*unstructured.Unstructured)
-			id := object.UnstructuredToObjMetaOrDie(obj)
+			id := object.UnstructuredToObjMetadata(obj)
 			if err != nil {
 				if klog.V(4).Enabled() {
 					klog.Errorf("unable to convert obj to info for %s/%s (%s)--continue",
@@ -245,7 +245,7 @@ func (a *ApplyTask) StatusUpdate(_ *taskrunner.TaskContext, _ object.ObjMetadata
 
 // mutate loops through the mutator list and executes them on the object.
 func (a *ApplyTask) mutate(ctx context.Context, obj *unstructured.Unstructured) error {
-	id := object.UnstructuredToObjMetaOrDie(obj)
+	id := object.UnstructuredToObjMetadata(obj)
 	for _, mutator := range a.Mutators {
 		klog.V(6).Infof("apply mutator %s: %s", mutator.Name(), id)
 		mutated, reason, err := mutator.Mutate(ctx, obj)
@@ -291,7 +291,7 @@ func (a *ApplyTask) sendBatchApplyEvents(
 	err error,
 ) {
 	for _, obj := range objects {
-		id := object.UnstructuredToObjMetaOrDie(obj)
+		id := object.UnstructuredToObjMetadata(obj)
 		taskContext.SendEvent(a.createApplyFailedEvent(
 			id,
 			applyerror.NewInitializeApplyOptionError(err),

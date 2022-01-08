@@ -103,7 +103,7 @@ func expectedPodEvents(pod *unstructured.Unstructured, waitOperation event.WaitE
 			ApplyEvent: &testutil.ExpApplyEvent{
 				GroupName:  "apply-0",
 				Operation:  event.Created,
-				Identifier: object.UnstructuredToObjMetaOrDie(pod),
+				Identifier: object.UnstructuredToObjMetadata(pod),
 				Error:      nil,
 			},
 		},
@@ -131,7 +131,7 @@ func expectedPodEvents(pod *unstructured.Unstructured, waitOperation event.WaitE
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-0",
 				Operation:  event.ReconcilePending,
-				Identifier: object.UnstructuredToObjMetaOrDie(pod),
+				Identifier: object.UnstructuredToObjMetadata(pod),
 			},
 		},
 		{
@@ -140,7 +140,7 @@ func expectedPodEvents(pod *unstructured.Unstructured, waitOperation event.WaitE
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-0",
 				Operation:  waitOperation,
-				Identifier: object.UnstructuredToObjMetaOrDie(pod),
+				Identifier: object.UnstructuredToObjMetadata(pod),
 			},
 		},
 		{

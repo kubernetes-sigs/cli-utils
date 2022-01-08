@@ -4,7 +4,6 @@
 package cache
 
 import (
-	"fmt"
 	"sync"
 
 	"k8s.io/klog/v2"
@@ -28,19 +27,14 @@ func NewResourceCacheMap() *ResourceCacheMap {
 
 // Load resources into the cache, generating the ID from the resource itself.
 // Existing resources with the same ID will be replaced.
-// Returns an error if any resource ID cannot be generated.
-func (rc *ResourceCacheMap) Load(values ...ResourceStatus) error {
+func (rc *ResourceCacheMap) Load(values ...ResourceStatus) {
 	rc.mu.Lock()
 	defer rc.mu.Unlock()
 
 	for _, value := range values {
-		id, err := object.UnstructuredToObjMeta(value.Resource)
-		if err != nil {
-			return fmt.Errorf("failed to generate resource ID: %w", err)
-		}
+		id := object.UnstructuredToObjMetadata(value.Resource)
 		rc.cache[id] = value
 	}
-	return nil
 }
 
 // Put the resource into the cache using the supplied ID, replacing any

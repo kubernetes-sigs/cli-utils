@@ -91,7 +91,7 @@ func mutationTest(ctx context.Context, c client.Client, invConfig InventoryConfi
 			ApplyEvent: &testutil.ExpApplyEvent{
 				GroupName:  "apply-0",
 				Operation:  event.Created,
-				Identifier: object.UnstructuredToObjMetaOrDie(podBObj),
+				Identifier: object.UnstructuredToObjMetadata(podBObj),
 				Error:      nil,
 			},
 		},
@@ -119,7 +119,7 @@ func mutationTest(ctx context.Context, c client.Client, invConfig InventoryConfi
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-0",
 				Operation:  event.ReconcilePending,
-				Identifier: object.UnstructuredToObjMetaOrDie(podBObj),
+				Identifier: object.UnstructuredToObjMetadata(podBObj),
 			},
 		},
 		{
@@ -128,7 +128,7 @@ func mutationTest(ctx context.Context, c client.Client, invConfig InventoryConfi
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-0",
 				Operation:  event.Reconciled,
-				Identifier: object.UnstructuredToObjMetaOrDie(podBObj),
+				Identifier: object.UnstructuredToObjMetadata(podBObj),
 			},
 		},
 		{
@@ -155,7 +155,7 @@ func mutationTest(ctx context.Context, c client.Client, invConfig InventoryConfi
 			ApplyEvent: &testutil.ExpApplyEvent{
 				GroupName:  "apply-1",
 				Operation:  event.Created,
-				Identifier: object.UnstructuredToObjMetaOrDie(podAObj),
+				Identifier: object.UnstructuredToObjMetadata(podAObj),
 				Error:      nil,
 			},
 		},
@@ -183,7 +183,7 @@ func mutationTest(ctx context.Context, c client.Client, invConfig InventoryConfi
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-1",
 				Operation:  event.ReconcilePending,
-				Identifier: object.UnstructuredToObjMetaOrDie(podAObj),
+				Identifier: object.UnstructuredToObjMetadata(podAObj),
 			},
 		},
 		{
@@ -192,7 +192,7 @@ func mutationTest(ctx context.Context, c client.Client, invConfig InventoryConfi
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-1",
 				Operation:  event.Reconciled,
-				Identifier: object.UnstructuredToObjMetaOrDie(podAObj),
+				Identifier: object.UnstructuredToObjMetadata(podAObj),
 			},
 		},
 		{
@@ -279,7 +279,7 @@ func mutationTest(ctx context.Context, c client.Client, invConfig InventoryConfi
 			DeleteEvent: &testutil.ExpDeleteEvent{
 				GroupName:  "prune-0",
 				Operation:  event.Deleted,
-				Identifier: object.UnstructuredToObjMetaOrDie(podAObj),
+				Identifier: object.UnstructuredToObjMetadata(podAObj),
 				Error:      nil,
 			},
 		},
@@ -307,7 +307,7 @@ func mutationTest(ctx context.Context, c client.Client, invConfig InventoryConfi
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-0",
 				Operation:  event.ReconcilePending,
-				Identifier: object.UnstructuredToObjMetaOrDie(podAObj),
+				Identifier: object.UnstructuredToObjMetadata(podAObj),
 			},
 		},
 		{
@@ -316,7 +316,7 @@ func mutationTest(ctx context.Context, c client.Client, invConfig InventoryConfi
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-0",
 				Operation:  event.Reconciled,
-				Identifier: object.UnstructuredToObjMetaOrDie(podAObj),
+				Identifier: object.UnstructuredToObjMetadata(podAObj),
 			},
 		},
 		{
@@ -343,7 +343,7 @@ func mutationTest(ctx context.Context, c client.Client, invConfig InventoryConfi
 			DeleteEvent: &testutil.ExpDeleteEvent{
 				GroupName:  "prune-1",
 				Operation:  event.Deleted,
-				Identifier: object.UnstructuredToObjMetaOrDie(podBObj),
+				Identifier: object.UnstructuredToObjMetadata(podBObj),
 				Error:      nil,
 			},
 		},
@@ -371,7 +371,7 @@ func mutationTest(ctx context.Context, c client.Client, invConfig InventoryConfi
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-1",
 				Operation:  event.ReconcilePending,
-				Identifier: object.UnstructuredToObjMetaOrDie(podBObj),
+				Identifier: object.UnstructuredToObjMetadata(podBObj),
 			},
 		},
 		{
@@ -380,7 +380,7 @@ func mutationTest(ctx context.Context, c client.Client, invConfig InventoryConfi
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-1",
 				Operation:  event.Reconciled,
-				Identifier: object.UnstructuredToObjMetaOrDie(podBObj),
+				Identifier: object.UnstructuredToObjMetadata(podBObj),
 			},
 		},
 		{

@@ -29,7 +29,7 @@ func SortObjs(objs object.UnstructuredSet) ([]object.UnstructuredSet, error) {
 	g := New()
 	objToUnstructured := map[object.ObjMetadata]*unstructured.Unstructured{}
 	for _, obj := range objs {
-		id := object.UnstructuredToObjMetaOrDie(obj)
+		id := object.UnstructuredToObjMetadata(obj)
 		objToUnstructured[id] = obj
 	}
 	// Add object vertices and dependency edges to graph.
@@ -84,7 +84,7 @@ func ReverseSortObjs(objs object.UnstructuredSet) ([]object.UnstructuredSet, err
 // with an explicit "apply-time-mutation" annotation.
 func addApplyTimeMutationEdges(g *Graph, objs object.UnstructuredSet) {
 	for _, obj := range objs {
-		id := object.UnstructuredToObjMetaOrDie(obj)
+		id := object.UnstructuredToObjMetadata(obj)
 		klog.V(3).Infof("adding vertex: %s", id)
 		g.AddVertex(id)
 		if mutation.HasAnnotation(obj) {
@@ -108,7 +108,7 @@ func addApplyTimeMutationEdges(g *Graph, objs object.UnstructuredSet) {
 // with an explicit "depends-on" annotation.
 func addDependsOnEdges(g *Graph, objs object.UnstructuredSet) {
 	for _, obj := range objs {
-		id := object.UnstructuredToObjMetaOrDie(obj)
+		id := object.UnstructuredToObjMetadata(obj)
 		klog.V(3).Infof("adding vertex: %s", id)
 		g.AddVertex(id)
 		deps, err := dependson.ReadAnnotation(obj)
@@ -135,7 +135,7 @@ func addCRDEdges(g *Graph, objs object.UnstructuredSet) {
 		if object.IsCRD(u) {
 			groupKind, found := object.GetCRDGroupKind(u)
 			if found {
-				obj := object.UnstructuredToObjMetaOrDie(u)
+				obj := object.UnstructuredToObjMetadata(u)
 				crds[groupKind.String()] = obj
 			}
 		}
@@ -146,7 +146,7 @@ func addCRDEdges(g *Graph, objs object.UnstructuredSet) {
 		gvk := u.GroupVersionKind()
 		groupKind := gvk.GroupKind()
 		if to, found := crds[groupKind.String()]; found {
-			from := object.UnstructuredToObjMetaOrDie(u)
+			from := object.UnstructuredToObjMetadata(u)
 			klog.V(3).Infof("adding edge from: custom resource %s, to CRD: %s", from, to)
 			g.AddEdge(from, to)
 		}
@@ -161,7 +161,7 @@ func addNamespaceEdges(g *Graph, objs object.UnstructuredSet) {
 	// First create a map of all the namespaces objects live in.
 	for _, obj := range objs {
 		if object.IsKindNamespace(obj) {
-			id := object.UnstructuredToObjMetaOrDie(obj)
+			id := object.UnstructuredToObjMetadata(obj)
 			namespace := obj.GetName()
 			namespaces[namespace] = id
 		}
@@ -172,7 +172,7 @@ func addNamespaceEdges(g *Graph, objs object.UnstructuredSet) {
 		if object.IsNamespaced(obj) {
 			objNamespace := obj.GetNamespace()
 			if namespace, found := namespaces[objNamespace]; found {
-				id := object.UnstructuredToObjMetaOrDie(obj)
+				id := object.UnstructuredToObjMetadata(obj)
 				klog.V(3).Infof("adding edge from: %s to namespace: %s", id, namespace)
 				g.AddEdge(id, namespace)
 			}

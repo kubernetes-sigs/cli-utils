@@ -103,7 +103,7 @@ func deleteUnstructuredAndWait(ctx context.Context, c client.Client, obj *unstru
 
 func waitForDeletion(ctx context.Context, c client.Client, obj *unstructured.Unstructured) {
 	ref := mutation.NewResourceReference(obj)
-	resultObj := ref.Unstructured()
+	resultObj := ref.ToUnstructured()
 
 	timeout := 30 * time.Second
 	retry := 2 * time.Second
@@ -144,7 +144,7 @@ func createUnstructuredAndWait(ctx context.Context, c client.Client, obj *unstru
 
 func waitForCreation(ctx context.Context, c client.Client, obj *unstructured.Unstructured) {
 	ref := mutation.NewResourceReference(obj)
-	resultObj := ref.Unstructured()
+	resultObj := ref.ToUnstructured()
 
 	timeout := 30 * time.Second
 	retry := 2 * time.Second
@@ -176,7 +176,7 @@ func waitForCreation(ctx context.Context, c client.Client, obj *unstructured.Uns
 
 func assertUnstructuredExists(ctx context.Context, c client.Client, obj *unstructured.Unstructured) *unstructured.Unstructured {
 	ref := mutation.NewResourceReference(obj)
-	resultObj := ref.Unstructured()
+	resultObj := ref.ToUnstructured()
 
 	err := c.Get(ctx, types.NamespacedName{
 		Namespace: obj.GetNamespace(),
@@ -189,7 +189,7 @@ func assertUnstructuredExists(ctx context.Context, c client.Client, obj *unstruc
 
 func assertUnstructuredDoesNotExist(ctx context.Context, c client.Client, obj *unstructured.Unstructured) {
 	ref := mutation.NewResourceReference(obj)
-	resultObj := ref.Unstructured()
+	resultObj := ref.ToUnstructured()
 
 	err := c.Get(ctx, types.NamespacedName{
 		Namespace: obj.GetNamespace(),

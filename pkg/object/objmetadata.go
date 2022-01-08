@@ -57,32 +57,13 @@ type ObjMetadata struct {
 	GroupKind schema.GroupKind
 }
 
-// CreateObjMetadata returns an ObjMetadata struct filled
-// with the passed values. This function normalizes and validates the
-// passed fields and returns an error for bad parameters.
-func CreateObjMetadata(namespace string, name string, gk schema.GroupKind) (ObjMetadata, error) {
-	// Namespace can be empty, but name cannot.
-	if name == "" {
-		return NilObjMetadata, fmt.Errorf("empty name for object")
-	}
-	if gk.Kind == "" {
-		return NilObjMetadata, fmt.Errorf("empty kind for object")
-	}
-	return ObjMetadata{
-		Namespace: namespace,
-		Name:      name,
-		GroupKind: gk,
-	}, nil
-}
-
 // ParseObjMetadata takes a string, splits it into its four fields,
 // and returns an ObjMetadata struct storing the four fields.
 // Example inventory string:
 //
 //   test-namespace_test-name_apps_ReplicaSet
 //
-// Returns an error if unable to parse and create the ObjMetadata
-// struct.
+// Returns an error if unable to parse and create the ObjMetadata struct.
 //
 // NOTE: name field can contain double underscore (__), which represents
 // a colon. RBAC resources can have this additional character (:) in their name.
@@ -115,11 +96,15 @@ func ParseObjMetadata(s string) (ObjMetadata, error) {
 		return NilObjMetadata, fmt.Errorf("too many fields within: %s", s)
 	}
 	// Create the ObjMetadata object from the four parsed fields.
-	gk := schema.GroupKind{
-		Group: group,
-		Kind:  kind,
+	id := ObjMetadata{
+		Namespace: namespace,
+		Name:      name,
+		GroupKind: schema.GroupKind{
+			Group: group,
+			Kind:  kind,
+		},
 	}
-	return CreateObjMetadata(namespace, name, gk)
+	return id, nil
 }
 
 // Equals compares two ObjMetadata and returns true if they are equal. This does
@@ -153,6 +138,10 @@ func RuntimeToObjMeta(obj runtime.Object) (ObjMetadata, error) {
 	if err != nil {
 		return NilObjMetadata, err
 	}
-	return CreateObjMetadata(accessor.GetNamespace(), accessor.GetName(),
-		obj.GetObjectKind().GroupVersionKind().GroupKind())
+	id := ObjMetadata{
+		Namespace: accessor.GetNamespace(),
+		Name:      accessor.GetName(),
+		GroupKind: obj.GetObjectKind().GroupVersionKind().GroupKind(),
+	}
+	return id, nil
 }

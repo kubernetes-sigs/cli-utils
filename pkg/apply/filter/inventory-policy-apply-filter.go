@@ -39,7 +39,7 @@ func (ipaf InventoryPolicyApplyFilter) Filter(obj *unstructured.Unstructured) (b
 		return true, "missing object", nil
 	}
 	// Object must be retrieved from the cluster to get the inventory id.
-	clusterObj, err := ipaf.getObject(object.UnstructuredToObjMetaOrDie(obj))
+	clusterObj, err := ipaf.getObject(object.UnstructuredToObjMetadata(obj))
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			// This simply means the object hasn't been created yet.

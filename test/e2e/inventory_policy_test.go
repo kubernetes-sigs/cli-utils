@@ -89,7 +89,7 @@ func inventoryPolicyMustMatchTest(ctx context.Context, c client.Client, invConfi
 			EventType: event.ApplyType,
 			ApplyEvent: &testutil.ExpApplyEvent{
 				GroupName:  "apply-0",
-				Identifier: object.UnstructuredToObjMetaOrDie(deployment1Obj),
+				Identifier: object.UnstructuredToObjMetadata(deployment1Obj),
 				Error: testutil.EqualErrorType(
 					inventory.NewInventoryOverlapError(errors.New("test")),
 				),
@@ -119,7 +119,7 @@ func inventoryPolicyMustMatchTest(ctx context.Context, c client.Client, invConfi
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-0",
 				Operation:  event.ReconcileSkipped,
-				Identifier: object.UnstructuredToObjMetaOrDie(deployment1Obj),
+				Identifier: object.UnstructuredToObjMetadata(deployment1Obj),
 			},
 		},
 		{
@@ -156,7 +156,7 @@ func inventoryPolicyMustMatchTest(ctx context.Context, c client.Client, invConfi
 	expected := testutil.ExpEvent{
 		EventType: event.StatusType,
 		StatusEvent: &testutil.ExpStatusEvent{
-			Identifier: object.UnstructuredToObjMetaOrDie(deployment1Obj),
+			Identifier: object.UnstructuredToObjMetadata(deployment1Obj),
 			Status:     status.InProgressStatus,
 			Error:      nil,
 		},
@@ -167,7 +167,7 @@ func inventoryPolicyMustMatchTest(ctx context.Context, c client.Client, invConfi
 	expected = testutil.ExpEvent{
 		EventType: event.StatusType,
 		StatusEvent: &testutil.ExpStatusEvent{
-			Identifier: object.UnstructuredToObjMetaOrDie(deployment1Obj),
+			Identifier: object.UnstructuredToObjMetadata(deployment1Obj),
 			Status:     status.CurrentStatus,
 			Error:      nil,
 		},
@@ -248,7 +248,7 @@ func inventoryPolicyAdoptIfNoInventoryTest(ctx context.Context, c client.Client,
 			ApplyEvent: &testutil.ExpApplyEvent{
 				GroupName:  "apply-0",
 				Operation:  event.Configured,
-				Identifier: object.UnstructuredToObjMetaOrDie(deployment1Obj),
+				Identifier: object.UnstructuredToObjMetadata(deployment1Obj),
 				Error:      nil,
 			},
 		},
@@ -276,7 +276,7 @@ func inventoryPolicyAdoptIfNoInventoryTest(ctx context.Context, c client.Client,
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-0",
 				Operation:  event.ReconcilePending,
-				Identifier: object.UnstructuredToObjMetaOrDie(deployment1Obj),
+				Identifier: object.UnstructuredToObjMetadata(deployment1Obj),
 			},
 		},
 		{
@@ -285,7 +285,7 @@ func inventoryPolicyAdoptIfNoInventoryTest(ctx context.Context, c client.Client,
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-0",
 				Operation:  event.Reconciled,
-				Identifier: object.UnstructuredToObjMetaOrDie(deployment1Obj),
+				Identifier: object.UnstructuredToObjMetadata(deployment1Obj),
 			},
 		},
 		{
@@ -322,7 +322,7 @@ func inventoryPolicyAdoptIfNoInventoryTest(ctx context.Context, c client.Client,
 	expected := testutil.ExpEvent{
 		EventType: event.StatusType,
 		StatusEvent: &testutil.ExpStatusEvent{
-			Identifier: object.UnstructuredToObjMetaOrDie(deployment1Obj),
+			Identifier: object.UnstructuredToObjMetadata(deployment1Obj),
 			Status:     status.InProgressStatus,
 			Error:      nil,
 		},
@@ -333,7 +333,7 @@ func inventoryPolicyAdoptIfNoInventoryTest(ctx context.Context, c client.Client,
 	expected = testutil.ExpEvent{
 		EventType: event.StatusType,
 		StatusEvent: &testutil.ExpStatusEvent{
-			Identifier: object.UnstructuredToObjMetaOrDie(deployment1Obj),
+			Identifier: object.UnstructuredToObjMetadata(deployment1Obj),
 			Status:     status.CurrentStatus,
 			Error:      nil,
 		},
@@ -430,7 +430,7 @@ func inventoryPolicyAdoptAllTest(ctx context.Context, c client.Client, invConfig
 			ApplyEvent: &testutil.ExpApplyEvent{
 				GroupName:  "apply-0",
 				Operation:  event.Configured,
-				Identifier: object.UnstructuredToObjMetaOrDie(deployment1Obj),
+				Identifier: object.UnstructuredToObjMetadata(deployment1Obj),
 				Error:      nil,
 			},
 		},
@@ -458,7 +458,7 @@ func inventoryPolicyAdoptAllTest(ctx context.Context, c client.Client, invConfig
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-0",
 				Operation:  event.ReconcilePending,
-				Identifier: object.UnstructuredToObjMetaOrDie(deployment1Obj),
+				Identifier: object.UnstructuredToObjMetadata(deployment1Obj),
 			},
 		},
 		{
@@ -467,7 +467,7 @@ func inventoryPolicyAdoptAllTest(ctx context.Context, c client.Client, invConfig
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-0",
 				Operation:  event.Reconciled,
-				Identifier: object.UnstructuredToObjMetaOrDie(deployment1Obj),
+				Identifier: object.UnstructuredToObjMetadata(deployment1Obj),
 			},
 		},
 		{
@@ -504,7 +504,7 @@ func inventoryPolicyAdoptAllTest(ctx context.Context, c client.Client, invConfig
 	expected := testutil.ExpEvent{
 		EventType: event.StatusType,
 		StatusEvent: &testutil.ExpStatusEvent{
-			Identifier: object.UnstructuredToObjMetaOrDie(deployment1Obj),
+			Identifier: object.UnstructuredToObjMetadata(deployment1Obj),
 			Status:     status.InProgressStatus,
 			Error:      nil,
 		},
@@ -515,7 +515,7 @@ func inventoryPolicyAdoptAllTest(ctx context.Context, c client.Client, invConfig
 	expected = testutil.ExpEvent{
 		EventType: event.StatusType,
 		StatusEvent: &testutil.ExpStatusEvent{
-			Identifier: object.UnstructuredToObjMetaOrDie(deployment1Obj),
+			Identifier: object.UnstructuredToObjMetadata(deployment1Obj),
 			Status:     status.CurrentStatus,
 			Error:      nil,
 		},

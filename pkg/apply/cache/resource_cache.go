@@ -25,7 +25,7 @@ type ResourceCache interface {
 	ResourceCacheReader
 	// Load one or more resources into the cache, generating the ObjMetadata
 	// from the objects.
-	Load(...ResourceStatus) error
+	Load(...ResourceStatus)
 	// Put the resource into the cache using the specified ID.
 	Put(object.ObjMetadata, ResourceStatus)
 	// Remove the resource associated with the ID from the cache.
