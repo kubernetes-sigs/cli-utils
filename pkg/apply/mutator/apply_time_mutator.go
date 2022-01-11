@@ -46,7 +46,7 @@ func (atm *ApplyTimeMutator) Mutate(ctx context.Context, obj *unstructured.Unstr
 	mutated := false
 	reason := ""
 
-	targetRef := mutation.NewResourceReference(obj)
+	targetRef := mutation.ResourceReferenceFromUnstructured(obj)
 
 	if !mutation.HasAnnotation(obj) {
 		return mutated, reason, nil
@@ -177,7 +177,7 @@ func (atm *ApplyTimeMutator) getObject(ctx context.Context, mapping *meta.RESTMa
 	if ref.Kind == "" {
 		return nil, fmt.Errorf("invalid source reference: empty kind")
 	}
-	id := ref.ObjMetadata()
+	id := ref.ToObjMetadata()
 
 	// get resource from cache
 	if atm.ResourceCache != nil {
@@ -225,7 +225,7 @@ func computeStatus(obj *unstructured.Unstructured) cache.ResourceStatus {
 	result, err := status.Compute(obj)
 	if err != nil {
 		if klog.V(3).Enabled() {
-			ref := mutation.NewResourceReference(obj)
+			ref := mutation.ResourceReferenceFromUnstructured(obj)
 			klog.Info("failed to compute resource status (%s): %d", ref, err)
 		}
 		return cache.ResourceStatus{

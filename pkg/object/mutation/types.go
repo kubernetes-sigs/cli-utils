@@ -95,13 +95,23 @@ type ResourceReference struct {
 	Namespace string `json:"namespace,omitempty"`
 }
 
-// NewResourceReference returns the object as a ResourceReference
-func NewResourceReference(obj *unstructured.Unstructured) ResourceReference {
+// ResourceReferenceFromUnstructured returns the object as a ResourceReference
+func ResourceReferenceFromUnstructured(obj *unstructured.Unstructured) ResourceReference {
 	return ResourceReference{
 		Name:       obj.GetName(),
 		Namespace:  obj.GetNamespace(),
 		Kind:       obj.GetKind(),
 		APIVersion: obj.GetAPIVersion(),
+	}
+}
+
+// ResourceReferenceFromObjMetadata returns the object as a ResourceReference
+func ResourceReferenceFromObjMetadata(id object.ObjMetadata) ResourceReference {
+	return ResourceReference{
+		Name:      id.Name,
+		Namespace: id.Namespace,
+		Kind:      id.GroupKind.Kind,
+		Group:     id.GroupKind.Group,
 	}
 }
 
@@ -112,16 +122,6 @@ func (r ResourceReference) GroupVersionKind() schema.GroupVersionKind {
 		return schema.GroupVersionKind{Group: r.Group, Kind: r.Kind}
 	}
 	return schema.FromAPIVersionAndKind(r.APIVersion, r.Kind)
-}
-
-// ObjMetadata returns the name, namespace, group, and kind of the
-// ResourceReference, wrapped in a new ObjMetadata object.
-func (r ResourceReference) ObjMetadata() object.ObjMetadata {
-	return object.ObjMetadata{
-		Name:      r.Name,
-		Namespace: r.Namespace,
-		GroupKind: r.GroupVersionKind().GroupKind(),
-	}
 }
 
 // ToUnstructured returns the name, namespace, group, version, and kind of the

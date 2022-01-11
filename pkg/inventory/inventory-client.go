@@ -156,7 +156,7 @@ func (cic *ClusterInventoryClient) Replace(localInv InventoryInfo, objs object.O
 	}
 	clusterObjs, err := cic.GetClusterObjs(localInv, dryRun)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to read inventory objects from cluster: %w", err)
 	}
 	if objs.Equal(clusterObjs) {
 		klog.V(4).Infof("applied objects same as cluster inventory: do nothing")
@@ -164,7 +164,7 @@ func (cic *ClusterInventoryClient) Replace(localInv InventoryInfo, objs object.O
 	}
 	clusterInv, err := cic.GetClusterInventoryInfo(localInv, dryRun)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to read inventory from cluster: %w", err)
 	}
 	clusterInv, err = cic.replaceInventory(clusterInv, objs)
 	if err != nil {
@@ -173,7 +173,7 @@ func (cic *ClusterInventoryClient) Replace(localInv InventoryInfo, objs object.O
 	klog.V(4).Infof("replace cluster inventory: %s/%s", clusterInv.GetNamespace(), clusterInv.GetName())
 	klog.V(4).Infof("replace cluster inventory %d objects", len(objs))
 	if err := cic.applyInventoryObj(clusterInv, dryRun); err != nil {
-		return err
+		return fmt.Errorf("failed to write updated inventory to cluster: %w", err)
 	}
 	return nil
 }
@@ -225,7 +225,7 @@ func (cic *ClusterInventoryClient) GetClusterObjs(localInv InventoryInfo, dryRun
 	var objs object.ObjMetadataSet
 	clusterInv, err := cic.GetClusterInventoryInfo(localInv, dryRun)
 	if err != nil {
-		return objs, err
+		return objs, fmt.Errorf("failed to read inventory from cluster: %w", err)
 	}
 	// First time; no inventory obj yet.
 	if clusterInv == nil {
@@ -247,7 +247,7 @@ func (cic *ClusterInventoryClient) GetClusterObjs(localInv InventoryInfo, dryRun
 func (cic *ClusterInventoryClient) GetClusterInventoryInfo(inv InventoryInfo, dryRun common.DryRunStrategy) (*unstructured.Unstructured, error) {
 	clusterInvObjects, err := cic.GetClusterInventoryObjs(inv)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read inventory objects from cluster: %w", err)
 	}
 
 	var clusterInv *unstructured.Unstructured

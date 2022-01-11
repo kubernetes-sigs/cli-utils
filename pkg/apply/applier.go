@@ -27,6 +27,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/engine"
 	"sigs.k8s.io/cli-utils/pkg/object"
+	"sigs.k8s.io/cli-utils/pkg/object/validation"
 	"sigs.k8s.io/cli-utils/pkg/ordering"
 )
 
@@ -143,9 +144,8 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.InventoryInfo, obje
 
 		// Validate the resources to make sure we catch those problems early
 		// before anything has been updated in the cluster.
-		if err := (&object.Validator{
-			Mapper: mapper,
-		}).Validate(objects); err != nil {
+		validator := &validation.Validator{Mapper: mapper}
+		if err := validator.Validate(objects); err != nil {
 			handleError(eventChannel, err)
 			return
 		}

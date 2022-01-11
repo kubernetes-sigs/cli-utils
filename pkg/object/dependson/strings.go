@@ -114,8 +114,8 @@ func ParseObjMetadata(objStr string) (object.ObjMetadata, error) {
 	fields := strings.Split(objStr, fieldSeparator)
 
 	if len(fields) != numFieldsClusterScoped && len(fields) != numFieldsNamespacedScoped {
-		return obj, fmt.Errorf("too many fields (expected %d or %d): %q",
-			numFieldsClusterScoped, numFieldsNamespacedScoped, objStr)
+		return obj, fmt.Errorf("expected %d or %d fields, found %d: %q",
+			numFieldsClusterScoped, numFieldsNamespacedScoped, len(fields), objStr)
 	}
 
 	group = fields[0]
