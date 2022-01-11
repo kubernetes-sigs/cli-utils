@@ -4,11 +4,11 @@
 package list
 
 import (
-	"fmt"
-
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/object"
+	printcommon "sigs.k8s.io/cli-utils/pkg/print/common"
+	"sigs.k8s.io/cli-utils/pkg/print/stats"
 )
 
 type Formatter interface {
@@ -21,10 +21,7 @@ type Formatter interface {
 	FormatActionGroupEvent(
 		age event.ActionGroupEvent,
 		ags []event.ActionGroup,
-		as *ApplyStats,
-		ps *PruneStats,
-		ds *DeleteStats,
-		ws *WaitStats,
+		s stats.Stats,
 		c Collector,
 	) error
 }
@@ -33,97 +30,6 @@ type FormatterFactory func(previewStrategy common.DryRunStrategy) Formatter
 
 type BaseListPrinter struct {
 	FormatterFactory FormatterFactory
-}
-
-type ApplyStats struct {
-	ServersideApplied int
-	Created           int
-	Unchanged         int
-	Configured        int
-	Failed            int
-}
-
-func (a *ApplyStats) inc(op event.ApplyEventOperation) {
-	switch op {
-	case event.ApplyUnspecified:
-	case event.ServersideApplied:
-		a.ServersideApplied++
-	case event.Created:
-		a.Created++
-	case event.Unchanged:
-		a.Unchanged++
-	case event.Configured:
-		a.Configured++
-	default:
-		panic(fmt.Errorf("unknown apply operation %s", op.String()))
-	}
-}
-
-func (a *ApplyStats) incFailed() {
-	a.Failed++
-}
-
-func (a *ApplyStats) Sum() int {
-	return a.ServersideApplied + a.Configured + a.Unchanged + a.Created + a.Failed
-}
-
-type PruneStats struct {
-	Pruned  int
-	Skipped int
-	Failed  int
-}
-
-func (p *PruneStats) incPruned() {
-	p.Pruned++
-}
-
-func (p *PruneStats) incSkipped() {
-	p.Skipped++
-}
-
-func (p *PruneStats) incFailed() {
-	p.Failed++
-}
-
-type DeleteStats struct {
-	Deleted int
-	Skipped int
-	Failed  int
-}
-
-func (d *DeleteStats) incDeleted() {
-	d.Deleted++
-}
-
-func (d *DeleteStats) incSkipped() {
-	d.Skipped++
-}
-
-func (d *DeleteStats) incFailed() {
-	d.Failed++
-}
-
-type WaitStats struct {
-	Reconciled int
-	Timeout    int
-	Failed     int
-	Skipped    int
-}
-
-func (w *WaitStats) incReconciled() {
-	w.Reconciled++
-}
-
-func (w *WaitStats) incTimeout() {
-	w.Timeout++
-}
-
-func (w *WaitStats) incFailed() {
-	w.Failed++
-}
-
-func (w *WaitStats) incSkipped() {
-	w.Skipped++
 }
 
 type Collector interface {
@@ -149,15 +55,13 @@ func (sc *StatusCollector) LatestStatus() map[object.ObjMetadata]event.StatusEve
 //nolint:gocyclo
 func (b *BaseListPrinter) Print(ch <-chan event.Event, previewStrategy common.DryRunStrategy, printStatus bool) error {
 	var actionGroups []event.ActionGroup
-	applyStats := &ApplyStats{}
-	pruneStats := &PruneStats{}
-	deleteStats := &DeleteStats{}
-	waitStats := &WaitStats{}
+	var statsCollector stats.Stats
 	statusCollector := &StatusCollector{
 		latestStatus: make(map[object.ObjMetadata]event.StatusEvent),
 	}
 	formatter := b.FormatterFactory(previewStrategy)
 	for e := range ch {
+		statsCollector.Handle(e)
 		switch e.Type {
 		case event.InitType:
 			actionGroups = e.InitEvent.ActionGroups
@@ -165,10 +69,6 @@ func (b *BaseListPrinter) Print(ch <-chan event.Event, previewStrategy common.Dr
 			_ = formatter.FormatErrorEvent(e.ErrorEvent)
 			return e.ErrorEvent.Err
 		case event.ApplyType:
-			applyStats.inc(e.ApplyEvent.Operation)
-			if e.ApplyEvent.Error != nil {
-				applyStats.incFailed()
-			}
 			if err := formatter.FormatApplyEvent(e.ApplyEvent); err != nil {
 				return err
 			}
@@ -180,42 +80,14 @@ func (b *BaseListPrinter) Print(ch <-chan event.Event, previewStrategy common.Dr
 				}
 			}
 		case event.PruneType:
-			switch e.PruneEvent.Operation {
-			case event.Pruned:
-				pruneStats.incPruned()
-			case event.PruneSkipped:
-				pruneStats.incSkipped()
-			}
-			if e.PruneEvent.Error != nil {
-				pruneStats.incFailed()
-			}
 			if err := formatter.FormatPruneEvent(e.PruneEvent); err != nil {
 				return err
 			}
 		case event.DeleteType:
-			switch e.DeleteEvent.Operation {
-			case event.Deleted:
-				deleteStats.incDeleted()
-			case event.DeleteSkipped:
-				deleteStats.incSkipped()
-			}
-			if e.DeleteEvent.Error != nil {
-				deleteStats.incFailed()
-			}
 			if err := formatter.FormatDeleteEvent(e.DeleteEvent); err != nil {
 				return err
 			}
 		case event.WaitType:
-			switch e.WaitEvent.Operation {
-			case event.Reconciled:
-				waitStats.incReconciled()
-			case event.ReconcileSkipped:
-				waitStats.incSkipped()
-			case event.ReconcileTimeout:
-				waitStats.incTimeout()
-			case event.ReconcileFailed:
-				waitStats.incFailed()
-			}
 			if err := formatter.FormatWaitEvent(e.WaitEvent); err != nil {
 				return err
 			}
@@ -223,39 +95,14 @@ func (b *BaseListPrinter) Print(ch <-chan event.Event, previewStrategy common.Dr
 			if err := formatter.FormatActionGroupEvent(
 				e.ActionGroupEvent,
 				actionGroups,
-				applyStats,
-				pruneStats,
-				deleteStats,
-				waitStats,
+				statsCollector,
 				statusCollector,
 			); err != nil {
 				return err
 			}
 		}
 	}
-	failedActuateSum := applyStats.Failed + pruneStats.Failed + deleteStats.Failed
-	failedReconcileSum := waitStats.Timeout + waitStats.Failed
-	switch {
-	case failedActuateSum > 0 && failedReconcileSum > 0:
-		return fmt.Errorf("%d resources failed, %d resources failed to reconcile before timeout",
-			failedActuateSum, failedReconcileSum)
-	case failedActuateSum > 0:
-		return fmt.Errorf("%d resources failed", failedActuateSum)
-	case failedReconcileSum > 0:
-		return fmt.Errorf("%d resources failed to reconcile before timeout",
-			failedReconcileSum)
-	default:
-		return nil
-	}
-}
-
-func ActionGroupByName(name string, ags []event.ActionGroup) (event.ActionGroup, bool) {
-	for _, ag := range ags {
-		if ag.Name == name {
-			return ag, true
-		}
-	}
-	return event.ActionGroup{}, false
+	return printcommon.ResultErrorFromStats(statsCollector)
 }
 
 // IsLastActionGroup returns true if the passed ActionGroupEvent is the

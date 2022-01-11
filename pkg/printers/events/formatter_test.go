@@ -24,7 +24,6 @@ func TestFormatter_FormatApplyEvent(t *testing.T) {
 	testCases := map[string]struct {
 		previewStrategy common.DryRunStrategy
 		event           event.ApplyEvent
-		applyStats      *list.ApplyStats
 		statusCollector list.Collector
 		expected        string
 	}{
@@ -125,7 +124,6 @@ func TestFormatter_FormatPruneEvent(t *testing.T) {
 	testCases := map[string]struct {
 		previewStrategy common.DryRunStrategy
 		event           event.PruneEvent
-		pruneStats      *list.PruneStats
 		expected        string
 	}{
 		"resource pruned without no dryrun": {
@@ -170,7 +168,6 @@ func TestFormatter_FormatDeleteEvent(t *testing.T) {
 	testCases := map[string]struct {
 		previewStrategy common.DryRunStrategy
 		event           event.DeleteEvent
-		deleteStats     *list.DeleteStats
 		statusCollector list.Collector
 		expected        string
 	}{
@@ -219,7 +216,6 @@ func TestFormatter_FormatWaitEvent(t *testing.T) {
 	testCases := map[string]struct {
 		previewStrategy common.DryRunStrategy
 		event           event.WaitEvent
-		waitStats       *list.WaitStats
 		statusCollector list.Collector
 		expected        string
 	}{

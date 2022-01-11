@@ -7,8 +7,11 @@ import (
 	"bytes"
 	"testing"
 
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/print/table"
+	"sigs.k8s.io/cli-utils/pkg/printers/printer"
+	printertesting "sigs.k8s.io/cli-utils/pkg/printers/testutil"
 )
 
 var (
@@ -71,4 +74,13 @@ func TestActionColumnDef(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestPrint(t *testing.T) {
+	printertesting.PrintResultErrorTest(t, func() printer.Printer {
+		ioStreams, _, _, _ := genericclioptions.NewTestIOStreams()
+		return &Printer{
+			IOStreams: ioStreams,
+		}
+	})
 }

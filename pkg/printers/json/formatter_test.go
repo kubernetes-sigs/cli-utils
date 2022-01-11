@@ -18,6 +18,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/print/list"
+	"sigs.k8s.io/cli-utils/pkg/print/stats"
 )
 
 func TestFormatter_FormatApplyEvent(t *testing.T) {
@@ -183,7 +184,6 @@ func TestFormatter_FormatPruneEvent(t *testing.T) {
 	testCases := map[string]struct {
 		previewStrategy common.DryRunStrategy
 		event           event.PruneEvent
-		pruneStats      *list.PruneStats
 		expected        map[string]interface{}
 	}{
 		"resource pruned without dryrun": {
@@ -255,7 +255,6 @@ func TestFormatter_FormatDeleteEvent(t *testing.T) {
 	testCases := map[string]struct {
 		previewStrategy common.DryRunStrategy
 		event           event.DeleteEvent
-		deleteStats     *list.DeleteStats
 		statusCollector list.Collector
 		expected        map[string]interface{}
 	}{
@@ -476,10 +475,7 @@ func TestFormatter_FormatActionGroupEvent(t *testing.T) {
 		previewStrategy common.DryRunStrategy
 		event           event.ActionGroupEvent
 		actionGroups    []event.ActionGroup
-		applyStats      *list.ApplyStats
-		pruneStats      *list.PruneStats
-		deleteStats     *list.DeleteStats
-		waitStats       *list.WaitStats
+		statsCollector  stats.Stats
 		statusCollector list.Collector
 		expected        map[string]interface{}
 	}{
@@ -519,8 +515,10 @@ func TestFormatter_FormatActionGroupEvent(t *testing.T) {
 					Action: event.ApplyAction,
 				},
 			},
-			applyStats: &list.ApplyStats{
-				ServersideApplied: 42,
+			statsCollector: stats.Stats{
+				ApplyStats: stats.ApplyStats{
+					ServersideApplied: 42,
+				},
 			},
 			expected: map[string]interface{}{
 				"eventType":       "completed",
@@ -559,8 +557,7 @@ func TestFormatter_FormatActionGroupEvent(t *testing.T) {
 		t.Run(tn, func(t *testing.T) {
 			ioStreams, _, out, _ := genericclioptions.NewTestIOStreams() //nolint:dogsled
 			formatter := NewFormatter(ioStreams, tc.previewStrategy)
-			err := formatter.FormatActionGroupEvent(tc.event, tc.actionGroups, tc.applyStats, tc.pruneStats,
-				tc.deleteStats, tc.waitStats, tc.statusCollector)
+			err := formatter.FormatActionGroupEvent(tc.event, tc.actionGroups, tc.statsCollector, tc.statusCollector)
 			assert.NoError(t, err)
 
 			assertOutput(t, tc.expected, out.String())

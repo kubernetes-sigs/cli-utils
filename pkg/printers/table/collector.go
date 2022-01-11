@@ -12,6 +12,7 @@ import (
 	pe "sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
 	"sigs.k8s.io/cli-utils/pkg/object"
+	"sigs.k8s.io/cli-utils/pkg/print/stats"
 	"sigs.k8s.io/cli-utils/pkg/print/table"
 )
 
@@ -72,6 +73,10 @@ type ResourceInfo struct {
 	// on this particular resource. This can be either Apply
 	// or Prune.
 	ResourceAction event.ResourceAction
+
+	// Error is set if an error occurred trying to perform
+	// the desired action on the resource.
+	Error error
 
 	// ApplyOpResult contains the result after
 	// a resource has been applied to the cluster.
@@ -211,6 +216,9 @@ func (r *ResourceStateCollector) processApplyEvent(e event.ApplyEvent) {
 		klog.V(4).Infof("%s apply event not found in ResourceInfos; no processing", identifier)
 		return
 	}
+	if e.Error != nil {
+		previous.Error = e.Error
+	}
 	previous.ApplyOpResult = e.Operation
 }
 
@@ -222,6 +230,9 @@ func (r *ResourceStateCollector) processPruneEvent(e event.PruneEvent) {
 	if !found {
 		klog.V(4).Infof("%s prune event not found in ResourceInfos; no processing", identifier)
 		return
+	}
+	if e.Error != nil {
+		previous.Error = e.Error
 	}
 	previous.PruneOpResult = e.Operation
 }
@@ -283,6 +294,33 @@ func (r *ResourceStateCollector) LatestState() *ResourceState {
 		resourceInfos: resourceInfos,
 		err:           r.err,
 	}
+}
+
+// Stats returns a summary of the results from the actuation operation
+// as a stats.Stats object.
+func (r *ResourceStateCollector) Stats() stats.Stats {
+	var s stats.Stats
+	for _, res := range r.resourceInfos {
+		switch res.ResourceAction {
+		case event.ApplyAction:
+			if res.Error != nil {
+				s.ApplyStats.IncFailed()
+			}
+			s.ApplyStats.Inc(res.ApplyOpResult)
+		case event.PruneAction:
+			if res.Error != nil {
+				s.PruneStats.IncFailed()
+			}
+			s.PruneStats.Inc(res.PruneOpResult)
+		case event.DeleteAction:
+			if res.Error != nil {
+				s.DeleteStats.IncFailed()
+			}
+			s.DeleteStats.Inc(res.DeleteOpResult)
+		}
+		s.WaitStats.Inc(res.WaitOpResult)
+	}
+	return s
 }
 
 type ResourceInfos []*ResourceInfo

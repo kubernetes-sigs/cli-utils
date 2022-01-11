@@ -13,6 +13,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/print/list"
+	"sigs.k8s.io/cli-utils/pkg/print/stats"
 )
 
 func NewFormatter(ioStreams genericclioptions.IOStreams,
@@ -107,15 +108,13 @@ func (ef *formatter) FormatErrorEvent(_ event.ErrorEvent) error {
 func (ef *formatter) FormatActionGroupEvent(
 	age event.ActionGroupEvent,
 	ags []event.ActionGroup,
-	as *list.ApplyStats,
-	ps *list.PruneStats,
-	ds *list.DeleteStats,
-	ws *list.WaitStats,
+	s stats.Stats,
 	_ list.Collector,
 ) error {
 	if age.Action == event.ApplyAction &&
 		age.Type == event.Finished &&
 		list.IsLastActionGroup(age, ags) {
+		as := s.ApplyStats
 		output := fmt.Sprintf("%d resource(s) applied. %d created, %d unchanged, %d configured, %d failed",
 			as.Sum(), as.Created, as.Unchanged, as.Configured, as.Failed)
 		// Only print information about serverside apply if some of the
@@ -129,19 +128,23 @@ func (ef *formatter) FormatActionGroupEvent(
 	if age.Action == event.PruneAction &&
 		age.Type == event.Finished &&
 		list.IsLastActionGroup(age, ags) {
-		ef.print("%d resource(s) pruned, %d skipped, %d failed", ps.Pruned, ps.Skipped, ps.Failed)
+		ps := s.PruneStats
+		ef.print("%d resource(s) pruned, %d skipped, %d failed to prune", ps.Pruned, ps.Skipped, ps.Failed)
 	}
 
 	if age.Action == event.DeleteAction &&
 		age.Type == event.Finished &&
 		list.IsLastActionGroup(age, ags) {
-		ef.print("%d resource(s) deleted, %d skipped", ds.Deleted, ds.Skipped)
+		ds := s.DeleteStats
+		ef.print("%d resource(s) deleted, %d skipped, %d failed to delete", ds.Deleted, ds.Skipped, ds.Failed)
 	}
 
 	if age.Action == event.WaitAction &&
 		age.Type == event.Finished &&
 		list.IsLastActionGroup(age, ags) {
-		ef.print("%d resource(s) reconciled, %d skipped", ws.Reconciled, ds.Skipped)
+		ws := s.WaitStats
+		ef.print("%d resource(s) reconciled, %d skipped, %d failed to reconcile, %d timed out", ws.Reconciled,
+			ws.Skipped, ws.Failed, ws.Timeout)
 	}
 	return nil
 }
