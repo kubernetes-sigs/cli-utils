@@ -17,9 +17,10 @@ import (
 	"github.com/spyzhov/ajson"
 )
 
-// Get evaluates the yq expression to extract values from the input map.
+// Get evaluates the JSONPath expression to extract values from the input map.
 // Returns the node values that were found (zero or more), or an error.
-// For details about the yq expression language, see: https://mikefarah.gitbook.io/yq/
+// For details about the JSONPath expression language, see:
+// https://goessner.net/articles/JsonPath/
 func Get(obj map[string]interface{}, expression string) ([]interface{}, error) {
 	// format input object as json for input into jsonpath library
 	jsonBytes, err := json.Marshal(obj)
@@ -65,9 +66,10 @@ func Get(obj map[string]interface{}, expression string) ([]interface{}, error) {
 	return result, nil
 }
 
-// Set evaluates the yq expression to set a value in the input map.
+// Set evaluates the JSONPath expression to set a value in the input map.
 // Returns the number of matching nodes that were updated, or an error.
-// For details about the yq expression language, see: https://mikefarah.gitbook.io/yq/
+// For details about the JSONPath expression language, see:
+// https://goessner.net/articles/JsonPath/
 func Set(obj map[string]interface{}, expression string, value interface{}) (int, error) {
 	// format input object as json for input into jsonpath library
 	jsonBytes, err := json.Marshal(obj)

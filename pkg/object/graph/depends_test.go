@@ -4,13 +4,18 @@
 package graph
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"sigs.k8s.io/cli-utils/pkg/multierror"
 	"sigs.k8s.io/cli-utils/pkg/object"
+	"sigs.k8s.io/cli-utils/pkg/object/dependson"
 	"sigs.k8s.io/cli-utils/pkg/object/mutation"
 	mutationutil "sigs.k8s.io/cli-utils/pkg/object/mutation/testutil"
+	"sigs.k8s.io/cli-utils/pkg/object/validation"
 	"sigs.k8s.io/cli-utils/pkg/testutil"
 )
 
@@ -371,8 +376,9 @@ func TestReverseSortObjs(t *testing.T) {
 
 func TestApplyTimeMutationEdges(t *testing.T) {
 	testCases := map[string]struct {
-		objs     []*unstructured.Unstructured
-		expected []Edge
+		objs          []*unstructured.Unstructured
+		expected      []Edge
+		expectedError error
 	}{
 		"no objects adds no graph edges": {
 			objs:     []*unstructured.Unstructured{},
@@ -398,7 +404,9 @@ func TestApplyTimeMutationEdges(t *testing.T) {
 					resources["deployment"],
 					mutationutil.AddApplyTimeMutation(t, &mutation.ApplyTimeMutation{
 						{
-							SourceRef:  mutation.NewResourceReference(testutil.Unstructured(t, resources["secret"])),
+							SourceRef: mutation.ResourceReferenceFromObjMetadata(
+								testutil.ToIdentifier(t, resources["secret"]),
+							),
 							SourcePath: "unused",
 							TargetPath: "unused",
 							Token:      "unused",
@@ -421,7 +429,9 @@ func TestApplyTimeMutationEdges(t *testing.T) {
 					resources["deployment"],
 					mutationutil.AddApplyTimeMutation(t, &mutation.ApplyTimeMutation{
 						{
-							SourceRef:  mutation.NewResourceReference(testutil.Unstructured(t, resources["secret"])),
+							SourceRef: mutation.ResourceReferenceFromObjMetadata(
+								testutil.ToIdentifier(t, resources["secret"]),
+							),
 							SourcePath: "unused",
 							TargetPath: "unused",
 							Token:      "unused",
@@ -433,7 +443,9 @@ func TestApplyTimeMutationEdges(t *testing.T) {
 					resources["pod"],
 					mutationutil.AddApplyTimeMutation(t, &mutation.ApplyTimeMutation{
 						{
-							SourceRef:  mutation.NewResourceReference(testutil.Unstructured(t, resources["secret"])),
+							SourceRef: mutation.ResourceReferenceFromObjMetadata(
+								testutil.ToIdentifier(t, resources["secret"]),
+							),
 							SourcePath: "unused",
 							TargetPath: "unused",
 							Token:      "unused",
@@ -460,13 +472,17 @@ func TestApplyTimeMutationEdges(t *testing.T) {
 					resources["pod"],
 					mutationutil.AddApplyTimeMutation(t, &mutation.ApplyTimeMutation{
 						{
-							SourceRef:  mutation.NewResourceReference(testutil.Unstructured(t, resources["secret"])),
+							SourceRef: mutation.ResourceReferenceFromObjMetadata(
+								testutil.ToIdentifier(t, resources["secret"]),
+							),
 							SourcePath: "unused",
 							TargetPath: "unused",
 							Token:      "unused",
 						},
 						{
-							SourceRef:  mutation.NewResourceReference(testutil.Unstructured(t, resources["deployment"])),
+							SourceRef: mutation.ResourceReferenceFromObjMetadata(
+								testutil.ToIdentifier(t, resources["deployment"]),
+							),
 							SourcePath: "unused",
 							TargetPath: "unused",
 							Token:      "unused",
@@ -487,12 +503,133 @@ func TestApplyTimeMutationEdges(t *testing.T) {
 				},
 			},
 		},
+		"error: invalid annotation": {
+			objs: []*unstructured.Unstructured{
+				{
+					Object: map[string]interface{}{
+						"apiVersion": "apps/v1",
+						"kind":       "Deployment",
+						"metadata": map[string]interface{}{
+							"name":      "foo",
+							"namespace": "default",
+							"annotations": map[string]interface{}{
+								mutation.Annotation: "invalid-mutation",
+							},
+						},
+					},
+				},
+			},
+			expected: []Edge{},
+			expectedError: validation.NewError(
+				errors.New("failed to parse apply-time-mutation annotation: "+
+					"error unmarshaling JSON: "+
+					"while decoding JSON: json: "+
+					"cannot unmarshal string into Go value of type mutation.ApplyTimeMutation"),
+				object.ObjMetadata{
+					GroupKind: schema.GroupKind{
+						Group: "apps",
+						Kind:  "Deployment",
+					},
+					Name:      "foo",
+					Namespace: "default",
+				},
+			),
+		},
+		"error: dependency not in object set": {
+			objs: []*unstructured.Unstructured{
+				testutil.Unstructured(t, resources["pod"],
+					mutationutil.AddApplyTimeMutation(t, &mutation.ApplyTimeMutation{
+						{
+							SourceRef: mutation.ResourceReferenceFromObjMetadata(
+								testutil.ToIdentifier(t, resources["deployment"]),
+							),
+						},
+					}),
+				),
+			},
+			expected: []Edge{},
+			expectedError: validation.NewError(
+				errors.New(`invalid "config.kubernetes.io/apply-time-mutation" annotation: `+
+					"dependency not in object set: "+
+					"apps/namespaces/test-namespace/Deployment/foo"),
+				object.ObjMetadata{
+					GroupKind: schema.GroupKind{
+						Group: "",
+						Kind:  "Pod",
+					},
+					Name:      "test-pod",
+					Namespace: "test-namespace",
+				},
+			),
+		},
+		"error: two invalid objects": {
+			objs: []*unstructured.Unstructured{
+				{
+					Object: map[string]interface{}{
+						"apiVersion": "apps/v1",
+						"kind":       "Deployment",
+						"metadata": map[string]interface{}{
+							"name":      "foo",
+							"namespace": "default",
+							"annotations": map[string]interface{}{
+								mutation.Annotation: "invalid-mutation",
+							},
+						},
+					},
+				},
+				testutil.Unstructured(t, resources["pod"],
+					mutationutil.AddApplyTimeMutation(t, &mutation.ApplyTimeMutation{
+						{
+							SourceRef: mutation.ResourceReferenceFromObjMetadata(
+								testutil.ToIdentifier(t, resources["secret"]),
+							),
+						},
+					}),
+				),
+			},
+			expected: []Edge{},
+			expectedError: multierror.New(
+				validation.NewError(
+					errors.New("failed to parse apply-time-mutation annotation: "+
+						"error unmarshaling JSON: "+
+						"while decoding JSON: json: "+
+						"cannot unmarshal string into Go value of type mutation.ApplyTimeMutation"),
+					object.ObjMetadata{
+						GroupKind: schema.GroupKind{
+							Group: "apps",
+							Kind:  "Deployment",
+						},
+						Name:      "foo",
+						Namespace: "default",
+					},
+				),
+				validation.NewError(
+					errors.New(`invalid "config.kubernetes.io/apply-time-mutation" annotation: `+
+						"dependency not in object set: "+
+						"/namespaces/test-namespace/Secret/secret"),
+					object.ObjMetadata{
+						GroupKind: schema.GroupKind{
+							Group: "",
+							Kind:  "Pod",
+						},
+						Name:      "test-pod",
+						Namespace: "test-namespace",
+					},
+				),
+			),
+		},
 	}
 
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
 			g := New()
-			addApplyTimeMutationEdges(g, tc.objs)
+			ids := object.UnstructuredSetToObjMetadataSet(tc.objs)
+			err := addApplyTimeMutationEdges(g, tc.objs, ids)
+			if tc.expectedError != nil {
+				assert.EqualError(t, err, tc.expectedError.Error())
+			} else {
+				assert.NoError(t, err)
+			}
 			actual := g.GetEdges()
 			verifyEdges(t, tc.expected, actual)
 		})
@@ -501,8 +638,9 @@ func TestApplyTimeMutationEdges(t *testing.T) {
 
 func TestAddDependsOnEdges(t *testing.T) {
 	testCases := map[string]struct {
-		objs     []*unstructured.Unstructured
-		expected []Edge
+		objs          []*unstructured.Unstructured
+		expected      []Edge
+		expectedError error
 	}{
 		"no objects adds no graph edges": {
 			objs:     []*unstructured.Unstructured{},
@@ -575,12 +713,184 @@ func TestAddDependsOnEdges(t *testing.T) {
 				},
 			},
 		},
+		"error: invalid annotation": {
+			objs: []*unstructured.Unstructured{
+				{
+					Object: map[string]interface{}{
+						"apiVersion": "apps/v1",
+						"kind":       "Deployment",
+						"metadata": map[string]interface{}{
+							"name":      "foo",
+							"namespace": "default",
+							"annotations": map[string]interface{}{
+								dependson.Annotation: "invalid-obj-ref",
+							},
+						},
+					},
+				},
+			},
+			expected: []Edge{},
+			expectedError: validation.NewError(
+				errors.New("failed to parse depends-on annotation: "+
+					"failed to parse object metadata: "+
+					"expected 3 or 5 fields, found 1: "+
+					`"invalid-obj-ref"`),
+				object.ObjMetadata{
+					GroupKind: schema.GroupKind{
+						Group: "apps",
+						Kind:  "Deployment",
+					},
+					Name:      "foo",
+					Namespace: "default",
+				},
+			),
+		},
+		"error: duplicate reference": {
+			objs: []*unstructured.Unstructured{
+				testutil.Unstructured(t, resources["pod"],
+					testutil.AddDependsOn(t,
+						testutil.ToIdentifier(t, resources["deployment"]),
+						testutil.ToIdentifier(t, resources["deployment"]),
+					),
+				),
+				testutil.Unstructured(t, resources["deployment"]),
+			},
+			expected: []Edge{
+				{
+					From: testutil.ToIdentifier(t, resources["pod"]),
+					To:   testutil.ToIdentifier(t, resources["deployment"]),
+				},
+			},
+			expectedError: validation.NewError(
+				errors.New(`invalid "config.kubernetes.io/depends-on" annotation: `+
+					"duplicate reference: "+
+					"apps/namespaces/test-namespace/Deployment/foo"),
+				object.ObjMetadata{
+					GroupKind: schema.GroupKind{
+						Group: "",
+						Kind:  "Pod",
+					},
+					Name:      "test-pod",
+					Namespace: "test-namespace",
+				},
+			),
+		},
+		"error: dependency not in object set": {
+			objs: []*unstructured.Unstructured{
+				testutil.Unstructured(t, resources["pod"],
+					testutil.AddDependsOn(t,
+						testutil.ToIdentifier(t, resources["deployment"]),
+					),
+				),
+			},
+			expected: []Edge{},
+			expectedError: validation.NewError(
+				errors.New(`invalid "config.kubernetes.io/depends-on" annotation: `+
+					"dependency not in object set: "+
+					"apps/namespaces/test-namespace/Deployment/foo"),
+				object.ObjMetadata{
+					GroupKind: schema.GroupKind{
+						Group: "",
+						Kind:  "Pod",
+					},
+					Name:      "test-pod",
+					Namespace: "test-namespace",
+				},
+			),
+		},
+		"error: two invalid objects": {
+			objs: []*unstructured.Unstructured{
+				{
+					Object: map[string]interface{}{
+						"apiVersion": "apps/v1",
+						"kind":       "Deployment",
+						"metadata": map[string]interface{}{
+							"name":      "foo",
+							"namespace": "default",
+							"annotations": map[string]interface{}{
+								dependson.Annotation: "invalid-obj-ref",
+							},
+						},
+					},
+				},
+				testutil.Unstructured(t, resources["pod"],
+					testutil.AddDependsOn(t,
+						testutil.ToIdentifier(t, resources["secret"]),
+					),
+				),
+			},
+			expected: []Edge{},
+			expectedError: multierror.New(
+				validation.NewError(
+					errors.New("failed to parse depends-on annotation: "+
+						"failed to parse object metadata: "+
+						"expected 3 or 5 fields, found 1: "+
+						`"invalid-obj-ref"`),
+					object.ObjMetadata{
+						GroupKind: schema.GroupKind{
+							Group: "apps",
+							Kind:  "Deployment",
+						},
+						Name:      "foo",
+						Namespace: "default",
+					},
+				),
+				validation.NewError(
+					errors.New(`invalid "config.kubernetes.io/depends-on" annotation: `+
+						"dependency not in object set: "+
+						"/namespaces/test-namespace/Secret/secret"),
+					object.ObjMetadata{
+						GroupKind: schema.GroupKind{
+							Group: "",
+							Kind:  "Pod",
+						},
+						Name:      "test-pod",
+						Namespace: "test-namespace",
+					},
+				),
+			),
+		},
+		"error: one object with two errors": {
+			objs: []*unstructured.Unstructured{
+				testutil.Unstructured(t, resources["pod"],
+					testutil.AddDependsOn(t,
+						testutil.ToIdentifier(t, resources["deployment"]),
+						testutil.ToIdentifier(t, resources["deployment"]),
+					),
+				),
+			},
+			expected: []Edge{},
+			expectedError: validation.NewError(
+				multierror.New(
+					errors.New(`invalid "config.kubernetes.io/depends-on" annotation: `+
+						"dependency not in object set: "+
+						"apps/namespaces/test-namespace/Deployment/foo"),
+					errors.New(`invalid "config.kubernetes.io/depends-on" annotation: `+
+						"duplicate reference: "+
+						"apps/namespaces/test-namespace/Deployment/foo"),
+				),
+				object.ObjMetadata{
+					GroupKind: schema.GroupKind{
+						Group: "",
+						Kind:  "Pod",
+					},
+					Name:      "test-pod",
+					Namespace: "test-namespace",
+				},
+			),
+		},
 	}
 
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
 			g := New()
-			addDependsOnEdges(g, tc.objs)
+			ids := object.UnstructuredSetToObjMetadataSet(tc.objs)
+			err := addDependsOnEdges(g, tc.objs, ids)
+			if tc.expectedError != nil {
+				assert.EqualError(t, err, tc.expectedError.Error())
+			} else {
+				assert.NoError(t, err)
+			}
 			actual := g.GetEdges()
 			verifyEdges(t, tc.expected, actual)
 		})
@@ -656,7 +966,8 @@ func TestAddNamespaceEdges(t *testing.T) {
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
 			g := New()
-			addNamespaceEdges(g, tc.objs)
+			ids := object.UnstructuredSetToObjMetadataSet(tc.objs)
+			addNamespaceEdges(g, tc.objs, ids)
 			actual := g.GetEdges()
 			verifyEdges(t, tc.expected, actual)
 		})
@@ -707,7 +1018,8 @@ func TestAddCRDEdges(t *testing.T) {
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
 			g := New()
-			addCRDEdges(g, tc.objs)
+			ids := object.UnstructuredSetToObjMetadataSet(tc.objs)
+			addCRDEdges(g, tc.objs, ids)
 			actual := g.GetEdges()
 			verifyEdges(t, tc.expected, actual)
 		})

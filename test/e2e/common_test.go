@@ -4,8 +4,10 @@
 package e2e
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"html/template"
 	"strings"
 	"time"
 
@@ -91,7 +93,7 @@ func withDependsOn(obj *unstructured.Unstructured, dep string) *unstructured.Uns
 }
 
 func deleteUnstructuredAndWait(ctx context.Context, c client.Client, obj *unstructured.Unstructured) {
-	ref := mutation.NewResourceReference(obj)
+	ref := mutation.ResourceReferenceFromUnstructured(obj)
 
 	err := c.Delete(ctx, obj,
 		client.PropagationPolicy(metav1.DeletePropagationForeground))
@@ -102,7 +104,7 @@ func deleteUnstructuredAndWait(ctx context.Context, c client.Client, obj *unstru
 }
 
 func waitForDeletion(ctx context.Context, c client.Client, obj *unstructured.Unstructured) {
-	ref := mutation.NewResourceReference(obj)
+	ref := mutation.ResourceReferenceFromUnstructured(obj)
 	resultObj := ref.ToUnstructured()
 
 	timeout := 30 * time.Second
@@ -133,7 +135,7 @@ func waitForDeletion(ctx context.Context, c client.Client, obj *unstructured.Uns
 }
 
 func createUnstructuredAndWait(ctx context.Context, c client.Client, obj *unstructured.Unstructured) {
-	ref := mutation.NewResourceReference(obj)
+	ref := mutation.ResourceReferenceFromUnstructured(obj)
 
 	err := c.Create(ctx, obj)
 	Expect(err).NotTo(HaveOccurred(),
@@ -143,7 +145,7 @@ func createUnstructuredAndWait(ctx context.Context, c client.Client, obj *unstru
 }
 
 func waitForCreation(ctx context.Context, c client.Client, obj *unstructured.Unstructured) {
-	ref := mutation.NewResourceReference(obj)
+	ref := mutation.ResourceReferenceFromUnstructured(obj)
 	resultObj := ref.ToUnstructured()
 
 	timeout := 30 * time.Second
@@ -175,7 +177,7 @@ func waitForCreation(ctx context.Context, c client.Client, obj *unstructured.Uns
 }
 
 func assertUnstructuredExists(ctx context.Context, c client.Client, obj *unstructured.Unstructured) *unstructured.Unstructured {
-	ref := mutation.NewResourceReference(obj)
+	ref := mutation.ResourceReferenceFromUnstructured(obj)
 	resultObj := ref.ToUnstructured()
 
 	err := c.Get(ctx, types.NamespacedName{
@@ -188,7 +190,7 @@ func assertUnstructuredExists(ctx context.Context, c client.Client, obj *unstruc
 }
 
 func assertUnstructuredDoesNotExist(ctx context.Context, c client.Client, obj *unstructured.Unstructured) {
-	ref := mutation.NewResourceReference(obj)
+	ref := mutation.ResourceReferenceFromUnstructured(obj)
 	resultObj := ref.ToUnstructured()
 
 	err := c.Get(ctx, types.NamespacedName{
@@ -283,4 +285,17 @@ func manifestToUnstructured(manifest []byte) *unstructured.Unstructured {
 	return &unstructured.Unstructured{
 		Object: u,
 	}
+}
+
+func templateToUnstructured(tmpl string, data interface{}) *unstructured.Unstructured {
+	t, err := template.New("manifest").Parse(tmpl)
+	if err != nil {
+		panic(fmt.Errorf("failed to parse manifest go-template: %w", err))
+	}
+	var buffer bytes.Buffer
+	err = t.Execute(&buffer, data)
+	if err != nil {
+		panic(fmt.Errorf("failed to execute manifest go-template: %w", err))
+	}
+	return manifestToUnstructured(buffer.Bytes())
 }

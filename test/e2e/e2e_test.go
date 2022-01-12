@@ -142,14 +142,15 @@ var _ = Describe("Applier", func() {
 					ctx, cancel = context.WithTimeout(context.Background(), defaultAfterTestTimeout)
 					defer cancel()
 					// clean up resources created by the tests
+					fields := struct{ Namespace string }{Namespace: namespace.GetName()}
 					objs := []*unstructured.Unstructured{
 						manifestToUnstructured(cr),
 						manifestToUnstructured(crd),
 						withNamespace(manifestToUnstructured(pod1), namespace.GetName()),
 						withNamespace(manifestToUnstructured(pod2), namespace.GetName()),
 						withNamespace(manifestToUnstructured(pod3), namespace.GetName()),
-						withNamespace(manifestToUnstructured(podA), namespace.GetName()),
-						withNamespace(manifestToUnstructured(podB), namespace.GetName()),
+						templateToUnstructured(podATemplate, fields),
+						templateToUnstructured(podBTemplate, fields),
 						withNamespace(manifestToUnstructured(deployment1), namespace.GetName()),
 						manifestToUnstructured(apiservice1),
 					}
