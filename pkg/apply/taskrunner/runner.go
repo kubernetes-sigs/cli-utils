@@ -17,11 +17,10 @@ import (
 )
 
 // NewTaskStatusRunner returns a new TaskStatusRunner.
-func NewTaskStatusRunner(identifiers object.ObjMetadataSet, statusPoller poller.Poller, cache cache.ResourceCache) *taskStatusRunner {
+func NewTaskStatusRunner(identifiers object.ObjMetadataSet, statusPoller poller.Poller) *taskStatusRunner {
 	return &taskStatusRunner{
 		identifiers:  identifiers,
 		statusPoller: statusPoller,
-		baseRunner:   newBaseRunner(cache),
 	}
 }
 
@@ -31,8 +30,6 @@ func NewTaskStatusRunner(identifiers object.ObjMetadataSet, statusPoller poller.
 type taskStatusRunner struct {
 	identifiers  object.ObjMetadataSet
 	statusPoller poller.Poller
-
-	baseRunner *baseRunner
 }
 
 // Options defines properties that is passed along to
@@ -43,86 +40,8 @@ type Options struct {
 	EmitStatusEvents bool
 }
 
-// Run starts the execution of the taskqueue. It will start the
-// statusPoller and then pass the statusChannel to the baseRunner
-// that does most of the work.
-func (tsr *taskStatusRunner) Run(ctx context.Context, taskQueue chan Task,
-	eventChannel chan event.Event, options Options) error {
-	// Give the poller its own context and run it in the background.
-	// If taskStatusRunner.Run is cancelled, baseRunner.run will exit early,
-	// causing the poller to be cancelled.
-	statusCtx, cancelFunc := context.WithCancel(context.Background())
-	statusChannel := tsr.statusPoller.Poll(statusCtx, tsr.identifiers, polling.Options{
-		PollInterval: options.PollInterval,
-		UseCache:     options.UseCache,
-	})
-
-	o := baseOptions{
-		emitStatusEvents: options.EmitStatusEvents,
-	}
-	err := tsr.baseRunner.run(ctx, taskQueue, statusChannel, eventChannel, o)
-	// cancel the statusPoller by cancelling the context.
-	cancelFunc()
-	// drain the statusChannel to make sure the lack of a consumer
-	// doesn't block the shutdown of the statusPoller.
-	for range statusChannel {
-	}
-	return err
-}
-
-// NewTaskRunner returns a new taskRunner. It can process taskqueues
-// that does not contain any wait tasks.
-// TODO: Do we need this abstraction layer now that baseRunner doesn't need a collector?
-func NewTaskRunner() *taskRunner {
-	return &taskRunner{
-		baseRunner: newBaseRunner(cache.NewResourceCacheMap()),
-	}
-}
-
-// taskRunner is a simplified taskRunner that does not support
-// wait tasks and does not provide any status updates for the
-// resources. This is useful in situations where we are not interested
-// in status, for example during dry-run.
-type taskRunner struct {
-	baseRunner *baseRunner
-}
-
-// Run starts the execution of the task queue. It delegates the
-// work to the baseRunner, but gives it as nil channel as the statusChannel.
-func (tr *taskRunner) Run(ctx context.Context, taskQueue chan Task,
-	eventChannel chan event.Event) error {
-	var nilStatusChannel chan pollevent.Event
-	o := baseOptions{
-		// The taskRunner doesn't poll for status, so there are not
-		// statusEvents to emit.
-		emitStatusEvents: false,
-	}
-	return tr.baseRunner.run(ctx, taskQueue, nilStatusChannel, eventChannel, o)
-}
-
-// newBaseRunner returns a new baseRunner using the provided cache.
-func newBaseRunner(cache cache.ResourceCache) *baseRunner {
-	return &baseRunner{
-		cache: cache,
-	}
-}
-
-// baseRunner provides the basic task runner functionality.
-//
-// The cache can be used by tasks to retrieve the last known resource state.
-//
-// This is not meant to be used directly. It is used by the taskRunner and
-// taskStatusRunner.
-type baseRunner struct {
-	cache cache.ResourceCache
-}
-
-type baseOptions struct {
-	// emitStatusEvents enables emitting events on the eventChannel
-	emitStatusEvents bool
-}
-
-// run executes the tasks in the taskqueue.
+// Run executes the tasks in the taskqueue, with the statusPoller running in the
+// background.
 //
 // The tasks run in a loop where a single goroutine will process events from
 // three different channels.
@@ -131,18 +50,37 @@ type baseOptions struct {
 //   validation of wait conditions.
 // - eventChannel is written to with events based on status updates, if
 //   emitStatusEvents is true.
-func (b *baseRunner) run(ctx context.Context, taskQueue chan Task,
-	statusChannel <-chan pollevent.Event, eventChannel chan event.Event,
-	o baseOptions) error {
-	// taskContext is passed into all tasks when they are started. It
-	// provides access to the eventChannel and the taskChannel, and
-	// also provides a way to pass data between tasks.
-	taskContext := NewTaskContext(eventChannel, b.cache)
+func (tsr *taskStatusRunner) Run(
+	ctx context.Context,
+	taskContext *TaskContext,
+	taskQueue chan Task,
+	opts Options,
+) error {
+	// Give the poller its own context and run it in the background.
+	// If taskStatusRunner.Run is cancelled, baseRunner.run will exit early,
+	// causing the poller to be cancelled.
+	statusCtx, cancelFunc := context.WithCancel(context.Background())
+	statusChannel := tsr.statusPoller.Poll(statusCtx, tsr.identifiers, polling.Options{
+		PollInterval: opts.PollInterval,
+		UseCache:     opts.UseCache,
+	})
+
+	// complete stops the statusPoller, drains the statusChannel, and returns
+	// the provided error.
+	// Run this before returning!
+	// Avoid using defer, otherwise the statusPoller will hang. It needs to be
+	// drained synchronously before return, instead of asynchronously after.
+	complete := func(err error) error {
+		cancelFunc()
+		for range statusChannel {
+		}
+		return err
+	}
 
 	// Find and start the first task in the queue.
-	currentTask, done := b.nextTask(taskQueue, taskContext)
+	currentTask, done := nextTask(taskQueue, taskContext)
 	if done {
-		return nil
+		return complete(nil)
 	}
 
 	// abort is used to signal that something has failed, and
@@ -185,7 +123,7 @@ func (b *baseRunner) run(ctx context.Context, taskQueue chan Task,
 				continue
 			}
 
-			if o.emitStatusEvents {
+			if opts.EmitStatusEvents {
 				// Forward all normal events to the eventChannel
 				taskContext.SendEvent(event.Event{
 					Type: event.StatusType,
@@ -231,16 +169,18 @@ func (b *baseRunner) run(ctx context.Context, taskQueue chan Task,
 				},
 			})
 			if msg.Err != nil {
-				return msg.Err
+				return complete(
+					fmt.Errorf("task failed (action: %q, name: %q): %w",
+						currentTask.Action(), currentTask.Name(), msg.Err))
 			}
 			if abort {
-				return abortReason
+				return complete(abortReason)
 			}
-			currentTask, done = b.nextTask(taskQueue, taskContext)
+			currentTask, done = nextTask(taskQueue, taskContext)
 			// If there are no more tasks, we are done. So just
 			// return.
 			if done {
-				return nil
+				return complete(nil)
 			}
 		// The doneCh will be closed if the passed in context is cancelled.
 		// If so, we just set the abort flag and wait for the currently running
@@ -257,8 +197,7 @@ func (b *baseRunner) run(ctx context.Context, taskQueue chan Task,
 // nextTask fetches the latest task from the taskQueue and
 // starts it. If the taskQueue is empty, it the second
 // return value will be true.
-func (b *baseRunner) nextTask(taskQueue chan Task,
-	taskContext *TaskContext) (Task, bool) {
+func nextTask(taskQueue chan Task, taskContext *TaskContext) (Task, bool) {
 	var tsk Task
 	select {
 	// If there is any tasks left in the queue, this

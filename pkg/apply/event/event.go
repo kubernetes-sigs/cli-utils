@@ -102,15 +102,15 @@ func (ie InitEvent) String() string {
 	return fmt.Sprintf("InitEvent{ ActionGroups: %s }", ie.ActionGroups)
 }
 
-//go:generate stringer -type=ResourceAction
+//go:generate stringer -type=ResourceAction -linecomment
 type ResourceAction int
 
 const (
-	ApplyAction ResourceAction = iota
-	PruneAction
-	DeleteAction
-	WaitAction
-	InventoryAction
+	ApplyAction     ResourceAction = iota // Apply
+	PruneAction                           // Prune
+	DeleteAction                          // Delete
+	WaitAction                            // Wait
+	InventoryAction                       // Inventory
 )
 
 type ActionGroupList []ActionGroup

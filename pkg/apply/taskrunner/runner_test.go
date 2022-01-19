@@ -14,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/cli-utils/pkg/apply/cache"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
+	"sigs.k8s.io/cli-utils/pkg/kstatus/polling"
 	pollevent "sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
 	"sigs.k8s.io/cli-utils/pkg/object"
@@ -270,12 +271,17 @@ func TestBaseRunner(t *testing.T) {
 
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
-			runner := newBaseRunner(cache.NewResourceCacheMap())
-			eventChannel := make(chan event.Event)
 			taskQueue := make(chan Task, len(tc.tasks))
 			for _, tsk := range tc.tasks {
 				taskQueue <- tsk
 			}
+
+			ids := object.ObjMetadataSet{} // unused by fake poller
+			poller := newFakePoller(tc.statusEvents)
+			eventChannel := make(chan event.Event)
+			resourceCache := cache.NewResourceCacheMap()
+			taskContext := NewTaskContext(eventChannel, resourceCache)
+			runner := NewTaskStatusRunner(ids, poller)
 
 			// Use a WaitGroup to make sure changes in the goroutines
 			// are visible to the main goroutine.
@@ -286,10 +292,8 @@ func TestBaseRunner(t *testing.T) {
 			go func() {
 				defer wg.Done()
 
-				<-time.NewTimer(tc.statusEventsDelay).C
-				for _, se := range tc.statusEvents {
-					statusChannel <- se
-				}
+				time.Sleep(tc.statusEventsDelay)
+				poller.Start()
 			}()
 
 			var events []event.Event
@@ -302,15 +306,14 @@ func TestBaseRunner(t *testing.T) {
 				}
 			}()
 
-			err := runner.run(context.Background(), taskQueue, statusChannel,
-				eventChannel, baseOptions{emitStatusEvents: true})
+			opts := Options{EmitStatusEvents: true}
+			ctx := context.Background()
+			err := runner.Run(ctx, taskContext, taskQueue, opts)
 			close(statusChannel)
 			close(eventChannel)
 			wg.Wait()
 
-			if err != nil {
-				t.Errorf("expected no error, but got %v", err)
-			}
+			assert.NoError(t, err)
 
 			if want, got := len(tc.expectedEventTypes), len(events); want != got {
 				t.Errorf("expected %d events, but got %d", want, got)
@@ -358,7 +361,7 @@ func TestBaseRunnerCancellation(t *testing.T) {
 				},
 			},
 			contextTimeout: 2 * time.Second,
-			expectedError:  context.Canceled,
+			expectedError:  context.DeadlineExceeded,
 			expectedEventTypes: []event.Type{
 				event.ActionGroupType,
 				event.ApplyType,
@@ -377,7 +380,7 @@ func TestBaseRunnerCancellation(t *testing.T) {
 				},
 			},
 			contextTimeout: 2 * time.Second,
-			expectedError:  context.Canceled,
+			expectedError:  context.DeadlineExceeded,
 			expectedEventTypes: []event.Type{
 				event.ActionGroupType,
 				event.WaitType, // pending
@@ -387,6 +390,7 @@ func TestBaseRunnerCancellation(t *testing.T) {
 		"error while custom task is running": {
 			tasks: []Task{
 				&fakeApplyTask{
+					name: "apply-0",
 					resultEvent: event.Event{
 						Type: event.ApplyType,
 					},
@@ -394,6 +398,7 @@ func TestBaseRunnerCancellation(t *testing.T) {
 					err:      testError,
 				},
 				&fakeApplyTask{
+					name: "prune-0",
 					resultEvent: event.Event{
 						Type: event.PruneType,
 					},
@@ -401,7 +406,7 @@ func TestBaseRunnerCancellation(t *testing.T) {
 				},
 			},
 			contextTimeout: 30 * time.Second,
-			expectedError:  testError,
+			expectedError:  fmt.Errorf(`task failed (action: "Apply", name: "apply-0"): %w`, testError),
 			expectedEventTypes: []event.Type{
 				event.ActionGroupType,
 				event.ApplyType,
@@ -427,7 +432,7 @@ func TestBaseRunnerCancellation(t *testing.T) {
 				},
 			},
 			contextTimeout: 30 * time.Second,
-			expectedError:  testError,
+			expectedError:  fmt.Errorf("polling for status failed: %w", testError),
 			expectedEventTypes: []event.Type{
 				event.ActionGroupType,
 				event.WaitType, // pending
@@ -438,13 +443,17 @@ func TestBaseRunnerCancellation(t *testing.T) {
 
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
-			runner := newBaseRunner(cache.NewResourceCacheMap())
-			eventChannel := make(chan event.Event)
-
 			taskQueue := make(chan Task, len(tc.tasks))
 			for _, tsk := range tc.tasks {
 				taskQueue <- tsk
 			}
+
+			ids := object.ObjMetadataSet{} // unused by fake poller
+			poller := newFakePoller(tc.statusEvents)
+			eventChannel := make(chan event.Event)
+			resourceCache := cache.NewResourceCacheMap()
+			taskContext := NewTaskContext(eventChannel, resourceCache)
+			runner := NewTaskStatusRunner(ids, poller)
 
 			// Use a WaitGroup to make sure changes in the goroutines
 			// are visible to the main goroutine.
@@ -455,10 +464,8 @@ func TestBaseRunnerCancellation(t *testing.T) {
 			go func() {
 				defer wg.Done()
 
-				<-time.NewTimer(tc.statusEventsDelay).C
-				for _, se := range tc.statusEvents {
-					statusChannel <- se
-				}
+				time.Sleep(tc.statusEventsDelay)
+				poller.Start()
 			}()
 
 			var events []event.Event
@@ -473,18 +480,17 @@ func TestBaseRunnerCancellation(t *testing.T) {
 
 			ctx, cancel := context.WithTimeout(context.Background(), tc.contextTimeout)
 			defer cancel()
-			err := runner.run(ctx, taskQueue, statusChannel, eventChannel,
-				baseOptions{emitStatusEvents: false})
+
+			opts := Options{EmitStatusEvents: true}
+			err := runner.Run(ctx, taskContext, taskQueue, opts)
 			close(statusChannel)
 			close(eventChannel)
 			wg.Wait()
 
-			if tc.expectedError == nil && err != nil {
-				t.Errorf("expected no error, but got %v", err)
-			}
-
-			if tc.expectedError != nil && err == nil {
-				t.Errorf("expected error %v, but didn't get one", tc.expectedError)
+			if tc.expectedError != nil {
+				assert.EqualError(t, err, tc.expectedError.Error())
+			} else {
+				assert.NoError(t, err)
 			}
 
 			if want, got := len(tc.expectedEventTypes), len(events); want != got {
@@ -533,3 +539,35 @@ func (f *fakeApplyTask) Start(taskContext *TaskContext) {
 func (f *fakeApplyTask) Cancel(_ *TaskContext) {}
 
 func (f *fakeApplyTask) StatusUpdate(_ *TaskContext, _ object.ObjMetadata) {}
+
+type fakePoller struct {
+	start  chan struct{}
+	events []pollevent.Event
+}
+
+func newFakePoller(statusEvents []pollevent.Event) *fakePoller {
+	return &fakePoller{
+		events: statusEvents,
+		start:  make(chan struct{}),
+	}
+}
+
+// Start events being sent on the status channel
+func (f *fakePoller) Start() {
+	close(f.start)
+}
+
+func (f *fakePoller) Poll(ctx context.Context, _ object.ObjMetadataSet, _ polling.Options) <-chan pollevent.Event {
+	eventChannel := make(chan pollevent.Event)
+	go func() {
+		defer close(eventChannel)
+		// wait until started to send the events
+		<-f.start
+		for _, f := range f.events {
+			eventChannel <- f
+		}
+		// wait until cancelled to close the event channel and exit
+		<-ctx.Done()
+	}()
+	return eventChannel
+}

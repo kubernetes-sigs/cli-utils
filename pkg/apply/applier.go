@@ -230,9 +230,10 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.InventoryInfo, obje
 		// Create a new TaskStatusRunner to execute the taskQueue.
 		klog.V(4).Infoln("applier building TaskStatusRunner...")
 		allIds := object.UnstructuredSetToObjMetadataSet(append(applyObjs, pruneObjs...))
-		runner := taskrunner.NewTaskStatusRunner(allIds, a.StatusPoller, resourceCache)
+		runner := taskrunner.NewTaskStatusRunner(allIds, a.StatusPoller)
+		taskContext := taskrunner.NewTaskContext(eventChannel, resourceCache)
 		klog.V(4).Infoln("applier running TaskStatusRunner...")
-		err = runner.Run(ctx, taskQueue.ToChannel(), eventChannel, taskrunner.Options{
+		err = runner.Run(ctx, taskContext, taskQueue.ToChannel(), taskrunner.Options{
 			PollInterval:     options.PollInterval,
 			UseCache:         true,
 			EmitStatusEvents: options.EmitStatusEvents,
