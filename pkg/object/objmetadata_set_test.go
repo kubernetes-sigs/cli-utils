@@ -6,6 +6,7 @@ package object
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -214,13 +215,8 @@ func TestObjMetadataSetHash(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			actual, err := tc.objs.Hash()
-			if err != nil {
-				t.Fatalf("Received unexpected error: %s", err)
-			}
-			if tc.expected != actual {
-				t.Errorf("Hash expected (%s), got (%s)", tc.expected, actual)
-			}
+			actual := tc.objs.Hash()
+			assert.Equal(t, tc.expected, actual)
 		})
 	}
 }
