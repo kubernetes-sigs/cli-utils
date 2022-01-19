@@ -6,10 +6,14 @@
 package graph
 
 import (
+	"sort"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/cli-utils/pkg/object"
+	"sigs.k8s.io/cli-utils/pkg/object/validation"
+	"sigs.k8s.io/cli-utils/pkg/testutil"
 )
 
 var (
@@ -33,64 +37,89 @@ var (
 
 func TestObjectGraphSort(t *testing.T) {
 	testCases := map[string]struct {
-		vertices object.ObjMetadataSet
-		edges    []Edge
-		expected []object.ObjMetadataSet
-		isError  bool
+		vertices      object.ObjMetadataSet
+		edges         []Edge
+		expected      []object.ObjMetadataSet
+		expectedError error
 	}{
 		"one edge": {
 			vertices: object.ObjMetadataSet{o1, o2},
 			edges:    []Edge{e1},
 			expected: []object.ObjMetadataSet{{o2}, {o1}},
-			isError:  false,
 		},
 		"two edges": {
 			vertices: object.ObjMetadataSet{o1, o2, o3},
 			edges:    []Edge{e1, e2},
 			expected: []object.ObjMetadataSet{{o3}, {o2}, {o1}},
-			isError:  false,
 		},
 		"three edges": {
 			vertices: object.ObjMetadataSet{o1, o2, o3},
 			edges:    []Edge{e1, e3, e2},
 			expected: []object.ObjMetadataSet{{o3}, {o2}, {o1}},
-			isError:  false,
 		},
 		"four edges": {
 			vertices: object.ObjMetadataSet{o1, o2, o3, o4},
 			edges:    []Edge{e1, e2, e4, e5},
 			expected: []object.ObjMetadataSet{{o4}, {o3}, {o2}, {o1}},
-			isError:  false,
 		},
 		"five edges": {
 			vertices: object.ObjMetadataSet{o1, o2, o3, o4},
 			edges:    []Edge{e5, e1, e3, e2, e4},
 			expected: []object.ObjMetadataSet{{o4}, {o3}, {o2}, {o1}},
-			isError:  false,
 		},
 		"no edges means all in the same first set": {
 			vertices: object.ObjMetadataSet{o1, o2, o3, o4},
 			edges:    []Edge{},
 			expected: []object.ObjMetadataSet{{o4, o3, o2, o1}},
-			isError:  false,
 		},
 		"multiple objects in first set": {
 			vertices: object.ObjMetadataSet{o1, o2, o3, o4, o5},
 			edges:    []Edge{e1, e2, e5, e8},
 			expected: []object.ObjMetadataSet{{o5, o3}, {o4}, {o2}, {o1}},
-			isError:  false,
 		},
 		"simple cycle in graph is an error": {
 			vertices: object.ObjMetadataSet{o1, o2},
 			edges:    []Edge{e1, e6},
 			expected: []object.ObjMetadataSet{},
-			isError:  true,
+			expectedError: validation.NewError(
+				CyclicDependencyError{
+					Edges: []Edge{
+						{
+							From: o1,
+							To:   o2,
+						},
+						{
+							From: o2,
+							To:   o1,
+						},
+					},
+				},
+				o1, o2,
+			),
 		},
 		"multi-edge cycle in graph is an error": {
 			vertices: object.ObjMetadataSet{o1, o2, o3},
 			edges:    []Edge{e1, e2, e7},
 			expected: []object.ObjMetadataSet{},
-			isError:  true,
+			expectedError: validation.NewError(
+				CyclicDependencyError{
+					Edges: []Edge{
+						{
+							From: o1,
+							To:   o2,
+						},
+						{
+							From: o2,
+							To:   o3,
+						},
+						{
+							From: o3,
+							To:   o1,
+						},
+					},
+				},
+				o1, o2, o3,
+			),
 		},
 	}
 
@@ -104,23 +133,266 @@ func TestObjectGraphSort(t *testing.T) {
 				g.AddEdge(edge.From, edge.To)
 			}
 			actual, err := g.Sort()
-			if err == nil && tc.isError {
-				t.Fatalf("expected error, but received none")
+			if tc.expectedError != nil {
+				assert.EqualError(t, tc.expectedError, err.Error())
+				return
 			}
-			if err != nil && !tc.isError {
-				t.Errorf("unexpected error: %s", err)
-			}
-			if !tc.isError {
-				if len(actual) != len(tc.expected) {
-					t.Errorf("expected (%s), got (%s)", tc.expected, actual)
-				}
-				for i, actualSet := range actual {
-					expectedSet := tc.expected[i]
-					if !expectedSet.Equal(actualSet) {
-						t.Errorf("expected sorted objects (%s), got (%s)", tc.expected, actual)
-					}
-				}
-			}
+			assert.NoError(t, err)
+			testutil.AssertEqual(t, tc.expected, actual)
+		})
+	}
+}
+
+func TestEdgeSort(t *testing.T) {
+	testCases := map[string]struct {
+		edges    []Edge
+		expected []Edge
+	}{
+		"one edge": {
+			edges: []Edge{
+				{
+					From: object.ObjMetadata{Name: "obj1"},
+					To:   object.ObjMetadata{Name: "obj2"},
+				},
+			},
+			expected: []Edge{
+				{
+					From: object.ObjMetadata{Name: "obj1"},
+					To:   object.ObjMetadata{Name: "obj2"},
+				},
+			},
+		},
+		"two edges no change": {
+			edges: []Edge{
+				{
+					From: object.ObjMetadata{Name: "obj1"},
+					To:   object.ObjMetadata{Name: "obj2"},
+				},
+				{
+					From: object.ObjMetadata{Name: "obj2"},
+					To:   object.ObjMetadata{Name: "obj3"},
+				},
+			},
+			expected: []Edge{
+				{
+					From: object.ObjMetadata{Name: "obj1"},
+					To:   object.ObjMetadata{Name: "obj2"},
+				},
+				{
+					From: object.ObjMetadata{Name: "obj2"},
+					To:   object.ObjMetadata{Name: "obj3"},
+				},
+			},
+		},
+		"two edges same from": {
+			edges: []Edge{
+				{
+					From: object.ObjMetadata{Name: "obj1"},
+					To:   object.ObjMetadata{Name: "obj3"},
+				},
+				{
+					From: object.ObjMetadata{Name: "obj1"},
+					To:   object.ObjMetadata{Name: "obj2"},
+				},
+			},
+			expected: []Edge{
+				{
+					From: object.ObjMetadata{Name: "obj1"},
+					To:   object.ObjMetadata{Name: "obj2"},
+				},
+				{
+					From: object.ObjMetadata{Name: "obj1"},
+					To:   object.ObjMetadata{Name: "obj3"},
+				},
+			},
+		},
+		"two edges": {
+			edges: []Edge{
+				{
+					From: object.ObjMetadata{Name: "obj2"},
+					To:   object.ObjMetadata{Name: "obj3"},
+				},
+				{
+					From: object.ObjMetadata{Name: "obj1"},
+					To:   object.ObjMetadata{Name: "obj2"},
+				},
+			},
+			expected: []Edge{
+				{
+					From: object.ObjMetadata{Name: "obj1"},
+					To:   object.ObjMetadata{Name: "obj2"},
+				},
+				{
+					From: object.ObjMetadata{Name: "obj2"},
+					To:   object.ObjMetadata{Name: "obj3"},
+				},
+			},
+		},
+		"two edges by name": {
+			edges: []Edge{
+				{
+					From: object.ObjMetadata{Name: "obj2", Namespace: "ns1", GroupKind: schema.GroupKind{Kind: "Pod"}},
+					To:   object.ObjMetadata{Name: "obj3", Namespace: "ns1", GroupKind: schema.GroupKind{Kind: "Pod"}},
+				},
+				{
+					From: object.ObjMetadata{Name: "obj1", Namespace: "ns1", GroupKind: schema.GroupKind{Kind: "Pod"}},
+					To:   object.ObjMetadata{Name: "obj2", Namespace: "ns1", GroupKind: schema.GroupKind{Kind: "Pod"}},
+				},
+			},
+			expected: []Edge{
+				{
+					From: object.ObjMetadata{Name: "obj1", Namespace: "ns1", GroupKind: schema.GroupKind{Kind: "Pod"}},
+					To:   object.ObjMetadata{Name: "obj2", Namespace: "ns1", GroupKind: schema.GroupKind{Kind: "Pod"}},
+				},
+				{
+					From: object.ObjMetadata{Name: "obj2", Namespace: "ns1", GroupKind: schema.GroupKind{Kind: "Pod"}},
+					To:   object.ObjMetadata{Name: "obj3", Namespace: "ns1", GroupKind: schema.GroupKind{Kind: "Pod"}},
+				},
+			},
+		},
+		"three edges": {
+			edges: []Edge{
+				{
+					From: object.ObjMetadata{Name: "obj3"},
+					To:   object.ObjMetadata{Name: "obj4"},
+				},
+				{
+					From: object.ObjMetadata{Name: "obj2"},
+					To:   object.ObjMetadata{Name: "obj3"},
+				},
+				{
+					From: object.ObjMetadata{Name: "obj1"},
+					To:   object.ObjMetadata{Name: "obj2"},
+				},
+			},
+			expected: []Edge{
+				{
+					From: object.ObjMetadata{Name: "obj1"},
+					To:   object.ObjMetadata{Name: "obj2"},
+				},
+				{
+					From: object.ObjMetadata{Name: "obj2"},
+					To:   object.ObjMetadata{Name: "obj3"},
+				},
+				{
+					From: object.ObjMetadata{Name: "obj3"},
+					To:   object.ObjMetadata{Name: "obj4"},
+				},
+			},
+		},
+		"two edges cycle": {
+			edges: []Edge{
+				{
+					From: object.ObjMetadata{Name: "obj2", Namespace: "ns1", GroupKind: schema.GroupKind{Kind: "Pod"}},
+					To:   object.ObjMetadata{Name: "obj1", Namespace: "ns1", GroupKind: schema.GroupKind{Kind: "Pod"}},
+				},
+				{
+					From: object.ObjMetadata{Name: "obj1", Namespace: "ns1", GroupKind: schema.GroupKind{Kind: "Pod"}},
+					To:   object.ObjMetadata{Name: "obj2", Namespace: "ns1", GroupKind: schema.GroupKind{Kind: "Pod"}},
+				},
+			},
+			expected: []Edge{
+				{
+					From: object.ObjMetadata{Name: "obj1", Namespace: "ns1", GroupKind: schema.GroupKind{Kind: "Pod"}},
+					To:   object.ObjMetadata{Name: "obj2", Namespace: "ns1", GroupKind: schema.GroupKind{Kind: "Pod"}},
+				},
+				{
+					From: object.ObjMetadata{Name: "obj2", Namespace: "ns1", GroupKind: schema.GroupKind{Kind: "Pod"}},
+					To:   object.ObjMetadata{Name: "obj1", Namespace: "ns1", GroupKind: schema.GroupKind{Kind: "Pod"}},
+				},
+			},
+		},
+		"three edges cycle": {
+			edges: []Edge{
+				{
+					From: object.ObjMetadata{Name: "obj3"},
+					To:   object.ObjMetadata{Name: "obj1"},
+				},
+				{
+					From: object.ObjMetadata{Name: "obj2"},
+					To:   object.ObjMetadata{Name: "obj3"},
+				},
+				{
+					From: object.ObjMetadata{Name: "obj1"},
+					To:   object.ObjMetadata{Name: "obj2"},
+				},
+			},
+			expected: []Edge{
+				{
+					From: object.ObjMetadata{Name: "obj1"},
+					To:   object.ObjMetadata{Name: "obj2"},
+				},
+				{
+					From: object.ObjMetadata{Name: "obj2"},
+					To:   object.ObjMetadata{Name: "obj3"},
+				},
+				{
+					From: object.ObjMetadata{Name: "obj3"},
+					To:   object.ObjMetadata{Name: "obj1"},
+				},
+			},
+		},
+	}
+
+	for tn, tc := range testCases {
+		t.Run(tn, func(t *testing.T) {
+			sort.Sort(SortableEdges(tc.edges))
+			assert.Equal(t, tc.expected, tc.edges)
+		})
+	}
+}
+
+func TestCyclicDependencyErrorString(t *testing.T) {
+	testCases := map[string]struct {
+		cycle          CyclicDependencyError
+		expectedString string
+	}{
+		"two object cycle": {
+			cycle: CyclicDependencyError{
+				Edges: []Edge{
+					{
+						From: o1,
+						To:   o2,
+					},
+					{
+						From: o2,
+						To:   o1,
+					},
+				},
+			},
+			expectedString: `cyclic dependency:
+- /obj1 -> /obj2
+- /obj2 -> /obj1
+`,
+		},
+		"three object cycle": {
+			cycle: CyclicDependencyError{
+				Edges: []Edge{
+					{
+						From: o1,
+						To:   o2,
+					},
+					{
+						From: o2,
+						To:   o3,
+					},
+					{
+						From: o3,
+						To:   o1,
+					},
+				},
+			},
+			expectedString: `cyclic dependency:
+- /obj1 -> /obj2
+- /obj2 -> /obj3
+- /obj3 -> /obj1
+`,
+		},
+	}
+
+	for tn, tc := range testCases {
+		t.Run(tn, func(t *testing.T) {
+			assert.Equal(t, tc.expectedString, tc.cycle.Error())
 		})
 	}
 }
