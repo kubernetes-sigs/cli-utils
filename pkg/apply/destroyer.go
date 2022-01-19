@@ -157,10 +157,10 @@ func (d *Destroyer) Run(ctx context.Context, inv inventory.InventoryInfo, option
 		klog.V(4).Infoln("destroyer building TaskStatusRunner...")
 		deleteIds := object.UnstructuredSetToObjMetadataSet(deleteObjs)
 		resourceCache := cache.NewResourceCacheMap()
-		runner := taskrunner.NewTaskStatusRunner(deleteIds, d.StatusPoller, resourceCache)
+		runner := taskrunner.NewTaskStatusRunner(deleteIds, d.StatusPoller)
+		taskContext := taskrunner.NewTaskContext(eventChannel, resourceCache)
 		klog.V(4).Infoln("destroyer running TaskStatusRunner...")
-		// TODO(seans): Make the poll interval configurable like the applier.
-		err = runner.Run(ctx, taskQueue.ToChannel(), eventChannel, taskrunner.Options{
+		err = runner.Run(ctx, taskContext, taskQueue.ToChannel(), taskrunner.Options{
 			UseCache:         true,
 			PollInterval:     options.PollInterval,
 			EmitStatusEvents: options.EmitStatusEvents,
