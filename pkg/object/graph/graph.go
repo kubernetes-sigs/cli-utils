@@ -9,10 +9,12 @@ package graph
 import (
 	"bytes"
 	"fmt"
+	"sort"
 
 	"sigs.k8s.io/cli-utils/pkg/multierror"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/object/validation"
+	"sigs.k8s.io/cli-utils/pkg/ordering"
 )
 
 // Graph is contains a directed set of edges, implemented as
@@ -45,7 +47,7 @@ func (g *Graph) AddVertex(v object.ObjMetadata) {
 	}
 }
 
-// GetVertices returns an unsorted set of unique vertices in the graph.
+// GetVertices returns a sorted set of unique vertices in the graph.
 func (g *Graph) GetVertices() object.ObjMetadataSet {
 	keys := make(object.ObjMetadataSet, len(g.edges))
 	i := 0
@@ -53,6 +55,7 @@ func (g *Graph) GetVertices() object.ObjMetadataSet {
 		keys[i] = k
 		i++
 	}
+	sort.Sort(ordering.SortableMetas(keys))
 	return keys
 }
 
@@ -74,8 +77,7 @@ func (g *Graph) AddEdge(from object.ObjMetadata, to object.ObjMetadata) {
 	}
 }
 
-// GetEdges returns the slice of vertex pairs which are
-// the directed edges of the graph.
+// GetEdges returns a sorted slice of directed graph edges (vertex pairs).
 func (g *Graph) GetEdges() []Edge {
 	edges := []Edge{}
 	for from, toList := range g.edges {
@@ -84,6 +86,7 @@ func (g *Graph) GetEdges() []Edge {
 			edges = append(edges, edge)
 		}
 	}
+	sort.Sort(SortableEdges(edges))
 	return edges
 }
 
@@ -163,4 +166,31 @@ func (cde CyclicDependencyError) Error() string {
 		errorBuf.WriteString(fmt.Sprintf("%s%s -> %s\n", multierror.Prefix, from, to))
 	}
 	return errorBuf.String()
+}
+
+// SortableEdges sorts a list of edges alphanumerically by From and then To.
+type SortableEdges []Edge
+
+var _ sort.Interface = SortableEdges{}
+
+func (a SortableEdges) Len() int      { return len(a) }
+func (a SortableEdges) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
+func (a SortableEdges) Less(i, j int) bool {
+	if a[i].From != a[j].From {
+		return metaIsLessThan(a[i].From, a[j].From)
+	}
+	return metaIsLessThan(a[i].To, a[j].To)
+}
+
+func metaIsLessThan(i, j object.ObjMetadata) bool {
+	if i.GroupKind.Group != j.GroupKind.Group {
+		return i.GroupKind.Group < j.GroupKind.Group
+	}
+	if i.GroupKind.Kind != j.GroupKind.Kind {
+		return i.GroupKind.Kind < j.GroupKind.Kind
+	}
+	if i.Namespace != j.Namespace {
+		return i.Namespace < j.Namespace
+	}
+	return i.Name < j.Name
 }
