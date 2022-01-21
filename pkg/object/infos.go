@@ -59,7 +59,7 @@ func UnstructuredToInfo(obj *unstructured.Unstructured) (*resource.Info, error) 
 		// kyaml adds both annotations for the time being, so we need to remove them both
 		// before apply.
 		delete(annos, kioutil.PathAnnotation)
-		delete(annos, kioutil.LegacyPathAnnotation)
+		delete(annos, kioutil.LegacyPathAnnotation) //nolint:staticcheck
 		obj.SetAnnotations(annos)
 	}
 

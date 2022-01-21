@@ -44,7 +44,7 @@ func TestUnstructuredToInfo(t *testing.T) {
 						"name": "foo",
 						"annotations": map[string]interface{}{
 							kioutil.PathAnnotation:       "deployment.yaml",
-							kioutil.LegacyPathAnnotation: "deployment.yaml",
+							kioutil.LegacyPathAnnotation: "deployment.yaml", //nolint:staticcheck
 						},
 					},
 				},
@@ -87,7 +87,7 @@ func TestUnstructuredToInfo(t *testing.T) {
 			}
 
 			if found {
-				for _, a := range []kioutil.AnnotationKey{kioutil.PathAnnotation, kioutil.LegacyPathAnnotation} {
+				for _, a := range []kioutil.AnnotationKey{kioutil.PathAnnotation, kioutil.LegacyPathAnnotation} { //nolint:staticcheck
 					_, hasAnnotation := annos[a]
 					assert.False(t, hasAnnotation, "did not expect %s", a)
 				}
