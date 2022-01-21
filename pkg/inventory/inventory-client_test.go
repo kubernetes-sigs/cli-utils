@@ -4,18 +4,14 @@
 package inventory
 
 import (
-	"bytes"
-	"io/ioutil"
-	"net/http"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/resource"
-	"k8s.io/client-go/rest/fake"
+	clienttesting "k8s.io/client-go/testing"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/object"
@@ -62,9 +58,7 @@ func TestGetClusterInventoryInfo(t *testing.T) {
 			invClient, err := NewInventoryClient(tf,
 				WrapInventoryObj, InvInfoToConfigMap)
 			require.NoError(t, err)
-			fakeBuilder := FakeBuilder{}
-			fakeBuilder.SetInventoryObjs(tc.localObjs)
-			invClient.builderFunc = fakeBuilder.GetBuilder()
+
 			var inv *unstructured.Unstructured
 			if tc.inv != nil {
 				inv = storeObjsInInventory(tc.inv, tc.localObjs)
@@ -157,22 +151,19 @@ func TestMerge(t *testing.T) {
 		},
 	}
 
-	tf := cmdtesting.NewTestFactory().WithNamespace(testNamespace)
-	defer tf.Cleanup()
-
 	for name, tc := range tests {
 		for i := range common.Strategies {
 			drs := common.Strategies[i]
 			t.Run(name, func(t *testing.T) {
+				tf := cmdtesting.NewTestFactory().WithNamespace(testNamespace)
+				defer tf.Cleanup()
+
+				tf.FakeDynamicClient.PrependReactor("list", "configmaps", toReactionFunc(tc.clusterObjs))
 				// Create the local inventory object storing "tc.localObjs"
 				invClient, err := NewInventoryClient(tf,
 					WrapInventoryObj, InvInfoToConfigMap)
 				require.NoError(t, err)
-				// Create a fake builder to return "tc.clusterObjs" from
-				// the cluster inventory object.
-				fakeBuilder := FakeBuilder{}
-				fakeBuilder.SetInventoryObjs(tc.clusterObjs)
-				invClient.builderFunc = fakeBuilder.GetBuilder()
+
 				// Call "Merge" to create the union of clusterObjs and localObjs.
 				pruneObjs, err := invClient.Merge(tc.localInv, tc.localObjs, drs)
 				if tc.isError {
@@ -222,33 +213,18 @@ func TestCreateInventory(t *testing.T) {
 		},
 	}
 
-	tf := cmdtesting.NewTestFactory().WithNamespace(testNamespace)
-	defer tf.Cleanup()
-
-	// The fake client must see a POST to the confimap URL.
-	tf.UnstructuredClient = &fake.RESTClient{
-		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
-		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-			if req.Method == "POST" && cmPathRegex.Match([]byte(req.URL.Path)) {
-				b, err := ioutil.ReadAll(req.Body)
-				if err != nil {
-					return nil, err
-				}
-				cm := corev1.ConfigMap{}
-				err = runtime.DecodeInto(codec, b, &cm)
-				if err != nil {
-					return nil, err
-				}
-				bodyRC := ioutil.NopCloser(bytes.NewReader(b))
-				return &http.Response{StatusCode: http.StatusCreated, Header: cmdtesting.DefaultHeader(), Body: bodyRC}, nil
-			}
-			return nil, nil
-		}),
-	}
-	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
-
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
+			tf := cmdtesting.NewTestFactory().WithNamespace(testNamespace)
+			defer tf.Cleanup()
+
+			var storedInventory map[string]string
+			tf.FakeDynamicClient.PrependReactor("create", "configmaps", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+				obj := *action.(clienttesting.CreateAction).GetObject().(*unstructured.Unstructured)
+				storedInventory, _, _ = unstructured.NestedStringMap(obj.Object, "data")
+				return true, nil, nil
+			})
+
 			invClient, err := NewInventoryClient(tf,
 				WrapInventoryObj, InvInfoToConfigMap)
 			require.NoError(t, err)
@@ -261,6 +237,12 @@ func TestCreateInventory(t *testing.T) {
 				assert.EqualError(t, err, tc.error)
 			} else {
 				assert.NoError(t, err)
+			}
+
+			expectedInventory := tc.localObjs.ToStringMap()
+			// handle empty inventories special to avoid problems with empty vs nil maps
+			if len(expectedInventory) != 0 || len(storedInventory) != 0 {
+				assert.Equal(t, expectedInventory, storedInventory)
 			}
 		})
 	}
@@ -378,19 +360,15 @@ func TestGetClusterObjs(t *testing.T) {
 		},
 	}
 
-	tf := cmdtesting.NewTestFactory().WithNamespace(testNamespace)
-	defer tf.Cleanup()
-
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
+			tf := cmdtesting.NewTestFactory().WithNamespace(testNamespace)
+			defer tf.Cleanup()
+			tf.FakeDynamicClient.PrependReactor("list", "configmaps", toReactionFunc(tc.clusterObjs))
+
 			invClient, err := NewInventoryClient(tf,
 				WrapInventoryObj, InvInfoToConfigMap)
 			require.NoError(t, err)
-			// Create fake builder returning "tc.clusterObjs" from cluster inventory.
-			fakeBuilder := FakeBuilder{}
-			fakeBuilder.SetInventoryObjs(tc.clusterObjs)
-			invClient.builderFunc = fakeBuilder.GetBuilder()
-			// Call "GetClusterObjs" and compare returned cluster inventory objs to expected.
 			clusterObjs, err := invClient.GetClusterObjs(tc.localInv)
 			if tc.isError {
 				if err == nil {
@@ -436,34 +414,13 @@ func TestDeleteInventoryObj(t *testing.T) {
 		},
 	}
 
-	tf := cmdtesting.NewTestFactory().WithNamespace(testNamespace)
-	defer tf.Cleanup()
-
-	tf.UnstructuredClient = &fake.RESTClient{
-		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
-		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-			if req.Method == "DELETE" && cmPathRegex.Match([]byte(req.URL.Path)) {
-				b, err := ioutil.ReadAll(req.Body)
-				if err != nil {
-					return nil, err
-				}
-				cm := corev1.ConfigMap{}
-				err = runtime.DecodeInto(codec, b, &cm)
-				if err != nil {
-					return nil, err
-				}
-				bodyRC := ioutil.NopCloser(bytes.NewReader(b))
-				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: bodyRC}, nil
-			}
-			return nil, nil
-		}),
-	}
-	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
-
 	for name, tc := range tests {
 		for i := range common.Strategies {
 			drs := common.Strategies[i]
 			t.Run(name, func(t *testing.T) {
+				tf := cmdtesting.NewTestFactory().WithNamespace(testNamespace)
+				defer tf.Cleanup()
+
 				invClient, err := NewInventoryClient(tf,
 					WrapInventoryObj, InvInfoToConfigMap)
 				require.NoError(t, err)
@@ -483,4 +440,17 @@ func TestDeleteInventoryObj(t *testing.T) {
 func ignoreErrInfoToObjMeta(info *resource.Info) object.ObjMetadata {
 	objMeta, _ := object.InfoToObjMeta(info)
 	return objMeta
+}
+
+func toReactionFunc(objs object.ObjMetadataSet) clienttesting.ReactionFunc {
+	return func(action clienttesting.Action) (bool, runtime.Object, error) {
+		u := copyInventoryInfo()
+		err := unstructured.SetNestedStringMap(u.Object, objs.ToStringMap(), "data")
+		if err != nil {
+			return true, nil, err
+		}
+		list := &unstructured.UnstructuredList{}
+		list.Items = []unstructured.Unstructured{*u}
+		return true, list, err
+	}
 }
