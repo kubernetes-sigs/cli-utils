@@ -118,11 +118,11 @@ func (t *TaskQueueBuilder) AppendInvAddTask(inv inventory.InventoryInfo, applyOb
 	return t
 }
 
-// AppendInvAddTask appends an inventory set task to the task queue.
+// AppendInvSetTask appends an inventory set task to the task queue.
 // Returns a pointer to the Builder to chain function calls.
 func (t *TaskQueueBuilder) AppendInvSetTask(inv inventory.InventoryInfo, dryRun common.DryRunStrategy) *TaskQueueBuilder {
 	klog.V(2).Infoln("adding inventory set task")
-	prevInvIds, _ := t.InvClient.GetClusterObjs(inv, dryRun)
+	prevInvIds, _ := t.InvClient.GetClusterObjs(inv)
 	t.tasks = append(t.tasks, &task.InvSetTask{
 		TaskName:      fmt.Sprintf("inventory-set-%d", t.invSetCounter),
 		InvClient:     t.InvClient,
@@ -134,7 +134,7 @@ func (t *TaskQueueBuilder) AppendInvSetTask(inv inventory.InventoryInfo, dryRun 
 	return t
 }
 
-// AppendInvAddTask appends to the task queue a task to delete the inventory object.
+// AppendDeleteInvTask appends to the task queue a task to delete the inventory object.
 // Returns a pointer to the Builder to chain function calls.
 func (t *TaskQueueBuilder) AppendDeleteInvTask(inv inventory.InventoryInfo, dryRun common.DryRunStrategy) *TaskQueueBuilder {
 	klog.V(2).Infoln("adding delete inventory task")
@@ -148,7 +148,7 @@ func (t *TaskQueueBuilder) AppendDeleteInvTask(inv inventory.InventoryInfo, dryR
 	return t
 }
 
-// AppendInvAddTask appends a task to the task queue to apply the passed objects
+// AppendApplyTask appends a task to the task queue to apply the passed objects
 // to the cluster. Returns a pointer to the Builder to chain function calls.
 func (t *TaskQueueBuilder) AppendApplyTask(applyObjs object.UnstructuredSet,
 	applyFilters []filter.ValidationFilter, applyMutators []mutator.Interface, o Options) *TaskQueueBuilder {
@@ -168,7 +168,7 @@ func (t *TaskQueueBuilder) AppendApplyTask(applyObjs object.UnstructuredSet,
 	return t
 }
 
-// AppendInvAddTask appends a task to wait on the passed objects to the task queue.
+// AppendWaitTask appends a task to wait on the passed objects to the task queue.
 // Returns a pointer to the Builder to chain function calls.
 func (t *TaskQueueBuilder) AppendWaitTask(waitIds object.ObjMetadataSet, condition taskrunner.Condition,
 	waitTimeout time.Duration) *TaskQueueBuilder {
@@ -184,7 +184,7 @@ func (t *TaskQueueBuilder) AppendWaitTask(waitIds object.ObjMetadataSet, conditi
 	return t
 }
 
-// AppendInvAddTask appends a task to delete objects from the cluster to the task queue.
+// AppendPruneTask appends a task to delete objects from the cluster to the task queue.
 // Returns a pointer to the Builder to chain function calls.
 func (t *TaskQueueBuilder) AppendPruneTask(pruneObjs object.UnstructuredSet,
 	pruneFilters []filter.ValidationFilter, o Options) *TaskQueueBuilder {

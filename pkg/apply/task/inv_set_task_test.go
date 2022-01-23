@@ -9,7 +9,6 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/apply/cache"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
-	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/testutil"
@@ -231,7 +230,7 @@ func TestInvSetTask(t *testing.T) {
 			if result.Err != nil {
 				t.Errorf("unexpected error running InvAddTask: %s", result.Err)
 			}
-			actual, _ := client.GetClusterObjs(nil, common.DryRunNone)
+			actual, _ := client.GetClusterObjs(nil)
 			testutil.AssertEqual(t, tc.expectedObjs, actual,
 				"Actual cluster objects (%d) do not match expected cluster objects (%d)",
 				len(actual), len(tc.expectedObjs))

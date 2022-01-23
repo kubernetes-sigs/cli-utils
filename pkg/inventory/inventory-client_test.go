@@ -69,7 +69,7 @@ func TestGetClusterInventoryInfo(t *testing.T) {
 			if tc.inv != nil {
 				inv = storeObjsInInventory(tc.inv, tc.localObjs)
 			}
-			clusterInv, err := invClient.GetClusterInventoryInfo(WrapInventoryInfoObj(inv), common.DryRunNone)
+			clusterInv, err := invClient.GetClusterInventoryInfo(WrapInventoryInfoObj(inv))
 			if tc.isError {
 				if err == nil {
 					t.Fatalf("expected error but received none")
@@ -391,7 +391,7 @@ func TestGetClusterObjs(t *testing.T) {
 			fakeBuilder.SetInventoryObjs(tc.clusterObjs)
 			invClient.builderFunc = fakeBuilder.GetBuilder()
 			// Call "GetClusterObjs" and compare returned cluster inventory objs to expected.
-			clusterObjs, err := invClient.GetClusterObjs(tc.localInv, common.DryRunNone)
+			clusterObjs, err := invClient.GetClusterObjs(tc.localInv)
 			if tc.isError {
 				if err == nil {
 					t.Fatalf("expected error but received none")
@@ -474,111 +474,6 @@ func TestDeleteInventoryObj(t *testing.T) {
 				err = invClient.deleteInventoryObjByName(inv, drs)
 				if err != nil {
 					t.Fatalf("unexpected error received: %s", err)
-				}
-			})
-		}
-	}
-}
-
-type invAndObjs struct {
-	inv     InventoryInfo
-	invObjs object.ObjMetadataSet
-}
-
-func TestMergeInventoryObjs(t *testing.T) {
-	pod1Obj := ignoreErrInfoToObjMeta(pod1Info)
-	pod2Obj := ignoreErrInfoToObjMeta(pod2Info)
-	pod3Obj := ignoreErrInfoToObjMeta(pod3Info)
-	tests := map[string]struct {
-		invs     []invAndObjs
-		expected object.ObjMetadataSet
-	}{
-		"Single inventory object with no inventory is valid": {
-			invs: []invAndObjs{
-				{
-					inv:     copyInventory(),
-					invObjs: object.ObjMetadataSet{},
-				},
-			},
-			expected: object.ObjMetadataSet{},
-		},
-		"Single inventory object returns same objects": {
-			invs: []invAndObjs{
-				{
-					inv:     copyInventory(),
-					invObjs: object.ObjMetadataSet{pod1Obj},
-				},
-			},
-			expected: object.ObjMetadataSet{pod1Obj},
-		},
-		"Two inventories with the same objects returns them": {
-			invs: []invAndObjs{
-				{
-					inv:     copyInventory(),
-					invObjs: object.ObjMetadataSet{pod1Obj},
-				},
-				{
-					inv:     copyInventory(),
-					invObjs: object.ObjMetadataSet{pod1Obj},
-				},
-			},
-			expected: object.ObjMetadataSet{pod1Obj},
-		},
-		"Two inventories with different retain the union": {
-			invs: []invAndObjs{
-				{
-					inv:     copyInventory(),
-					invObjs: object.ObjMetadataSet{pod1Obj},
-				},
-				{
-					inv:     copyInventory(),
-					invObjs: object.ObjMetadataSet{pod2Obj},
-				},
-			},
-			expected: object.ObjMetadataSet{pod1Obj, pod2Obj},
-		},
-		"More than two inventory objects retains all objects": {
-			invs: []invAndObjs{
-				{
-					inv:     copyInventory(),
-					invObjs: object.ObjMetadataSet{pod1Obj, pod2Obj},
-				},
-				{
-					inv:     copyInventory(),
-					invObjs: object.ObjMetadataSet{pod2Obj},
-				},
-				{
-					inv:     copyInventory(),
-					invObjs: object.ObjMetadataSet{pod3Obj},
-				},
-			},
-			expected: object.ObjMetadataSet{pod1Obj, pod2Obj, pod3Obj},
-		},
-	}
-
-	tf := cmdtesting.NewTestFactory().WithNamespace(testNamespace)
-	defer tf.Cleanup()
-
-	for name, tc := range tests {
-		for i := range common.Strategies {
-			drs := common.Strategies[i]
-			t.Run(name, func(t *testing.T) {
-				invClient, err := NewInventoryClient(tf,
-					WrapInventoryObj, InvInfoToConfigMap)
-				require.NoError(t, err)
-				inventories := []*unstructured.Unstructured{}
-				for _, i := range tc.invs {
-					inv := storeObjsInInventory(i.inv, i.invObjs)
-					inventories = append(inventories, inv)
-				}
-				retained, err := invClient.mergeClusterInventory(inventories, drs)
-				if err != nil {
-					t.Fatalf("unexpected error: %s", err)
-				}
-				wrapped := WrapInventoryObj(retained)
-				mergedObjs, _ := wrapped.Load()
-				if !tc.expected.Equal(mergedObjs) {
-					t.Errorf("expected merged inventory objects (%v), got (%v)", tc.expected, mergedObjs)
 				}
 			})
 		}
