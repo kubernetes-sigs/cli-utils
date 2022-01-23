@@ -4,10 +4,11 @@
 package solver
 
 import (
-	"reflect"
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/cli-utils/pkg/apply/filter"
@@ -105,6 +106,12 @@ metadata:
 )
 
 func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
+	// Use a custom Asserter to customize the comparison options
+	asserter := testutil.NewAsserter(
+		cmpopts.EquateErrors(),
+		waitTaskComparer(),
+	)
+
 	testCases := map[string]struct {
 		applyObjs     []*unstructured.Unstructured
 		options       Options
@@ -113,7 +120,7 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 	}{
 		"no resources, no tasks": {
 			applyObjs:     []*unstructured.Unstructured{},
-			expectedTasks: []taskrunner.Task{},
+			expectedTasks: nil,
 		},
 		"single resource, one apply task, one wait task": {
 			applyObjs: []*unstructured.Unstructured{
@@ -126,14 +133,13 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 						testutil.Unstructured(t, resources["deployment"]),
 					},
 				},
-				taskrunner.NewWaitTask(
-					"wait-0",
-					object.ObjMetadataSet{
+				&taskrunner.WaitTask{
+					TaskName: "wait-0",
+					Ids: object.ObjMetadataSet{
 						testutil.ToIdentifier(t, resources["deployment"]),
 					},
-					taskrunner.AllCurrent, 1*time.Second,
-					testutil.NewFakeRESTMapper(),
-				),
+					Condition: taskrunner.AllCurrent,
+				},
 			},
 		},
 		"multiple resource with no timeout": {
@@ -148,16 +154,16 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 						testutil.Unstructured(t, resources["deployment"]),
 						testutil.Unstructured(t, resources["secret"]),
 					},
+					DryRunStrategy: common.DryRunNone,
 				},
-				taskrunner.NewWaitTask(
-					"wait-0",
-					object.ObjMetadataSet{
+				&taskrunner.WaitTask{
+					TaskName: "wait-0",
+					Ids: object.ObjMetadataSet{
 						testutil.ToIdentifier(t, resources["deployment"]),
 						testutil.ToIdentifier(t, resources["secret"]),
 					},
-					taskrunner.AllCurrent, 1*time.Second,
-					testutil.NewFakeRESTMapper(),
-				),
+					Condition: taskrunner.AllCurrent,
+				},
 			},
 		},
 		"multiple resources with reconcile timeout": {
@@ -166,25 +172,26 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 				testutil.Unstructured(t, resources["secret"]),
 			},
 			options: Options{
-				ReconcileTimeout: time.Minute,
+				ReconcileTimeout: 1 * time.Minute,
 			},
 			expectedTasks: []taskrunner.Task{
 				&task.ApplyTask{
 					TaskName: "apply-0",
 					Objects: []*unstructured.Unstructured{
-						testutil.Unstructured(t, resources["deployment"]),
 						testutil.Unstructured(t, resources["secret"]),
+						testutil.Unstructured(t, resources["deployment"]),
 					},
+					DryRunStrategy: common.DryRunNone,
 				},
-				taskrunner.NewWaitTask(
-					"wait-0",
-					object.ObjMetadataSet{
-						testutil.ToIdentifier(t, resources["deployment"]),
+				&taskrunner.WaitTask{
+					TaskName: "wait-0",
+					Ids: object.ObjMetadataSet{
 						testutil.ToIdentifier(t, resources["secret"]),
+						testutil.ToIdentifier(t, resources["deployment"]),
 					},
-					taskrunner.AllCurrent, 1*time.Second,
-					testutil.NewFakeRESTMapper(),
-				),
+					Condition: taskrunner.AllCurrent,
+					Timeout:   1 * time.Minute,
+				},
 			},
 		},
 		"multiple resources with reconcile timeout and dryrun": {
@@ -204,6 +211,7 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 						testutil.Unstructured(t, resources["deployment"]),
 						testutil.Unstructured(t, resources["secret"]),
 					},
+					DryRunStrategy: common.DryRunClient,
 				},
 			},
 		},
@@ -224,6 +232,7 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 						testutil.Unstructured(t, resources["pod"]),
 						testutil.Unstructured(t, resources["default-pod"]),
 					},
+					DryRunStrategy: common.DryRunServer,
 				},
 			},
 		},
@@ -239,31 +248,31 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 					Objects: []*unstructured.Unstructured{
 						testutil.Unstructured(t, resources["crd"]),
 					},
+					DryRunStrategy: common.DryRunNone,
 				},
-				taskrunner.NewWaitTask(
-					"wait-0",
-					object.ObjMetadataSet{
+				&taskrunner.WaitTask{
+					TaskName: "wait-0",
+					Ids: object.ObjMetadataSet{
 						testutil.ToIdentifier(t, resources["crd"]),
 					},
-					taskrunner.AllCurrent, 1*time.Second,
-					testutil.NewFakeRESTMapper(),
-				),
+					Condition: taskrunner.AllCurrent,
+				},
 				&task.ApplyTask{
 					TaskName: "apply-1",
 					Objects: []*unstructured.Unstructured{
 						testutil.Unstructured(t, resources["crontab1"]),
 						testutil.Unstructured(t, resources["crontab2"]),
 					},
+					DryRunStrategy: common.DryRunNone,
 				},
-				taskrunner.NewWaitTask(
-					"wait-1",
-					object.ObjMetadataSet{
+				&taskrunner.WaitTask{
+					TaskName: "wait-1",
+					Ids: object.ObjMetadataSet{
 						testutil.ToIdentifier(t, resources["crontab1"]),
 						testutil.ToIdentifier(t, resources["crontab2"]),
 					},
-					taskrunner.AllCurrent, 1*time.Second,
-					testutil.NewFakeRESTMapper(),
-				),
+					Condition: taskrunner.AllCurrent,
+				},
 			},
 		},
 		"no wait with CRDs if it is a dryrun": {
@@ -282,6 +291,7 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 					Objects: []*unstructured.Unstructured{
 						testutil.Unstructured(t, resources["crd"]),
 					},
+					DryRunStrategy: common.DryRunClient,
 				},
 				&task.ApplyTask{
 					TaskName: "apply-1",
@@ -289,6 +299,7 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 						testutil.Unstructured(t, resources["crontab1"]),
 						testutil.Unstructured(t, resources["crontab2"]),
 					},
+					DryRunStrategy: common.DryRunClient,
 				},
 			},
 		},
@@ -304,31 +315,31 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 					Objects: []*unstructured.Unstructured{
 						testutil.Unstructured(t, resources["namespace"]),
 					},
+					DryRunStrategy: common.DryRunNone,
 				},
-				taskrunner.NewWaitTask(
-					"wait-0",
-					object.ObjMetadataSet{
+				&taskrunner.WaitTask{
+					TaskName: "wait-0",
+					Ids: object.ObjMetadataSet{
 						testutil.ToIdentifier(t, resources["namespace"]),
 					},
-					taskrunner.AllCurrent, 1*time.Second,
-					testutil.NewFakeRESTMapper(),
-				),
+					Condition: taskrunner.AllCurrent,
+				},
 				&task.ApplyTask{
 					TaskName: "apply-1",
 					Objects: []*unstructured.Unstructured{
-						testutil.Unstructured(t, resources["pod"]),
 						testutil.Unstructured(t, resources["secret"]),
+						testutil.Unstructured(t, resources["pod"]),
 					},
+					DryRunStrategy: common.DryRunNone,
 				},
-				taskrunner.NewWaitTask(
-					"wait-1",
-					object.ObjMetadataSet{
-						testutil.ToIdentifier(t, resources["pod"]),
+				&taskrunner.WaitTask{
+					TaskName: "wait-1",
+					Ids: object.ObjMetadataSet{
 						testutil.ToIdentifier(t, resources["secret"]),
+						testutil.ToIdentifier(t, resources["pod"]),
 					},
-					taskrunner.AllCurrent, 1*time.Second,
-					testutil.NewFakeRESTMapper(),
-				),
+					Condition: taskrunner.AllCurrent,
+				},
 			},
 		},
 		"deployment depends on secret creates multiple tasks": {
@@ -343,30 +354,30 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 					Objects: []*unstructured.Unstructured{
 						testutil.Unstructured(t, resources["secret"]),
 					},
+					DryRunStrategy: common.DryRunNone,
 				},
-				taskrunner.NewWaitTask(
-					"wait-0",
-					object.ObjMetadataSet{
+				&taskrunner.WaitTask{
+					TaskName: "wait-0",
+					Ids: object.ObjMetadataSet{
 						testutil.ToIdentifier(t, resources["secret"]),
 					},
-					taskrunner.AllCurrent, 1*time.Second,
-					testutil.NewFakeRESTMapper(),
-				),
+					Condition: taskrunner.AllCurrent,
+				},
 				&task.ApplyTask{
 					TaskName: "apply-1",
 					Objects: []*unstructured.Unstructured{
 						testutil.Unstructured(t, resources["deployment"],
 							testutil.AddDependsOn(t, testutil.ToIdentifier(t, resources["secret"]))),
 					},
+					DryRunStrategy: common.DryRunNone,
 				},
-				taskrunner.NewWaitTask(
-					"wait-1",
-					object.ObjMetadataSet{
+				&taskrunner.WaitTask{
+					TaskName: "wait-1",
+					Ids: object.ObjMetadataSet{
 						testutil.ToIdentifier(t, resources["deployment"]),
 					},
-					taskrunner.AllCurrent, 1*time.Second,
-					testutil.NewFakeRESTMapper(),
-				),
+					Condition: taskrunner.AllCurrent,
+				},
 			},
 		},
 		"cyclic dependency returns error": {
@@ -398,17 +409,30 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
+			mapper := testutil.NewFakeRESTMapper()
+			// inject mapper for equality comparison
+			for _, t := range tc.expectedTasks {
+				switch typedTask := t.(type) {
+				case *task.ApplyTask:
+					typedTask.Mapper = mapper
+				case *taskrunner.WaitTask:
+					typedTask.Mapper = mapper
+				}
+			}
+
 			applyIds := object.UnstructuredSetToObjMetadataSet(tc.applyObjs)
 			fakeInvClient := inventory.NewFakeInventoryClient(applyIds)
 			tqb := TaskQueueBuilder{
 				Pruner:    pruner,
-				Mapper:    testutil.NewFakeRESTMapper(),
+				Mapper:    mapper,
 				InvClient: fakeInvClient,
 			}
+			var filters []filter.ValidationFilter
+			var mutators []mutator.Interface
 			tq, err := tqb.AppendApplyWaitTasks(
 				tc.applyObjs,
-				[]filter.ValidationFilter{},
-				[]mutator.Interface{},
+				filters,
+				mutators,
 				tc.options,
 			).Build()
 			if tc.expectedError != nil {
@@ -416,27 +440,18 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 				return
 			}
 			assert.NoError(t, err)
-			assert.Equal(t, len(tc.expectedTasks), len(tq.tasks))
-			for i, expTask := range tc.expectedTasks {
-				actualTask := tq.tasks[i]
-				assert.Equal(t, getType(expTask), getType(actualTask))
-				assert.Equal(t, expTask.Name(), actualTask.Name())
-
-				switch expTsk := expTask.(type) {
-				case *task.ApplyTask:
-					actApplyTask := toApplyTask(t, actualTask)
-					testutil.AssertEqual(t, expTsk.Objects, actApplyTask.Objects, "ApplyTask mismatch")
-				case *taskrunner.WaitTask:
-					actWaitTask := toWaitTask(t, actualTask)
-					testutil.AssertEqual(t, expTsk.Ids, actWaitTask.Ids)
-					assert.Equal(t, taskrunner.AllCurrent, actWaitTask.Condition, "WaitTask mismatch")
-				}
-			}
+			asserter.Equal(t, tc.expectedTasks, tq.tasks)
 		})
 	}
 }
 
 func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
+	// Use a custom Asserter to customize the comparison options
+	asserter := testutil.NewAsserter(
+		cmpopts.EquateErrors(),
+		waitTaskComparer(),
+	)
+
 	testCases := map[string]struct {
 		pruneObjs     []*unstructured.Unstructured
 		options       Options
@@ -446,7 +461,7 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 		"no resources, no tasks": {
 			pruneObjs:     []*unstructured.Unstructured{},
 			options:       Options{Prune: true},
-			expectedTasks: []taskrunner.Task{},
+			expectedTasks: nil,
 		},
 		"single resource, one prune task, one wait task": {
 			pruneObjs: []*unstructured.Unstructured{
@@ -460,14 +475,13 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 						testutil.Unstructured(t, resources["default-pod"]),
 					},
 				},
-				taskrunner.NewWaitTask(
-					"wait-0",
-					object.ObjMetadataSet{
+				&taskrunner.WaitTask{
+					TaskName: "wait-0",
+					Ids: object.ObjMetadataSet{
 						testutil.ToIdentifier(t, resources["default-pod"]),
 					},
-					taskrunner.AllCurrent, 1*time.Second,
-					testutil.NewFakeRESTMapper(),
-				),
+					Condition: taskrunner.AllNotFound,
+				},
 			},
 		},
 		"multiple resources, one prune task, one wait task": {
@@ -484,15 +498,14 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 						testutil.Unstructured(t, resources["pod"]),
 					},
 				},
-				taskrunner.NewWaitTask(
-					"wait-0",
-					object.ObjMetadataSet{
+				&taskrunner.WaitTask{
+					TaskName: "wait-0",
+					Ids: object.ObjMetadataSet{
 						testutil.ToIdentifier(t, resources["default-pod"]),
 						testutil.ToIdentifier(t, resources["pod"]),
 					},
-					taskrunner.AllCurrent, 1*time.Second,
-					testutil.NewFakeRESTMapper(),
-				),
+					Condition: taskrunner.AllNotFound,
+				},
 			},
 		},
 		"dependent resources, two prune tasks, two wait tasks": {
@@ -511,28 +524,26 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 							testutil.AddDependsOn(t, testutil.ToIdentifier(t, resources["secret"]))),
 					},
 				},
-				taskrunner.NewWaitTask(
-					"wait-0",
-					object.ObjMetadataSet{
+				&taskrunner.WaitTask{
+					TaskName: "wait-0",
+					Ids: object.ObjMetadataSet{
 						testutil.ToIdentifier(t, resources["pod"]),
 					},
-					taskrunner.AllCurrent, 1*time.Second,
-					testutil.NewFakeRESTMapper(),
-				),
+					Condition: taskrunner.AllNotFound,
+				},
 				&task.PruneTask{
 					TaskName: "prune-1",
 					Objects: []*unstructured.Unstructured{
 						testutil.Unstructured(t, resources["secret"]),
 					},
 				},
-				taskrunner.NewWaitTask(
-					"wait-1",
-					object.ObjMetadataSet{
+				&taskrunner.WaitTask{
+					TaskName: "wait-1",
+					Ids: object.ObjMetadataSet{
 						testutil.ToIdentifier(t, resources["secret"]),
 					},
-					taskrunner.AllCurrent, 1*time.Second,
-					testutil.NewFakeRESTMapper(),
-				),
+					Condition: taskrunner.AllNotFound,
+				},
 			},
 		},
 		"single resource with prune timeout has wait task": {
@@ -550,15 +561,14 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 						testutil.Unstructured(t, resources["pod"]),
 					},
 				},
-				taskrunner.NewWaitTask(
-					"wait-0",
-					object.ObjMetadataSet{
+				&taskrunner.WaitTask{
+					TaskName: "wait-0",
+					Ids: object.ObjMetadataSet{
 						testutil.ToIdentifier(t, resources["pod"]),
 					},
-					taskrunner.AllCurrent,
-					3*time.Minute,
-					testutil.NewFakeRESTMapper(),
-				),
+					Condition: taskrunner.AllNotFound,
+					Timeout:   3 * time.Minute,
+				},
 			},
 		},
 		"multiple resources with prune timeout and server-dryrun": {
@@ -579,6 +589,7 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 						testutil.Unstructured(t, resources["pod"]),
 						testutil.Unstructured(t, resources["default-pod"]),
 					},
+					DryRunStrategy: common.DryRunServer,
 				},
 			},
 		},
@@ -598,29 +609,27 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 						testutil.Unstructured(t, resources["crontab2"]),
 					},
 				},
-				taskrunner.NewWaitTask(
-					"wait-0",
-					object.ObjMetadataSet{
+				&taskrunner.WaitTask{
+					TaskName: "wait-0",
+					Ids: object.ObjMetadataSet{
 						testutil.ToIdentifier(t, resources["crontab1"]),
 						testutil.ToIdentifier(t, resources["crontab2"]),
 					},
-					taskrunner.AllCurrent, 1*time.Second,
-					testutil.NewFakeRESTMapper(),
-				),
+					Condition: taskrunner.AllNotFound,
+				},
 				&task.PruneTask{
 					TaskName: "prune-1",
 					Objects: []*unstructured.Unstructured{
 						testutil.Unstructured(t, resources["crd"]),
 					},
 				},
-				taskrunner.NewWaitTask(
-					"wait-1",
-					object.ObjMetadataSet{
+				&taskrunner.WaitTask{
+					TaskName: "wait-1",
+					Ids: object.ObjMetadataSet{
 						testutil.ToIdentifier(t, resources["crd"]),
 					},
-					taskrunner.AllCurrent, 1*time.Second,
-					testutil.NewFakeRESTMapper(),
-				),
+					Condition: taskrunner.AllNotFound,
+				},
 			},
 		},
 		"no wait with CRDs if it is a dryrun": {
@@ -641,12 +650,14 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 						testutil.Unstructured(t, resources["crontab1"]),
 						testutil.Unstructured(t, resources["crontab2"]),
 					},
+					DryRunStrategy: common.DryRunClient,
 				},
 				&task.PruneTask{
 					TaskName: "prune-1",
 					Objects: []*unstructured.Unstructured{
 						testutil.Unstructured(t, resources["crd"]),
 					},
+					DryRunStrategy: common.DryRunClient,
 				},
 			},
 		},
@@ -665,29 +676,27 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 						testutil.Unstructured(t, resources["secret"]),
 					},
 				},
-				taskrunner.NewWaitTask(
-					"wait-0",
-					object.ObjMetadataSet{
+				&taskrunner.WaitTask{
+					TaskName: "wait-0",
+					Ids: object.ObjMetadataSet{
 						testutil.ToIdentifier(t, resources["pod"]),
 						testutil.ToIdentifier(t, resources["secret"]),
 					},
-					taskrunner.AllCurrent, 1*time.Second,
-					testutil.NewFakeRESTMapper(),
-				),
+					Condition: taskrunner.AllNotFound,
+				},
 				&task.PruneTask{
 					TaskName: "prune-1",
 					Objects: []*unstructured.Unstructured{
 						testutil.Unstructured(t, resources["namespace"]),
 					},
 				},
-				taskrunner.NewWaitTask(
-					"wait-1",
-					object.ObjMetadataSet{
+				&taskrunner.WaitTask{
+					TaskName: "wait-1",
+					Ids: object.ObjMetadataSet{
 						testutil.ToIdentifier(t, resources["namespace"]),
 					},
-					taskrunner.AllCurrent, 1*time.Second,
-					testutil.NewFakeRESTMapper(),
-				),
+					Condition: taskrunner.AllNotFound,
+				},
 			},
 		},
 		"cyclic dependency returns error": {
@@ -720,72 +729,49 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
+			mapper := testutil.NewFakeRESTMapper()
+			// inject mapper & pruner for equality comparison
+			for _, t := range tc.expectedTasks {
+				switch typedTask := t.(type) {
+				case *task.PruneTask:
+					typedTask.Pruner = &prune.Pruner{}
+				case *taskrunner.WaitTask:
+					typedTask.Mapper = mapper
+				}
+			}
+
 			pruneIds := object.UnstructuredSetToObjMetadataSet(tc.pruneObjs)
 			fakeInvClient := inventory.NewFakeInventoryClient(pruneIds)
 			tqb := TaskQueueBuilder{
 				Pruner:    pruner,
-				Mapper:    testutil.NewFakeRESTMapper(),
+				Mapper:    mapper,
 				InvClient: fakeInvClient,
 			}
-			emptyPruneFilters := []filter.ValidationFilter{}
+			var emptyPruneFilters []filter.ValidationFilter
 			tq, err := tqb.AppendPruneWaitTasks(tc.pruneObjs, emptyPruneFilters, tc.options).Build()
 			if tc.expectedError != nil {
 				assert.EqualError(t, err, tc.expectedError.Error())
 				return
 			}
 			assert.NoError(t, err)
-			assert.Equal(t, len(tc.expectedTasks), len(tq.tasks))
-			for i, expTask := range tc.expectedTasks {
-				actualTask := tq.tasks[i]
-				assert.Equal(t, getType(expTask), getType(actualTask))
-				assert.Equal(t, expTask.Name(), actualTask.Name())
-
-				switch expTsk := expTask.(type) {
-				case *task.PruneTask:
-					actPruneTask := toPruneTask(t, actualTask)
-					testutil.AssertEqual(t, expTsk.Objects, actPruneTask.Objects, "PruneTask mismatch")
-				case *taskrunner.WaitTask:
-					actWaitTask := toWaitTask(t, actualTask)
-					testutil.AssertEqual(t, expTsk.Ids, actWaitTask.Ids)
-					assert.Equal(t, taskrunner.AllNotFound, actWaitTask.Condition, "WaitTask mismatch")
-					// Validate the prune wait timeout.
-					assert.Equal(t, tc.options.PruneTimeout, actualTask.(*taskrunner.WaitTask).Timeout)
-				}
-			}
+			asserter.Equal(t, tc.expectedTasks, tq.tasks)
 		})
 	}
 }
 
-func toWaitTask(t *testing.T, task taskrunner.Task) *taskrunner.WaitTask {
-	switch tsk := task.(type) {
-	case *taskrunner.WaitTask:
-		return tsk
-	default:
-		t.Fatalf("expected type *WaitTask, but got %s", reflect.TypeOf(task).String())
-		return nil
-	}
-}
-
-func toApplyTask(t *testing.T, aTask taskrunner.Task) *task.ApplyTask {
-	switch tsk := aTask.(type) {
-	case *task.ApplyTask:
-		return tsk
-	default:
-		t.Fatalf("expected type *ApplyTask, but got %s", reflect.TypeOf(aTask).String())
-		return nil
-	}
-}
-
-func toPruneTask(t *testing.T, pTask taskrunner.Task) *task.PruneTask {
-	switch tsk := pTask.(type) {
-	case *task.PruneTask:
-		return tsk
-	default:
-		t.Fatalf("expected type *PruneTask, but got %s", reflect.TypeOf(pTask).String())
-		return nil
-	}
-}
-
-func getType(task taskrunner.Task) reflect.Type {
-	return reflect.TypeOf(task)
+// waitTaskComparer allows comparion of WaitTasks, ignoring private fields.
+func waitTaskComparer() cmp.Option {
+	return cmp.Comparer(func(x, y *taskrunner.WaitTask) bool {
+		if x == nil {
+			return y == nil
+		}
+		if y == nil {
+			return false
+		}
+		return x.TaskName == y.TaskName &&
+			x.Ids.Hash() == y.Ids.Hash() && // exact order match
+			x.Condition == y.Condition &&
+			x.Timeout == y.Timeout &&
+			cmp.Equal(x.Mapper, y.Mapper)
+	})
 }

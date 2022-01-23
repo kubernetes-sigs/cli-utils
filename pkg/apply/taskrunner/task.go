@@ -38,11 +38,11 @@ type Task interface {
 // the resources specifies by ids all meet the specified condition.
 func NewWaitTask(name string, ids object.ObjMetadataSet, cond Condition, timeout time.Duration, mapper meta.RESTMapper) *WaitTask {
 	return &WaitTask{
-		name:      name,
+		TaskName:  name,
 		Ids:       ids,
 		Condition: cond,
 		Timeout:   timeout,
-		mapper:    mapper,
+		Mapper:    mapper,
 	}
 }
 
@@ -54,8 +54,8 @@ func NewWaitTask(name string, ids object.ObjMetadataSet, cond Condition, timeout
 // is handled in a special way to the taskrunner and is a part of the core
 // package.
 type WaitTask struct {
-	// name allows providing a name for the task.
-	name string
+	// TaskName allows providing a name for the task.
+	TaskName string
 	// Ids is the full list of resources that we are waiting for.
 	Ids object.ObjMetadataSet
 	// Condition defines the status we want all resources to reach
@@ -63,8 +63,8 @@ type WaitTask struct {
 	// Timeout defines how long we are willing to wait for the condition
 	// to be met.
 	Timeout time.Duration
-	// mapper is the RESTMapper to update after CRDs have been reconciled
-	mapper meta.RESTMapper
+	// Mapper is the RESTMapper to update after CRDs have been reconciled
+	Mapper meta.RESTMapper
 	// cancelFunc is a function that will cancel the timeout timer
 	// on the task.
 	cancelFunc context.CancelFunc
@@ -78,7 +78,7 @@ type WaitTask struct {
 }
 
 func (w *WaitTask) Name() string {
-	return w.name
+	return w.TaskName
 }
 
 func (w *WaitTask) Action() event.ResourceAction {
@@ -114,7 +114,7 @@ func (w *WaitTask) Start(taskContext *TaskContext) {
 		// Err is always non-nil when Done channel is closed.
 		err := ctx.Err()
 
-		klog.V(2).Infof("wait task completing (name: %q,): %v", w.name, err)
+		klog.V(2).Infof("wait task completing (name: %q,): %v", w.TaskName, err)
 
 		switch err {
 		case context.Canceled:
@@ -166,7 +166,7 @@ func (w *WaitTask) startInner(taskContext *TaskContext) {
 
 	if len(pending) == 0 {
 		// all reconciled - clear pending and exit
-		klog.V(3).Infof("all objects reconciled or skipped (name: %q)", w.name)
+		klog.V(3).Infof("all objects reconciled or skipped (name: %q)", w.TaskName)
 		w.cancelFunc()
 	}
 }
@@ -281,7 +281,7 @@ func (w *WaitTask) StatusUpdate(taskContext *TaskContext, id object.ObjMetadata)
 	// can be completed.
 	if len(w.pending) == 0 {
 		// all reconciled, so exit
-		klog.V(3).Infof("all objects reconciled or skipped (name: %q)", w.name)
+		klog.V(3).Infof("all objects reconciled or skipped (name: %q)", w.TaskName)
 		w.cancelFunc()
 	}
 }
@@ -304,7 +304,7 @@ func (w *WaitTask) updateRESTMapper(taskContext *TaskContext) {
 	}
 
 	klog.V(5).Infof("resetting RESTMapper")
-	ddRESTMapper, err := extractDeferredDiscoveryRESTMapper(w.mapper)
+	ddRESTMapper, err := extractDeferredDiscoveryRESTMapper(w.Mapper)
 	if err != nil {
 		if klog.V(4).Enabled() {
 			klog.Errorf("error resetting RESTMapper: %v", err)

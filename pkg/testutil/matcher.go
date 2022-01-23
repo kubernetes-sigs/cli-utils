@@ -1,6 +1,5 @@
 // Copyright 2020 The Kubernetes Authors.
 // SPDX-License-Identifier: Apache-2.0
-//
 
 package testutil
 
@@ -9,12 +8,9 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
-	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/onsi/gomega/format"
-	"github.com/stretchr/testify/assert"
 )
 
 // Equal returns a matcher for use with Gomega that uses go-cmp's cmp.Equal to
@@ -22,30 +18,32 @@ import (
 //
 // Example Usage:
 // Expect(receivedEvents).To(testutil.Equal(expectedEvents))
-func Equal(expected interface{}) *cmpMatcher {
-	return &cmpMatcher{expected: expected}
+func Equal(expected interface{}) *EqualMatcher {
+	return DefaultAsserter.EqualMatcher(expected)
 }
 
-type cmpMatcher struct {
-	expected    interface{}
+type EqualMatcher struct {
+	Expected interface{}
+	Options  cmp.Options
+
 	explanation error
 }
 
-func (cm *cmpMatcher) Match(actual interface{}) (bool, error) {
-	match := cmp.Equal(cm.expected, actual, cmpopts.EquateErrors())
+func (cm *EqualMatcher) Match(actual interface{}) (bool, error) {
+	match := cmp.Equal(cm.Expected, actual, cm.Options...)
 	if !match {
-		cm.explanation = errors.New(cmp.Diff(cm.expected, actual, cmpopts.EquateErrors()))
+		cm.explanation = errors.New(cmp.Diff(cm.Expected, actual, cm.Options...))
 	}
 	return match, nil
 }
 
-func (cm *cmpMatcher) FailureMessage(actual interface{}) string {
-	return "\n" + format.Message(actual, "to deeply equal", cm.expected) +
+func (cm *EqualMatcher) FailureMessage(actual interface{}) string {
+	return "\n" + format.Message(actual, "to deeply equal", cm.Expected) +
 		"\nDiff (- Expected, + Actual):\n" + indent(cm.explanation.Error(), 1)
 }
 
-func (cm *cmpMatcher) NegatedFailureMessage(actual interface{}) string {
-	return "\n" + format.Message(actual, "not to deeply equal", cm.expected) +
+func (cm *EqualMatcher) NegatedFailureMessage(actual interface{}) string {
+	return "\n" + format.Message(actual, "not to deeply equal", cm.Expected) +
 		"\nDiff (- Expected, + Actual):\n" + indent(cm.explanation.Error(), 1)
 }
 
@@ -108,32 +106,4 @@ func (e equalErrorString) Is(err error) bool {
 		return false
 	}
 	return e.err == err.Error()
-}
-
-// AssertEqual fails the test if the actual value does not deeply equal the
-// expected value. Prints a diff on failure.
-func AssertEqual(t *testing.T, expected, actual interface{}, msgAndArgs ...interface{}) {
-	t.Helper() // print the caller's file:line, instead of this func, on failure
-	matcher := Equal(expected)
-	match, err := matcher.Match(actual)
-	if err != nil {
-		t.Errorf("errored testing equality: %s", err)
-	}
-	if !match {
-		assert.Fail(t, matcher.FailureMessage(actual), msgAndArgs...)
-	}
-}
-
-// AssertNotEqual fails the test if the actual value deeply equals the
-// expected value. Prints a diff on failure.
-func AssertNotEqual(t *testing.T, expected, actual interface{}, msgAndArgs ...interface{}) {
-	t.Helper() // print the caller's file:line, instead of this func, on failure
-	matcher := Equal(expected)
-	match, err := matcher.Match(actual)
-	if err != nil {
-		t.Errorf("errored testing equality: %s", err)
-	}
-	if match {
-		assert.Fail(t, matcher.NegatedFailureMessage(actual), msgAndArgs...)
-	}
 }
