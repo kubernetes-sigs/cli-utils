@@ -5,14 +5,11 @@ package taskrunner
 
 import (
 	"context"
-	"fmt"
-	"reflect"
 	"sync"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/restmapper"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
@@ -304,30 +301,5 @@ func (w *WaitTask) updateRESTMapper(taskContext *TaskContext) {
 	}
 
 	klog.V(5).Infof("resetting RESTMapper")
-	ddRESTMapper, err := extractDeferredDiscoveryRESTMapper(w.Mapper)
-	if err != nil {
-		if klog.V(4).Enabled() {
-			klog.Errorf("error resetting RESTMapper: %v", err)
-		}
-	}
-	ddRESTMapper.Reset()
-}
-
-// extractDeferredDiscoveryRESTMapper unwraps the provided RESTMapper
-// interface to get access to the underlying DeferredDiscoveryRESTMapper
-// that can be reset.
-func extractDeferredDiscoveryRESTMapper(mapper meta.RESTMapper) (
-	*restmapper.DeferredDiscoveryRESTMapper,
-	error,
-) {
-	val := reflect.ValueOf(mapper)
-	if val.Type().Kind() != reflect.Struct {
-		return nil, fmt.Errorf("unexpected RESTMapper type: %s", val.Type().String())
-	}
-	fv := val.FieldByName("RESTMapper")
-	ddRESTMapper, ok := fv.Interface().(*restmapper.DeferredDiscoveryRESTMapper)
-	if !ok {
-		return nil, fmt.Errorf("unexpected RESTMapper field type: %s", fv.Type())
-	}
-	return ddRESTMapper, nil
+	meta.MaybeResetRESTMapper(w.Mapper)
 }

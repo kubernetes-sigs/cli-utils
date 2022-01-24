@@ -20,7 +20,6 @@ import (
 	"sigs.k8s.io/cli-utils/cmd/status"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/manifestreader"
-	"sigs.k8s.io/cli-utils/pkg/util/factory"
 
 	// This is here rather than in the libraries because of
 	// https://github.com/kubernetes-sigs/kustomize/issues/2060
@@ -42,9 +41,7 @@ func main() {
 	flags := cmd.PersistentFlags()
 	kubeConfigFlags := genericclioptions.NewConfigFlags(true).WithDeprecatedPasswordFlag()
 	kubeConfigFlags.AddFlags(flags)
-	matchVersionKubeConfigFlags := util.NewMatchVersionFlags(&factory.CachingRESTClientGetter{
-		Delegate: kubeConfigFlags,
-	})
+	matchVersionKubeConfigFlags := util.NewMatchVersionFlags(kubeConfigFlags)
 	matchVersionKubeConfigFlags.AddFlags(flags)
 	flags.AddGoFlagSet(flag.CommandLine)
 	f := util.NewFactory(matchVersionKubeConfigFlags)
