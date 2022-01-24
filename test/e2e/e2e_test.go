@@ -24,7 +24,6 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/apply"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
-	"sigs.k8s.io/cli-utils/pkg/util/factory"
 	"sigs.k8s.io/cli-utils/test/e2e/customprovider"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -357,9 +356,7 @@ func newCustomInvDestroyer() *apply.Destroyer {
 
 func newFactory() util.Factory {
 	kubeConfigFlags := genericclioptions.NewConfigFlags(true).WithDeprecatedPasswordFlag()
-	matchVersionKubeConfigFlags := util.NewMatchVersionFlags(&factory.CachingRESTClientGetter{
-		Delegate: kubeConfigFlags,
-	})
+	matchVersionKubeConfigFlags := util.NewMatchVersionFlags(kubeConfigFlags)
 	return util.NewFactory(matchVersionKubeConfigFlags)
 }
 
