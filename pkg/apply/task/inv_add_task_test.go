@@ -130,7 +130,7 @@ func TestInvAddTask(t *testing.T) {
 			if result.Err != nil {
 				t.Errorf("unexpected error running InvAddTask: %s", result.Err)
 			}
-			actual, _ := client.GetClusterObjs(nil, common.DryRunNone)
+			actual, _ := client.GetClusterObjs(nil)
 			if !tc.expectedObjs.Equal(actual) {
 				t.Errorf("expected merged inventory (%s), got (%s)", tc.expectedObjs, actual)
 			}

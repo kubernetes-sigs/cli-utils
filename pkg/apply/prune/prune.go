@@ -195,7 +195,7 @@ func (p *Pruner) GetPruneObjs(
 	opts Options,
 ) (object.UnstructuredSet, error) {
 	ids := object.UnstructuredSetToObjMetadataSet(objs)
-	invIDs, err := p.InvClient.GetClusterObjs(inv, opts.DryRunStrategy)
+	invIDs, err := p.InvClient.GetClusterObjs(inv)
 	if err != nil {
 		return nil, err
 	}

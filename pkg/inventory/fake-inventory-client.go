@@ -23,7 +23,7 @@ var (
 
 type FakeInventoryClientFactory object.ObjMetadataSet
 
-func (f FakeInventoryClientFactory) NewInventoryClient(factory cmdutil.Factory) (InventoryClient, error) {
+func (f FakeInventoryClientFactory) NewInventoryClient(cmdutil.Factory) (InventoryClient, error) {
 	return NewFakeInventoryClient(object.ObjMetadataSet(f)), nil
 }
 
@@ -36,7 +36,7 @@ func NewFakeInventoryClient(initObjs object.ObjMetadataSet) *FakeInventoryClient
 }
 
 // GetClusterObjs returns currently stored set of objects.
-func (fic *FakeInventoryClient) GetClusterObjs(InventoryInfo, common.DryRunStrategy) (object.ObjMetadataSet, error) {
+func (fic *FakeInventoryClient) GetClusterObjs(InventoryInfo) (object.ObjMetadataSet, error) {
 	if fic.Err != nil {
 		return object.ObjMetadataSet{}, fic.Err
 	}
@@ -91,7 +91,7 @@ func (fic *FakeInventoryClient) ClearError() {
 	fic.Err = nil
 }
 
-func (fic *FakeInventoryClient) GetClusterInventoryInfo(InventoryInfo, common.DryRunStrategy) (*unstructured.Unstructured, error) {
+func (fic *FakeInventoryClient) GetClusterInventoryInfo(InventoryInfo) (*unstructured.Unstructured, error) {
 	return nil, nil
 }
 
