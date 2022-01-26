@@ -26,7 +26,7 @@ import (
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/klog/v2"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
-	"sigs.k8s.io/cli-utils/pkg/apply/info"
+	"k8s.io/kubectl/pkg/scheme"
 	"sigs.k8s.io/cli-utils/pkg/apply/poller"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
@@ -42,8 +42,13 @@ type inventoryInfo struct {
 	set       object.ObjMetadataSet
 }
 
-func (i inventoryInfo) toWrapped() inventory.InventoryInfo {
-	inv := &unstructured.Unstructured{
+func (i inventoryInfo) toUnstructured() *unstructured.Unstructured {
+	invMap := make(map[string]interface{})
+	for _, objMeta := range i.set {
+		invMap[objMeta.String()] = ""
+	}
+
+	return &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"apiVersion": "v1",
 			"kind":       "ConfigMap",
@@ -54,9 +59,13 @@ func (i inventoryInfo) toWrapped() inventory.InventoryInfo {
 					common.InventoryLabel: i.id,
 				},
 			},
+			"data": invMap,
 		},
 	}
-	return inventory.WrapInventoryInfoObj(inv)
+}
+
+func (i inventoryInfo) toWrapped() inventory.InventoryInfo {
+	return inventory.WrapInventoryInfoObj(i.toUnstructured())
 }
 
 func newTestApplier(
@@ -73,7 +82,7 @@ func newTestApplier(
 		factory: tf,
 	}
 
-	invClient := newTestInventory(t, tf, infoHelper)
+	invClient := newTestInventory(t, tf)
 
 	applier, err := NewApplier(tf, invClient)
 	require.NoError(t, err)
@@ -95,11 +104,7 @@ func newTestDestroyer(
 	tf := newTestFactory(t, invInfo, object.UnstructuredSet{}, clusterObjs)
 	defer tf.Cleanup()
 
-	infoHelper := &fakeInfoHelper{
-		factory: tf,
-	}
-
-	invClient := newTestInventory(t, tf, infoHelper)
+	invClient := newTestInventory(t, tf)
 
 	destroyer, err := NewDestroyer(tf, invClient)
 	require.NoError(t, err)
@@ -111,18 +116,11 @@ func newTestDestroyer(
 func newTestInventory(
 	t *testing.T,
 	tf *cmdtesting.TestFactory,
-	infoHelper info.InfoHelper,
 ) inventory.InventoryClient {
 	// Use an InventoryClient with a fakeInfoHelper to allow generating Info
 	// objects that use the FakeRESTClient as the UnstructuredClient.
 	invClient, err := inventory.ClusterInventoryClientFactory{}.NewInventoryClient(tf)
 	require.NoError(t, err)
-
-	// TODO(mortent): This is not great, but at least this keeps the
-	// ugliness in the test code until we can find a way to wire it
-	// up so to avoid it.
-	invClient.(*inventory.ClusterInventoryClient).InfoHelper = infoHelper
-
 	return invClient
 }
 
@@ -159,12 +157,6 @@ func newTestFactory(
 
 	handlers := []handler{
 		&nsHandler{},
-		&inventoryObjectHandler{
-			inventoryName:      invInfo.name,
-			inventoryNamespace: invInfo.namespace,
-			inventoryID:        invInfo.id,
-			inventorySet:       invInfo.set,
-		},
 		&genericHandler{
 			resources: objs,
 			mapper:    mapper,
@@ -172,7 +164,7 @@ func newTestFactory(
 	}
 
 	tf.UnstructuredClient = newFakeRESTClient(t, handlers)
-	tf.FakeDynamicClient = fakeDynamicClient(t, mapper, objs...)
+	tf.FakeDynamicClient = fakeDynamicClient(t, mapper, invInfo, objs...)
 
 	return tf
 }
@@ -285,95 +277,39 @@ func (g *genericHandler) handle(t *testing.T, req *http.Request) (*http.Response
 	return nil, false, nil
 }
 
-// inventoryObjectHandler knows how to handle requests on the inventory objects.
-// It knows how to handle creation, list and get requests for inventory objects.
-type inventoryObjectHandler struct {
-	inventoryName      string
-	inventoryNamespace string
-	inventoryID        string
-	inventorySet       object.ObjMetadataSet
-	inventoryObj       *v1.ConfigMap
+func newInventoryReactor(invInfo inventoryInfo) *inventoryReactor {
+	return &inventoryReactor{
+		inventoryObj: invInfo.toUnstructured(),
+	}
 }
 
-var (
-	cmPathRegex     = regexp.MustCompile(`^/namespaces/([^/]+)/configmaps$`)
-	invObjPathRegex = regexp.MustCompile(`^/namespaces/([^/]+)/configmaps/[a-zA-Z]+-[a-z0-9]+$`)
-)
-
-func (i *inventoryObjectHandler) handle(t *testing.T, req *http.Request) (*http.Response, bool, error) {
-	klog.V(5).Infof("inventoryObjectHandler: handling %s request for %q", req.Method, req.URL)
-	if (req.Method == "POST" && cmPathRegex.Match([]byte(req.URL.Path))) ||
-		(req.Method == "PUT" && invObjPathRegex.Match([]byte(req.URL.Path))) {
-		b, err := ioutil.ReadAll(req.Body)
-		if err != nil {
-			return nil, false, err
-		}
-		cm := v1.ConfigMap{}
-		err = runtime.DecodeInto(codec, b, &cm)
-		if err != nil {
-			return nil, false, err
-		}
-		if cm.Name == i.inventoryName && cm.Namespace == i.inventoryNamespace {
-			i.inventoryObj = &cm
-			inventorySet, err := object.FromStringMap(cm.Data)
-			if err != nil {
-				return nil, false, err
-			}
-			i.inventorySet = inventorySet
-
-			bodyRC := ioutil.NopCloser(bytes.NewReader(b))
-			var statusCode int
-			if req.Method == "POST" {
-				statusCode = http.StatusCreated
-			} else {
-				statusCode = http.StatusOK
-			}
-			return &http.Response{StatusCode: statusCode, Header: cmdtesting.DefaultHeader(), Body: bodyRC}, true, nil
-		}
-		return nil, false, nil
-	}
-
-	if req.Method == http.MethodGet && cmPathRegex.Match([]byte(req.URL.Path)) {
-		cmList := v1.ConfigMapList{
-			TypeMeta: metav1.TypeMeta{
-				APIVersion: "v1",
-				Kind:       "List",
-			},
-			Items: []v1.ConfigMap{},
-		}
-		if len(i.inventorySet) > 0 {
-			cmList.Items = append(cmList.Items, i.currentInvObj())
-		}
-		bodyRC := ioutil.NopCloser(bytes.NewReader(toJSONBytes(t, &cmList)))
-		return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: bodyRC}, true, nil
-	}
-
-	if req.Method == http.MethodGet && invObjPathRegex.Match([]byte(req.URL.Path)) {
-		if len(i.inventorySet) == 0 {
-			return &http.Response{StatusCode: http.StatusNotFound, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.StringBody("")}, true, nil
-		}
-		invObj := i.currentInvObj()
-		bodyRC := ioutil.NopCloser(bytes.NewReader(toJSONBytes(t, &invObj)))
-		return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: bodyRC}, true, nil
-	}
-	return nil, false, nil
+type inventoryReactor struct {
+	inventoryObj *unstructured.Unstructured
 }
 
-func (i *inventoryObjectHandler) currentInvObj() v1.ConfigMap {
-	return v1.ConfigMap{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: v1.SchemeGroupVersion.String(),
-			Kind:       "ConfigMap",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      i.inventoryName,
-			Namespace: i.inventoryNamespace,
-			Labels: map[string]string{
-				common.InventoryLabel: i.inventoryID,
-			},
-		},
-		Data: i.inventorySet.ToStringMap(),
-	}
+func (ir *inventoryReactor) updateFakeDynamicClient(fdc *dynamicfake.FakeDynamicClient) {
+	fdc.PrependReactor("create", "configmaps", func(action clienttesting.Action) (bool, runtime.Object, error) {
+		obj := *action.(clienttesting.CreateAction).GetObject().(*unstructured.Unstructured)
+		ir.inventoryObj = &obj
+		return true, nil, nil
+	})
+	fdc.PrependReactor("list", "configmaps", func(action clienttesting.Action) (bool, runtime.Object, error) {
+		uList := &unstructured.UnstructuredList{
+			Items: []unstructured.Unstructured{},
+		}
+		if ir.inventoryObj != nil {
+			uList.Items = append(uList.Items, *ir.inventoryObj)
+		}
+		return true, uList, nil
+	})
+	fdc.PrependReactor("get", "configmaps", func(action clienttesting.Action) (bool, runtime.Object, error) {
+		return true, ir.inventoryObj, nil
+	})
+	fdc.PrependReactor("update", "configmaps", func(action clienttesting.Action) (bool, runtime.Object, error) {
+		obj := *action.(clienttesting.UpdateAction).GetObject().(*unstructured.Unstructured)
+		ir.inventoryObj = &obj
+		return true, nil, nil
+	})
 }
 
 // nsHandler can handle requests for a namespace. It will behave as if
@@ -486,8 +422,11 @@ func (f *fakeInfoHelper) getClient(gv schema.GroupVersion) (resource.RESTClient,
 }
 
 // fakeDynamicClient returns a fake dynamic client.
-func fakeDynamicClient(t *testing.T, mapper meta.RESTMapper, objs ...resourceInfo) *dynamicfake.FakeDynamicClient {
-	fakeClient := dynamicfake.NewSimpleDynamicClient(runtime.NewScheme())
+func fakeDynamicClient(t *testing.T, mapper meta.RESTMapper, invInfo inventoryInfo, objs ...resourceInfo) *dynamicfake.FakeDynamicClient {
+	fakeClient := dynamicfake.NewSimpleDynamicClient(scheme.Scheme)
+
+	invReactor := newInventoryReactor(invInfo)
+	invReactor.updateFakeDynamicClient(fakeClient)
 
 	for i := range objs {
 		obj := objs[i]
@@ -507,6 +446,7 @@ func fakeDynamicClient(t *testing.T, mapper meta.RESTMapper, objs ...resourceInf
 			return true, nil, nil
 		})
 	}
+
 	return fakeClient
 }
 

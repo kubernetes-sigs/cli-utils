@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"sigs.k8s.io/kustomize/kyaml/kio/kioutil"
 )
 
 var (
@@ -188,4 +189,15 @@ func crdDefinesVersion(crd *unstructured.Unstructured, version string) (bool, er
 		}
 	}
 	return false, nil
+}
+
+// StripKyamlAnnotations removes any path and index annotations from the
+// unstructured resource.
+func StripKyamlAnnotations(u *unstructured.Unstructured) {
+	annos := u.GetAnnotations()
+	delete(annos, kioutil.PathAnnotation)
+	delete(annos, kioutil.LegacyPathAnnotation) //nolint:staticcheck
+	delete(annos, kioutil.IndexAnnotation)
+	delete(annos, kioutil.LegacyIndexAnnotation) //nolint:staticcheck
+	u.SetAnnotations(annos)
 }
