@@ -291,11 +291,11 @@ func TestReplace(t *testing.T) {
 	// Client and server dry-run do not throw errors.
 	invClient, err := NewInventoryClient(tf, WrapInventoryObj, InvInfoToConfigMap)
 	require.NoError(t, err)
-	err = invClient.Replace(copyInventory(), object.ObjMetadataSet{}, common.DryRunClient)
+	err = invClient.Replace(copyInventory(), object.ObjMetadataSet{}, common.DryRunClient, nil)
 	if err != nil {
 		t.Fatalf("unexpected error received: %s", err)
 	}
-	err = invClient.Replace(copyInventory(), object.ObjMetadataSet{}, common.DryRunServer)
+	err = invClient.Replace(copyInventory(), object.ObjMetadataSet{}, common.DryRunServer, nil)
 	if err != nil {
 		t.Fatalf("unexpected error received: %s", err)
 	}
@@ -307,7 +307,7 @@ func TestReplace(t *testing.T) {
 				WrapInventoryObj, InvInfoToConfigMap)
 			require.NoError(t, err)
 			wrappedInv := invClient.InventoryFactoryFunc(inventoryObj)
-			if err := wrappedInv.Store(tc.clusterObjs); err != nil {
+			if err := wrappedInv.Store(tc.clusterObjs, nil); err != nil {
 				t.Fatalf("unexpected error storing inventory objects: %s", err)
 			}
 			inv, err := wrappedInv.GetObject()
@@ -315,7 +315,7 @@ func TestReplace(t *testing.T) {
 				t.Fatalf("unexpected error storing inventory objects: %s", err)
 			}
 			// Call replaceInventory with the new set of "localObjs"
-			inv, err = invClient.replaceInventory(inv, tc.localObjs)
+			inv, err = invClient.replaceInventory(inv, tc.localObjs, nil)
 			if err != nil {
 				t.Fatalf("unexpected error received: %s", err)
 			}

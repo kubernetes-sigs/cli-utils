@@ -7,6 +7,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/cli-utils/pkg/common"
+	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
@@ -58,7 +59,8 @@ func (fic *FakeInventoryClient) Merge(_ InventoryInfo, objs object.ObjMetadataSe
 // Replace the stored cluster inventory objs with the passed obj, or an
 // error if one is set up.
 
-func (fic *FakeInventoryClient) Replace(_ InventoryInfo, objs object.ObjMetadataSet, _ common.DryRunStrategy) error {
+func (fic *FakeInventoryClient) Replace(_ InventoryInfo, objs object.ObjMetadataSet, _ common.DryRunStrategy,
+	_ map[object.ObjMetadata]status.ApplyReconcileStatus) error {
 	if fic.Err != nil {
 		return fic.Err
 	}

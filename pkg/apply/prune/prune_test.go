@@ -126,7 +126,7 @@ func createInventoryInfo(children ...*unstructured.Unstructured) inventory.Inven
 	inventoryObjCopy := inventoryObj.DeepCopy()
 	wrappedInv := inventory.WrapInventoryObj(inventoryObjCopy)
 	objs := object.UnstructuredSetToObjMetadataSet(children)
-	if err := wrappedInv.Store(objs); err != nil {
+	if err := wrappedInv.Store(objs, nil); err != nil {
 		return nil
 	}
 	obj, err := wrappedInv.GetObject()
