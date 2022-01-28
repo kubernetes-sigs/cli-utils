@@ -7,11 +7,8 @@
 package graph
 
 import (
-	"bytes"
-	"fmt"
 	"sort"
 
-	"sigs.k8s.io/cli-utils/pkg/multierror"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/object/validation"
 	"sigs.k8s.io/cli-utils/pkg/ordering"
@@ -23,13 +20,6 @@ import (
 type Graph struct {
 	// map "from" vertex -> list of "to" vertices
 	edges map[object.ObjMetadata]object.ObjMetadataSet
-}
-
-// Edge encapsulates a pair of vertices describing a
-// directed edge.
-type Edge struct {
-	From object.ObjMetadata
-	To   object.ObjMetadata
 }
 
 // New returns a pointer to an empty Graph data structure.
@@ -149,48 +139,4 @@ func (g *Graph) Sort() ([]object.ObjMetadataSet, error) {
 		sorted = append(sorted, leafVertices)
 	}
 	return sorted, nil
-}
-
-// CyclicDependencyError when directed acyclic graph contains a cycle.
-// The cycle makes it impossible to topological sort.
-type CyclicDependencyError struct {
-	Edges []Edge
-}
-
-func (cde CyclicDependencyError) Error() string {
-	var errorBuf bytes.Buffer
-	errorBuf.WriteString("cyclic dependency:\n")
-	for _, edge := range cde.Edges {
-		from := fmt.Sprintf("%s/%s", edge.From.Namespace, edge.From.Name)
-		to := fmt.Sprintf("%s/%s", edge.To.Namespace, edge.To.Name)
-		errorBuf.WriteString(fmt.Sprintf("%s%s -> %s\n", multierror.Prefix, from, to))
-	}
-	return errorBuf.String()
-}
-
-// SortableEdges sorts a list of edges alphanumerically by From and then To.
-type SortableEdges []Edge
-
-var _ sort.Interface = SortableEdges{}
-
-func (a SortableEdges) Len() int      { return len(a) }
-func (a SortableEdges) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
-func (a SortableEdges) Less(i, j int) bool {
-	if a[i].From != a[j].From {
-		return metaIsLessThan(a[i].From, a[j].From)
-	}
-	return metaIsLessThan(a[i].To, a[j].To)
-}
-
-func metaIsLessThan(i, j object.ObjMetadata) bool {
-	if i.GroupKind.Group != j.GroupKind.Group {
-		return i.GroupKind.Group < j.GroupKind.Group
-	}
-	if i.GroupKind.Kind != j.GroupKind.Kind {
-		return i.GroupKind.Kind < j.GroupKind.Kind
-	}
-	if i.Namespace != j.Namespace {
-		return i.Namespace < j.Namespace
-	}
-	return i.Name < j.Name
 }

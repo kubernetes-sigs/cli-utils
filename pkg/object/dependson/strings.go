@@ -54,10 +54,10 @@ func FormatDependencySet(depSet DependencySet) (string, error) {
 // Returns the parsed DependencySet or an error if unable to parse.
 func ParseDependencySet(depsStr string) (DependencySet, error) {
 	objs := DependencySet{}
-	for _, objStr := range strings.Split(depsStr, annotationSeparator) {
+	for i, objStr := range strings.Split(depsStr, annotationSeparator) {
 		obj, err := ParseObjMetadata(objStr)
 		if err != nil {
-			return objs, fmt.Errorf("failed to parse object metadata: %w", err)
+			return objs, fmt.Errorf("failed to parse object reference (index: %d): %w", i, err)
 		}
 		objs = append(objs, obj)
 	}

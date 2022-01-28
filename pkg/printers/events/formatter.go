@@ -12,6 +12,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/object"
+	"sigs.k8s.io/cli-utils/pkg/object/validation"
 	"sigs.k8s.io/cli-utils/pkg/print/list"
 	"sigs.k8s.io/cli-utils/pkg/print/stats"
 )
@@ -25,6 +26,36 @@ func NewFormatter(ioStreams genericclioptions.IOStreams,
 
 type formatter struct {
 	ioStreams genericclioptions.IOStreams
+}
+
+func (ef *formatter) FormatValidationEvent(ve event.ValidationEvent) error {
+	// unwrap validation errors
+	err := ve.Error
+	if vErr, ok := err.(*validation.Error); ok {
+		err = vErr.Unwrap()
+	}
+
+	switch {
+	case len(ve.Identifiers) == 0:
+		// no objects, invalid event
+		return fmt.Errorf("invalid validation event: no identifiers: %w", err)
+	case len(ve.Identifiers) == 1:
+		// only 1 object, unwrap for similarity with status event
+		id := ve.Identifiers[0]
+		ef.print("Invalid object (%s): %v",
+			resourceIDToString(id.GroupKind, id.Name), err.Error())
+	default:
+		// more than 1 object, wrap list in brackets
+		var sb strings.Builder
+		id := ve.Identifiers[0]
+		_, _ = fmt.Fprintf(&sb, "Invalid objects (%s", resourceIDToString(id.GroupKind, id.Name))
+		for _, id := range ve.Identifiers[1:] {
+			_, _ = fmt.Fprintf(&sb, ", %s", resourceIDToString(id.GroupKind, id.Name))
+		}
+		_, _ = fmt.Fprintf(&sb, "): %v", err)
+		ef.print(sb.String())
+	}
+	return nil
 }
 
 func (ef *formatter) FormatApplyEvent(ae event.ApplyEvent) error {

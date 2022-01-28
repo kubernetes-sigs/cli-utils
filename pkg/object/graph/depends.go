@@ -7,7 +7,6 @@
 package graph
 
 import (
-	"fmt"
 	"sort"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -133,10 +132,17 @@ func addApplyTimeMutationEdges(g *Graph, objs object.UnstructuredSet, ids object
 			// Require dependencies to be in the same resource group.
 			// Waiting for external dependencies isn't implemented (yet).
 			if !ids.Contains(dep) {
-				err := fmt.Errorf("invalid %q annotation: dependency not in object set: %s",
-					mutation.Annotation, sub.SourceRef)
+				err := object.InvalidAnnotationError{
+					Annotation: mutation.Annotation,
+					Cause: ExternalDependencyError{
+						Edge: Edge{
+							From: id,
+							To:   dep,
+						},
+					},
+				}
 				objErrors = append(objErrors, err)
-				klog.V(3).Infof("failed to add edges from: %s: %v", id, err)
+				klog.V(3).Infof("failed to add edges: %v", err)
 				continue
 			}
 			klog.V(3).Infof("adding edge from: %s, to: %s", id, dep)
@@ -175,10 +181,15 @@ func addDependsOnEdges(g *Graph, objs object.UnstructuredSet, ids object.ObjMeta
 			// Duplicate dependencies in the same annotation are not allowed.
 			// Having duplicates won't break the graph, but skip it anyway.
 			if _, found := seen[dep]; found {
-				// Won't error - already passed validation
-				depStr, _ := dependson.FormatObjMetadata(dep)
-				err := fmt.Errorf("invalid %q annotation: duplicate reference: %s",
-					dependson.Annotation, depStr)
+				err := object.InvalidAnnotationError{
+					Annotation: dependson.Annotation,
+					Cause: DuplicateDependencyError{
+						Edge: Edge{
+							From: id,
+							To:   dep,
+						},
+					},
+				}
 				objErrors = append(objErrors, err)
 				klog.V(3).Infof("failed to add edges from: %s: %v", id, err)
 				continue
@@ -188,10 +199,17 @@ func addDependsOnEdges(g *Graph, objs object.UnstructuredSet, ids object.ObjMeta
 			// Require dependencies to be in the same resource group.
 			// Waiting for external dependencies isn't implemented (yet).
 			if !ids.Contains(dep) {
-				err := fmt.Errorf("invalid %q annotation: dependency not in object set: %s",
-					dependson.Annotation, mutation.ResourceReferenceFromObjMetadata(dep))
+				err := object.InvalidAnnotationError{
+					Annotation: dependson.Annotation,
+					Cause: ExternalDependencyError{
+						Edge: Edge{
+							From: id,
+							To:   dep,
+						},
+					},
+				}
 				objErrors = append(objErrors, err)
-				klog.V(3).Infof("failed to add edges from: %s: %v", id, err)
+				klog.V(3).Infof("failed to add edges: %v", err)
 				continue
 			}
 			klog.V(3).Infof("adding edge from: %s, to: %s", id, dep)

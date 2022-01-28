@@ -89,8 +89,18 @@ func (setA ObjMetadataSet) Intersection(setB ObjMetadataSet) ObjMetadataSet {
 		}
 	}
 	intersection := make(ObjMetadataSet, 0, len(mapI))
-	for o := range mapI {
-		intersection = append(intersection, o)
+	// Iterate over setA & setB to retain input order and have stable output
+	for _, id := range setA {
+		if _, ok := mapI[id]; ok {
+			intersection = append(intersection, id)
+			delete(mapI, id)
+		}
+	}
+	for _, id := range setB {
+		if _, ok := mapI[id]; ok {
+			intersection = append(intersection, id)
+			delete(mapI, id)
+		}
 	}
 	return intersection
 }
@@ -105,8 +115,18 @@ func (setA ObjMetadataSet) Union(setB ObjMetadataSet) ObjMetadataSet {
 		m[b] = struct{}{}
 	}
 	union := make(ObjMetadataSet, 0, len(m))
-	for u := range m {
-		union = append(union, u)
+	// Iterate over setA & setB to retain input order and have stable output
+	for _, id := range setA {
+		if _, ok := m[id]; ok {
+			union = append(union, id)
+			delete(m, id)
+		}
+	}
+	for _, id := range setB {
+		if _, ok := m[id]; ok {
+			union = append(union, id)
+			delete(m, id)
+		}
 	}
 	return union
 }
@@ -124,10 +144,20 @@ func (setA ObjMetadataSet) Diff(setB ObjMetadataSet) ObjMetadataSet {
 	}
 	// Create/return slice from the map of remaining items
 	diff := make(ObjMetadataSet, 0, len(m))
-	for r := range m {
-		diff = append(diff, r)
+	// Iterate over setA to retain input order and have stable output
+	for _, id := range setA {
+		if _, ok := m[id]; ok {
+			diff = append(diff, id)
+			delete(m, id)
+		}
 	}
 	return diff
+}
+
+// Unique returns the set with duplicates removed.
+// Order may or may not remain consistent.
+func (setA ObjMetadataSet) Unique() ObjMetadataSet {
+	return ObjMetadataSetFromMap(setA.ToMap())
 }
 
 // Hash the objects in the set by serializing, sorting, concatonating, and

@@ -105,6 +105,12 @@ func (i *InvSetTask) Start(taskContext *taskrunner.TaskContext) {
 		klog.V(4).Infof("remove from inventory %d abandoned objects", len(abandonedObjects))
 		invObjs = invObjs.Diff(abandonedObjects)
 
+		// If an object is invalid and was previously stored in the inventory,
+		// then keep it in the inventory so it can be applied/pruned next time.
+		invalidObjects := i.PrevInventory.Intersection(taskContext.InvalidObjects())
+		klog.V(4).Infof("keep in inventory %d invalid objects", len(invalidObjects))
+		invObjs = invObjs.Union(invalidObjects)
+
 		klog.V(4).Infof("set inventory %d total objects", len(invObjs))
 		err := i.InvClient.Replace(i.InvInfo, invObjs, i.DryRun)
 

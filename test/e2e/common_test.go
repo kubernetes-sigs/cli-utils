@@ -7,8 +7,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"html/template"
 	"strings"
+	"text/template"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -22,6 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/common"
+	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
 	"sigs.k8s.io/cli-utils/pkg/object/dependson"
 	"sigs.k8s.io/cli-utils/pkg/object/mutation"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -203,6 +204,40 @@ func assertUnstructuredDoesNotExist(ctx context.Context, c client.Client, obj *u
 		"expected GET to error with NotFound (%s): %s", ref, err)
 }
 
+func applyUnstructured(ctx context.Context, c client.Client, obj *unstructured.Unstructured) {
+	ref := mutation.ResourceReferenceFromUnstructured(obj)
+	resultObj := ref.ToUnstructured()
+
+	err := c.Get(ctx, types.NamespacedName{
+		Namespace: obj.GetNamespace(),
+		Name:      obj.GetName(),
+	}, resultObj)
+	Expect(err).NotTo(HaveOccurred(),
+		"expected GET not to error (%s)", ref)
+
+	err = c.Patch(ctx, obj, client.MergeFrom(resultObj))
+	Expect(err).NotTo(HaveOccurred(),
+		"expected PATCH not to error (%s): %s", ref, err)
+}
+
+func assertUnstructuredAvailable(obj *unstructured.Unstructured) {
+	ref := mutation.ResourceReferenceFromUnstructured(obj)
+	objc, err := status.GetObjectWithConditions(obj.Object)
+	Expect(err).NotTo(HaveOccurred())
+	available := false
+	for _, c := range objc.Status.Conditions {
+		switch c.Type {
+		case "Available": // appsv1.DeploymentAvailable
+			if c.Status == "True" { // corev1.ConditionTrue
+				available = true
+				break
+			}
+		}
+	}
+	Expect(available).To(BeTrue(),
+		"expected Available condition to be True (%s)", ref)
+}
+
 func randomString(prefix string) string {
 	randomSuffix := common.RandomStr()
 	return fmt.Sprintf("%s%s", prefix, randomSuffix)
@@ -280,7 +315,7 @@ func manifestToUnstructured(manifest []byte) *unstructured.Unstructured {
 	u := make(map[string]interface{})
 	err := yaml.Unmarshal(manifest, &u)
 	if err != nil {
-		panic(err)
+		panic(fmt.Errorf("failed to parse manifest yaml: %w", err))
 	}
 	return &unstructured.Unstructured{
 		Object: u,

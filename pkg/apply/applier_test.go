@@ -13,12 +13,15 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubectl/pkg/scheme"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	pollevent "sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
+	"sigs.k8s.io/cli-utils/pkg/multierror"
 	"sigs.k8s.io/cli-utils/pkg/object"
+	"sigs.k8s.io/cli-utils/pkg/object/validation"
 	"sigs.k8s.io/cli-utils/pkg/testutil"
 )
 
@@ -489,7 +492,7 @@ func TestApplier(t *testing.T) {
 						Type:      event.Started,
 					},
 				},
-				// Secrets applied before Deployments (see pkg/ordering)
+				// Apply Secrets before Deployments (see ordering.SortableMetas)
 				{
 					EventType: event.ApplyType,
 					ApplyEvent: &testutil.ExpApplyEvent{
@@ -522,7 +525,7 @@ func TestApplier(t *testing.T) {
 						Type:      event.Started,
 					},
 				},
-				// Secrets before Deployments (see pkg/ordering)
+				// Apply Secrets before Deployments (see ordering.SortableMetas)
 				{
 					EventType: event.WaitType,
 					WaitEvent: &testutil.ExpWaitEvent{
@@ -539,7 +542,7 @@ func TestApplier(t *testing.T) {
 						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
 					},
 				},
-				// Deployment before Secret (see statusEvents)
+				// Wait Deployments before Secrets (see testutil.GroupedEventsByID)
 				{
 					EventType: event.WaitType,
 					WaitEvent: &testutil.ExpWaitEvent{
@@ -695,7 +698,7 @@ func TestApplier(t *testing.T) {
 						Type:      event.Started,
 					},
 				},
-				// Deployments deleted before Secrets (see pkg/ordering)
+				// Prune Deployments before Secrets (see ordering.SortableMetas)
 				{
 					EventType: event.PruneType,
 					PruneEvent: &testutil.ExpPruneEvent{
@@ -728,7 +731,7 @@ func TestApplier(t *testing.T) {
 						Type:      event.Started,
 					},
 				},
-				// Deployments before Secrets (see pkg/ordering)
+				// Prune Deployments before Secrets (see ordering.SortableMetas)
 				{
 					EventType: event.WaitType,
 					WaitEvent: &testutil.ExpWaitEvent{
@@ -745,7 +748,7 @@ func TestApplier(t *testing.T) {
 						Identifier: testutil.ToIdentifier(t, resources["secret"]),
 					},
 				},
-				// Deployment before Secret (see statusEvents)
+				// Wait Deployments before Secrets (see testutil.GroupedEventsByID)
 				{
 					EventType: event.WaitType,
 					WaitEvent: &testutil.ExpWaitEvent{
@@ -1179,15 +1182,258 @@ func TestApplier(t *testing.T) {
 				},
 			},
 		},
+		"SkipInvalid - skip invalid objects and apply valid objects": {
+			namespace: "default",
+			resources: object.UnstructuredSet{
+				testutil.Unstructured(t, resources["deployment"], JSONPathSetter{
+					"$.metadata.name", "",
+				}),
+				testutil.Unstructured(t, resources["deployment"], JSONPathSetter{
+					"$.kind", "",
+				}),
+				testutil.Unstructured(t, resources["secret"]),
+			},
+			invInfo: inventoryInfo{
+				name:      "inv-123",
+				namespace: "default",
+				id:        "test",
+			},
+			clusterObjs: object.UnstructuredSet{},
+			options: Options{
+				ReconcileTimeout: time.Minute,
+				InventoryPolicy:  inventory.AdoptIfNoInventory,
+				EmitStatusEvents: true,
+				ValidationPolicy: validation.SkipInvalid,
+			},
+			statusEvents: []pollevent.Event{
+				{
+					EventType: pollevent.ResourceUpdateEvent,
+					Resource: &pollevent.ResourceStatus{
+						Identifier: testutil.ToIdentifier(t, resources["secret"]),
+						Status:     status.CurrentStatus,
+						Resource:   testutil.Unstructured(t, resources["secret"]),
+					},
+				},
+			},
+			expectedStatusEvents: []testutil.ExpEvent{
+				{
+					EventType: event.StatusType,
+					StatusEvent: &testutil.ExpStatusEvent{
+						Identifier: testutil.ToIdentifier(t, resources["secret"]),
+						Status:     status.CurrentStatus,
+					},
+				},
+			},
+			expectedEvents: []testutil.ExpEvent{
+				{
+					EventType: event.ValidationType,
+					ValidationEvent: &testutil.ExpValidationEvent{
+						Identifiers: object.ObjMetadataSet{
+							object.UnstructuredToObjMetadata(
+								testutil.Unstructured(t, resources["deployment"], JSONPathSetter{
+									"$.kind", "",
+								}),
+							),
+						},
+						Error: testutil.EqualErrorString(validation.NewError(
+							field.Required(field.NewPath("kind"), "kind is required"),
+							object.UnstructuredToObjMetadata(
+								testutil.Unstructured(t, resources["deployment"], JSONPathSetter{
+									"$.kind", "",
+								}),
+							),
+						).Error()),
+					},
+				},
+				{
+					EventType: event.ValidationType,
+					ValidationEvent: &testutil.ExpValidationEvent{
+						Identifiers: object.ObjMetadataSet{
+							object.UnstructuredToObjMetadata(
+								testutil.Unstructured(t, resources["deployment"], JSONPathSetter{
+									"$.metadata.name", "",
+								}),
+							),
+						},
+						Error: testutil.EqualErrorString(validation.NewError(
+							field.Required(field.NewPath("metadata", "name"), "name is required"),
+							object.UnstructuredToObjMetadata(
+								testutil.Unstructured(t, resources["deployment"], JSONPathSetter{
+									"$.metadata.name", "",
+								}),
+							),
+						).Error()),
+					},
+				},
+				{
+					EventType: event.InitType,
+					InitEvent: &testutil.ExpInitEvent{},
+				},
+				{
+					EventType: event.ActionGroupType,
+					ActionGroupEvent: &testutil.ExpActionGroupEvent{
+						GroupName: "inventory-add-0",
+						Action:    event.InventoryAction,
+						Type:      event.Started,
+					},
+				},
+				{
+					EventType: event.ActionGroupType,
+					ActionGroupEvent: &testutil.ExpActionGroupEvent{
+						GroupName: "inventory-add-0",
+						Action:    event.InventoryAction,
+						Type:      event.Finished,
+					},
+				},
+
+				{
+					EventType: event.ActionGroupType,
+					ActionGroupEvent: &testutil.ExpActionGroupEvent{
+						GroupName: "apply-0",
+						Action:    event.ApplyAction,
+						Type:      event.Started,
+					},
+				},
+				// Secret applied
+				{
+					EventType: event.ApplyType,
+					ApplyEvent: &testutil.ExpApplyEvent{
+						GroupName:  "apply-0",
+						Operation:  event.Created, // Create new
+						Identifier: testutil.ToIdentifier(t, resources["secret"]),
+					},
+				},
+				{
+					EventType: event.ActionGroupType,
+					ActionGroupEvent: &testutil.ExpActionGroupEvent{
+						GroupName: "apply-0",
+						Action:    event.ApplyAction,
+						Type:      event.Finished,
+					},
+				},
+				{
+					EventType: event.ActionGroupType,
+					ActionGroupEvent: &testutil.ExpActionGroupEvent{
+						GroupName: "wait-0",
+						Action:    event.WaitAction,
+						Type:      event.Started,
+					},
+				},
+				// Secret pending
+				{
+					EventType: event.WaitType,
+					WaitEvent: &testutil.ExpWaitEvent{
+						GroupName:  "wait-0",
+						Operation:  event.ReconcilePending,
+						Identifier: testutil.ToIdentifier(t, resources["secret"]),
+					},
+				},
+				// Secret reconciled
+				{
+					EventType: event.WaitType,
+					WaitEvent: &testutil.ExpWaitEvent{
+						GroupName:  "wait-0",
+						Operation:  event.Reconciled,
+						Identifier: testutil.ToIdentifier(t, resources["secret"]),
+					},
+				},
+				{
+					EventType: event.ActionGroupType,
+					ActionGroupEvent: &testutil.ExpActionGroupEvent{
+						GroupName: "wait-0",
+						Action:    event.WaitAction,
+						Type:      event.Finished,
+					},
+				},
+				{
+					EventType: event.ActionGroupType,
+					ActionGroupEvent: &testutil.ExpActionGroupEvent{
+						GroupName: "inventory-set-0",
+						Action:    event.InventoryAction,
+						Type:      event.Started,
+					},
+				},
+				{
+					EventType: event.ActionGroupType,
+					ActionGroupEvent: &testutil.ExpActionGroupEvent{
+						GroupName: "inventory-set-0",
+						Action:    event.InventoryAction,
+						Type:      event.Finished,
+					},
+				},
+			},
+		},
+		"ExitEarly - exit early on invalid objects and skip valid objects": {
+			namespace: "default",
+			resources: object.UnstructuredSet{
+				testutil.Unstructured(t, resources["deployment"], JSONPathSetter{
+					"$.metadata.name", "",
+				}),
+				testutil.Unstructured(t, resources["deployment"], JSONPathSetter{
+					"$.kind", "",
+				}),
+				testutil.Unstructured(t, resources["secret"]),
+			},
+			invInfo: inventoryInfo{
+				name:      "inv-123",
+				namespace: "default",
+				id:        "test",
+			},
+			clusterObjs: object.UnstructuredSet{},
+			options: Options{
+				ReconcileTimeout: time.Minute,
+				InventoryPolicy:  inventory.AdoptIfNoInventory,
+				EmitStatusEvents: true,
+				ValidationPolicy: validation.ExitEarly,
+			},
+			statusEvents:         []pollevent.Event{},
+			expectedStatusEvents: []testutil.ExpEvent{},
+			expectedEvents: []testutil.ExpEvent{
+				{
+					EventType: event.ErrorType,
+					ErrorEvent: &testutil.ExpErrorEvent{
+						Err: testutil.EqualErrorString(multierror.New(
+							validation.NewError(
+								field.Required(field.NewPath("metadata", "name"), "name is required"),
+								object.UnstructuredToObjMetadata(
+									testutil.Unstructured(t, resources["deployment"], JSONPathSetter{
+										"$.metadata.name", "",
+									}),
+								),
+							),
+							validation.NewError(
+								field.Required(field.NewPath("kind"), "kind is required"),
+								object.UnstructuredToObjMetadata(
+									testutil.Unstructured(t, resources["deployment"], JSONPathSetter{
+										"$.kind", "",
+									}),
+								),
+							),
+						).Error()),
+					},
+				},
+			},
+		},
 	}
 
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
 			poller := newFakePoller(tc.statusEvents)
 
+			// Only feed valid objects into the TestApplier.
+			// Invalid objects should not generate API requests.
+			validObjs := object.UnstructuredSet{}
+			for _, obj := range tc.resources {
+				id := object.UnstructuredToObjMetadata(obj)
+				if id.GroupKind.Kind == "" || id.Name == "" {
+					continue
+				}
+				validObjs = append(validObjs, obj)
+			}
+
 			applier := newTestApplier(t,
 				tc.invInfo,
-				tc.resources,
+				validObjs,
 				tc.clusterObjs,
 				poller,
 			)

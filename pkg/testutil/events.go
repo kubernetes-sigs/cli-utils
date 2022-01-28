@@ -24,6 +24,7 @@ type ExpEvent struct {
 	PruneEvent       *ExpPruneEvent
 	DeleteEvent      *ExpDeleteEvent
 	WaitEvent        *ExpWaitEvent
+	ValidationEvent  *ExpValidationEvent
 }
 
 type ExpInitEvent struct {
@@ -72,6 +73,11 @@ type ExpWaitEvent struct {
 	GroupName  string
 	Operation  event.WaitEventOperation
 	Identifier object.ObjMetadata
+}
+
+type ExpValidationEvent struct {
+	Identifiers object.ObjMetadataSet
+	Error       error
 }
 
 func VerifyEvents(expEvents []ExpEvent, events []event.Event) error {
@@ -270,6 +276,24 @@ func isMatch(ee ExpEvent, e event.Event) bool {
 		}
 		return true
 
+	case event.ValidationType:
+		vee := ee.ValidationEvent
+		if vee == nil {
+			return true
+		}
+		ve := e.ValidationEvent
+
+		if vee.Identifiers != nil {
+			if !vee.Identifiers.Equal(ve.Identifiers) {
+				return false
+			}
+		}
+
+		if vee.Error != nil {
+			return ve.Error != nil
+		}
+		return ve.Error == nil
+
 	default:
 		return true
 	}
@@ -364,6 +388,15 @@ func EventToExpEvent(e event.Event) ExpEvent {
 				Operation:  e.WaitEvent.Operation,
 			},
 		}
+
+	case event.ValidationType:
+		return ExpEvent{
+			EventType: event.ValidationType,
+			ValidationEvent: &ExpValidationEvent{
+				Identifiers: e.ValidationEvent.Identifiers,
+				Error:       e.ValidationEvent.Error,
+			},
+		}
 	}
 	return ExpEvent{}
 }
@@ -433,6 +466,8 @@ func (ape GroupedEventsByID) Less(i, j int) bool {
 			return false
 		}
 		return ape[i].WaitEvent.Identifier.String() < ape[j].WaitEvent.Identifier.String()
+	case event.ValidationType:
+		return ape[i].ValidationEvent.Identifiers.Hash() < ape[j].ValidationEvent.Identifiers.Hash()
 	default:
 		// don't change order if not ApplyType, PruneType, or DeleteType
 		return false

@@ -28,6 +28,7 @@ func newCountingFormatter() *countingFormatter {
 }
 
 type countingFormatter struct {
+	validationEvent  []event.ValidationEvent
 	applyEvents      []event.ApplyEvent
 	statusEvents     []event.StatusEvent
 	pruneEvents      []event.PruneEvent
@@ -35,6 +36,11 @@ type countingFormatter struct {
 	waitEvents       []event.WaitEvent
 	errorEvent       event.ErrorEvent
 	actionGroupEvent []event.ActionGroupEvent
+}
+
+func (c *countingFormatter) FormatValidationEvent(e event.ValidationEvent) error {
+	c.validationEvent = append(c.validationEvent, e)
+	return nil
 }
 
 func (c *countingFormatter) FormatApplyEvent(e event.ApplyEvent) error {

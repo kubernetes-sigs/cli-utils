@@ -521,10 +521,12 @@ func TestApplyTimeMutationEdges(t *testing.T) {
 			},
 			expected: []Edge{},
 			expectedError: validation.NewError(
-				errors.New("failed to parse apply-time-mutation annotation: "+
-					"error unmarshaling JSON: "+
-					"while decoding JSON: json: "+
-					"cannot unmarshal string into Go value of type mutation.ApplyTimeMutation"),
+				object.InvalidAnnotationError{
+					Annotation: mutation.Annotation,
+					Cause: errors.New("error unmarshaling JSON: " +
+						"while decoding JSON: json: " +
+						"cannot unmarshal string into Go value of type mutation.ApplyTimeMutation"),
+				},
 				object.ObjMetadata{
 					GroupKind: schema.GroupKind{
 						Group: "apps",
@@ -549,9 +551,15 @@ func TestApplyTimeMutationEdges(t *testing.T) {
 			},
 			expected: []Edge{},
 			expectedError: validation.NewError(
-				errors.New(`invalid "config.kubernetes.io/apply-time-mutation" annotation: `+
-					"dependency not in object set: "+
-					"apps/namespaces/test-namespace/Deployment/foo"),
+				object.InvalidAnnotationError{
+					Annotation: mutation.Annotation,
+					Cause: ExternalDependencyError{
+						Edge: Edge{
+							From: testutil.ToIdentifier(t, resources["pod"]),
+							To:   testutil.ToIdentifier(t, resources["deployment"]),
+						},
+					},
+				},
 				object.ObjMetadata{
 					GroupKind: schema.GroupKind{
 						Group: "",
@@ -590,10 +598,12 @@ func TestApplyTimeMutationEdges(t *testing.T) {
 			expected: []Edge{},
 			expectedError: multierror.New(
 				validation.NewError(
-					errors.New("failed to parse apply-time-mutation annotation: "+
-						"error unmarshaling JSON: "+
-						"while decoding JSON: json: "+
-						"cannot unmarshal string into Go value of type mutation.ApplyTimeMutation"),
+					object.InvalidAnnotationError{
+						Annotation: mutation.Annotation,
+						Cause: errors.New("error unmarshaling JSON: " +
+							"while decoding JSON: json: " +
+							"cannot unmarshal string into Go value of type mutation.ApplyTimeMutation"),
+					},
 					object.ObjMetadata{
 						GroupKind: schema.GroupKind{
 							Group: "apps",
@@ -604,9 +614,15 @@ func TestApplyTimeMutationEdges(t *testing.T) {
 					},
 				),
 				validation.NewError(
-					errors.New(`invalid "config.kubernetes.io/apply-time-mutation" annotation: `+
-						"dependency not in object set: "+
-						"/namespaces/test-namespace/Secret/secret"),
+					object.InvalidAnnotationError{
+						Annotation: mutation.Annotation,
+						Cause: ExternalDependencyError{
+							Edge: Edge{
+								From: testutil.ToIdentifier(t, resources["pod"]),
+								To:   testutil.ToIdentifier(t, resources["secret"]),
+							},
+						},
+					},
 					object.ObjMetadata{
 						GroupKind: schema.GroupKind{
 							Group: "",
@@ -731,10 +747,11 @@ func TestAddDependsOnEdges(t *testing.T) {
 			},
 			expected: []Edge{},
 			expectedError: validation.NewError(
-				errors.New("failed to parse depends-on annotation: "+
-					"failed to parse object metadata: "+
-					"expected 3 or 5 fields, found 1: "+
-					`"invalid-obj-ref"`),
+				object.InvalidAnnotationError{
+					Annotation: dependson.Annotation,
+					Cause: errors.New("failed to parse object reference (index: 0): " +
+						`expected 3 or 5 fields, found 1: "invalid-obj-ref"`),
+				},
 				object.ObjMetadata{
 					GroupKind: schema.GroupKind{
 						Group: "apps",
@@ -762,9 +779,15 @@ func TestAddDependsOnEdges(t *testing.T) {
 				},
 			},
 			expectedError: validation.NewError(
-				errors.New(`invalid "config.kubernetes.io/depends-on" annotation: `+
-					"duplicate reference: "+
-					"apps/namespaces/test-namespace/Deployment/foo"),
+				object.InvalidAnnotationError{
+					Annotation: dependson.Annotation,
+					Cause: DuplicateDependencyError{
+						Edge: Edge{
+							From: testutil.ToIdentifier(t, resources["pod"]),
+							To:   testutil.ToIdentifier(t, resources["deployment"]),
+						},
+					},
+				},
 				object.ObjMetadata{
 					GroupKind: schema.GroupKind{
 						Group: "",
@@ -775,7 +798,7 @@ func TestAddDependsOnEdges(t *testing.T) {
 				},
 			),
 		},
-		"error: dependency not in object set": {
+		"error: external dependency": {
 			objs: []*unstructured.Unstructured{
 				testutil.Unstructured(t, resources["pod"],
 					testutil.AddDependsOn(t,
@@ -785,9 +808,15 @@ func TestAddDependsOnEdges(t *testing.T) {
 			},
 			expected: []Edge{},
 			expectedError: validation.NewError(
-				errors.New(`invalid "config.kubernetes.io/depends-on" annotation: `+
-					"dependency not in object set: "+
-					"apps/namespaces/test-namespace/Deployment/foo"),
+				object.InvalidAnnotationError{
+					Annotation: dependson.Annotation,
+					Cause: ExternalDependencyError{
+						Edge: Edge{
+							From: testutil.ToIdentifier(t, resources["pod"]),
+							To:   testutil.ToIdentifier(t, resources["deployment"]),
+						},
+					},
+				},
 				object.ObjMetadata{
 					GroupKind: schema.GroupKind{
 						Group: "",
@@ -822,10 +851,11 @@ func TestAddDependsOnEdges(t *testing.T) {
 			expected: []Edge{},
 			expectedError: multierror.New(
 				validation.NewError(
-					errors.New("failed to parse depends-on annotation: "+
-						"failed to parse object metadata: "+
-						"expected 3 or 5 fields, found 1: "+
-						`"invalid-obj-ref"`),
+					object.InvalidAnnotationError{
+						Annotation: dependson.Annotation,
+						Cause: errors.New("failed to parse object reference (index: 0): " +
+							`expected 3 or 5 fields, found 1: "invalid-obj-ref"`),
+					},
 					object.ObjMetadata{
 						GroupKind: schema.GroupKind{
 							Group: "apps",
@@ -836,9 +866,15 @@ func TestAddDependsOnEdges(t *testing.T) {
 					},
 				),
 				validation.NewError(
-					errors.New(`invalid "config.kubernetes.io/depends-on" annotation: `+
-						"dependency not in object set: "+
-						"/namespaces/test-namespace/Secret/secret"),
+					object.InvalidAnnotationError{
+						Annotation: dependson.Annotation,
+						Cause: ExternalDependencyError{
+							Edge: Edge{
+								From: testutil.ToIdentifier(t, resources["pod"]),
+								To:   testutil.ToIdentifier(t, resources["secret"]),
+							},
+						},
+					},
 					object.ObjMetadata{
 						GroupKind: schema.GroupKind{
 							Group: "",
@@ -862,12 +898,24 @@ func TestAddDependsOnEdges(t *testing.T) {
 			expected: []Edge{},
 			expectedError: validation.NewError(
 				multierror.New(
-					errors.New(`invalid "config.kubernetes.io/depends-on" annotation: `+
-						"dependency not in object set: "+
-						"apps/namespaces/test-namespace/Deployment/foo"),
-					errors.New(`invalid "config.kubernetes.io/depends-on" annotation: `+
-						"duplicate reference: "+
-						"apps/namespaces/test-namespace/Deployment/foo"),
+					object.InvalidAnnotationError{
+						Annotation: dependson.Annotation,
+						Cause: ExternalDependencyError{
+							Edge: Edge{
+								From: testutil.ToIdentifier(t, resources["pod"]),
+								To:   testutil.ToIdentifier(t, resources["deployment"]),
+							},
+						},
+					},
+					object.InvalidAnnotationError{
+						Annotation: dependson.Annotation,
+						Cause: DuplicateDependencyError{
+							Edge: Edge{
+								From: testutil.ToIdentifier(t, resources["pod"]),
+								To:   testutil.ToIdentifier(t, resources["deployment"]),
+							},
+						},
+					},
 				),
 				object.ObjMetadata{
 					GroupKind: schema.GroupKind{

@@ -143,3 +143,52 @@ spec:
     - name: tcp
       containerPort: 80
 `
+
+var invalidMutationPodBTemplate = `
+kind: Pod
+apiVersion: v1
+metadata:
+  name: pod-b
+  namespace: {{.Namespace}}
+  annotations:
+    config.kubernetes.io/apply-time-mutation: |
+      - sourceRef:
+          kind: Pod
+          name: pod-a # cyclic dependency
+          namespace: {{.Namespace}}
+        sourcePath: $.status.podIP
+        targetPath: $.spec.containers[?(@.name=="nginx")].env[?(@.name=="SERVICE_HOST")].value
+        token: ${pob-b-ip}
+      - sourceRef:
+          kind: Pod
+          name: pod-a
+          namespace: "" # empty namespace on a namespaced type
+        sourcePath: $.spec.containers[?(@.name=="nginx")].ports[?(@.name=="tcp")].containerPort
+        targetPath: $.spec.containers[?(@.name=="nginx")].env[?(@.name=="SERVICE_HOST")].value
+        token: ${pob-b-port}
+spec:
+  containers:
+  - name: nginx
+    image: nginx:1.21
+    ports:
+    - name: tcp
+      containerPort: 80
+    env:
+    - name: SERVICE_HOST
+      value: "${pob-b-ip}:${pob-b-port}"
+`
+
+var invalidPodTemplate = `
+kind: Pod
+apiVersion: v1
+metadata:
+  # missing name
+  namespace: {{.Namespace}}
+spec:
+  containers:
+  - name: nginx
+    image: nginx:1.21
+    ports:
+    - name: tcp
+      containerPort: 80
+`

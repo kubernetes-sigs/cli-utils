@@ -33,6 +33,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/object/graph"
+	"sigs.k8s.io/cli-utils/pkg/object/validation"
 )
 
 type TaskQueueBuilder struct {
@@ -41,6 +42,9 @@ type TaskQueueBuilder struct {
 	Factory    util.Factory
 	Mapper     meta.RESTMapper
 	InvClient  inventory.InventoryClient
+	// Collector is used to collect validation errors and invalid objects.
+	// Invalid objects will be filtered and not be injected into tasks.
+	Collector *validation.Collector
 	// True if we are destroying, which deletes the inventory object
 	// as well (possibly) the inventory namespace.
 	Destroy bool
@@ -52,7 +56,6 @@ type TaskQueueBuilder struct {
 	waitCounter      int
 	pruneCounter     int
 	tasks            []taskrunner.Task
-	err              error
 }
 
 type TaskQueue struct {
@@ -90,23 +93,17 @@ type Options struct {
 	InventoryPolicy        inventory.InventoryPolicy
 }
 
-// Build returns the queue of tasks that have been created.
-// TODO(seans): Now that we're reporting errors, we probably
-// want to move away from the Builder patter for the TaskBuilder.
-func (t *TaskQueueBuilder) Build() (*TaskQueue, error) {
-	if t.err != nil {
-		return nil, t.err
-	}
-	return &TaskQueue{
-		tasks: t.tasks,
-	}, nil
+// Build returns the queue of tasks that have been created
+func (t *TaskQueueBuilder) Build() *TaskQueue {
+	return &TaskQueue{tasks: t.tasks}
 }
 
 // AppendInvAddTask appends an inventory add task to the task queue.
 // Returns a pointer to the Builder to chain function calls.
 func (t *TaskQueueBuilder) AppendInvAddTask(inv inventory.InventoryInfo, applyObjs object.UnstructuredSet,
 	dryRun common.DryRunStrategy) *TaskQueueBuilder {
-	klog.V(2).Infoln("adding inventory add task")
+	applyObjs = t.Collector.FilterInvalidObjects(applyObjs)
+	klog.V(2).Infoln("adding inventory add task (%d objects)", len(applyObjs))
 	t.tasks = append(t.tasks, &task.InvAddTask{
 		TaskName:  fmt.Sprintf("inventory-add-%d", t.invAddCounter),
 		InvClient: t.InvClient,
@@ -152,6 +149,7 @@ func (t *TaskQueueBuilder) AppendDeleteInvTask(inv inventory.InventoryInfo, dryR
 // to the cluster. Returns a pointer to the Builder to chain function calls.
 func (t *TaskQueueBuilder) AppendApplyTask(applyObjs object.UnstructuredSet,
 	applyFilters []filter.ValidationFilter, applyMutators []mutator.Interface, o Options) *TaskQueueBuilder {
+	applyObjs = t.Collector.FilterInvalidObjects(applyObjs)
 	klog.V(2).Infof("adding apply task (%d objects)", len(applyObjs))
 	t.tasks = append(t.tasks, &task.ApplyTask{
 		TaskName:          fmt.Sprintf("apply-%d", t.applyCounter),
@@ -172,6 +170,7 @@ func (t *TaskQueueBuilder) AppendApplyTask(applyObjs object.UnstructuredSet,
 // Returns a pointer to the Builder to chain function calls.
 func (t *TaskQueueBuilder) AppendWaitTask(waitIds object.ObjMetadataSet, condition taskrunner.Condition,
 	waitTimeout time.Duration) *TaskQueueBuilder {
+	waitIds = t.Collector.FilterInvalidIds(waitIds)
 	klog.V(2).Infoln("adding wait task")
 	t.tasks = append(t.tasks, taskrunner.NewWaitTask(
 		fmt.Sprintf("wait-%d", t.waitCounter),
@@ -188,6 +187,7 @@ func (t *TaskQueueBuilder) AppendWaitTask(waitIds object.ObjMetadataSet, conditi
 // Returns a pointer to the Builder to chain function calls.
 func (t *TaskQueueBuilder) AppendPruneTask(pruneObjs object.UnstructuredSet,
 	pruneFilters []filter.ValidationFilter, o Options) *TaskQueueBuilder {
+	pruneObjs = t.Collector.FilterInvalidObjects(pruneObjs)
 	klog.V(2).Infof("adding prune task (%d objects)", len(pruneObjs))
 	t.tasks = append(t.tasks,
 		&task.PruneTask{
@@ -213,9 +213,13 @@ func (t *TaskQueueBuilder) AppendApplyWaitTasks(applyObjs object.UnstructuredSet
 	// objects to apply into sets using a topological sort.
 	applySets, err := graph.SortObjs(applyObjs)
 	if err != nil {
-		t.err = err
+		t.Collector.Collect(err)
 	}
 	for _, applySet := range applySets {
+		applySet = t.Collector.FilterInvalidObjects(applySet)
+		if len(applySet) == 0 {
+			continue
+		}
 		t.AppendApplyTask(applySet, applyFilters, applyMutators, o)
 		// dry-run skips wait tasks
 		if !o.DryRunStrategy.ClientOrServerDryRun() {
@@ -236,9 +240,13 @@ func (t *TaskQueueBuilder) AppendPruneWaitTasks(pruneObjs object.UnstructuredSet
 		// objects to prune into sets using a (reverse) topological sort.
 		pruneSets, err := graph.ReverseSortObjs(pruneObjs)
 		if err != nil {
-			t.err = err
+			t.Collector.Collect(err)
 		}
 		for _, pruneSet := range pruneSets {
+			pruneSet = t.Collector.FilterInvalidObjects(pruneSet)
+			if len(pruneSet) == 0 {
+				continue
+			}
 			t.AppendPruneTask(pruneSet, pruneFilters, o)
 			// dry-run skips wait tasks
 			if !o.DryRunStrategy.ClientOrServerDryRun() {
