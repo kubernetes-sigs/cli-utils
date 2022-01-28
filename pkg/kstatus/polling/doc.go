@@ -34,7 +34,7 @@
 //   }
 //
 //   poller := polling.NewStatusPoller(reader, mapper, true)
-//   eventsChan := poller.Poll(context.Background(), identifiers, polling.Options{})
+//   eventsChan := poller.Poll(context.Background(), identifiers, polling.PollOptions{})
 //   for e := range eventsChan {
 //      // Handle event
 //   }

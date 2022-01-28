@@ -19,7 +19,6 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/aggregator"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/collector"
-	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/engine"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
 	"sigs.k8s.io/cli-utils/pkg/manifestreader"
@@ -153,9 +152,8 @@ func (r *StatusRunner) runE(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("unknown value for pollUntil: %q", r.pollUntil)
 	}
 
-	eventChannel := statusPoller.Poll(ctx, identifiers, polling.Options{
+	eventChannel := statusPoller.Poll(ctx, identifiers, polling.PollOptions{
 		PollInterval: r.period,
-		UseCache:     true,
 	})
 
 	return printer.Print(eventChannel, identifiers, cancelFunc)
@@ -193,5 +191,5 @@ func allKnownNotifierFunc(cancelFunc context.CancelFunc) collector.ObserverFunc 
 }
 
 func pollerFactoryFunc(f cmdutil.Factory) (poller.Poller, error) {
-	return polling.NewStatusPollerFromFactory(f, []engine.StatusReader{})
+	return polling.NewStatusPollerFromFactory(f, polling.Options{})
 }

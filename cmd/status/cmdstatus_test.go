@@ -261,7 +261,7 @@ type fakePoller struct {
 }
 
 func (f *fakePoller) Poll(ctx context.Context, _ object.ObjMetadataSet,
-	_ polling.Options) <-chan pollevent.Event {
+	_ polling.PollOptions) <-chan pollevent.Event {
 	eventChannel := make(chan pollevent.Event)
 	go func() {
 		defer close(eventChannel)

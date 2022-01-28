@@ -112,14 +112,13 @@ func TestStatusPollerRunner(t *testing.T) {
 				Mapper:              fakeMapper,
 				DefaultStatusReader: tc.defaultStatusReader,
 				StatusReaders:       []StatusReader{},
+				ClusterReaderFactory: ClusterReaderFactoryFunc(func(client.Reader, meta.RESTMapper, object.ObjMetadataSet) (ClusterReader, error) {
+					return testutil.NewNoopClusterReader(), nil
+				}),
 			}
 
 			options := Options{
 				PollInterval: 2 * time.Second,
-				ClusterReaderFactoryFunc: func(_ client.Reader, _ meta.RESTMapper, _ object.ObjMetadataSet) (
-					ClusterReader, error) {
-					return testutil.NewNoopClusterReader(), nil
-				},
 			}
 
 			eventChannel := engine.Poll(ctx, identifiers, options)
@@ -145,14 +144,14 @@ func TestNewStatusPollerRunnerCancellation(t *testing.T) {
 
 	timer := time.NewTimer(5 * time.Second)
 
-	engine := PollerEngine{}
+	engine := PollerEngine{
+		ClusterReaderFactory: ClusterReaderFactoryFunc(func(client.Reader, meta.RESTMapper, object.ObjMetadataSet) (ClusterReader, error) {
+			return testutil.NewNoopClusterReader(), nil
+		}),
+	}
 
 	options := Options{
 		PollInterval: 2 * time.Second,
-		ClusterReaderFactoryFunc: func(_ client.Reader, _ meta.RESTMapper, _ object.ObjMetadataSet) (
-			ClusterReader, error) {
-			return testutil.NewNoopClusterReader(), nil
-		},
 	}
 
 	eventChannel := engine.Poll(ctx, identifiers, options)
@@ -184,14 +183,12 @@ func TestNewStatusPollerRunnerIdentifierValidation(t *testing.T) {
 		Mapper: fakemapper.NewFakeRESTMapper(
 			appsv1.SchemeGroupVersion.WithKind("Deployment"),
 		),
+		ClusterReaderFactory: ClusterReaderFactoryFunc(func(client.Reader, meta.RESTMapper, object.ObjMetadataSet) (ClusterReader, error) {
+			return testutil.NewNoopClusterReader(), nil
+		}),
 	}
 
-	eventChannel := engine.Poll(context.Background(), identifiers, Options{
-		ClusterReaderFactoryFunc: func(_ client.Reader, _ meta.RESTMapper, _ object.ObjMetadataSet) (
-			ClusterReader, error) {
-			return testutil.NewNoopClusterReader(), nil
-		},
-	})
+	eventChannel := engine.Poll(context.Background(), identifiers, Options{})
 
 	timer := time.NewTimer(3 * time.Second)
 	defer timer.Stop()

@@ -557,7 +557,7 @@ func (f *fakePoller) Start() {
 	close(f.start)
 }
 
-func (f *fakePoller) Poll(ctx context.Context, _ object.ObjMetadataSet, _ polling.Options) <-chan pollevent.Event {
+func (f *fakePoller) Poll(ctx context.Context, _ object.ObjMetadataSet, _ polling.PollOptions) <-chan pollevent.Event {
 	eventChannel := make(chan pollevent.Event)
 	go func() {
 		defer close(eventChannel)

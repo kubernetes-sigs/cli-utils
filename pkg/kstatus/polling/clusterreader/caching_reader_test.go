@@ -88,7 +88,7 @@ func TestSync(t *testing.T) {
 		t.Run(tn, func(t *testing.T) {
 			fakeReader := &fakeReader{}
 
-			clusterReader, err := NewCachingClusterReader(fakeReader, fakeMapper, tc.identifiers)
+			clusterReader, err := newCachingClusterReader(fakeReader, fakeMapper, tc.identifiers)
 			require.NoError(t, err)
 
 			err = clusterReader.Sync(context.Background())
@@ -166,7 +166,7 @@ func TestSync_Errors(t *testing.T) {
 				err: tc.readerError,
 			}
 
-			clusterReader, err := NewCachingClusterReader(fakeReader, tc.mapper, identifiers)
+			clusterReader, err := newCachingClusterReader(fakeReader, tc.mapper, identifiers)
 			require.NoError(t, err)
 
 			err = clusterReader.Sync(context.Background())
@@ -186,6 +186,16 @@ func TestSync_Errors(t *testing.T) {
 			}
 		})
 	}
+}
+
+// newCachingClusterReader creates a new CachingClusterReader and returns it as the concrete
+// type instead of engine.ClusterReader.
+func newCachingClusterReader(reader client.Reader, mapper meta.RESTMapper, identifiers object.ObjMetadataSet) (*CachingClusterReader, error) {
+	r, err := NewCachingClusterReader(reader, mapper, identifiers)
+	if err != nil {
+		return nil, err
+	}
+	return r.(*CachingClusterReader), nil
 }
 
 func sortGVKNamespaces(gvkNamespaces []gkNamespace) {

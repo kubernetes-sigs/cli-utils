@@ -22,7 +22,6 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling"
-	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/engine"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/object/validation"
 )
@@ -38,7 +37,7 @@ func NewDestroyer(factory cmdutil.Factory, invClient inventory.InventoryClient) 
 	if err != nil {
 		return nil, fmt.Errorf("error setting up PruneOptions: %w", err)
 	}
-	statusPoller, err := polling.NewStatusPollerFromFactory(factory, []engine.StatusReader{})
+	statusPoller, err := polling.NewStatusPollerFromFactory(factory, polling.Options{})
 	if err != nil {
 		return nil, err
 	}
@@ -209,7 +208,6 @@ func (d *Destroyer) Run(ctx context.Context, inv inventory.InventoryInfo, option
 		runner := taskrunner.NewTaskStatusRunner(deleteIds, d.StatusPoller)
 		klog.V(4).Infoln("destroyer running TaskStatusRunner...")
 		err = runner.Run(ctx, taskContext, taskQueue.ToChannel(), taskrunner.Options{
-			UseCache:         true,
 			PollInterval:     options.PollInterval,
 			EmitStatusEvents: options.EmitStatusEvents,
 		})
