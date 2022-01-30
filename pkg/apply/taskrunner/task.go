@@ -4,6 +4,7 @@
 package taskrunner
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"time"
@@ -101,12 +102,16 @@ func (w *WaitTask) Start(taskContext *TaskContext) {
 // the WaitTask struct. Once the timer expires, it will send
 // a message on the EventChannel provided in the taskContext.
 func (w *WaitTask) setTimer(taskContext *TaskContext) {
-	timer := time.NewTimer(w.Timeout)
+	ctx, cancel := context.WithTimeout(context.Background(), w.Timeout)
 	go func() {
 		// TODO(mortent): See if there is a better way to do this. This
 		// solution will cause the goroutine to hang forever if the
 		// Timeout is cancelled.
-		<-timer.C
+		<-ctx.Done()
+		// If the context was cancelled, we don't want to send any events.
+		if ctx.Err() == context.Canceled {
+			return
+		}
 		select {
 		// We only send the TimeoutError to the eventChannel if no one has gotten
 		// to the token first.
@@ -130,7 +135,7 @@ func (w *WaitTask) setTimer(taskContext *TaskContext) {
 		}
 	}()
 	w.cancelFunc = func() {
-		timer.Stop()
+		cancel()
 	}
 }
 

@@ -60,8 +60,10 @@ func TestWaitTask_TimeoutCancelled(t *testing.T) {
 	timer := time.NewTimer(3 * time.Second)
 
 	select {
+	case res := <-taskContext.EventChannel():
+		t.Errorf("didn't expect error on eventChannel, but got %v", res)
 	case res := <-taskContext.TaskChannel():
-		t.Errorf("didn't expect timeout error, but got %v", res.Err)
+		t.Errorf("didn't expect event on taskChannel, but got %v", res)
 	case <-timer.C:
 		return
 	}
