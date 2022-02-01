@@ -138,14 +138,17 @@ func (r *PreviewRunner) RunE(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return err
 		}
-		a, err := apply.NewApplier(r.factory, invClient)
+		a, err := apply.NewApplierBuilder().
+			WithFactory(r.factory).
+			WithInventoryClient(invClient).
+			Build()
 		if err != nil {
 			return err
 		}
 
 		// Run the applier. It will return a channel where we can receive updates
 		// to keep track of progress and any issues.
-		ch = a.Run(ctx, inv, objs, apply.Options{
+		ch = a.Run(ctx, inv, objs, apply.ApplierOptions{
 			EmitStatusEvents:  false,
 			NoPrune:           noPrune,
 			DryRunStrategy:    drs,

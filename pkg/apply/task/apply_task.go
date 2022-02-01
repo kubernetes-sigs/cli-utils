@@ -14,10 +14,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
+	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/cmd/apply"
 	cmddelete "k8s.io/kubectl/pkg/cmd/delete"
-	"k8s.io/kubectl/pkg/cmd/util"
 	applyerror "sigs.k8s.io/cli-utils/pkg/apply/error"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/filter"
@@ -46,7 +47,8 @@ type applyOptions interface {
 type ApplyTask struct {
 	TaskName string
 
-	Factory           util.Factory
+	DynamicClient     dynamic.Interface
+	OpenAPIGetter     discovery.OpenAPISchemaInterface
 	InfoHelper        info.InfoHelper
 	Mapper            meta.RESTMapper
 	Objects           object.UnstructuredSet
@@ -87,18 +89,6 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 		objects := a.Objects
 		klog.V(2).Infof("apply task starting (name: %q, objects: %d)",
 			a.Name(), len(objects))
-		// Create a new instance of the applyOptions interface and use it
-		// to apply the objects.
-		ao, err := applyOptionsFactoryFunc(a.Name(), taskContext.EventChannel(),
-			a.ServerSideOptions, a.DryRunStrategy, a.Factory)
-		if err != nil {
-			if klog.V(4).Enabled() {
-				klog.Errorf("error creating ApplyOptions (%s)--returning", err)
-			}
-			a.sendBatchApplyEvents(taskContext, objects, err)
-			a.sendTaskResult(taskContext)
-			return
-		}
 		for _, obj := range objects {
 			// Set the client and mapping fields on the provided
 			// info so they can be applied to the cluster.
@@ -157,7 +147,10 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 				continue
 			}
 
-			// Apply the object
+			// Create a new instance of the applyOptions interface and use it
+			// to apply the objects.
+			ao := applyOptionsFactoryFunc(a.Name(), taskContext.EventChannel(),
+				a.ServerSideOptions, a.DryRunStrategy, a.DynamicClient, a.OpenAPIGetter)
 			ao.SetObjects([]*resource.Info{info})
 			klog.V(5).Infof("applying %s/%s...", info.Namespace, info.Name)
 			err = ao.Run()
@@ -189,16 +182,9 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 	}()
 }
 
-func newApplyOptions(taskName string, eventChannel chan event.Event, serverSideOptions common.ServerSideOptions,
-	strategy common.DryRunStrategy, factory util.Factory) (applyOptions, error) {
-	discovery, err := factory.ToDiscoveryClient()
-	if err != nil {
-		return nil, err
-	}
-	dynamic, err := factory.DynamicClient()
-	if err != nil {
-		return nil, err
-	}
+func newApplyOptions(taskName string, eventChannel chan<- event.Event, serverSideOptions common.ServerSideOptions,
+	strategy common.DryRunStrategy, dynamicClient dynamic.Interface,
+	openAPIGetter discovery.OpenAPISchemaInterface) applyOptions {
 	emptyString := ""
 	return &apply.ApplyOptions{
 		VisitedNamespaces: sets.NewString(),
@@ -227,9 +213,9 @@ func newApplyOptions(taskName string, eventChannel chan event.Event, serverSideO
 			ch:        eventChannel,
 			groupName: taskName,
 		}).toPrinterFunc(),
-		DynamicClient:  dynamic,
-		DryRunVerifier: resource.NewDryRunVerifier(dynamic, discovery),
-	}, nil
+		DynamicClient:  dynamicClient,
+		DryRunVerifier: resource.NewDryRunVerifier(dynamicClient, openAPIGetter),
+	}
 }
 
 func (a *ApplyTask) sendTaskResult(taskContext *taskrunner.TaskContext) {
@@ -283,23 +269,6 @@ func (a *ApplyTask) createApplyFailedEvent(id object.ObjMetadata, err error) eve
 	}
 }
 
-// sendBatchApplyEvents is a helper function to send out multiple apply events for
-// a list of resources when failed to initialize the apply process.
-func (a *ApplyTask) sendBatchApplyEvents(
-	taskContext *taskrunner.TaskContext,
-	objects object.UnstructuredSet,
-	err error,
-) {
-	for _, obj := range objects {
-		id := object.UnstructuredToObjMetadata(obj)
-		taskContext.SendEvent(a.createApplyFailedEvent(
-			id,
-			applyerror.NewInitializeApplyOptionError(err),
-		))
-		taskContext.AddFailedApply(id)
-	}
-}
-
 func isAPIService(obj *unstructured.Unstructured) bool {
 	gk := obj.GroupVersionKind().GroupKind()
 	return gk.Group == "apiregistration.k8s.io" && gk.Kind == "APIService"
@@ -311,11 +280,8 @@ func isStreamError(err error) bool {
 	return strings.Contains(err.Error(), "stream error: stream ID ")
 }
 
-func (a *ApplyTask) clientSideApply(info *resource.Info, eventChannel chan event.Event) error {
-	ao, err := applyOptionsFactoryFunc(a.Name(), eventChannel, common.ServerSideOptions{ServerSideApply: false}, a.DryRunStrategy, a.Factory)
-	if err != nil {
-		return err
-	}
+func (a *ApplyTask) clientSideApply(info *resource.Info, eventChannel chan<- event.Event) error {
+	ao := applyOptionsFactoryFunc(a.Name(), eventChannel, common.ServerSideOptions{ServerSideApply: false}, a.DryRunStrategy, a.DynamicClient, a.OpenAPIGetter)
 	ao.SetObjects([]*resource.Info{info})
 	return ao.Run()
 }

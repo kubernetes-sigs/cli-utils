@@ -31,7 +31,7 @@ func pruneRetrieveErrorTest(ctx context.Context, c client.Client, invConfig Inve
 		pod1Obj,
 	}
 
-	applierEvents := runCollect(applier.Run(ctx, inv, resource1, apply.Options{
+	applierEvents := runCollect(applier.Run(ctx, inv, resource1, apply.ApplierOptions{
 		EmitStatusEvents: false,
 	}))
 
@@ -165,7 +165,7 @@ func pruneRetrieveErrorTest(ctx context.Context, c client.Client, invConfig Inve
 		pod2Obj,
 	}
 
-	applierEvents2 := runCollect(applier.Run(ctx, inv, resource2, apply.Options{
+	applierEvents2 := runCollect(applier.Run(ctx, inv, resource2, apply.ApplierOptions{
 		EmitStatusEvents: false,
 	}))
 

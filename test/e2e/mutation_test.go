@@ -49,7 +49,7 @@ func mutationTest(ctx context.Context, c client.Client, invConfig InventoryConfi
 		podBObj,
 	}
 
-	applierEvents := runCollect(applier.Run(ctx, inv, resources, apply.Options{
+	applierEvents := runCollect(applier.Run(ctx, inv, resources, apply.ApplierOptions{
 		EmitStatusEvents: false,
 	}))
 

@@ -14,6 +14,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/apply/cache"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/filter"
+	"sigs.k8s.io/cli-utils/pkg/apply/info"
 	"sigs.k8s.io/cli-utils/pkg/apply/poller"
 	"sigs.k8s.io/cli-utils/pkg/apply/prune"
 	"sigs.k8s.io/cli-utils/pkg/apply/solver"
@@ -89,7 +90,7 @@ type DestroyerOptions struct {
 
 func setDestroyerDefaults(o *DestroyerOptions) {
 	if o.PollInterval == time.Duration(0) {
-		o.PollInterval = poller.DefaultPollInterval
+		o.PollInterval = defaultPollInterval
 	}
 	if o.DeletePropagationPolicy == "" {
 		o.DeletePropagationPolicy = metav1.DeletePropagationBackground
@@ -130,13 +131,20 @@ func (d *Destroyer) Run(ctx context.Context, inv inventory.InventoryInfo, option
 		validator.Validate(deleteObjs)
 
 		klog.V(4).Infoln("destroyer building task queue...")
+		dynamicClient, err := d.factory.DynamicClient()
+		if err != nil {
+			handleError(eventChannel, err)
+			return
+		}
 		taskBuilder := &solver.TaskQueueBuilder{
-			Pruner:    d.pruner,
-			Factory:   d.factory,
-			Mapper:    mapper,
-			InvClient: d.invClient,
-			Destroy:   true,
-			Collector: vCollector,
+			Pruner:        d.pruner,
+			DynamicClient: dynamicClient,
+			OpenAPIGetter: d.factory.OpenAPIGetter(),
+			InfoHelper:    info.NewInfoHelper(mapper, d.factory.UnstructuredClientForMapping),
+			Mapper:        mapper,
+			InvClient:     d.invClient,
+			Destroy:       true,
+			Collector:     vCollector,
 		}
 		opts := solver.Options{
 			Prune:                  true,

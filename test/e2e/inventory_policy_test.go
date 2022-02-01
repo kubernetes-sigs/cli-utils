@@ -31,7 +31,7 @@ func inventoryPolicyMustMatchTest(ctx context.Context, c client.Client, invConfi
 		deployment1Obj,
 	}
 
-	runWithNoErr(applier.Run(ctx, firstInv, firstResources, apply.Options{
+	runWithNoErr(applier.Run(ctx, firstInv, firstResources, apply.ApplierOptions{
 		ReconcileTimeout: 2 * time.Minute,
 		EmitStatusEvents: true,
 	}))
@@ -44,7 +44,7 @@ func inventoryPolicyMustMatchTest(ctx context.Context, c client.Client, invConfi
 		withReplicas(deployment1Obj, 6),
 	}
 
-	applierEvents := runCollect(applier.Run(ctx, secondInv, secondResources, apply.Options{
+	applierEvents := runCollect(applier.Run(ctx, secondInv, secondResources, apply.ApplierOptions{
 		ReconcileTimeout: 2 * time.Minute,
 		EmitStatusEvents: true,
 		InventoryPolicy:  inventory.InventoryPolicyMustMatch,
@@ -202,7 +202,7 @@ func inventoryPolicyAdoptIfNoInventoryTest(ctx context.Context, c client.Client,
 		withReplicas(deployment1Obj, 6),
 	}
 
-	applierEvents := runCollect(applier.Run(ctx, inv, resources, apply.Options{
+	applierEvents := runCollect(applier.Run(ctx, inv, resources, apply.ApplierOptions{
 		ReconcileTimeout: 2 * time.Minute,
 		EmitStatusEvents: true,
 		InventoryPolicy:  inventory.AdoptIfNoInventory,
@@ -371,7 +371,7 @@ func inventoryPolicyAdoptAllTest(ctx context.Context, c client.Client, invConfig
 		deployment1Obj,
 	}
 
-	runWithNoErr(applier.Run(ctx, firstInv, firstResources, apply.Options{
+	runWithNoErr(applier.Run(ctx, firstInv, firstResources, apply.ApplierOptions{
 		ReconcileTimeout: 2 * time.Minute,
 		EmitStatusEvents: true,
 	}))
@@ -384,7 +384,7 @@ func inventoryPolicyAdoptAllTest(ctx context.Context, c client.Client, invConfig
 		withReplicas(deployment1Obj, 6),
 	}
 
-	applierEvents := runCollect(applier.Run(ctx, secondInv, secondResources, apply.Options{
+	applierEvents := runCollect(applier.Run(ctx, secondInv, secondResources, apply.ApplierOptions{
 		ReconcileTimeout: 2 * time.Minute,
 		EmitStatusEvents: true,
 		InventoryPolicy:  inventory.AdoptAll,

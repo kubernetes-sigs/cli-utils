@@ -20,8 +20,9 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/klog/v2"
-	"k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/filter"
 	"sigs.k8s.io/cli-utils/pkg/apply/info"
@@ -37,11 +38,12 @@ import (
 )
 
 type TaskQueueBuilder struct {
-	Pruner     *prune.Pruner
-	InfoHelper info.InfoHelper
-	Factory    util.Factory
-	Mapper     meta.RESTMapper
-	InvClient  inventory.InventoryClient
+	Pruner        *prune.Pruner
+	DynamicClient dynamic.Interface
+	OpenAPIGetter discovery.OpenAPISchemaInterface
+	InfoHelper    info.InfoHelper
+	Mapper        meta.RESTMapper
+	InvClient     inventory.InventoryClient
 	// Collector is used to collect validation errors and invalid objects.
 	// Invalid objects will be filtered and not be injected into tasks.
 	Collector *validation.Collector
@@ -158,8 +160,9 @@ func (t *TaskQueueBuilder) AppendApplyTask(applyObjs object.UnstructuredSet,
 		Mutators:          applyMutators,
 		ServerSideOptions: o.ServerSideOptions,
 		DryRunStrategy:    o.DryRunStrategy,
+		DynamicClient:     t.DynamicClient,
+		OpenAPIGetter:     t.OpenAPIGetter,
 		InfoHelper:        t.InfoHelper,
-		Factory:           t.Factory,
 		Mapper:            t.Mapper,
 	})
 	t.applyCounter += 1

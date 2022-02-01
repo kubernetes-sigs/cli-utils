@@ -85,9 +85,12 @@ func newTestApplier(
 
 	invClient := newTestInventory(t, tf)
 
-	applier, err := NewApplier(tf, invClient)
+	applier, err := NewApplierBuilder().
+		WithFactory(tf).
+		WithInventoryClient(invClient).
+		WithStatusPoller(statusPoller).
+		Build()
 	require.NoError(t, err)
-	applier.StatusPoller = statusPoller
 
 	// Inject the fakeInfoHelper to allow generating Info
 	// objects that use the FakeRESTClient as the UnstructuredClient.

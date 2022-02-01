@@ -34,7 +34,7 @@ func crdTest(ctx context.Context, _ client.Client, invConfig InventoryConfig, in
 		crdObj,
 	}
 
-	applierEvents := runCollect(applier.Run(ctx, inv, resources, apply.Options{
+	applierEvents := runCollect(applier.Run(ctx, inv, resources, apply.ApplierOptions{
 		ReconcileTimeout: 2 * time.Minute,
 		EmitStatusEvents: false,
 	}))

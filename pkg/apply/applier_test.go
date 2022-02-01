@@ -97,7 +97,7 @@ func TestApplier(t *testing.T) {
 		// objects in the cluster
 		clusterObjs object.UnstructuredSet
 		// options input to applier.Run
-		options Options
+		options ApplierOptions
 		// fake input events from the status poller
 		statusEvents []pollevent.Event
 		// expected output status events (async)
@@ -120,7 +120,7 @@ func TestApplier(t *testing.T) {
 				id:        "test",
 			},
 			clusterObjs: object.UnstructuredSet{},
-			options: Options{
+			options: ApplierOptions{
 				NoPrune:         true,
 				InventoryPolicy: inventory.InventoryPolicyMustMatch,
 			},
@@ -227,7 +227,7 @@ func TestApplier(t *testing.T) {
 				id:        "test",
 			},
 			clusterObjs: object.UnstructuredSet{},
-			options: Options{
+			options: ApplierOptions{
 				ReconcileTimeout: time.Minute,
 				InventoryPolicy:  inventory.InventoryPolicyMustMatch,
 				EmitStatusEvents: true,
@@ -423,7 +423,7 @@ func TestApplier(t *testing.T) {
 			clusterObjs: object.UnstructuredSet{
 				testutil.Unstructured(t, resources["deployment"]),
 			},
-			options: Options{
+			options: ApplierOptions{
 				ReconcileTimeout: time.Minute,
 				InventoryPolicy:  inventory.AdoptIfNoInventory,
 				EmitStatusEvents: true,
@@ -605,7 +605,7 @@ func TestApplier(t *testing.T) {
 				testutil.Unstructured(t, resources["deployment"], testutil.AddOwningInv(t, "test")),
 				testutil.Unstructured(t, resources["secret"], testutil.AddOwningInv(t, "test")),
 			},
-			options: Options{
+			options: ApplierOptions{
 				InventoryPolicy:  inventory.InventoryPolicyMustMatch,
 				EmitStatusEvents: true,
 			},
@@ -804,7 +804,7 @@ func TestApplier(t *testing.T) {
 			clusterObjs: object.UnstructuredSet{
 				testutil.Unstructured(t, resources["deployment"], testutil.AddOwningInv(t, "unmatched")),
 			},
-			options: Options{
+			options: ApplierOptions{
 				ReconcileTimeout: time.Minute,
 				InventoryPolicy:  inventory.InventoryPolicyMustMatch,
 				EmitStatusEvents: true,
@@ -944,7 +944,7 @@ func TestApplier(t *testing.T) {
 			clusterObjs: object.UnstructuredSet{
 				testutil.Unstructured(t, resources["deployment"], testutil.AddOwningInv(t, "unmatched")),
 			},
-			options: Options{
+			options: ApplierOptions{
 				InventoryPolicy:  inventory.InventoryPolicyMustMatch,
 				EmitStatusEvents: true,
 			},
@@ -1051,7 +1051,7 @@ func TestApplier(t *testing.T) {
 			clusterObjs: object.UnstructuredSet{
 				testutil.Unstructured(t, resources["deployment"], testutil.AddOwningInv(t, "test")),
 			},
-			options: Options{
+			options: ApplierOptions{
 				InventoryPolicy:  inventory.InventoryPolicyMustMatch,
 				EmitStatusEvents: true,
 			},
@@ -1199,7 +1199,7 @@ func TestApplier(t *testing.T) {
 				id:        "test",
 			},
 			clusterObjs: object.UnstructuredSet{},
-			options: Options{
+			options: ApplierOptions{
 				ReconcileTimeout: time.Minute,
 				InventoryPolicy:  inventory.AdoptIfNoInventory,
 				EmitStatusEvents: true,
@@ -1380,7 +1380,7 @@ func TestApplier(t *testing.T) {
 				id:        "test",
 			},
 			clusterObjs: object.UnstructuredSet{},
-			options: Options{
+			options: ApplierOptions{
 				ReconcileTimeout: time.Minute,
 				InventoryPolicy:  inventory.AdoptIfNoInventory,
 				EmitStatusEvents: true,
@@ -1531,7 +1531,7 @@ func TestApplierCancel(t *testing.T) {
 		// objects in the cluster
 		clusterObjs object.UnstructuredSet
 		// options input to applier.Run
-		options Options
+		options ApplierOptions
 		// timeout for applier.Run
 		runTimeout time.Duration
 		// timeout for the test
@@ -1558,7 +1558,7 @@ func TestApplierCancel(t *testing.T) {
 				id:        "test",
 			},
 			clusterObjs: object.UnstructuredSet{},
-			options: Options{
+			options: ApplierOptions{
 				// EmitStatusEvents required to test event output
 				EmitStatusEvents: true,
 				NoPrune:          true,
@@ -1716,7 +1716,7 @@ func TestApplierCancel(t *testing.T) {
 				id:        "test",
 			},
 			clusterObjs: object.UnstructuredSet{},
-			options: Options{
+			options: ApplierOptions{
 				// EmitStatusEvents required to test event output
 				EmitStatusEvents: true,
 				NoPrune:          true,
@@ -1947,7 +1947,7 @@ func TestApplierCancel(t *testing.T) {
 			if tc.expectRunTimeout {
 				assert.Equal(t, context.DeadlineExceeded, runCtx.Err(), "Applier.Run exited, but not by expected timeout")
 			} else {
-				assert.Nil(t, runCtx.Err(), "Applier.Run exited, but not by expected timeout")
+				assert.NoError(t, runCtx.Err(), "Applier.Run exited, but not by expected timeout")
 			}
 		})
 	}
@@ -1955,7 +1955,7 @@ func TestApplierCancel(t *testing.T) {
 
 func TestReadAndPrepareObjectsNilInv(t *testing.T) {
 	applier := Applier{}
-	_, _, err := applier.prepareObjects(nil, object.UnstructuredSet{}, Options{})
+	_, _, err := applier.prepareObjects(nil, object.UnstructuredSet{}, ApplierOptions{})
 	assert.Error(t, err)
 }
 
@@ -2062,7 +2062,7 @@ func TestReadAndPrepareObjects(t *testing.T) {
 				newFakePoller([]pollevent.Event{}),
 			)
 
-			applyObjs, pruneObjs, err := applier.prepareObjects(tc.invInfo.toWrapped(), tc.resources, Options{})
+			applyObjs, pruneObjs, err := applier.prepareObjects(tc.invInfo.toWrapped(), tc.resources, ApplierOptions{})
 			if tc.isError {
 				assert.Error(t, err)
 				return

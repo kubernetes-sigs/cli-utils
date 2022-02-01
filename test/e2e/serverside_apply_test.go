@@ -27,7 +27,7 @@ func serversideApplyTest(ctx context.Context, c client.Client, invConfig Invento
 		manifestToUnstructured(apiservice1),
 	}
 
-	runWithNoErr(applier.Run(ctx, inv, firstResources, apply.Options{
+	runWithNoErr(applier.Run(ctx, inv, firstResources, apply.ApplierOptions{
 		ReconcileTimeout: 2 * time.Minute,
 		EmitStatusEvents: true,
 		ServerSideOptions: common.ServerSideOptions{

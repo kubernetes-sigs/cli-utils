@@ -29,7 +29,7 @@ func reconciliationFailed(ctx context.Context, invConfig InventoryConfig, invent
 		podObj,
 	}
 
-	applierEvents := runCollect(applier.Run(ctx, inventoryInfo, resources, apply.Options{
+	applierEvents := runCollect(applier.Run(ctx, inventoryInfo, resources, apply.ApplierOptions{
 		ReconcileTimeout: 2 * time.Minute,
 		EmitStatusEvents: false,
 	}))
@@ -52,7 +52,7 @@ func reconciliationTimeout(ctx context.Context, invConfig InventoryConfig, inven
 		podObj,
 	}
 
-	applierEvents := runCollect(applier.Run(ctx, inventoryInfo, resources, apply.Options{
+	applierEvents := runCollect(applier.Run(ctx, inventoryInfo, resources, apply.ApplierOptions{
 		ReconcileTimeout: 30 * time.Second,
 		EmitStatusEvents: false,
 	}))

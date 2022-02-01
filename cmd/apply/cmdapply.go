@@ -141,7 +141,10 @@ func (r *ApplyRunner) RunE(cmd *cobra.Command, args []string) error {
 
 	// Run the applier. It will return a channel where we can receive updates
 	// to keep track of progress and any issues.
-	a, err := apply.NewApplier(r.factory, invClient)
+	a, err := apply.NewApplierBuilder().
+		WithFactory(r.factory).
+		WithInventoryClient(invClient).
+		Build()
 	if err != nil {
 		return err
 	}
@@ -151,7 +154,7 @@ func (r *ApplyRunner) RunE(cmd *cobra.Command, args []string) error {
 		r.printStatusEvents = true
 	}
 
-	ch := a.Run(ctx, inv, objs, apply.Options{
+	ch := a.Run(ctx, inv, objs, apply.ApplierOptions{
 		ServerSideOptions: r.serverSideOptions,
 		PollInterval:      r.period,
 		ReconcileTimeout:  r.reconcileTimeout,

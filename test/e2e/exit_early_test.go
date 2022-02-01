@@ -40,7 +40,7 @@ func exitEarlyTest(ctx context.Context, c client.Client, invConfig InventoryConf
 		invalidPodObj,
 	}
 
-	applierEvents := runCollect(applier.Run(ctx, inv, resources, apply.Options{
+	applierEvents := runCollect(applier.Run(ctx, inv, resources, apply.ApplierOptions{
 		EmitStatusEvents: false,
 		ValidationPolicy: validation.ExitEarly,
 	}))

@@ -55,7 +55,7 @@ func skipInvalidTest(ctx context.Context, c client.Client, invConfig InventoryCo
 		invalidPodObj,
 	}
 
-	applierEvents := runCollect(applier.Run(ctx, inv, resources, apply.Options{
+	applierEvents := runCollect(applier.Run(ctx, inv, resources, apply.ApplierOptions{
 		EmitStatusEvents: false,
 		ValidationPolicy: validation.SkipInvalid,
 	}))
