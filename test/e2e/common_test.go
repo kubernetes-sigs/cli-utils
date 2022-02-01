@@ -226,12 +226,10 @@ func assertUnstructuredAvailable(obj *unstructured.Unstructured) {
 	Expect(err).NotTo(HaveOccurred())
 	available := false
 	for _, c := range objc.Status.Conditions {
-		switch c.Type {
-		case "Available": // appsv1.DeploymentAvailable
-			if c.Status == "True" { // corev1.ConditionTrue
-				available = true
-				break
-			}
+		// appsv1.DeploymentAvailable && corev1.ConditionTrue
+		if c.Type == "Available" && c.Status == "True" {
+			available = true
+			break
 		}
 	}
 	Expect(available).To(BeTrue(),
