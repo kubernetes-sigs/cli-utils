@@ -423,7 +423,7 @@ func copyInventory() InventoryInfo {
 
 func storeObjsInInventory(info InventoryInfo, objs object.ObjMetadataSet) *unstructured.Unstructured {
 	wrapped := WrapInventoryObj(InvInfoToConfigMap(info))
-	_ = wrapped.Store(objs, nil)
+	_ = wrapped.Store(objs)
 	inv, _ := wrapped.GetObject()
 	return inv
 }
