@@ -13,6 +13,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/cli-utils/pkg/common"
+	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
@@ -94,7 +95,7 @@ func (icm *InventoryConfigMap) Load() (object.ObjMetadataSet, error) {
 // Store is an Inventory interface function implemented to store
 // the object metadata in the wrapped ConfigMap. Actual storing
 // happens in "GetObject".
-func (icm *InventoryConfigMap) Store(objMetas object.ObjMetadataSet) error {
+func (icm *InventoryConfigMap) Store(objMetas object.ObjMetadataSet, _ map[object.ObjMetadata]status.ApplyReconcileStatus) error {
 	icm.objMetas = objMetas
 	return nil
 }
