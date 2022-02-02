@@ -18,5 +18,5 @@ import (
 // The options allows callers to override some of the settings of the poller,
 // like the polling frequency and the caching strategy.
 type Poller interface {
-	Poll(ctx context.Context, identifiers object.ObjMetadataSet, options polling.Options) <-chan pollevent.Event
+	Poll(ctx context.Context, identifiers object.ObjMetadataSet, options polling.PollOptions) <-chan pollevent.Event
 }

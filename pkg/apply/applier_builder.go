@@ -114,7 +114,7 @@ func (b *ApplierBuilder) finalize() (*ApplierBuilder, error) {
 		if err != nil {
 			return nil, fmt.Errorf("error creating client: %v", err)
 		}
-		bx.statusPoller = polling.NewStatusPoller(c, bx.mapper, nil)
+		bx.statusPoller = polling.NewStatusPoller(c, bx.mapper, polling.Options{})
 	}
 	return &bx, nil
 }

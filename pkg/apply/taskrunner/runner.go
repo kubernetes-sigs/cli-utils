@@ -36,7 +36,6 @@ type taskStatusRunner struct {
 // the statusPoller.
 type Options struct {
 	PollInterval     time.Duration
-	UseCache         bool
 	EmitStatusEvents bool
 }
 
@@ -60,9 +59,8 @@ func (tsr *taskStatusRunner) Run(
 	// If taskStatusRunner.Run is cancelled, baseRunner.run will exit early,
 	// causing the poller to be cancelled.
 	statusCtx, cancelFunc := context.WithCancel(context.Background())
-	statusChannel := tsr.statusPoller.Poll(statusCtx, tsr.identifiers, polling.Options{
+	statusChannel := tsr.statusPoller.Poll(statusCtx, tsr.identifiers, polling.PollOptions{
 		PollInterval: opts.PollInterval,
-		UseCache:     opts.UseCache,
 	})
 
 	// complete stops the statusPoller, drains the statusChannel, and returns

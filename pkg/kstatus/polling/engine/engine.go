@@ -15,17 +15,25 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// ClusterReaderFactoryFunc defines the signature for the function the PollerEngine will use to create
-// a new ClusterReader for each statusPollerRunner.
-type ClusterReaderFactoryFunc func(reader client.Reader, mapper meta.RESTMapper,
-	identifiers object.ObjMetadataSet) (ClusterReader, error)
+// ClusterReaderFactory provides an interface that can be implemented to provide custom
+// ClusterReader implementations in the StatusPoller.
+type ClusterReaderFactory interface {
+	New(reader client.Reader, mapper meta.RESTMapper, identifiers object.ObjMetadataSet) (ClusterReader, error)
+}
+
+type ClusterReaderFactoryFunc func(client.Reader, meta.RESTMapper, object.ObjMetadataSet) (ClusterReader, error)
+
+func (c ClusterReaderFactoryFunc) New(r client.Reader, m meta.RESTMapper, ids object.ObjMetadataSet) (ClusterReader, error) {
+	return c(r, m, ids)
+}
 
 // PollerEngine provides functionality for polling a cluster for status of a set of resources.
 type PollerEngine struct {
-	Reader              client.Reader
-	Mapper              meta.RESTMapper
-	StatusReaders       []StatusReader
-	DefaultStatusReader StatusReader
+	Reader               client.Reader
+	Mapper               meta.RESTMapper
+	StatusReaders        []StatusReader
+	DefaultStatusReader  StatusReader
+	ClusterReaderFactory ClusterReaderFactory
 }
 
 // Poll will create a new statusPollerRunner that will poll all the resources provided and report their status
@@ -39,19 +47,13 @@ func (s *PollerEngine) Poll(ctx context.Context, identifiers object.ObjMetadataS
 	go func() {
 		defer close(eventChannel)
 
-		err := s.validate(options)
+		err := s.validateIdentifiers(identifiers)
 		if err != nil {
 			handleError(eventChannel, err)
 			return
 		}
 
-		err = s.validateIdentifiers(identifiers)
-		if err != nil {
-			handleError(eventChannel, err)
-			return
-		}
-
-		clusterReader, err := options.ClusterReaderFactoryFunc(s.Reader, s.Mapper, identifiers)
+		clusterReader, err := s.ClusterReaderFactory.New(s.Reader, s.Mapper, identifiers)
 		if err != nil {
 			handleError(eventChannel, fmt.Errorf("error creating new ClusterReader: %w", err))
 			return
@@ -78,14 +80,6 @@ func handleError(eventChannel chan event.Event, err error) {
 		EventType: event.ErrorEvent,
 		Error:     err,
 	}
-}
-
-// validate checks that the passed in options contains valid values.
-func (s *PollerEngine) validate(options Options) error {
-	if options.ClusterReaderFactoryFunc == nil {
-		return fmt.Errorf("clusterReaderFactoryFunc must be specified")
-	}
-	return nil
 }
 
 // validateIdentifiers makes sure that all namespaced resources
@@ -118,11 +112,6 @@ type Options struct {
 	// PollInterval defines how often the PollerEngine should poll the cluster for the latest
 	// state of the resources.
 	PollInterval time.Duration
-
-	// ClusterReaderFactoryFunc provides the PollerEngine with a factory function for creating new
-	// StatusReaders. Since these can be stateful, every call to Poll will create a new
-	// ClusterReader.
-	ClusterReaderFactoryFunc ClusterReaderFactoryFunc
 }
 
 // statusPollerRunner is responsible for polling of a set of resources. Each call to Poll will create

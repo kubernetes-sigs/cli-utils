@@ -232,7 +232,6 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.InventoryInfo, obje
 		klog.V(4).Infoln("applier running TaskStatusRunner...")
 		err = runner.Run(ctx, taskContext, taskQueue.ToChannel(), taskrunner.Options{
 			PollInterval:     options.PollInterval,
-			UseCache:         true,
 			EmitStatusEvents: options.EmitStatusEvents,
 		})
 		if err != nil {
