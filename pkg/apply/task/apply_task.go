@@ -106,7 +106,7 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 					id,
 					applyerror.NewUnknownTypeError(err),
 				))
-				taskContext.AddFailedApply(id)
+				taskContext.InventoryManager().AddFailedApply(id)
 				continue
 			}
 
@@ -122,13 +122,13 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 						klog.Errorf("error during %s, (%s): %s", filter.Name(), id, filterErr)
 					}
 					taskContext.SendEvent(a.createApplyFailedEvent(id, filterErr))
-					taskContext.AddFailedApply(id)
+					taskContext.InventoryManager().AddFailedApply(id)
 					break
 				}
 				if filtered {
 					klog.V(4).Infof("apply filtered (filter: %q, resource: %q, reason: %q)", filter.Name(), id, reason)
 					taskContext.SendEvent(a.createApplyEvent(id, event.Unchanged, obj))
-					taskContext.AddSkippedApply(id)
+					taskContext.InventoryManager().AddSkippedApply(id)
 					break
 				}
 			}
@@ -143,7 +143,7 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 					klog.Errorf("error mutating: %w", err)
 				}
 				taskContext.SendEvent(a.createApplyFailedEvent(id, err))
-				taskContext.AddFailedApply(id)
+				taskContext.InventoryManager().AddFailedApply(id)
 				continue
 			}
 
@@ -168,13 +168,13 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 					id,
 					applyerror.NewApplyRunError(err),
 				))
-				taskContext.AddFailedApply(id)
+				taskContext.InventoryManager().AddFailedApply(id)
 			} else if info.Object != nil {
 				acc, err := meta.Accessor(info.Object)
 				if err == nil {
 					uid := acc.GetUID()
 					gen := acc.GetGeneration()
-					taskContext.AddSuccessfulApply(id, uid, gen)
+					taskContext.InventoryManager().AddSuccessfulApply(id, uid, gen)
 				}
 			}
 		}

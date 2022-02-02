@@ -49,7 +49,7 @@ type InventoryClient interface {
 type ClusterInventoryClient struct {
 	dc                    dynamic.Interface
 	mapper                meta.RESTMapper
-	InventoryFactoryFunc  InventoryFactoryFunc
+	InventoryFactoryFunc  StorageFactoryFunc
 	invToUnstructuredFunc InventoryToUnstructuredFunc
 }
 
@@ -58,7 +58,7 @@ var _ InventoryClient = &ClusterInventoryClient{}
 // NewInventoryClient returns a concrete implementation of the
 // InventoryClient interface or an error.
 func NewInventoryClient(factory cmdutil.Factory,
-	invFunc InventoryFactoryFunc,
+	invFunc StorageFactoryFunc,
 	invToUnstructuredFunc InventoryToUnstructuredFunc) (*ClusterInventoryClient, error) {
 	dc, err := factory.DynamicClient()
 	if err != nil {

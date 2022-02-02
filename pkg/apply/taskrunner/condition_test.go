@@ -157,7 +157,7 @@ func TestCollector_ConditionMet(t *testing.T) {
 
 			if tc.appliedGen != nil {
 				for id, gen := range tc.appliedGen {
-					taskContext.AddSuccessfulApply(id, types.UID("unused"), gen)
+					taskContext.InventoryManager().AddSuccessfulApply(id, types.UID("unused"), gen)
 				}
 			}
 

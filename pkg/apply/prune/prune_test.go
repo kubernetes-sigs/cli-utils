@@ -482,19 +482,21 @@ func TestPrune(t *testing.T) {
 			err = testutil.VerifyEvents(tc.expectedEvents, actualEvents)
 			assert.NoError(t, err)
 
+			im := taskContext.InventoryManager()
+
 			// validate record of failed prunes
 			for _, id := range tc.expectedFailed {
-				assert.Truef(t, taskContext.IsFailedDelete(id), "Prune() should mark object as failed: %s", id)
+				assert.Truef(t, im.IsFailedDelete(id), "Prune() should mark object as failed: %s", id)
 			}
 			for _, id := range pruneIds.Diff(tc.expectedFailed) {
-				assert.Falsef(t, taskContext.IsFailedDelete(id), "Prune() should NOT mark object as failed: %s", id)
+				assert.Falsef(t, im.IsFailedDelete(id), "Prune() should NOT mark object as failed: %s", id)
 			}
 			// validate record of skipped prunes
 			for _, id := range tc.expectedSkipped {
-				assert.Truef(t, taskContext.IsSkippedDelete(id), "Prune() should mark object as skipped: %s", id)
+				assert.Truef(t, im.IsSkippedDelete(id), "Prune() should mark object as skipped: %s", id)
 			}
 			for _, id := range pruneIds.Diff(tc.expectedSkipped) {
-				assert.Falsef(t, taskContext.IsSkippedDelete(id), "Prune() should NOT mark object as skipped: %s", id)
+				assert.Falsef(t, im.IsSkippedDelete(id), "Prune() should NOT mark object as skipped: %s", id)
 			}
 			// validate record of abandoned objects
 			for _, id := range tc.expectedAbandoned {
@@ -561,9 +563,11 @@ func TestPruneDeletionPrevention(t *testing.T) {
 				}
 			}
 
+			im := taskContext.InventoryManager()
+
 			assert.Truef(t, taskContext.IsAbandonedObject(pruneID), "Prune() should mark object as abandoned")
-			assert.Truef(t, taskContext.IsSkippedDelete(pruneID), "Prune() should mark object as skipped")
-			assert.Falsef(t, taskContext.IsFailedDelete(pruneID), "Prune() should NOT mark object as failed")
+			assert.Truef(t, im.IsSkippedDelete(pruneID), "Prune() should mark object as skipped")
+			assert.Falsef(t, im.IsFailedDelete(pruneID), "Prune() should NOT mark object as failed")
 		})
 	}
 }

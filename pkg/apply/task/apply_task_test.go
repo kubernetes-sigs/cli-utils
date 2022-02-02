@@ -114,14 +114,16 @@ func TestApplyTask_BasicAppliedObjects(t *testing.T) {
 			// The applied resources should be stored in the TaskContext
 			// for the final inventory.
 			expectedIDs := object.UnstructuredSetToObjMetadataSet(objs)
-			actual := taskContext.SuccessfulApplies()
+			actual := taskContext.InventoryManager().SuccessfulApplies()
 			if !actual.Equal(expectedIDs) {
 				t.Errorf("expected (%s) inventory resources, got (%s)", expectedIDs, actual)
 			}
 
+			im := taskContext.InventoryManager()
+
 			for _, id := range expectedIDs {
-				assert.Falsef(t, taskContext.IsFailedApply(id), "ApplyTask should NOT mark object as failed: %s", id)
-				assert.Falsef(t, taskContext.IsSkippedApply(id), "ApplyTask should NOT mark object as skipped: %s", id)
+				assert.Falsef(t, im.IsFailedApply(id), "ApplyTask should NOT mark object as failed: %s", id)
+				assert.Falsef(t, im.IsSkippedApply(id), "ApplyTask should NOT mark object as skipped: %s", id)
 			}
 		})
 	}
@@ -198,10 +200,10 @@ func TestApplyTask_FetchGeneration(t *testing.T) {
 					Name:      info.name,
 					Namespace: info.namespace,
 				}
-				uid, _ := taskContext.AppliedResourceUID(id)
+				uid, _ := taskContext.InventoryManager().AppliedResourceUID(id)
 				assert.Equal(t, info.uid, uid)
 
-				gen, _ := taskContext.AppliedGeneration(id)
+				gen, _ := taskContext.InventoryManager().AppliedGeneration(id)
 				assert.Equal(t, info.generation, gen)
 			}
 		})
@@ -491,19 +493,21 @@ func TestApplyTaskWithError(t *testing.T) {
 
 			applyIds := object.UnstructuredSetToObjMetadataSet(tc.objs)
 
+			im := taskContext.InventoryManager()
+
 			// validate record of failed prunes
 			for _, id := range tc.expectedFailed {
-				assert.Truef(t, taskContext.IsFailedApply(id), "ApplyTask should mark object as failed: %s", id)
+				assert.Truef(t, im.IsFailedApply(id), "ApplyTask should mark object as failed: %s", id)
 			}
 			for _, id := range applyIds.Diff(tc.expectedFailed) {
-				assert.Falsef(t, taskContext.IsFailedApply(id), "ApplyTask should NOT mark object as failed: %s", id)
+				assert.Falsef(t, im.IsFailedApply(id), "ApplyTask should NOT mark object as failed: %s", id)
 			}
 			// validate record of skipped prunes
 			for _, id := range tc.expectedSkipped {
-				assert.Truef(t, taskContext.IsSkippedApply(id), "ApplyTask should mark object as skipped: %s", id)
+				assert.Truef(t, im.IsSkippedApply(id), "ApplyTask should mark object as skipped: %s", id)
 			}
 			for _, id := range applyIds.Diff(tc.expectedSkipped) {
-				assert.Falsef(t, taskContext.IsSkippedApply(id), "ApplyTask should NOT mark object as skipped: %s", id)
+				assert.Falsef(t, im.IsSkippedApply(id), "ApplyTask should NOT mark object as skipped: %s", id)
 			}
 		})
 	}

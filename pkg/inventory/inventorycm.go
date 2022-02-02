@@ -19,7 +19,7 @@ import (
 // WrapInventoryObj takes a passed ConfigMap (as a resource.Info),
 // wraps it with the InventoryConfigMap and upcasts the wrapper as
 // an the Inventory interface.
-func WrapInventoryObj(inv *unstructured.Unstructured) Inventory {
+func WrapInventoryObj(inv *unstructured.Unstructured) Storage {
 	return &InventoryConfigMap{inv: inv}
 }
 
@@ -47,7 +47,7 @@ type InventoryConfigMap struct {
 }
 
 var _ InventoryInfo = &InventoryConfigMap{}
-var _ Inventory = &InventoryConfigMap{}
+var _ Storage = &InventoryConfigMap{}
 
 func (icm *InventoryConfigMap) Name() string {
 	return icm.inv.GetName()

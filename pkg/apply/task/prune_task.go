@@ -57,7 +57,7 @@ func (p *PruneTask) Start(taskContext *taskrunner.TaskContext) {
 		// Create filter to prevent deletion of currently applied
 		// objects. Must be done here to wait for applied UIDs.
 		uidFilter := filter.CurrentUIDFilter{
-			CurrentUIDs: taskContext.AppliedResourceUIDs(),
+			CurrentUIDs: taskContext.InventoryManager().AppliedResourceUIDs(),
 		}
 		p.Filters = append(p.Filters, uidFilter)
 		err := p.Pruner.Prune(
