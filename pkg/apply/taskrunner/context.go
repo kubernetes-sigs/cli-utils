@@ -9,6 +9,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/object"
+	"sigs.k8s.io/cli-utils/pkg/object/graph"
 )
 
 // NewTaskContext returns a new TaskContext
@@ -17,6 +18,7 @@ func NewTaskContext(eventChannel chan event.Event, resourceCache cache.ResourceC
 		taskChannel:      make(chan TaskResult),
 		eventChannel:     eventChannel,
 		resourceCache:    resourceCache,
+		Graph:            graph.New(),
 		inventoryManager: inventory.NewManager(),
 		abandonedObjects: make(map[object.ObjMetadata]struct{}),
 		invalidObjects:   make(map[object.ObjMetadata]struct{}),
@@ -29,6 +31,7 @@ type TaskContext struct {
 	taskChannel      chan TaskResult
 	eventChannel     chan event.Event
 	resourceCache    cache.ResourceCache
+	Graph            *graph.Graph
 	inventoryManager *inventory.Manager
 	abandonedObjects map[object.ObjMetadata]struct{}
 	invalidObjects   map[object.ObjMetadata]struct{}

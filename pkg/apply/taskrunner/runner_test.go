@@ -42,6 +42,8 @@ var (
 
 func TestBaseRunner(t *testing.T) {
 	testCases := map[string]struct {
+		applyIds           object.ObjMetadataSet
+		pruneIds           object.ObjMetadataSet
 		tasks              []Task
 		statusEventsDelay  time.Duration
 		statusEvents       []pollevent.Event
@@ -49,6 +51,7 @@ func TestBaseRunner(t *testing.T) {
 		expectedWaitEvents []event.WaitEvent
 	}{
 		"wait task runs until condition is met": {
+			applyIds: object.ObjMetadataSet{depID, cmID},
 			tasks: []Task{
 				&fakeApplyTask{
 					resultEvent: event.Event{
@@ -122,6 +125,7 @@ func TestBaseRunner(t *testing.T) {
 			},
 		},
 		"wait task times out eventually (Unknown)": {
+			applyIds: object.ObjMetadataSet{depID, cmID},
 			tasks: []Task{
 				NewWaitTask("wait", object.ObjMetadataSet{depID, cmID}, AllCurrent,
 					2*time.Second, testutil.NewFakeRESTMapper()),
@@ -169,6 +173,7 @@ func TestBaseRunner(t *testing.T) {
 			},
 		},
 		"wait task times out eventually (InProgress)": {
+			applyIds: object.ObjMetadataSet{depID, cmID},
 			tasks: []Task{
 				NewWaitTask("wait", object.ObjMetadataSet{depID, cmID}, AllCurrent,
 					2*time.Second, testutil.NewFakeRESTMapper()),
@@ -283,6 +288,14 @@ func TestBaseRunner(t *testing.T) {
 			taskContext := NewTaskContext(eventChannel, resourceCache)
 			runner := NewTaskStatusRunner(ids, poller)
 
+			// Register actuation plan in the inventory
+			for _, id := range tc.applyIds {
+				taskContext.InventoryManager().AddPendingApply(id)
+			}
+			for _, id := range tc.pruneIds {
+				taskContext.InventoryManager().AddPendingDelete(id)
+			}
+
 			// Use a WaitGroup to make sure changes in the goroutines
 			// are visible to the main goroutine.
 			var wg sync.WaitGroup
@@ -315,21 +328,22 @@ func TestBaseRunner(t *testing.T) {
 
 			assert.NoError(t, err)
 
-			if want, got := len(tc.expectedEventTypes), len(events); want != got {
-				t.Errorf("expected %d events, but got %d", want, got)
-			}
 			var waitEvents []event.WaitEvent
-			for i, e := range events {
-				expectedEventType := tc.expectedEventTypes[i]
-				if want, got := expectedEventType, e.Type; want != got {
-					t.Errorf("expected event type %s, but got %s",
-						want, got)
-				}
+			for _, e := range events {
 				if e.Type == event.WaitType {
 					waitEvents = append(waitEvents, e.WaitEvent)
 				}
+				if e.Type == event.ErrorType {
+					t.Errorf("Unexpected error event: %v", e.ErrorEvent.Err)
+				}
 			}
 			assert.Equal(t, tc.expectedWaitEvents, waitEvents)
+
+			eventTypes := make([]event.Type, len(events))
+			for i, e := range events {
+				eventTypes[i] = e.Type
+			}
+			assert.Equal(t, tc.expectedEventTypes, eventTypes)
 		})
 	}
 }
@@ -338,6 +352,8 @@ func TestBaseRunnerCancellation(t *testing.T) {
 	testError := fmt.Errorf("this is a test error")
 
 	testCases := map[string]struct {
+		applyIds           object.ObjMetadataSet
+		pruneIds           object.ObjMetadataSet
 		tasks              []Task
 		statusEventsDelay  time.Duration
 		statusEvents       []pollevent.Event
@@ -369,6 +385,7 @@ func TestBaseRunnerCancellation(t *testing.T) {
 			},
 		},
 		"cancellation while wait task is running": {
+			applyIds: object.ObjMetadataSet{depID},
 			tasks: []Task{
 				NewWaitTask("wait", object.ObjMetadataSet{depID}, AllCurrent,
 					20*time.Second, testutil.NewFakeRESTMapper()),
@@ -414,6 +431,7 @@ func TestBaseRunnerCancellation(t *testing.T) {
 			},
 		},
 		"error from status poller while wait task is running": {
+			applyIds: object.ObjMetadataSet{depID},
 			tasks: []Task{
 				NewWaitTask("wait", object.ObjMetadataSet{depID}, AllCurrent,
 					20*time.Second, testutil.NewFakeRESTMapper()),
@@ -455,6 +473,14 @@ func TestBaseRunnerCancellation(t *testing.T) {
 			taskContext := NewTaskContext(eventChannel, resourceCache)
 			runner := NewTaskStatusRunner(ids, poller)
 
+			// Register actuation plan in the inventory
+			for _, id := range tc.applyIds {
+				taskContext.InventoryManager().AddPendingApply(id)
+			}
+			for _, id := range tc.pruneIds {
+				taskContext.InventoryManager().AddPendingDelete(id)
+			}
+
 			// Use a WaitGroup to make sure changes in the goroutines
 			// are visible to the main goroutine.
 			var wg sync.WaitGroup
@@ -493,16 +519,17 @@ func TestBaseRunnerCancellation(t *testing.T) {
 				assert.NoError(t, err)
 			}
 
-			if want, got := len(tc.expectedEventTypes), len(events); want != got {
-				t.Errorf("expected %d events, but got %d", want, got)
-			}
-			for i, e := range events {
-				expectedEventType := tc.expectedEventTypes[i]
-				if want, got := expectedEventType, e.Type; want != got {
-					t.Errorf("expected event type %s, but got %s",
-						want, got)
+			for _, e := range events {
+				if e.Type == event.ErrorType {
+					t.Errorf("Unexpected error event: %v", e.ErrorEvent.Err)
 				}
 			}
+
+			eventTypes := make([]event.Type, len(events))
+			for i, e := range events {
+				eventTypes[i] = e.Type
+			}
+			assert.Equal(t, tc.expectedEventTypes, eventTypes)
 		})
 	}
 }

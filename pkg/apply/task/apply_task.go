@@ -171,6 +171,7 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 				taskContext.InventoryManager().AddFailedApply(id)
 			} else if info.Object != nil {
 				acc, err := meta.Accessor(info.Object)
+				// TODO: why is apply not successful if Accessor errors?
 				if err == nil {
 					uid := acc.GetUID()
 					gen := acc.GetGeneration()

@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	ktestutil "sigs.k8s.io/cli-utils/pkg/kstatus/polling/testutil"
+	"sigs.k8s.io/cli-utils/pkg/object/reference"
 )
 
 var configmap1y = `
@@ -33,7 +34,7 @@ data: {}
 
 var m1 = ApplyTimeMutation{
 	{
-		SourceRef: ResourceReference{
+		SourceRef: reference.ObjectReference{
 			Group:     "resourcemanager.cnrm.cloud.google.com",
 			Kind:      "Project",
 			Name:      "example-name",
@@ -63,7 +64,7 @@ data: {}
 
 var m2 = ApplyTimeMutation{
 	{
-		SourceRef: ResourceReference{
+		SourceRef: reference.ObjectReference{
 			Group: "",
 			Kind:  "ConfigMap",
 			Name:  "example-name",
@@ -160,7 +161,7 @@ data: {}
 
 var m3 = ApplyTimeMutation{
 	{
-		SourceRef: ResourceReference{
+		SourceRef: reference.ObjectReference{
 			Group:     "resourcemanager.cnrm.cloud.google.com",
 			Kind:      "Project",
 			Name:      "example-name",
@@ -171,7 +172,7 @@ var m3 = ApplyTimeMutation{
 		Token:      "${project-number}",
 	},
 	{
-		SourceRef: ResourceReference{
+		SourceRef: reference.ObjectReference{
 			Group: "",
 			Kind:  "ConfigMap",
 			Name:  "example-name",

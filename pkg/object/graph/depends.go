@@ -19,6 +19,80 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/ordering"
 )
 
+func AddDependencies(g *Graph, objs object.UnstructuredSet) error {
+	if len(objs) == 0 {
+		return nil
+	}
+	var errors []error
+	// Convert to IDs (same length & order as objs)
+	ids := object.UnstructuredSetToObjMetadataSet(objs)
+	// Add objects as graph vertices
+	addVertices(g, ids)
+	// Add dependencies as graph edges
+	addCRDEdges(g, objs, ids)
+	addNamespaceEdges(g, objs, ids)
+	if err := addDependsOnEdges(g, objs, ids); err != nil {
+		errors = append(errors, err)
+	}
+	if err := addApplyTimeMutationEdges(g, objs, ids); err != nil {
+		errors = append(errors, err)
+	}
+	return multierror.Wrap(errors...)
+}
+
+// SortAndFilter sorts the graph into a SetList of IDs and then converts into a
+// SetList of Unstructured objects. IDs not in the UnstructuredSet are ignored.
+// Empty sets are skipped.
+func SortAndFilter(g *Graph, objs object.UnstructuredSet) ([]object.UnstructuredSet, error) {
+	var objSets []object.UnstructuredSet
+	if len(objs) == 0 {
+		return objSets, nil
+	}
+	// Run topological sort on the graph.
+	var errors []error
+	idSetList, err := g.Sort()
+	if err != nil {
+		errors = append(errors, err)
+	}
+	// Convert to IDs (same length & order as objs)
+	ids := object.UnstructuredSetToObjMetadataSet(objs)
+	// Create the graph, and build a map of object metadata to the object (Unstructured).
+	objToUnstructured := map[object.ObjMetadata]*unstructured.Unstructured{}
+	for i, obj := range objs {
+		id := ids[i]
+		objToUnstructured[id] = obj
+	}
+	// Map the object metadata back to the sorted sets of unstructured objects.
+	// Ignore any edges that aren't part of the input set (don't wait for them).
+	for _, idSet := range idSetList {
+		currentSet := object.UnstructuredSet{}
+		for _, id := range idSet {
+			var found bool
+			var obj *unstructured.Unstructured
+			if obj, found = objToUnstructured[id]; found {
+				currentSet = append(currentSet, obj)
+			}
+		}
+		// Sort each set in apply order
+		sort.Sort(ordering.SortableUnstructureds(currentSet))
+		objSets = append(objSets, currentSet)
+	}
+	return objSets, multierror.Wrap(errors...)
+}
+
+func ReverseSetList(setList []object.UnstructuredSet) {
+	// Reverse the ordering of the object sets using swaps.
+	for i, j := 0, len(setList)-1; i < j; i, j = i+1, j-1 {
+		setList[i], setList[j] = setList[j], setList[i]
+	}
+	// Reverse the ordering of the objects in each set using swaps.
+	for _, set := range setList {
+		for i, j := 0, len(set)-1; i < j; i, j = i+1, j-1 {
+			set[i], set[j] = set[j], set[i]
+		}
+	}
+}
+
 // SortObjs returns a slice of the sets of objects to apply (in order).
 // Each of the objects in an apply set is applied together. The order of
 // the returned applied sets is a topological ordering of the sets to apply.
@@ -122,22 +196,22 @@ func addApplyTimeMutationEdges(g *Graph, objs object.UnstructuredSet, ids object
 		seen := make(map[object.ObjMetadata]struct{})
 		var objErrors []error
 		for _, sub := range subs {
-			dep := sub.SourceRef.ToObjMetadata()
+			depID := sub.SourceRef.ToObjMetadata()
 			// Duplicate dependencies can be safely skipped.
-			if _, found := seen[dep]; found {
+			if _, found := seen[depID]; found {
 				continue
 			}
 			// Mark as seen
-			seen[dep] = struct{}{}
+			seen[depID] = struct{}{}
 			// Require dependencies to be in the same resource group.
 			// Waiting for external dependencies isn't implemented (yet).
-			if !ids.Contains(dep) {
+			if !ids.Contains(depID) {
 				err := object.InvalidAnnotationError{
 					Annotation: mutation.Annotation,
 					Cause: ExternalDependencyError{
 						Edge: Edge{
 							From: id,
-							To:   dep,
+							To:   depID,
 						},
 					},
 				}
@@ -145,8 +219,8 @@ func addApplyTimeMutationEdges(g *Graph, objs object.UnstructuredSet, ids object
 				klog.V(3).Infof("failed to add edges: %v", err)
 				continue
 			}
-			klog.V(3).Infof("adding edge from: %s, to: %s", id, dep)
-			g.AddEdge(id, dep)
+			klog.V(3).Infof("adding edge from: %s, to: %s", id, depID)
+			g.AddEdge(id, depID)
 		}
 		if len(objErrors) > 0 {
 			errors = append(errors,
@@ -178,15 +252,16 @@ func addDependsOnEdges(g *Graph, objs object.UnstructuredSet, ids object.ObjMeta
 		seen := make(map[object.ObjMetadata]struct{})
 		var objErrors []error
 		for _, dep := range deps {
+			depID := dep.ToObjMetadata()
 			// Duplicate dependencies in the same annotation are not allowed.
 			// Having duplicates won't break the graph, but skip it anyway.
-			if _, found := seen[dep]; found {
+			if _, found := seen[depID]; found {
 				err := object.InvalidAnnotationError{
 					Annotation: dependson.Annotation,
 					Cause: DuplicateDependencyError{
 						Edge: Edge{
 							From: id,
-							To:   dep,
+							To:   depID,
 						},
 					},
 				}
@@ -195,16 +270,16 @@ func addDependsOnEdges(g *Graph, objs object.UnstructuredSet, ids object.ObjMeta
 				continue
 			}
 			// Mark as seen
-			seen[dep] = struct{}{}
+			seen[depID] = struct{}{}
 			// Require dependencies to be in the same resource group.
 			// Waiting for external dependencies isn't implemented (yet).
-			if !ids.Contains(dep) {
+			if !ids.Contains(depID) {
 				err := object.InvalidAnnotationError{
 					Annotation: dependson.Annotation,
 					Cause: ExternalDependencyError{
 						Edge: Edge{
 							From: id,
-							To:   dep,
+							To:   depID,
 						},
 					},
 				}
@@ -213,7 +288,7 @@ func addDependsOnEdges(g *Graph, objs object.UnstructuredSet, ids object.ObjMeta
 				continue
 			}
 			klog.V(3).Infof("adding edge from: %s, to: %s", id, dep)
-			g.AddEdge(id, dep)
+			g.AddEdge(id, depID)
 		}
 		if len(objErrors) > 0 {
 			errors = append(errors,

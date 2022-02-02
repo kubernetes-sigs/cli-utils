@@ -10,6 +10,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/cli-utils/pkg/apply/filter"
 	"sigs.k8s.io/cli-utils/pkg/apply/mutator"
@@ -420,6 +421,10 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 				}
 			}
 
+			depGraph := graph.New()
+			err := graph.AddDependencies(depGraph, tc.applyObjs)
+			require.NoError(t, err)
+
 			applyIds := object.UnstructuredSetToObjMetadataSet(tc.applyObjs)
 			fakeInvClient := inventory.NewFakeClient(applyIds)
 			vCollector := &validation.Collector{}
@@ -428,6 +433,7 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 				Mapper:    mapper,
 				InvClient: fakeInvClient,
 				Collector: vCollector,
+				Graph:     depGraph,
 			}
 			var filters []filter.ValidationFilter
 			var mutators []mutator.Interface
@@ -437,7 +443,7 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 				mutators,
 				tc.options,
 			).Build()
-			err := vCollector.ToError()
+			err = vCollector.ToError()
 			if tc.expectedError != nil {
 				assert.EqualError(t, err, tc.expectedError.Error())
 				return
@@ -785,6 +791,10 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 				}
 			}
 
+			depGraph := graph.New()
+			err := graph.AddDependencies(depGraph, tc.pruneObjs)
+			require.NoError(t, err)
+
 			pruneIds := object.UnstructuredSetToObjMetadataSet(tc.pruneObjs)
 			fakeInvClient := inventory.NewFakeClient(pruneIds)
 			vCollector := &validation.Collector{}
@@ -793,10 +803,11 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 				Mapper:    mapper,
 				InvClient: fakeInvClient,
 				Collector: vCollector,
+				Graph:     depGraph,
 			}
 			var emptyPruneFilters []filter.ValidationFilter
 			tq := tqb.AppendPruneWaitTasks(tc.pruneObjs, emptyPruneFilters, tc.options).Build()
-			err := vCollector.ToError()
+			err = vCollector.ToError()
 			if tc.expectedError != nil {
 				assert.EqualError(t, err, tc.expectedError.Error())
 				return

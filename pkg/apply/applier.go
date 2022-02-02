@@ -14,6 +14,7 @@ import (
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/klog/v2"
+	"sigs.k8s.io/cli-utils/pkg/apis/actuation"
 	"sigs.k8s.io/cli-utils/pkg/apply/cache"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/filter"
@@ -26,6 +27,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/object"
+	"sigs.k8s.io/cli-utils/pkg/object/graph"
 	"sigs.k8s.io/cli-utils/pkg/object/validation"
 )
 
@@ -125,6 +127,21 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.Info, objects objec
 		}
 		klog.V(4).Infof("calculated %d apply objs; %d prune objs", len(applyObjs), len(pruneObjs))
 
+		// Add all objects to a dependency graph
+		depGraph := graph.New()
+		var allObjs object.UnstructuredSet
+		allObjs = append(allObjs, applyObjs...)
+		allObjs = append(allObjs, pruneObjs...)
+		err = graph.AddDependencies(depGraph, allObjs)
+		if err != nil {
+			vCollector.Collect(err)
+		}
+
+		// Build a TaskContext for passing info between tasks
+		resourceCache := cache.NewResourceCacheMap()
+		taskContext := taskrunner.NewTaskContext(eventChannel, resourceCache)
+		taskContext.Graph = depGraph
+
 		// Fetch the queue (channel) of tasks that should be executed.
 		klog.V(4).Infoln("applier building task queue...")
 		taskBuilder := &solver.TaskQueueBuilder{
@@ -136,6 +153,7 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.Info, objects objec
 			InvClient:     a.invClient,
 			Destroy:       false,
 			Collector:     vCollector,
+			Graph:         depGraph,
 		}
 		opts := solver.Options{
 			ServerSideOptions:      options.ServerSideOptions,
@@ -154,6 +172,10 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.Info, objects objec
 				Inv:       invInfo,
 				InvPolicy: options.InventoryPolicy,
 			},
+			filter.DependencyFilter{
+				TaskContext: taskContext,
+				Strategy:    actuation.ActuationStrategyApply,
+			},
 		}
 
 		// Build list of prune validation filters.
@@ -166,9 +188,12 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.Info, objects objec
 			filter.LocalNamespacesFilter{
 				LocalNamespaces: localNamespaces(invInfo, object.UnstructuredSetToObjMetadataSet(objects)),
 			},
+			filter.DependencyFilter{
+				TaskContext: taskContext,
+				Strategy:    actuation.ActuationStrategyDelete,
+			},
 		}
 		// Build list of apply mutators.
-		resourceCache := cache.NewResourceCacheMap()
 		applyMutators := []mutator.Interface{
 			&mutator.ApplyTimeMutator{
 				Client:        a.client,
@@ -205,12 +230,16 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.Info, objects objec
 			return
 		}
 
-		// Build a TaskContext for passing info between tasks
-		taskContext := taskrunner.NewTaskContext(eventChannel, resourceCache)
-
 		// Register invalid objects to be retained in the inventory, if present.
 		for _, id := range vCollector.InvalidIds {
 			taskContext.AddInvalidObject(id)
+		}
+		// Register actuation plan in the inventory
+		for _, id := range object.UnstructuredSetToObjMetadataSet(applyObjs) {
+			taskContext.InventoryManager().AddPendingApply(id)
+		}
+		for _, id := range object.UnstructuredSetToObjMetadataSet(pruneObjs) {
+			taskContext.InventoryManager().AddPendingDelete(id)
 		}
 
 		// Send event to inform the caller about the resources that

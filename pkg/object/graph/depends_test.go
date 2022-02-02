@@ -15,6 +15,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/object/dependson"
 	"sigs.k8s.io/cli-utils/pkg/object/mutation"
 	mutationutil "sigs.k8s.io/cli-utils/pkg/object/mutation/testutil"
+	"sigs.k8s.io/cli-utils/pkg/object/reference"
 	"sigs.k8s.io/cli-utils/pkg/object/validation"
 	"sigs.k8s.io/cli-utils/pkg/testutil"
 )
@@ -404,7 +405,7 @@ func TestApplyTimeMutationEdges(t *testing.T) {
 					resources["deployment"],
 					mutationutil.AddApplyTimeMutation(t, &mutation.ApplyTimeMutation{
 						{
-							SourceRef: mutation.ResourceReferenceFromObjMetadata(
+							SourceRef: reference.ObjectReferenceFromObjMetadata(
 								testutil.ToIdentifier(t, resources["secret"]),
 							),
 							SourcePath: "unused",
@@ -429,7 +430,7 @@ func TestApplyTimeMutationEdges(t *testing.T) {
 					resources["deployment"],
 					mutationutil.AddApplyTimeMutation(t, &mutation.ApplyTimeMutation{
 						{
-							SourceRef: mutation.ResourceReferenceFromObjMetadata(
+							SourceRef: reference.ObjectReferenceFromObjMetadata(
 								testutil.ToIdentifier(t, resources["secret"]),
 							),
 							SourcePath: "unused",
@@ -443,7 +444,7 @@ func TestApplyTimeMutationEdges(t *testing.T) {
 					resources["pod"],
 					mutationutil.AddApplyTimeMutation(t, &mutation.ApplyTimeMutation{
 						{
-							SourceRef: mutation.ResourceReferenceFromObjMetadata(
+							SourceRef: reference.ObjectReferenceFromObjMetadata(
 								testutil.ToIdentifier(t, resources["secret"]),
 							),
 							SourcePath: "unused",
@@ -472,7 +473,7 @@ func TestApplyTimeMutationEdges(t *testing.T) {
 					resources["pod"],
 					mutationutil.AddApplyTimeMutation(t, &mutation.ApplyTimeMutation{
 						{
-							SourceRef: mutation.ResourceReferenceFromObjMetadata(
+							SourceRef: reference.ObjectReferenceFromObjMetadata(
 								testutil.ToIdentifier(t, resources["secret"]),
 							),
 							SourcePath: "unused",
@@ -480,7 +481,7 @@ func TestApplyTimeMutationEdges(t *testing.T) {
 							Token:      "unused",
 						},
 						{
-							SourceRef: mutation.ResourceReferenceFromObjMetadata(
+							SourceRef: reference.ObjectReferenceFromObjMetadata(
 								testutil.ToIdentifier(t, resources["deployment"]),
 							),
 							SourcePath: "unused",
@@ -542,7 +543,7 @@ func TestApplyTimeMutationEdges(t *testing.T) {
 				testutil.Unstructured(t, resources["pod"],
 					mutationutil.AddApplyTimeMutation(t, &mutation.ApplyTimeMutation{
 						{
-							SourceRef: mutation.ResourceReferenceFromObjMetadata(
+							SourceRef: reference.ObjectReferenceFromObjMetadata(
 								testutil.ToIdentifier(t, resources["deployment"]),
 							),
 						},
@@ -588,7 +589,7 @@ func TestApplyTimeMutationEdges(t *testing.T) {
 				testutil.Unstructured(t, resources["pod"],
 					mutationutil.AddApplyTimeMutation(t, &mutation.ApplyTimeMutation{
 						{
-							SourceRef: mutation.ResourceReferenceFromObjMetadata(
+							SourceRef: reference.ObjectReferenceFromObjMetadata(
 								testutil.ToIdentifier(t, resources["secret"]),
 							),
 						},
@@ -646,7 +647,7 @@ func TestApplyTimeMutationEdges(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 			}
-			actual := g.GetEdges()
+			actual := edgeMapToList(g.edges)
 			verifyEdges(t, tc.expected, actual)
 		})
 	}
@@ -750,7 +751,7 @@ func TestAddDependsOnEdges(t *testing.T) {
 				object.InvalidAnnotationError{
 					Annotation: dependson.Annotation,
 					Cause: errors.New("failed to parse object reference (index: 0): " +
-						`expected 3 or 5 fields, found 1: "invalid-obj-ref"`),
+						`wrong number of segments: "invalid-obj-ref"`),
 				},
 				object.ObjMetadata{
 					GroupKind: schema.GroupKind{
@@ -854,7 +855,7 @@ func TestAddDependsOnEdges(t *testing.T) {
 					object.InvalidAnnotationError{
 						Annotation: dependson.Annotation,
 						Cause: errors.New("failed to parse object reference (index: 0): " +
-							`expected 3 or 5 fields, found 1: "invalid-obj-ref"`),
+							`wrong number of segments: "invalid-obj-ref"`),
 					},
 					object.ObjMetadata{
 						GroupKind: schema.GroupKind{
@@ -939,7 +940,7 @@ func TestAddDependsOnEdges(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 			}
-			actual := g.GetEdges()
+			actual := edgeMapToList(g.edges)
 			verifyEdges(t, tc.expected, actual)
 		})
 	}
@@ -1016,7 +1017,7 @@ func TestAddNamespaceEdges(t *testing.T) {
 			g := New()
 			ids := object.UnstructuredSetToObjMetadataSet(tc.objs)
 			addNamespaceEdges(g, tc.objs, ids)
-			actual := g.GetEdges()
+			actual := edgeMapToList(g.edges)
 			verifyEdges(t, tc.expected, actual)
 		})
 	}
@@ -1068,7 +1069,7 @@ func TestAddCRDEdges(t *testing.T) {
 			g := New()
 			ids := object.UnstructuredSetToObjMetadataSet(tc.objs)
 			addCRDEdges(g, tc.objs, ids)
-			actual := g.GetEdges()
+			actual := edgeMapToList(g.edges)
 			verifyEdges(t, tc.expected, actual)
 		})
 	}

@@ -58,9 +58,10 @@ func TestInvSetTask(t *testing.T) {
 		},
 		"one apply objs, one prune failures; one inventory": {
 			// aritifical use case: applies and prunes are mutually exclusive
+			// failed delete replaces successful apply in the task context
 			appliedObjs:   object.ObjMetadataSet{id3},
 			failedDeletes: object.ObjMetadataSet{id3},
-			expectedObjs:  object.ObjMetadataSet{id3},
+			expectedObjs:  object.ObjMetadataSet{},
 		},
 		"two apply objs, two prune failures; three inventory": {
 			// aritifical use case: applies and prunes are mutually exclusive

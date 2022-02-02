@@ -68,11 +68,11 @@ func Invalid(fieldPath []interface{}, value interface{}, detail string) *field.E
 
 // NotFound returns a *Error indicating "value not found".  This is
 // used to report failure to find a requested value (e.g. looking up an ID).
-func NotFound(fieldPath []interface{}, value interface{}) *field.Error {
+func NotFound(fieldPath []interface{}) *field.Error {
 	return &field.Error{
 		Type:     field.ErrorTypeNotFound,
 		Field:    FieldPath(fieldPath),
-		BadValue: value,
+		BadValue: "",
 		Detail:   "",
 	}
 }

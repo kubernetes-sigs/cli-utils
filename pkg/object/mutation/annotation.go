@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/cli-utils/pkg/object"
+	"sigs.k8s.io/cli-utils/pkg/object/reference"
 	"sigs.k8s.io/yaml"
 )
 
@@ -37,7 +38,8 @@ func ReadAnnotation(obj *unstructured.Unstructured) (ApplyTimeMutation, error) {
 		return mutation, nil
 	}
 	if klog.V(5).Enabled() {
-		klog.Infof("object (%v) has apply-time-mutation annotation:\n%s", ResourceReferenceFromUnstructured(obj), mutationYaml)
+		klog.Infof("object (%v) has apply-time-mutation annotation:\n%s",
+			reference.ObjectReferenceFromUnstructured(obj), mutationYaml)
 	}
 
 	err := yaml.Unmarshal([]byte(mutationYaml), &mutation)

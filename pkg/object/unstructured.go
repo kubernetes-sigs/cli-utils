@@ -121,14 +121,14 @@ func LookupResourceScope(u *unstructured.Unstructured, crds []*unstructured.Unst
 			return nil, err
 		}
 		if !found || group == "" {
-			return nil, NotFound([]interface{}{"spec", "group"}, group)
+			return nil, NotFound([]interface{}{"spec", "group"})
 		}
 		kind, found, err := NestedField(crd.Object, "spec", "names", "kind")
 		if err != nil {
 			return nil, err
 		}
 		if !found || kind == "" {
-			return nil, NotFound([]interface{}{"spec", "kind"}, group)
+			return nil, NotFound([]interface{}{"spec", "kind"})
 		}
 		if gvk.Kind != kind || gvk.Group != group {
 			continue
@@ -167,7 +167,7 @@ func crdDefinesVersion(crd *unstructured.Unstructured, version string) (bool, er
 		return false, err
 	}
 	if !found {
-		return false, NotFound([]interface{}{"spec", "versions"}, versions)
+		return false, NotFound([]interface{}{"spec", "versions"})
 	}
 	versionsSlice, ok := versions.([]interface{})
 	if !ok {
@@ -182,7 +182,7 @@ func crdDefinesVersion(crd *unstructured.Unstructured, version string) (bool, er
 			return false, err
 		}
 		if !found {
-			return false, NotFound([]interface{}{"spec", "versions", i, "name"}, name)
+			return false, NotFound([]interface{}{"spec", "versions", i, "name"})
 		}
 		if name == version {
 			return true, nil

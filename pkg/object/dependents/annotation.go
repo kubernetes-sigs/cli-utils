@@ -1,7 +1,7 @@
 // Copyright 2021 The Kubernetes Authors.
 // SPDX-License-Identifier: Apache-2.0
 
-package dependson
+package dependents
 
 import (
 	"errors"
@@ -13,10 +13,10 @@ import (
 )
 
 const (
-	Annotation = "config.kubernetes.io/depends-on"
+	Annotation = "config.kubernetes.io/dependents"
 )
 
-// HasAnnotation returns true if the config.kubernetes.io/depends-on annotation
+// HasAnnotation returns true if the config.kubernetes.io/dependents annotation
 // is present, false if not.
 func HasAnnotation(u *unstructured.Unstructured) bool {
 	if u == nil {
@@ -26,10 +26,10 @@ func HasAnnotation(u *unstructured.Unstructured) bool {
 	return found
 }
 
-// ReadAnnotation reads the depends-on annotation and parses the the set of
+// ReadAnnotation reads the dependents annotation and parses the the set of
 // object references.
-func ReadAnnotation(obj *unstructured.Unstructured) (DependencySet, error) {
-	depSet := DependencySet{}
+func ReadAnnotation(obj *unstructured.Unstructured) (DependentSet, error) {
+	depSet := DependentSet{}
 	if obj == nil {
 		return depSet, nil
 	}
@@ -37,8 +37,9 @@ func ReadAnnotation(obj *unstructured.Unstructured) (DependencySet, error) {
 	if !found {
 		return depSet, nil
 	}
+
 	if klog.V(5).Enabled() {
-		klog.Infof("object (%v) has depends-on annotation: %s",
+		klog.Infof("object (%v) has dependents annotation: %s",
 			reference.ObjectReferenceFromUnstructured(obj), depSetStr)
 	}
 
@@ -53,12 +54,12 @@ func ReadAnnotation(obj *unstructured.Unstructured) (DependencySet, error) {
 }
 
 // WriteAnnotation updates the supplied unstructured object to add the
-// depends-on annotation.
-func WriteAnnotation(obj *unstructured.Unstructured, depSet DependencySet) error {
+// dependents annotation.
+func WriteAnnotation(obj *unstructured.Unstructured, depSet DependentSet) error {
 	if obj == nil {
 		return errors.New("object is nil")
 	}
-	if depSet.Equal(DependencySet{}) {
+	if depSet.Equal(DependentSet{}) {
 		return errors.New("dependent set is empty")
 	}
 

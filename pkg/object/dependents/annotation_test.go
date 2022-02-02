@@ -1,7 +1,7 @@
 // Copyright 2021 The Kubernetes Authors.
 // SPDX-License-Identifier: Apache-2.0
 
-package dependson
+package dependents
 
 import (
 	"errors"
@@ -96,36 +96,36 @@ var namespacedObj = reference.ObjectReference{
 func TestReadAnnotation(t *testing.T) {
 	testCases := map[string]struct {
 		obj           *unstructured.Unstructured
-		expected      DependencySet
+		expected      DependentSet
 		expectedError error
 	}{
 		"nil object is not found": {
 			obj:      nil,
-			expected: DependencySet{},
+			expected: DependentSet{},
 		},
 		"Object with no annotations returns not found": {
 			obj:      noAnnotations,
-			expected: DependencySet{},
+			expected: DependentSet{},
 		},
 		"Unparseable depends on annotation returns not found": {
 			obj:      badAnnotation,
-			expected: DependencySet{},
-			expectedError: errors.New(`invalid "config.kubernetes.io/depends-on" annotation: ` +
+			expected: DependentSet{},
+			expectedError: errors.New(`invalid "config.kubernetes.io/dependents" annotation: ` +
 				`failed to parse object reference (index: 0): ` +
 				`wrong number of segments: ` +
 				`"test-group:namespaces:test-namespace:test-kind:namespaced-obj"`),
 		},
 		"Cluster-scoped object depends on annotation": {
 			obj:      u1,
-			expected: DependencySet{clusterScopedObj},
+			expected: DependentSet{clusterScopedObj},
 		},
 		"Namespaced object depends on annotation": {
 			obj:      u2,
-			expected: DependencySet{namespacedObj},
+			expected: DependentSet{namespacedObj},
 		},
 		"Multiple objects specified in annotation": {
 			obj:      multipleAnnotations,
-			expected: DependencySet{namespacedObj, clusterScopedObj},
+			expected: DependentSet{namespacedObj, clusterScopedObj},
 		},
 	}
 
@@ -155,35 +155,35 @@ func getDependentsAnnotation(obj *unstructured.Unstructured) *string {
 func TestWriteAnnotation(t *testing.T) {
 	testCases := map[string]struct {
 		obj           *unstructured.Unstructured
-		dependson     DependencySet
+		dependson     DependentSet
 		expected      *string
 		expectedError error
 	}{
 		"nil object": {
 			obj:           nil,
-			dependson:     DependencySet{},
+			dependson:     DependentSet{},
 			expected:      nil,
 			expectedError: errors.New("object is nil"),
 		},
 		"empty mutation": {
 			obj:           &unstructured.Unstructured{},
-			dependson:     DependencySet{},
+			dependson:     DependentSet{},
 			expected:      nil,
 			expectedError: errors.New("dependent set is empty"),
 		},
 		"Namespace-scoped object": {
 			obj:       &unstructured.Unstructured{},
-			dependson: DependencySet{namespacedObj},
+			dependson: DependentSet{namespacedObj},
 			expected:  getDependentsAnnotation(u2),
 		},
 		"Cluster-scoped object": {
 			obj:       &unstructured.Unstructured{},
-			dependson: DependencySet{clusterScopedObj},
+			dependson: DependentSet{clusterScopedObj},
 			expected:  getDependentsAnnotation(u1),
 		},
 		"Multiple objects": {
 			obj:       &unstructured.Unstructured{},
-			dependson: DependencySet{namespacedObj, clusterScopedObj},
+			dependson: DependentSet{namespacedObj, clusterScopedObj},
 			expected:  getDependentsAnnotation(multipleAnnotations),
 		},
 	}

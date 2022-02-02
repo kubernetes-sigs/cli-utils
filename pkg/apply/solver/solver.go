@@ -47,6 +47,7 @@ type TaskQueueBuilder struct {
 	// Collector is used to collect validation errors and invalid objects.
 	// Invalid objects will be filtered and not be injected into tasks.
 	Collector *validation.Collector
+	Graph     *graph.Graph
 	// True if we are destroying, which deletes the inventory object
 	// as well (possibly) the inventory namespace.
 	Destroy bool
@@ -212,9 +213,13 @@ func (t *TaskQueueBuilder) AppendPruneTask(pruneObjs object.UnstructuredSet,
 // (like CRD's). Returns a pointer to the Builder to chain function calls.
 func (t *TaskQueueBuilder) AppendApplyWaitTasks(applyObjs object.UnstructuredSet,
 	applyFilters []filter.ValidationFilter, applyMutators []mutator.Interface, o Options) *TaskQueueBuilder {
-	// Use the "depends-on" annotation to create a graph, ands sort the
-	// objects to apply into sets using a topological sort.
-	applySets, err := graph.SortObjs(applyObjs)
+	// Add dependencies from annotations
+	// err := graph.AddDependencies(t.Graph, applyObjs)
+	// if err != nil {
+	// 	t.Collector.Collect(err)
+	// }
+	// Sort IDs and convert to Objects
+	applySets, err := graph.SortAndFilter(t.Graph, applyObjs)
 	if err != nil {
 		t.Collector.Collect(err)
 	}
@@ -239,12 +244,18 @@ func (t *TaskQueueBuilder) AppendApplyWaitTasks(applyObjs object.UnstructuredSet
 func (t *TaskQueueBuilder) AppendPruneWaitTasks(pruneObjs object.UnstructuredSet,
 	pruneFilters []filter.ValidationFilter, o Options) *TaskQueueBuilder {
 	if o.Prune {
-		// Use the "depends-on" annotation to create a graph, ands sort the
-		// objects to prune into sets using a (reverse) topological sort.
-		pruneSets, err := graph.ReverseSortObjs(pruneObjs)
+		// Add dependencies from annotations
+		// err := graph.AddDependencies(t.Graph, pruneObjs)
+		// if err != nil {
+		// 	t.Collector.Collect(err)
+		// }
+		// Sort IDs and convert to Objects
+		pruneSets, err := graph.SortAndFilter(t.Graph, pruneObjs)
 		if err != nil {
 			t.Collector.Collect(err)
 		}
+		// Reverse apply order to get deletion order
+		graph.ReverseSetList(pruneSets)
 		for _, pruneSet := range pruneSets {
 			pruneSet = t.Collector.FilterInvalidObjects(pruneSet)
 			if len(pruneSet) == 0 {

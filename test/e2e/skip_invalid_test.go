@@ -5,6 +5,7 @@ package e2e
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	. "github.com/onsi/ginkgo"
@@ -357,9 +358,30 @@ func skipInvalidTest(ctx context.Context, c client.Client, invConfig InventoryCo
 				Identifiers: object.ObjMetadataSet{
 					object.UnstructuredToObjMetadata(deployment1Obj),
 				},
-				Error: testutil.EqualErrorType(
-					validation.NewError(nil), // TODO: be more specific
-				),
+				Error: testutil.EqualErrorString(validation.NewError(
+					object.InvalidAnnotationError{
+						Annotation: dependson.Annotation,
+						Cause:      errors.New(`failed to parse object reference (index: 0): wrong number of segments: "invalid"`),
+					},
+					object.UnstructuredToObjMetadata(deployment1Obj),
+				).Error()),
+			},
+		},
+		// TODO: why is this caught twice now? Sorting? Should it dedupe?
+		{
+			// Deployment1 validation error
+			EventType: event.ValidationType,
+			ValidationEvent: &testutil.ExpValidationEvent{
+				Identifiers: object.ObjMetadataSet{
+					object.UnstructuredToObjMetadata(deployment1Obj),
+				},
+				Error: testutil.EqualErrorString(validation.NewError(
+					object.InvalidAnnotationError{
+						Annotation: dependson.Annotation,
+						Cause:      errors.New(`failed to parse object reference (index: 0): wrong number of segments: "invalid"`),
+					},
+					object.UnstructuredToObjMetadata(deployment1Obj),
+				).Error()),
 			},
 		},
 		{

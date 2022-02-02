@@ -101,7 +101,7 @@ func (p *Pruner) Prune(
 		// UID will change if the object is deleted and re-created.
 		uid := obj.GetUID()
 		if uid == "" {
-			err := object.NotFound([]interface{}{"metadata", "uid"}, "")
+			err := object.NotFound([]interface{}{"metadata", "uid"})
 			taskContext.SendEvent(eventFactory.CreateFailedEvent(id, err))
 			taskContext.InventoryManager().AddFailedDelete(id)
 			continue
@@ -144,6 +144,8 @@ func (p *Pruner) Prune(
 				}
 				taskContext.SendEvent(eventFactory.CreateSkippedEvent(obj, reason))
 				taskContext.InventoryManager().AddSkippedDelete(id)
+				objStatus, _ := taskContext.InventoryManager().ObjectStatus(id)
+				klog.V(3).Infof("object status: %#v", objStatus)
 				break
 			}
 		}
@@ -170,7 +172,7 @@ func (p *Pruner) Prune(
 				continue
 			}
 		}
-		taskContext.InventoryManager().AddSuccessfulDelete(id, obj.GetUID())
+		taskContext.InventoryManager().AddSuccessfulDelete(id, uid)
 		taskContext.SendEvent(eventFactory.CreateSuccessEvent(obj))
 	}
 	return nil

@@ -56,6 +56,7 @@ func (p *PruneTask) Start(taskContext *taskrunner.TaskContext) {
 			p.Name(), len(p.Objects))
 		// Create filter to prevent deletion of currently applied
 		// objects. Must be done here to wait for applied UIDs.
+		// TODO: Move to applier/destroyer and use TaskContext to filter.
 		uidFilter := filter.CurrentUIDFilter{
 			CurrentUIDs: taskContext.InventoryManager().AppliedResourceUIDs(),
 		}

@@ -32,8 +32,9 @@ func (tc *Manager) Inventory() *actuation.Inventory {
 // ObjectStatus retrieves the status of an object with the specified ID.
 // The returned status is a pointer and can be updated in-place for efficiency.
 func (tc *Manager) ObjectStatus(id object.ObjMetadata) (*actuation.ObjectStatus, bool) {
+	ref := ObjectReferenceFromObjMetadata(id)
 	for i, objStatus := range tc.inventory.Status.Objects {
-		if ObjMetadataEqualObjectReference(id, objStatus.ObjectReference) {
+		if objStatus.ObjectReference == ref {
 			return &(tc.inventory.Status.Objects[i]), true
 		}
 	}
@@ -65,14 +66,15 @@ func (tc *Manager) ObjectsWithReconcileStatus(status actuation.ReconcileStatus) 
 }
 
 // SetObjectStatus updates or adds an ObjectStatus record to the inventory.
-func (tc *Manager) SetObjectStatus(id object.ObjMetadata, objStatus actuation.ObjectStatus) {
-	for i, objStatus := range tc.inventory.Status.Objects {
-		if ObjMetadataEqualObjectReference(id, objStatus.ObjectReference) {
-			tc.inventory.Status.Objects[i] = objStatus
+func (tc *Manager) SetObjectStatus(id object.ObjMetadata, newStatus actuation.ObjectStatus) {
+	ref := ObjectReferenceFromObjMetadata(id)
+	for i, oldStatus := range tc.inventory.Status.Objects {
+		if oldStatus.ObjectReference == ref {
+			tc.inventory.Status.Objects[i] = newStatus
 			return
 		}
 	}
-	tc.inventory.Status.Objects = append(tc.inventory.Status.Objects, objStatus)
+	tc.inventory.Status.Objects = append(tc.inventory.Status.Objects, newStatus)
 }
 
 // IsSuccessfulApply returns true if the object apply was successful
@@ -391,4 +393,56 @@ func (tc *Manager) SetPendingReconcile(id object.ObjMetadata) error {
 // PendingReconciles returns all the objects where reconcile is pending
 func (tc *Manager) PendingReconciles() object.ObjMetadataSet {
 	return tc.ObjectsWithReconcileStatus(actuation.ReconcilePending)
+}
+
+// IsPendingApply returns true if the object pending apply
+func (tc *Manager) IsPendingApply(id object.ObjMetadata) bool {
+	objStatus, found := tc.ObjectStatus(id)
+	if !found {
+		return false
+	}
+	return objStatus.Strategy == actuation.ActuationStrategyApply &&
+		objStatus.Actuation == actuation.ActuationPending
+}
+
+// AddPendingApply registers that the object is pending apply
+func (tc *Manager) AddPendingApply(id object.ObjMetadata) {
+	tc.SetObjectStatus(id, actuation.ObjectStatus{
+		ObjectReference: ObjectReferenceFromObjMetadata(id),
+		Strategy:        actuation.ActuationStrategyApply,
+		Actuation:       actuation.ActuationPending,
+		Reconcile:       actuation.ReconcilePending,
+	})
+}
+
+// PendingApplies returns all the objects that are pending apply
+func (tc *Manager) PendingApplies() object.ObjMetadataSet {
+	return tc.ObjectsWithActuationStatus(actuation.ActuationStrategyApply,
+		actuation.ActuationPending)
+}
+
+// IsPendingDelete returns true if the object pending delete
+func (tc *Manager) IsPendingDelete(id object.ObjMetadata) bool {
+	objStatus, found := tc.ObjectStatus(id)
+	if !found {
+		return false
+	}
+	return objStatus.Strategy == actuation.ActuationStrategyDelete &&
+		objStatus.Actuation == actuation.ActuationPending
+}
+
+// AddPendingDelete registers that the object is pending delete
+func (tc *Manager) AddPendingDelete(id object.ObjMetadata) {
+	tc.SetObjectStatus(id, actuation.ObjectStatus{
+		ObjectReference: ObjectReferenceFromObjMetadata(id),
+		Strategy:        actuation.ActuationStrategyDelete,
+		Actuation:       actuation.ActuationPending,
+		Reconcile:       actuation.ReconcilePending,
+	})
+}
+
+// PendingDeletes returns all the objects that are pending delete
+func (tc *Manager) PendingDeletes() object.ObjMetadataSet {
+	return tc.ObjectsWithActuationStatus(actuation.ActuationStrategyDelete,
+		actuation.ActuationPending)
 }

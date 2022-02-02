@@ -24,7 +24,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
 	"sigs.k8s.io/cli-utils/pkg/object/dependson"
-	"sigs.k8s.io/cli-utils/pkg/object/mutation"
+	"sigs.k8s.io/cli-utils/pkg/object/reference"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -94,7 +94,7 @@ func withDependsOn(obj *unstructured.Unstructured, dep string) *unstructured.Uns
 }
 
 func deleteUnstructuredAndWait(ctx context.Context, c client.Client, obj *unstructured.Unstructured) {
-	ref := mutation.ResourceReferenceFromUnstructured(obj)
+	ref := reference.ObjectReferenceFromUnstructured(obj)
 
 	err := c.Delete(ctx, obj,
 		client.PropagationPolicy(metav1.DeletePropagationForeground))
@@ -105,7 +105,7 @@ func deleteUnstructuredAndWait(ctx context.Context, c client.Client, obj *unstru
 }
 
 func waitForDeletion(ctx context.Context, c client.Client, obj *unstructured.Unstructured) {
-	ref := mutation.ResourceReferenceFromUnstructured(obj)
+	ref := reference.ObjectReferenceFromUnstructured(obj)
 	resultObj := ref.ToUnstructured()
 
 	timeout := 30 * time.Second
@@ -136,7 +136,7 @@ func waitForDeletion(ctx context.Context, c client.Client, obj *unstructured.Uns
 }
 
 func createUnstructuredAndWait(ctx context.Context, c client.Client, obj *unstructured.Unstructured) {
-	ref := mutation.ResourceReferenceFromUnstructured(obj)
+	ref := reference.ObjectReferenceFromUnstructured(obj)
 
 	err := c.Create(ctx, obj)
 	Expect(err).NotTo(HaveOccurred(),
@@ -146,7 +146,7 @@ func createUnstructuredAndWait(ctx context.Context, c client.Client, obj *unstru
 }
 
 func waitForCreation(ctx context.Context, c client.Client, obj *unstructured.Unstructured) {
-	ref := mutation.ResourceReferenceFromUnstructured(obj)
+	ref := reference.ObjectReferenceFromUnstructured(obj)
 	resultObj := ref.ToUnstructured()
 
 	timeout := 30 * time.Second
@@ -178,7 +178,7 @@ func waitForCreation(ctx context.Context, c client.Client, obj *unstructured.Uns
 }
 
 func assertUnstructuredExists(ctx context.Context, c client.Client, obj *unstructured.Unstructured) *unstructured.Unstructured {
-	ref := mutation.ResourceReferenceFromUnstructured(obj)
+	ref := reference.ObjectReferenceFromUnstructured(obj)
 	resultObj := ref.ToUnstructured()
 
 	err := c.Get(ctx, types.NamespacedName{
@@ -191,7 +191,7 @@ func assertUnstructuredExists(ctx context.Context, c client.Client, obj *unstruc
 }
 
 func assertUnstructuredDoesNotExist(ctx context.Context, c client.Client, obj *unstructured.Unstructured) {
-	ref := mutation.ResourceReferenceFromUnstructured(obj)
+	ref := reference.ObjectReferenceFromUnstructured(obj)
 	resultObj := ref.ToUnstructured()
 
 	err := c.Get(ctx, types.NamespacedName{
@@ -205,7 +205,7 @@ func assertUnstructuredDoesNotExist(ctx context.Context, c client.Client, obj *u
 }
 
 func applyUnstructured(ctx context.Context, c client.Client, obj *unstructured.Unstructured) {
-	ref := mutation.ResourceReferenceFromUnstructured(obj)
+	ref := reference.ObjectReferenceFromUnstructured(obj)
 	resultObj := ref.ToUnstructured()
 
 	err := c.Get(ctx, types.NamespacedName{
@@ -221,7 +221,7 @@ func applyUnstructured(ctx context.Context, c client.Client, obj *unstructured.U
 }
 
 func assertUnstructuredAvailable(obj *unstructured.Unstructured) {
-	ref := mutation.ResourceReferenceFromUnstructured(obj)
+	ref := reference.ObjectReferenceFromUnstructured(obj)
 	objc, err := status.GetObjectWithConditions(obj.Object)
 	Expect(err).NotTo(HaveOccurred())
 	available := false

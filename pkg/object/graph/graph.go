@@ -19,13 +19,15 @@ import (
 // vertices).
 type Graph struct {
 	// map "from" vertex -> list of "to" vertices
-	edges map[object.ObjMetadata]object.ObjMetadataSet
+	edges        map[object.ObjMetadata]object.ObjMetadataSet
+	reverseEdges map[object.ObjMetadata]object.ObjMetadataSet
 }
 
 // New returns a pointer to an empty Graph data structure.
 func New() *Graph {
 	g := &Graph{}
 	g.edges = make(map[object.ObjMetadata]object.ObjMetadataSet)
+	g.reverseEdges = make(map[object.ObjMetadata]object.ObjMetadataSet)
 	return g
 }
 
@@ -35,18 +37,6 @@ func (g *Graph) AddVertex(v object.ObjMetadata) {
 	if _, exists := g.edges[v]; !exists {
 		g.edges[v] = object.ObjMetadataSet{}
 	}
-}
-
-// GetVertices returns a sorted set of unique vertices in the graph.
-func (g *Graph) GetVertices() object.ObjMetadataSet {
-	keys := make(object.ObjMetadataSet, len(g.edges))
-	i := 0
-	for k := range g.edges {
-		keys[i] = k
-		i++
-	}
-	sort.Sort(ordering.SortableMetas(keys))
-	return keys
 }
 
 // AddEdge adds a edge from one ObjMetadata vertex to another. The
@@ -64,20 +54,8 @@ func (g *Graph) AddEdge(from object.ObjMetadata, to object.ObjMetadata) {
 	// into the adjacency list.
 	if !g.isAdjacent(from, to) {
 		g.edges[from] = append(g.edges[from], to)
+		g.reverseEdges[to] = append(g.reverseEdges[to], from)
 	}
-}
-
-// GetEdges returns a sorted slice of directed graph edges (vertex pairs).
-func (g *Graph) GetEdges() []Edge {
-	edges := []Edge{}
-	for from, toList := range g.edges {
-		for _, to := range toList {
-			edge := Edge{From: from, To: to}
-			edges = append(edges, edge)
-		}
-	}
-	sort.Sort(SortableEdges(edges))
-	return edges
 }
 
 // isAdjacent returns true if an edge "from" vertex -> "to" vertex exists;
@@ -96,30 +74,39 @@ func (g *Graph) isAdjacent(from object.ObjMetadata, to object.ObjMetadata) bool 
 	return false
 }
 
-// Size returns the number of vertices in the graph.
-func (g *Graph) Size() int {
-	return len(g.edges)
-}
-
-// removeVertex removes the passed vertex as well as any edges
-// into the vertex.
-func (g *Graph) removeVertex(r object.ObjMetadata) {
-	// First, remove the object from all adjacency lists.
-	for v, adj := range g.edges {
-		g.edges[v] = adj.Remove(r)
+// EdgesFrom returns the objects that this object depends on.
+func (g *Graph) EdgesFrom(from object.ObjMetadata) object.ObjMetadataSet {
+	edgesFrom, exists := g.edges[from]
+	if !exists {
+		return nil
 	}
-	// Finally, remove the vertex
-	delete(g.edges, r)
+	return append(object.ObjMetadataSet{}, edgesFrom...)
 }
 
-// Sort returns the ordered set of vertices after
-// a topological sort.
+// EdgesTo returns the objects that depend on this object.
+func (g *Graph) EdgesTo(to object.ObjMetadata) object.ObjMetadataSet {
+	edgesTo, exists := g.reverseEdges[to]
+	if !exists {
+		return nil
+	}
+	return append(object.ObjMetadataSet{}, edgesTo...)
+}
+
+// Sort returns the ordered set of vertices after a topological sort.
 func (g *Graph) Sort() ([]object.ObjMetadataSet, error) {
+	// deep copy edge map to avoid destructive sorting
+	edges := make(map[object.ObjMetadata]object.ObjMetadataSet, len(g.edges))
+	for vertex, deps := range g.edges {
+		c := make(object.ObjMetadataSet, len(deps))
+		copy(c, deps)
+		edges[vertex] = c
+	}
+
 	sorted := []object.ObjMetadataSet{}
-	for g.Size() > 0 {
+	for len(edges) > 0 {
 		// Identify all the leaf vertices.
 		leafVertices := object.ObjMetadataSet{}
-		for v, adj := range g.edges {
+		for v, adj := range edges {
 			if len(adj) == 0 {
 				leafVertices = append(leafVertices, v)
 			}
@@ -129,14 +116,48 @@ func (g *Graph) Sort() ([]object.ObjMetadataSet, error) {
 		if len(leafVertices) == 0 {
 			// Error can be ignored, so return the full set list
 			return sorted, validation.NewError(CyclicDependencyError{
-				Edges: g.GetEdges(),
-			}, g.GetVertices()...)
+				Edges: edgeMapToList(edges),
+			}, edgeMapKeys(edges)...)
 		}
 		// Remove all edges to leaf vertices.
 		for _, v := range leafVertices {
-			g.removeVertex(v)
+			removeVertex(edges, v)
 		}
 		sorted = append(sorted, leafVertices)
 	}
 	return sorted, nil
+}
+
+func removeVertex(edges map[object.ObjMetadata]object.ObjMetadataSet, r object.ObjMetadata) {
+	// First, remove the object from all adjacency lists.
+	for v, adj := range edges {
+		edges[v] = adj.Remove(r)
+	}
+	// Finally, remove the vertex
+	delete(edges, r)
+}
+
+// edgeMapToList returns a sorted slice of directed graph edges (vertex pairs).
+func edgeMapToList(edgeMap map[object.ObjMetadata]object.ObjMetadataSet) []Edge {
+	edges := []Edge{}
+	for from, toList := range edgeMap {
+		for _, to := range toList {
+			edge := Edge{From: from, To: to}
+			edges = append(edges, edge)
+		}
+	}
+	sort.Sort(SortableEdges(edges))
+	return edges
+}
+
+// edgeMapKeys returns a sorted set of unique vertices in the graph.
+func edgeMapKeys(edgeMap map[object.ObjMetadata]object.ObjMetadataSet) object.ObjMetadataSet {
+	keys := make(object.ObjMetadataSet, len(edgeMap))
+	i := 0
+	for k := range edgeMap {
+		keys[i] = k
+		i++
+	}
+	sort.Sort(ordering.SortableMetas(keys))
+	return keys
 }

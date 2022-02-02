@@ -13,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
+	"sigs.k8s.io/cli-utils/pkg/apis/actuation"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
 	"sigs.k8s.io/cli-utils/pkg/object"
@@ -131,7 +132,7 @@ func (w *WaitTask) Start(taskContext *TaskContext) {
 	}()
 }
 
-func (w *WaitTask) sendEvent(taskContext *TaskContext, id object.ObjMetadata, op event.WaitEventOperation) {
+func (w *WaitTask) sendWaitEvent(taskContext *TaskContext, id object.ObjMetadata, op event.WaitEventOperation) {
 	taskContext.SendEvent(event.Event{
 		Type: event.WaitType,
 		WaitEvent: event.WaitEvent{
@@ -140,6 +141,25 @@ func (w *WaitTask) sendEvent(taskContext *TaskContext, id object.ObjMetadata, op
 			Operation:  op,
 		},
 	})
+}
+
+func (w *WaitTask) sendErrorEvent(taskContext *TaskContext, err error) {
+	taskContext.SendEvent(event.Event{
+		Type: event.ErrorType,
+		ErrorEvent: event.ErrorEvent{
+			Err: err,
+		},
+	})
+}
+
+func (w *WaitTask) setReconcileStatus(taskContext *TaskContext, id object.ObjMetadata, status actuation.ReconcileStatus) {
+	objStatus, found := taskContext.InventoryManager().ObjectStatus(id)
+	if !found {
+		err := fmt.Errorf("failed to mark object as reconcile %s: object not in inventory: %v", status, id)
+		w.sendErrorEvent(taskContext, err)
+		return
+	}
+	objStatus.Reconcile = status
 }
 
 // startInner sends initial pending, skipped, an reconciled events.
@@ -156,27 +176,15 @@ func (w *WaitTask) startInner(taskContext *TaskContext) {
 			// replaced
 			w.handleChangedUID(taskContext, id)
 		case w.skipped(taskContext, id):
-			err := taskContext.InventoryManager().SetSkippedReconcile(id)
-			if err != nil {
-				// Object never applied or deleted!
-				klog.Errorf("Failed to mark object as skipped reconcile: %v", err)
-			}
-			w.sendEvent(taskContext, id, event.ReconcileSkipped)
+			w.setReconcileStatus(taskContext, id, actuation.ReconcileSkipped)
+			w.sendWaitEvent(taskContext, id, event.ReconcileSkipped)
 		case w.reconciledByID(taskContext, id):
-			err := taskContext.InventoryManager().SetSuccessfulReconcile(id)
-			if err != nil {
-				// Object never applied or deleted!
-				klog.Errorf("Failed to mark object as successful reconcile: %v", err)
-			}
-			w.sendEvent(taskContext, id, event.Reconciled)
+			w.setReconcileStatus(taskContext, id, actuation.ReconcileSucceeded)
+			w.sendWaitEvent(taskContext, id, event.Reconciled)
 		default:
-			err := taskContext.InventoryManager().SetPendingReconcile(id)
-			if err != nil {
-				// Object never applied or deleted!
-				klog.Errorf("Failed to mark object as pending reconcile: %v", err)
-			}
 			pending = append(pending, id)
-			w.sendEvent(taskContext, id, event.ReconcilePending)
+			w.setReconcileStatus(taskContext, id, actuation.ReconcilePending)
+			w.sendWaitEvent(taskContext, id, event.ReconcilePending)
 		}
 	}
 	w.pending = pending
@@ -195,12 +203,8 @@ func (w *WaitTask) sendTimeoutEvents(taskContext *TaskContext) {
 	defer w.mu.RUnlock()
 
 	for _, id := range w.pending {
-		err := taskContext.InventoryManager().SetTimeoutReconcile(id)
-		if err != nil {
-			// Object never applied or deleted!
-			klog.Errorf("Failed to mark object as pending reconcile: %v", err)
-		}
-		w.sendEvent(taskContext, id, event.ReconcileTimeout)
+		w.setReconcileStatus(taskContext, id, actuation.ReconcileTimeout)
+		w.sendWaitEvent(taskContext, id, event.ReconcileTimeout)
 	}
 }
 
@@ -280,23 +284,15 @@ func (w *WaitTask) handleChangedUID(taskContext *TaskContext, id object.ObjMetad
 	case AllNotFound:
 		// Object recreated by another actor after deletion.
 		// Treat as success.
-		klog.Infof("UID change detected: deleted object have been recreated: marking reconcile successful: %v", id)
-		err := taskContext.InventoryManager().SetSuccessfulReconcile(id)
-		if err != nil {
-			// Object never applied or deleted!
-			klog.Errorf("Failed to mark object as successful reconcile: %v", err)
-		}
-		w.sendEvent(taskContext, id, event.Reconciled)
+		klog.V(1).Infof("UID change detected: deleted object have been recreated: marking reconcile successful: %v", id)
+		w.setReconcileStatus(taskContext, id, actuation.ReconcileSucceeded)
+		w.sendWaitEvent(taskContext, id, event.Reconciled)
 	case AllCurrent:
 		// Object deleted and recreated by another actor after apply.
 		// Treat as failure (unverifiable).
-		klog.Infof("UID change detected: applied object has been deleted and recreated: marking reconcile failed: %v", id)
-		err := taskContext.InventoryManager().SetFailedReconcile(id)
-		if err != nil {
-			// Object never applied or deleted!
-			klog.Errorf("Failed to mark object as failed reconcile: %v", err)
-		}
-		w.sendEvent(taskContext, id, event.ReconcileFailed)
+		klog.V(1).Infof("UID change detected: applied object has been deleted and recreated: marking reconcile failed: %v", id)
+		w.setReconcileStatus(taskContext, id, actuation.ReconcileFailed)
+		w.sendWaitEvent(taskContext, id, event.ReconcileFailed)
 	default:
 		panic(fmt.Sprintf("Invalid wait condition: %v", w.Condition))
 	}
@@ -327,24 +323,14 @@ func (w *WaitTask) StatusUpdate(taskContext *TaskContext, id object.ObjMetadata)
 			w.handleChangedUID(taskContext, id)
 			w.pending = w.pending.Remove(id)
 		case w.reconciledByID(taskContext, id):
-			// reconciled - remove from pending & send event
-			err := taskContext.InventoryManager().SetSuccessfulReconcile(id)
-			if err != nil {
-				// Object never applied or deleted!
-				klog.Errorf("Failed to mark object as successful reconcile: %v", err)
-			}
 			w.pending = w.pending.Remove(id)
-			w.sendEvent(taskContext, id, event.Reconciled)
+			w.setReconcileStatus(taskContext, id, actuation.ReconcileSucceeded)
+			w.sendWaitEvent(taskContext, id, event.Reconciled)
 		case w.failedByID(taskContext, id):
-			// failed - remove from pending & send event
-			err := taskContext.InventoryManager().SetFailedReconcile(id)
-			if err != nil {
-				// Object never applied or deleted!
-				klog.Errorf("Failed to mark object as failed reconcile: %v", err)
-			}
 			w.pending = w.pending.Remove(id)
 			w.failed = append(w.failed, id)
-			w.sendEvent(taskContext, id, event.ReconcileFailed)
+			w.setReconcileStatus(taskContext, id, actuation.ReconcileFailed)
+			w.sendWaitEvent(taskContext, id, event.ReconcileFailed)
 		default:
 			// can't be all reconciled now, so don't bother checking
 			return
@@ -360,25 +346,15 @@ func (w *WaitTask) StatusUpdate(taskContext *TaskContext, id object.ObjMetadata)
 		// resources have completed/timed out, we consider it
 		// current.
 		if w.reconciledByID(taskContext, id) {
-			// reconciled - remove from pending & send event
-			err := taskContext.InventoryManager().SetSuccessfulReconcile(id)
-			if err != nil {
-				// Object never applied or deleted!
-				klog.Errorf("Failed to mark object as successful reconcile: %v", err)
-			}
 			w.failed = w.failed.Remove(id)
-			w.sendEvent(taskContext, id, event.Reconciled)
+			w.setReconcileStatus(taskContext, id, actuation.ReconcileSucceeded)
+			w.sendWaitEvent(taskContext, id, event.Reconciled)
 		} else if !w.failedByID(taskContext, id) {
-			// If a resource is no longer reported as Failed and is not Reconciled,
-			// they should just go back to InProgress.
-			err := taskContext.InventoryManager().SetPendingReconcile(id)
-			if err != nil {
-				// Object never applied or deleted!
-				klog.Errorf("Failed to mark object as pending reconcile: %v", err)
-			}
+			// Not Reconciled + Not Failed + Not Skipped = Pending
 			w.failed = w.failed.Remove(id)
 			w.pending = append(w.pending, id)
-			w.sendEvent(taskContext, id, event.ReconcilePending)
+			w.setReconcileStatus(taskContext, id, actuation.ReconcilePending)
+			w.sendWaitEvent(taskContext, id, event.ReconcilePending)
 		}
 		// can't be all reconciled, so don't bother checking. A failed
 		// resource doesn't prevent a WaitTask from completing, so there
@@ -387,14 +363,10 @@ func (w *WaitTask) StatusUpdate(taskContext *TaskContext, id object.ObjMetadata)
 	default:
 		// reconciled - check if unreconciled
 		if !w.reconciledByID(taskContext, id) {
-			// unreconciled - add to pending & send event
-			err := taskContext.InventoryManager().SetPendingReconcile(id)
-			if err != nil {
-				// Object never applied or deleted!
-				klog.Errorf("Failed to mark object as pending reconcile: %v", err)
-			}
+			// Not Reconciled + Not Failed + Not Skipped = Pending
 			w.pending = append(w.pending, id)
-			w.sendEvent(taskContext, id, event.ReconcilePending)
+			w.setReconcileStatus(taskContext, id, actuation.ReconcilePending)
+			w.sendWaitEvent(taskContext, id, event.ReconcilePending)
 			// can't be all reconciled now, so don't bother checking
 			return
 		}

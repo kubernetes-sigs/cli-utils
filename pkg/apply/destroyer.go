@@ -11,6 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"sigs.k8s.io/cli-utils/pkg/apis/actuation"
 	"sigs.k8s.io/cli-utils/pkg/apply/cache"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/filter"
@@ -23,6 +24,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling"
 	"sigs.k8s.io/cli-utils/pkg/object"
+	"sigs.k8s.io/cli-utils/pkg/object/graph"
 	"sigs.k8s.io/cli-utils/pkg/object/validation"
 )
 
@@ -129,6 +131,24 @@ func (d *Destroyer) Run(ctx context.Context, inv inventory.Info, options Destroy
 		}
 		validator.Validate(deleteObjs)
 
+		// Add all objects to a dependency graph
+		depGraph := graph.New()
+		err = graph.AddDependencies(depGraph, deleteObjs)
+		if err != nil {
+			vCollector.Collect(err)
+		}
+
+		// Add dependencies from annotations
+		err = graph.AddDependencies(depGraph, deleteObjs)
+		if err != nil {
+			vCollector.Collect(err)
+		}
+
+		// Build a TaskContext for passing info between tasks
+		resourceCache := cache.NewResourceCacheMap()
+		taskContext := taskrunner.NewTaskContext(eventChannel, resourceCache)
+		taskContext.Graph = depGraph
+
 		klog.V(4).Infoln("destroyer building task queue...")
 		dynamicClient, err := d.factory.DynamicClient()
 		if err != nil {
@@ -144,6 +164,7 @@ func (d *Destroyer) Run(ctx context.Context, inv inventory.Info, options Destroy
 			InvClient:     d.invClient,
 			Destroy:       true,
 			Collector:     vCollector,
+			Graph:         depGraph,
 		}
 		opts := solver.Options{
 			Prune:                  true,
@@ -156,6 +177,10 @@ func (d *Destroyer) Run(ctx context.Context, inv inventory.Info, options Destroy
 			filter.InventoryPolicyFilter{
 				Inv:       inv,
 				InvPolicy: options.InventoryPolicy,
+			},
+			filter.DependencyFilter{
+				TaskContext: taskContext,
+				Strategy:    actuation.ActuationStrategyDelete,
 			},
 		}
 
@@ -185,13 +210,12 @@ func (d *Destroyer) Run(ctx context.Context, inv inventory.Info, options Destroy
 			return
 		}
 
-		// Build a TaskContext for passing info between tasks
-		resourceCache := cache.NewResourceCacheMap()
-		taskContext := taskrunner.NewTaskContext(eventChannel, resourceCache)
-
 		// Register invalid objects to be retained in the inventory, if present.
 		for _, id := range vCollector.InvalidIds {
 			taskContext.AddInvalidObject(id)
+		}
+		for _, id := range object.UnstructuredSetToObjMetadataSet(deleteObjs) {
+			taskContext.InventoryManager().AddPendingDelete(id)
 		}
 
 		// Send event to inform the caller about the resources that

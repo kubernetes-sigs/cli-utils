@@ -14,6 +14,7 @@ import (
 	"k8s.io/kubectl/pkg/scheme"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/object/dependson"
+	"sigs.k8s.io/cli-utils/pkg/object/reference"
 )
 
 var codec = scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
@@ -89,8 +90,9 @@ func (a owningInvMutator) Mutate(u *unstructured.Unstructured) {
 // by a comma.
 func AddDependsOn(t *testing.T, deps ...object.ObjMetadata) Mutator {
 	return dependsOnMutator{
-		t:    t,
-		deps: dependson.DependencySet(deps),
+		t: t,
+		deps: dependson.DependencySet(
+			reference.ObjectReferenceSetFromObjMetadataSet(deps)),
 	}
 }
 

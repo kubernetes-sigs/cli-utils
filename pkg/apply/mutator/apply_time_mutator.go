@@ -21,6 +21,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/object/mutation"
+	"sigs.k8s.io/cli-utils/pkg/object/reference"
 )
 
 // ApplyTimeMutator mutates an object by injecting values specified by the
@@ -46,7 +47,7 @@ func (atm *ApplyTimeMutator) Mutate(ctx context.Context, obj *unstructured.Unstr
 	mutated := false
 	reason := ""
 
-	targetRef := mutation.ResourceReferenceFromUnstructured(obj)
+	targetRef := reference.ObjectReferenceFromUnstructured(obj)
 
 	if !mutation.HasAnnotation(obj) {
 		return mutated, reason, nil
@@ -63,7 +64,8 @@ func (atm *ApplyTimeMutator) Mutate(ctx context.Context, obj *unstructured.Unstr
 	// validate no self-references
 	// Early validation to avoid GETs, but won't catch sources with implicit namespace.
 	for _, sub := range subs {
-		if targetRef.Equal(sub.SourceRef) {
+		// ignore API version for comparison
+		if targetRef.ToObjMetadata() == sub.SourceRef.ToObjMetadata() {
 			return mutated, reason, fmt.Errorf("invalid self-reference (%s)", sub.SourceRef)
 		}
 	}
@@ -154,7 +156,7 @@ func (atm *ApplyTimeMutator) Mutate(ctx context.Context, obj *unstructured.Unstr
 	return mutated, reason, nil
 }
 
-func (atm *ApplyTimeMutator) getMapping(ref mutation.ResourceReference) (*meta.RESTMapping, error) {
+func (atm *ApplyTimeMutator) getMapping(ref reference.ObjectReference) (*meta.RESTMapping, error) {
 	// lookup object using group api version, if specified
 	sourceGvk := ref.GroupVersionKind()
 	var mapping *meta.RESTMapping
@@ -172,8 +174,8 @@ func (atm *ApplyTimeMutator) getMapping(ref mutation.ResourceReference) (*meta.R
 
 // getObject returns a cached object, if cached and cache exists, otherwise
 // the object is retrieved from the cluster.
-func (atm *ApplyTimeMutator) getObject(ctx context.Context, mapping *meta.RESTMapping, ref mutation.ResourceReference) (*unstructured.Unstructured, error) {
-	// validate source object
+func (atm *ApplyTimeMutator) getObject(ctx context.Context, mapping *meta.RESTMapping, ref reference.ObjectReference) (*unstructured.Unstructured, error) {
+	// validate source reference
 	if ref.Name == "" {
 		return nil, fmt.Errorf("invalid source object: empty name")
 	}
@@ -228,7 +230,7 @@ func computeStatus(obj *unstructured.Unstructured) cache.ResourceStatus {
 	result, err := status.Compute(obj)
 	if err != nil {
 		if klog.V(3).Enabled() {
-			ref := mutation.ResourceReferenceFromUnstructured(obj)
+			ref := reference.ObjectReferenceFromUnstructured(obj)
 			klog.Info("failed to compute object status (%s): %d", ref, err)
 		}
 		return cache.ResourceStatus{
