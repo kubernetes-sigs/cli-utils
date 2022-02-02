@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"strings"
+	"sync"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -89,94 +90,103 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 		objects := a.Objects
 		klog.V(2).Infof("apply task starting (name: %q, objects: %d)",
 			a.Name(), len(objects))
+
+		var wg sync.WaitGroup
 		for _, obj := range objects {
-			// Set the client and mapping fields on the provided
-			// info so they can be applied to the cluster.
-			info, err := a.InfoHelper.BuildInfo(obj)
-			// BuildInfo strips path annotations.
-			// Use modified object for filters, mutations, and events.
-			obj = info.Object.(*unstructured.Unstructured)
-			id := object.UnstructuredToObjMetadata(obj)
-			if err != nil {
-				if klog.V(4).Enabled() {
-					klog.Errorf("unable to convert obj to info for %s/%s (%s)--continue",
-						obj.GetNamespace(), obj.GetName(), err)
-				}
-				taskContext.SendEvent(a.createApplyFailedEvent(
-					id,
-					applyerror.NewUnknownTypeError(err),
-				))
-				taskContext.AddFailedApply(id)
-				continue
-			}
-
-			// Check filters to see if we're prevented from applying.
-			var filtered bool
-			var filterErr error
-			for _, filter := range a.Filters {
-				klog.V(6).Infof("apply filter %s: %s", filter.Name(), id)
-				var reason string
-				filtered, reason, filterErr = filter.Filter(obj)
-				if filterErr != nil {
-					if klog.V(5).Enabled() {
-						klog.Errorf("error during %s, (%s): %s", filter.Name(), id, filterErr)
+			wg.Add(1)
+			obj := obj
+			go func() {
+				defer wg.Done()
+				// Set the client and mapping fields on the provided
+				// info so they can be applied to the cluster.
+				info, err := a.InfoHelper.BuildInfo(obj)
+				// BuildInfo strips path annotations.
+				// Use modified object for filters, mutations, and events.
+				obj = info.Object.(*unstructured.Unstructured)
+				id := object.UnstructuredToObjMetadata(obj)
+				if err != nil {
+					if klog.V(4).Enabled() {
+						klog.Errorf("unable to convert obj to info for %s/%s (%s)--continue",
+							obj.GetNamespace(), obj.GetName(), err)
 					}
-					taskContext.SendEvent(a.createApplyFailedEvent(id, filterErr))
+					taskContext.SendEvent(a.createApplyFailedEvent(
+						id,
+						applyerror.NewUnknownTypeError(err),
+					))
 					taskContext.AddFailedApply(id)
-					break
+					return
 				}
-				if filtered {
-					klog.V(4).Infof("apply filtered (filter: %q, resource: %q, reason: %q)", filter.Name(), id, reason)
-					taskContext.SendEvent(a.createApplyEvent(id, event.Unchanged, obj))
-					taskContext.AddSkippedApply(id)
-					break
-				}
-			}
-			if filtered || filterErr != nil {
-				continue
-			}
 
-			// Execute mutators, if any apply
-			err = a.mutate(ctx, obj)
-			if err != nil {
-				if klog.V(5).Enabled() {
-					klog.Errorf("error mutating: %w", err)
+				// Check filters to see if we're prevented from applying.
+				var filtered bool
+				var filterErr error
+				for _, filter := range a.Filters {
+					klog.V(6).Infof("apply filter %s: %s", filter.Name(), id)
+					var reason string
+					filtered, reason, filterErr = filter.Filter(obj)
+					if filterErr != nil {
+						if klog.V(5).Enabled() {
+							klog.Errorf("error during %s, (%s): %s", filter.Name(), id, filterErr)
+						}
+						taskContext.SendEvent(a.createApplyFailedEvent(id, filterErr))
+						taskContext.AddFailedApply(id)
+						break
+					}
+					if filtered {
+						klog.V(4).Infof("apply filtered (filter: %q, resource: %q, reason: %q)", filter.Name(), id, reason)
+						taskContext.SendEvent(a.createApplyEvent(id, event.Unchanged, obj))
+						taskContext.AddSkippedApply(id)
+						break
+					}
 				}
-				taskContext.SendEvent(a.createApplyFailedEvent(id, err))
-				taskContext.AddFailedApply(id)
-				continue
-			}
+				if filtered || filterErr != nil {
+					return
+				}
 
-			// Create a new instance of the applyOptions interface and use it
-			// to apply the objects.
-			ao := applyOptionsFactoryFunc(a.Name(), taskContext.EventChannel(),
-				a.ServerSideOptions, a.DryRunStrategy, a.DynamicClient, a.OpenAPIGetter)
-			ao.SetObjects([]*resource.Info{info})
-			klog.V(5).Infof("applying %s/%s...", info.Namespace, info.Name)
-			err = ao.Run()
-			if err != nil && a.ServerSideOptions.ServerSideApply && isAPIService(obj) && isStreamError(err) {
-				// Server-side Apply doesn't work with APIService before k8s 1.21
-				// https://github.com/kubernetes/kubernetes/issues/89264
-				// Thus APIService is handled specially using client-side apply.
-				err = a.clientSideApply(info, taskContext.EventChannel())
-			}
-			if err != nil {
-				if klog.V(4).Enabled() {
-					klog.Errorf("error applying (%s/%s) %s", info.Namespace, info.Name, err)
+				// Execute mutators, if any apply
+				err = a.mutate(ctx, obj)
+				if err != nil {
+					if klog.V(5).Enabled() {
+						klog.Errorf("error mutating: %w", err)
+					}
+					taskContext.SendEvent(a.createApplyFailedEvent(id, err))
+					taskContext.AddFailedApply(id)
+					return
 				}
-				taskContext.SendEvent(a.createApplyFailedEvent(
-					id,
-					applyerror.NewApplyRunError(err),
-				))
-				taskContext.AddFailedApply(id)
-			} else if info.Object != nil {
-				acc, err := meta.Accessor(info.Object)
-				if err == nil {
-					uid := acc.GetUID()
-					gen := acc.GetGeneration()
-					taskContext.AddSuccessfulApply(id, uid, gen)
+
+				// Create a new instance of the applyOptions interface and use it
+				// to apply the objects.
+				ao := applyOptionsFactoryFunc(a.Name(), taskContext.EventChannel(),
+					a.ServerSideOptions, a.DryRunStrategy, a.DynamicClient, a.OpenAPIGetter)
+				ao.SetObjects([]*resource.Info{info})
+				klog.V(5).Infof("applying %s/%s...", info.Namespace, info.Name)
+				err = ao.Run()
+				if err != nil && a.ServerSideOptions.ServerSideApply && isAPIService(obj) && isStreamError(err) {
+					// Server-side Apply doesn't work with APIService before k8s 1.21
+					// https://github.com/kubernetes/kubernetes/issues/89264
+					// Thus APIService is handled specially using client-side apply.
+					err = a.clientSideApply(info, taskContext.EventChannel())
 				}
-			}
+				if err != nil {
+					if klog.V(4).Enabled() {
+						klog.Errorf("error applying (%s/%s) %s", info.Namespace, info.Name, err)
+					}
+					taskContext.SendEvent(a.createApplyFailedEvent(
+						id,
+						applyerror.NewApplyRunError(err),
+					))
+					taskContext.AddFailedApply(id)
+				} else if info.Object != nil {
+					acc, err := meta.Accessor(info.Object)
+					if err == nil {
+						uid := acc.GetUID()
+						gen := acc.GetGeneration()
+						taskContext.AddSuccessfulApply(id, uid, gen)
+					}
+				}
+			}()
+
+			wg.Wait()
 		}
 		a.sendTaskResult(taskContext)
 	}()
