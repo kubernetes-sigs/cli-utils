@@ -11,7 +11,6 @@ import (
 	"k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
-	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
@@ -157,7 +156,7 @@ func (i InventoryCustomType) Load() (object.ObjMetadataSet, error) {
 	return inv, nil
 }
 
-func (i InventoryCustomType) Store(objs object.ObjMetadataSet, _ map[object.ObjMetadata]status.ApplyReconcileStatus) error {
+func (i InventoryCustomType) Store(objs object.ObjMetadataSet) error {
 	var inv []interface{}
 	for _, obj := range objs {
 		inv = append(inv, map[string]interface{}{

@@ -9,7 +9,6 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
-	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
@@ -112,11 +111,8 @@ func (i *InvSetTask) Start(taskContext *taskrunner.TaskContext) {
 		klog.V(4).Infof("keep in inventory %d invalid objects", len(invalidObjects))
 		invObjs = invObjs.Union(invalidObjects)
 
-		klog.V(4).Infof("get the apply status for %d objects", len(invObjs))
-		applyStatus := i.getApplyReoncileStatus(taskContext)
-
 		klog.V(4).Infof("set inventory %d total objects", len(invObjs))
-		err := i.InvClient.Replace(i.InvInfo, invObjs, i.DryRun, applyStatus)
+		err := i.InvClient.Replace(i.InvInfo, invObjs, i.DryRun)
 
 		klog.V(2).Infof("inventory set task completing (name: %q)", i.Name())
 		taskContext.TaskChannel() <- taskrunner.TaskResult{Err: err}
@@ -128,41 +124,3 @@ func (i *InvSetTask) Cancel(_ *taskrunner.TaskContext) {}
 
 // StatusUpdate is not supported by the InvSetTask.
 func (i *InvSetTask) StatusUpdate(_ *taskrunner.TaskContext, _ object.ObjMetadata) {}
-
-// getApplyReoncileStatus captures the apply status and reconcile status
-// for each individual resource in the inventory list.
-// The apply/reconcile status is then passed
-// to the inventory client and stored in the inventory object
-// through the Inventory interface.
-func (i InvSetTask) getApplyReoncileStatus(taskContext *taskrunner.TaskContext) map[object.ObjMetadata]status.ApplyReconcileStatus {
-	applyStatus := map[object.ObjMetadata]status.ApplyReconcileStatus{}
-	// capture the apply status
-	for _, obj := range taskContext.SuccessfulApplies() {
-		applyStatus[obj] = status.ApplyReconcileStatus{
-			ApplyStatus: status.ApplySucceeded,
-		}
-	}
-	for _, obj := range i.PrevInventory.Intersection(taskContext.FailedApplies()) {
-		applyStatus[obj] = status.ApplyReconcileStatus{
-			ApplyStatus: status.ApplyFailed,
-		}
-	}
-	for _, obj := range i.PrevInventory.Intersection(taskContext.SkippedApplies()) {
-		applyStatus[obj] = status.ApplyReconcileStatus{
-			ApplyStatus: status.ApplySkipped,
-		}
-	}
-	for _, obj := range i.PrevInventory.Intersection(taskContext.FailedDeletes()) {
-		applyStatus[obj] = status.ApplyReconcileStatus{
-			ApplyStatus: status.PruneFailed,
-		}
-	}
-	for _, obj := range i.PrevInventory.Intersection(taskContext.SkippedDeletes()) {
-		applyStatus[obj] = status.ApplyReconcileStatus{
-			ApplyStatus: status.PruneSkipped,
-		}
-	}
-
-	// TODO(Liujingfang1): capture the reconcile status
-	return applyStatus
-}
