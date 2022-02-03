@@ -92,7 +92,7 @@ func invToUnstructuredFunc(inv inventory.InventoryInfo) *unstructured.Unstructur
 	}
 }
 
-func WrapInventoryObj(obj *unstructured.Unstructured) inventory.Inventory {
+func WrapInventoryObj(obj *unstructured.Unstructured) inventory.Storage {
 	return &InventoryCustomType{inv: obj}
 }
 
@@ -100,7 +100,7 @@ func WrapInventoryInfoObj(obj *unstructured.Unstructured) inventory.InventoryInf
 	return &InventoryCustomType{inv: obj}
 }
 
-var _ inventory.Inventory = &InventoryCustomType{}
+var _ inventory.Storage = &InventoryCustomType{}
 var _ inventory.InventoryInfo = &InventoryCustomType{}
 
 type InventoryCustomType struct {

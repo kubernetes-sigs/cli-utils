@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"sigs.k8s.io/cli-utils/pkg/apply/cache"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
+	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/testutil"
@@ -87,14 +88,14 @@ func TestWaitTask_CompleteEventually(t *testing.T) {
 	defer close(eventChannel)
 
 	// mark deployment 1 & 2 as applied
-	taskContext.AddSuccessfulApply(testDeployment1ID, "unused", 1)
-	taskContext.AddSuccessfulApply(testDeployment2ID, "unused", 1)
+	taskContext.InventoryManager().AddSuccessfulApply(testDeployment1ID, "unused", 1)
+	taskContext.InventoryManager().AddSuccessfulApply(testDeployment2ID, "unused", 1)
 
 	// mark deployment 3 as failed
-	taskContext.AddFailedApply(testDeployment3ID)
+	taskContext.InventoryManager().AddFailedApply(testDeployment3ID)
 
 	// mark deployment 4 as skipped
-	taskContext.AddSkippedApply(testDeployment4ID)
+	taskContext.InventoryManager().AddSkippedApply(testDeployment4ID)
 
 	// run task async, to let the test collect events
 	go func() {
@@ -205,6 +206,42 @@ loop:
 	testutil.AssertEqual(t, expectedEvents, receivedEvents,
 		"Actual events (%d) do not match expected events (%d)",
 		len(receivedEvents), len(expectedEvents))
+
+	expectedInventory := inventory.Inventory{
+		Status: inventory.InventoryStatus{
+			Objects: []inventory.ObjectStatus{
+				{
+					ObjectReference: inventory.ObjectReferenceFromObjMetadata(testDeployment1ID),
+					Strategy:        inventory.ActuationStrategyApply,
+					Actuation:       inventory.ActuationSucceeded,
+					Reconcile:       inventory.ReconcileSucceeded,
+					UID:             "unused",
+					Generation:      1,
+				},
+				{
+					ObjectReference: inventory.ObjectReferenceFromObjMetadata(testDeployment2ID),
+					Strategy:        inventory.ActuationStrategyApply,
+					Actuation:       inventory.ActuationSucceeded,
+					Reconcile:       inventory.ReconcileSucceeded,
+					UID:             "unused",
+					Generation:      1,
+				},
+				{
+					ObjectReference: inventory.ObjectReferenceFromObjMetadata(testDeployment3ID),
+					Strategy:        inventory.ActuationStrategyApply,
+					Actuation:       inventory.ActuationFailed,
+					Reconcile:       inventory.ReconcileSkipped,
+				},
+				{
+					ObjectReference: inventory.ObjectReferenceFromObjMetadata(testDeployment4ID),
+					Strategy:        inventory.ActuationStrategyApply,
+					Actuation:       inventory.ActuationSkipped,
+					Reconcile:       inventory.ReconcileSkipped,
+				},
+			},
+		},
+	}
+	testutil.AssertEqual(t, &expectedInventory, taskContext.InventoryManager().Inventory())
 }
 
 func TestWaitTask_Timeout(t *testing.T) {
@@ -230,14 +267,14 @@ func TestWaitTask_Timeout(t *testing.T) {
 	defer close(eventChannel)
 
 	// mark deployment 1 & 2 as applied
-	taskContext.AddSuccessfulApply(testDeployment1ID, "unused", 1)
-	taskContext.AddSuccessfulApply(testDeployment2ID, "unused", 1)
+	taskContext.InventoryManager().AddSuccessfulApply(testDeployment1ID, "unused", 1)
+	taskContext.InventoryManager().AddSuccessfulApply(testDeployment2ID, "unused", 1)
 
 	// mark deployment 3 as failed
-	taskContext.AddFailedApply(testDeployment3ID)
+	taskContext.InventoryManager().AddFailedApply(testDeployment3ID)
 
 	// mark deployment 4 as skipped
-	taskContext.AddSkippedApply(testDeployment4ID)
+	taskContext.InventoryManager().AddSkippedApply(testDeployment4ID)
 
 	// run task async, to let the test collect events
 	go func() {
@@ -332,6 +369,42 @@ loop:
 	testutil.AssertEqual(t, expectedEvents, receivedEvents,
 		"Actual events (%d) do not match expected events (%d)",
 		len(receivedEvents), len(expectedEvents))
+
+	expectedInventory := inventory.Inventory{
+		Status: inventory.InventoryStatus{
+			Objects: []inventory.ObjectStatus{
+				{
+					ObjectReference: inventory.ObjectReferenceFromObjMetadata(testDeployment1ID),
+					Strategy:        inventory.ActuationStrategyApply,
+					Actuation:       inventory.ActuationSucceeded,
+					Reconcile:       inventory.ReconcileSucceeded,
+					UID:             "unused",
+					Generation:      1,
+				},
+				{
+					ObjectReference: inventory.ObjectReferenceFromObjMetadata(testDeployment2ID),
+					Strategy:        inventory.ActuationStrategyApply,
+					Actuation:       inventory.ActuationSucceeded,
+					Reconcile:       inventory.ReconcileTimeout,
+					UID:             "unused",
+					Generation:      1,
+				},
+				{
+					ObjectReference: inventory.ObjectReferenceFromObjMetadata(testDeployment3ID),
+					Strategy:        inventory.ActuationStrategyApply,
+					Actuation:       inventory.ActuationFailed,
+					Reconcile:       inventory.ReconcileSkipped,
+				},
+				{
+					ObjectReference: inventory.ObjectReferenceFromObjMetadata(testDeployment4ID),
+					Strategy:        inventory.ActuationStrategyApply,
+					Actuation:       inventory.ActuationSkipped,
+					Reconcile:       inventory.ReconcileSkipped,
+				},
+			},
+		},
+	}
+	testutil.AssertEqual(t, &expectedInventory, taskContext.InventoryManager().Inventory())
 }
 
 func TestWaitTask_StartAndComplete(t *testing.T) {
@@ -351,8 +424,7 @@ func TestWaitTask_StartAndComplete(t *testing.T) {
 	defer close(eventChannel)
 
 	// mark the deployment as applied
-	appliedGeneration := int64(1)
-	taskContext.AddSuccessfulApply(testDeploymentID, "unused", appliedGeneration)
+	taskContext.InventoryManager().AddSuccessfulApply(testDeploymentID, "unused", 1)
 
 	// mark the deployment as Current before starting
 	resourceCache.Put(testDeploymentID, cache.ResourceStatus{
@@ -397,6 +469,22 @@ loop:
 	testutil.AssertEqual(t, expectedEvents, receivedEvents,
 		"Actual events (%d) do not match expected events (%d)",
 		len(receivedEvents), len(expectedEvents))
+
+	expectedInventory := inventory.Inventory{
+		Status: inventory.InventoryStatus{
+			Objects: []inventory.ObjectStatus{
+				{
+					ObjectReference: inventory.ObjectReferenceFromObjMetadata(testDeploymentID),
+					Strategy:        inventory.ActuationStrategyApply,
+					Actuation:       inventory.ActuationSucceeded,
+					Reconcile:       inventory.ReconcileSucceeded,
+					UID:             "unused",
+					Generation:      1,
+				},
+			},
+		},
+	}
+	testutil.AssertEqual(t, &expectedInventory, taskContext.InventoryManager().Inventory())
 }
 
 func TestWaitTask_Cancel(t *testing.T) {
@@ -413,6 +501,9 @@ func TestWaitTask_Cancel(t *testing.T) {
 	resourceCache := cache.NewResourceCacheMap()
 	taskContext := NewTaskContext(eventChannel, resourceCache)
 	defer close(eventChannel)
+
+	// mark the deployment as applied
+	taskContext.InventoryManager().AddSuccessfulApply(testDeploymentID, "unused", 1)
 
 	// run task async, to let the test collect events
 	go func() {
@@ -459,6 +550,22 @@ loop:
 	testutil.AssertEqual(t, expectedEvents, receivedEvents,
 		"Actual events (%d) do not match expected events (%d)",
 		len(receivedEvents), len(expectedEvents))
+
+	expectedInventory := inventory.Inventory{
+		Status: inventory.InventoryStatus{
+			Objects: []inventory.ObjectStatus{
+				{
+					ObjectReference: inventory.ObjectReferenceFromObjMetadata(testDeploymentID),
+					Strategy:        inventory.ActuationStrategyApply,
+					Actuation:       inventory.ActuationSucceeded,
+					Reconcile:       inventory.ReconcilePending,
+					UID:             "unused",
+					Generation:      1,
+				},
+			},
+		},
+	}
+	testutil.AssertEqual(t, &expectedInventory, taskContext.InventoryManager().Inventory())
 }
 
 func TestWaitTask_SingleTaskResult(t *testing.T) {
@@ -479,8 +586,7 @@ func TestWaitTask_SingleTaskResult(t *testing.T) {
 	defer close(eventChannel)
 
 	// mark the deployment as applied
-	appliedGeneration := int64(1)
-	taskContext.AddSuccessfulApply(testDeploymentID, "unused", appliedGeneration)
+	taskContext.InventoryManager().AddSuccessfulApply(testDeploymentID, "unused", 1)
 
 	// run task async, to let the test collect events
 	go func() {
@@ -492,7 +598,7 @@ func TestWaitTask_SingleTaskResult(t *testing.T) {
 
 		// mark the deployment as Current
 		resourceCache.Put(testDeploymentID, cache.ResourceStatus{
-			Resource: withGeneration(testDeployment, appliedGeneration),
+			Resource: withGeneration(testDeployment, 1),
 			Status:   status.CurrentStatus,
 		})
 
@@ -547,6 +653,22 @@ loop:
 		{}, // Empty result means success
 	}
 	assert.Equal(t, expectedResults, receivedResults)
+
+	expectedInventory := inventory.Inventory{
+		Status: inventory.InventoryStatus{
+			Objects: []inventory.ObjectStatus{
+				{
+					ObjectReference: inventory.ObjectReferenceFromObjMetadata(testDeploymentID),
+					Strategy:        inventory.ActuationStrategyApply,
+					Actuation:       inventory.ActuationSucceeded,
+					Reconcile:       inventory.ReconcileSucceeded,
+					UID:             "unused",
+					Generation:      1,
+				},
+			},
+		},
+	}
+	testutil.AssertEqual(t, &expectedInventory, taskContext.InventoryManager().Inventory())
 }
 
 func TestWaitTask_Failed(t *testing.T) {
@@ -561,11 +683,12 @@ func TestWaitTask_Failed(t *testing.T) {
 		eventsFunc               func(*cache.ResourceCacheMap, *WaitTask, *TaskContext)
 		waitTimeout              time.Duration
 		expectedEvents           []event.Event
+		expectedInventory        *inventory.Inventory
 	}{
 		"continue on failed if others InProgress": {
 			configureTaskContextFunc: func(taskContext *TaskContext) {
-				taskContext.AddSuccessfulApply(testDeployment1ID, "unused", 1)
-				taskContext.AddSuccessfulApply(testDeployment2ID, "unused", 1)
+				taskContext.InventoryManager().AddSuccessfulApply(testDeployment1ID, "unused", 1)
+				taskContext.InventoryManager().AddSuccessfulApply(testDeployment2ID, "unused", 1)
 			},
 			eventsFunc: func(resourceCache *cache.ResourceCacheMap, task *WaitTask, taskContext *TaskContext) {
 				resourceCache.Put(testDeployment1ID, cache.ResourceStatus{
@@ -625,11 +748,33 @@ func TestWaitTask_Failed(t *testing.T) {
 					},
 				},
 			},
+			expectedInventory: &inventory.Inventory{
+				Status: inventory.InventoryStatus{
+					Objects: []inventory.ObjectStatus{
+						{
+							ObjectReference: inventory.ObjectReferenceFromObjMetadata(testDeployment1ID),
+							Strategy:        inventory.ActuationStrategyApply,
+							Actuation:       inventory.ActuationSucceeded,
+							Reconcile:       inventory.ReconcileFailed,
+							UID:             "unused",
+							Generation:      1,
+						},
+						{
+							ObjectReference: inventory.ObjectReferenceFromObjMetadata(testDeployment2ID),
+							Strategy:        inventory.ActuationStrategyApply,
+							Actuation:       inventory.ActuationSucceeded,
+							Reconcile:       inventory.ReconcileSucceeded,
+							UID:             "unused",
+							Generation:      1,
+						},
+					},
+				},
+			},
 		},
 		"complete wait task is last resource becomes failed": {
 			configureTaskContextFunc: func(taskContext *TaskContext) {
-				taskContext.AddSuccessfulApply(testDeployment1ID, "unused", 1)
-				taskContext.AddSuccessfulApply(testDeployment2ID, "unused", 1)
+				taskContext.InventoryManager().AddSuccessfulApply(testDeployment1ID, "unused", 1)
+				taskContext.InventoryManager().AddSuccessfulApply(testDeployment2ID, "unused", 1)
 			},
 			eventsFunc: func(resourceCache *cache.ResourceCacheMap, task *WaitTask, taskContext *TaskContext) {
 				resourceCache.Put(testDeployment2ID, cache.ResourceStatus{
@@ -683,11 +828,33 @@ func TestWaitTask_Failed(t *testing.T) {
 					},
 				},
 			},
+			expectedInventory: &inventory.Inventory{
+				Status: inventory.InventoryStatus{
+					Objects: []inventory.ObjectStatus{
+						{
+							ObjectReference: inventory.ObjectReferenceFromObjMetadata(testDeployment1ID),
+							Strategy:        inventory.ActuationStrategyApply,
+							Actuation:       inventory.ActuationSucceeded,
+							Reconcile:       inventory.ReconcileFailed,
+							UID:             "unused",
+							Generation:      1,
+						},
+						{
+							ObjectReference: inventory.ObjectReferenceFromObjMetadata(testDeployment2ID),
+							Strategy:        inventory.ActuationStrategyApply,
+							Actuation:       inventory.ActuationSucceeded,
+							Reconcile:       inventory.ReconcileSucceeded,
+							UID:             "unused",
+							Generation:      1,
+						},
+					},
+				},
+			},
 		},
 		"failed resource can become current": {
 			configureTaskContextFunc: func(taskContext *TaskContext) {
-				taskContext.AddSuccessfulApply(testDeployment1ID, "unused", 1)
-				taskContext.AddSuccessfulApply(testDeployment2ID, "unused", 1)
+				taskContext.InventoryManager().AddSuccessfulApply(testDeployment1ID, "unused", 1)
+				taskContext.InventoryManager().AddSuccessfulApply(testDeployment2ID, "unused", 1)
 			},
 			eventsFunc: func(resourceCache *cache.ResourceCacheMap, task *WaitTask, taskContext *TaskContext) {
 				resourceCache.Put(testDeployment1ID, cache.ResourceStatus{
@@ -756,11 +923,33 @@ func TestWaitTask_Failed(t *testing.T) {
 					},
 				},
 			},
+			expectedInventory: &inventory.Inventory{
+				Status: inventory.InventoryStatus{
+					Objects: []inventory.ObjectStatus{
+						{
+							ObjectReference: inventory.ObjectReferenceFromObjMetadata(testDeployment1ID),
+							Strategy:        inventory.ActuationStrategyApply,
+							Actuation:       inventory.ActuationSucceeded,
+							Reconcile:       inventory.ReconcileSucceeded,
+							UID:             "unused",
+							Generation:      1,
+						},
+						{
+							ObjectReference: inventory.ObjectReferenceFromObjMetadata(testDeployment2ID),
+							Strategy:        inventory.ActuationStrategyApply,
+							Actuation:       inventory.ActuationSucceeded,
+							Reconcile:       inventory.ReconcileSucceeded,
+							UID:             "unused",
+							Generation:      1,
+						},
+					},
+				},
+			},
 		},
 		"failed resource can become InProgress": {
 			configureTaskContextFunc: func(taskContext *TaskContext) {
-				taskContext.AddSuccessfulApply(testDeployment1ID, "unused", 1)
-				taskContext.AddSuccessfulApply(testDeployment2ID, "unused", 1)
+				taskContext.InventoryManager().AddSuccessfulApply(testDeployment1ID, "unused", 1)
+				taskContext.InventoryManager().AddSuccessfulApply(testDeployment2ID, "unused", 1)
 			},
 			eventsFunc: func(resourceCache *cache.ResourceCacheMap, task *WaitTask, taskContext *TaskContext) {
 				resourceCache.Put(testDeployment1ID, cache.ResourceStatus{
@@ -838,6 +1027,28 @@ func TestWaitTask_Failed(t *testing.T) {
 					},
 				},
 			},
+			expectedInventory: &inventory.Inventory{
+				Status: inventory.InventoryStatus{
+					Objects: []inventory.ObjectStatus{
+						{
+							ObjectReference: inventory.ObjectReferenceFromObjMetadata(testDeployment1ID),
+							Strategy:        inventory.ActuationStrategyApply,
+							Actuation:       inventory.ActuationSucceeded,
+							Reconcile:       inventory.ReconcileTimeout,
+							UID:             "unused",
+							Generation:      1,
+						},
+						{
+							ObjectReference: inventory.ObjectReferenceFromObjMetadata(testDeployment2ID),
+							Strategy:        inventory.ActuationStrategyApply,
+							Actuation:       inventory.ActuationSucceeded,
+							Reconcile:       inventory.ReconcileSucceeded,
+							UID:             "unused",
+							Generation:      1,
+						},
+					},
+				},
+			},
 		},
 	}
 
@@ -885,6 +1096,8 @@ func TestWaitTask_Failed(t *testing.T) {
 			testutil.AssertEqual(t, tc.expectedEvents, receivedEvents,
 				"Actual events (%d) do not match expected events (%d)",
 				len(receivedEvents), len(tc.expectedEvents))
+
+			testutil.AssertEqual(t, tc.expectedInventory, taskContext.InventoryManager().Inventory())
 		})
 	}
 }

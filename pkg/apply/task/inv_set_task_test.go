@@ -174,20 +174,21 @@ func TestInvSetTask(t *testing.T) {
 				InvInfo:       nil,
 				PrevInventory: tc.prevInventory,
 			}
+			im := context.InventoryManager()
 			for _, applyObj := range tc.appliedObjs {
-				context.AddSuccessfulApply(applyObj, "unusued-uid", int64(0))
+				im.AddSuccessfulApply(applyObj, "unusued-uid", int64(0))
 			}
 			for _, applyFailure := range tc.failedApplies {
-				context.AddFailedApply(applyFailure)
+				im.AddFailedApply(applyFailure)
 			}
 			for _, pruneObj := range tc.failedDeletes {
-				context.AddFailedDelete(pruneObj)
+				im.AddFailedDelete(pruneObj)
 			}
 			for _, skippedApply := range tc.skippedApplies {
-				context.AddSkippedApply(skippedApply)
+				im.AddSkippedApply(skippedApply)
 			}
 			for _, skippedDelete := range tc.skippedDeletes {
-				context.AddSkippedDelete(skippedDelete)
+				im.AddSkippedDelete(skippedDelete)
 			}
 			for _, abandonedObj := range tc.abandonedObjs {
 				context.AddAbandonedObject(abandonedObj)

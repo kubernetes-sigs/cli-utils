@@ -59,7 +59,7 @@ func allMatchStatus(taskContext *TaskContext, ids object.ObjMetadataSet, s statu
 			return false
 		}
 
-		applyGen, _ := taskContext.AppliedGeneration(id) // generation at apply time
+		applyGen, _ := taskContext.InventoryManager().AppliedGeneration(id) // generation at apply time
 		cachedGen := int64(0)
 		if cached.Resource != nil {
 			cachedGen = cached.Resource.GetGeneration()
@@ -81,7 +81,7 @@ func noneMatchStatus(taskContext *TaskContext, ids object.ObjMetadataSet, s stat
 			return false
 		}
 
-		applyGen, _ := taskContext.AppliedGeneration(id) // generation at apply time
+		applyGen, _ := taskContext.InventoryManager().AppliedGeneration(id) // generation at apply time
 		cachedGen := int64(0)
 		if cached.Resource != nil {
 			cachedGen = cached.Resource.GetGeneration()
