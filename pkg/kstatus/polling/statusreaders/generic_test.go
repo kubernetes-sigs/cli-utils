@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/testutil"
+	fakecr "sigs.k8s.io/cli-utils/pkg/kstatus/polling/clusterreader/fake"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	fakemapper "sigs.k8s.io/cli-utils/pkg/testutil"
@@ -59,7 +59,7 @@ func TestGenericStatusReader(t *testing.T) {
 
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
-			fakeReader := testutil.NewNoopClusterReader()
+			fakeReader := fakecr.NewNoopClusterReader()
 			fakeMapper := fakemapper.NewFakeRESTMapper()
 			resourceStatusReader := &genericStatusReader{
 				mapper: fakeMapper,
@@ -73,8 +73,9 @@ func TestGenericStatusReader(t *testing.T) {
 			o.SetName(name)
 			o.SetNamespace(namespace)
 
-			resourceStatus := resourceStatusReader.ReadStatusForObject(context.Background(), fakeReader, o)
+			resourceStatus, err := resourceStatusReader.ReadStatusForObject(context.Background(), fakeReader, o)
 
+			assert.NoError(t, err)
 			assert.Equal(t, tc.expectedIdentifier, resourceStatus.Identifier)
 			assert.Equal(t, tc.expectedStatus, resourceStatus.Status)
 		})

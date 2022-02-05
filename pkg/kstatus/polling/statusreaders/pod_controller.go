@@ -42,29 +42,18 @@ type podControllerStatusReader struct {
 	statusForGenResourcesFunc statusForGenResourcesFunc
 }
 
-func (p *podControllerStatusReader) readStatus(ctx context.Context, reader engine.ClusterReader, obj *unstructured.Unstructured) *event.ResourceStatus {
+func (p *podControllerStatusReader) readStatus(ctx context.Context, reader engine.ClusterReader, obj *unstructured.Unstructured) (*event.ResourceStatus, error) {
 	identifier := object.UnstructuredToObjMetadata(obj)
 
 	podResourceStatuses, err := p.statusForGenResourcesFunc(ctx, p.mapper, reader, p.podStatusReader, obj,
 		p.groupKind, "spec", "selector")
 	if err != nil {
-		return &event.ResourceStatus{
-			Identifier: identifier,
-			Status:     status.UnknownStatus,
-			Resource:   obj,
-			Error:      err,
-		}
+		return errResourceToResourceStatus(err, obj)
 	}
 
 	res, err := p.statusFunc(obj)
 	if err != nil {
-		return &event.ResourceStatus{
-			Identifier:         identifier,
-			Status:             status.UnknownStatus,
-			Resource:           obj,
-			Error:              err,
-			GeneratedResources: podResourceStatuses,
-		}
+		return errResourceToResourceStatus(err, obj, podResourceStatuses...)
 	}
 
 	// If the status comes back as pending, we take a look at the pods to make sure
@@ -85,7 +74,7 @@ func (p *podControllerStatusReader) readStatus(ctx context.Context, reader engin
 				Resource:           obj,
 				Message:            fmt.Sprintf("%d pods have failed", len(failedPods)),
 				GeneratedResources: podResourceStatuses,
-			}
+			}, nil
 		}
 	}
 
@@ -95,5 +84,5 @@ func (p *podControllerStatusReader) readStatus(ctx context.Context, reader engin
 		Resource:           obj,
 		Message:            res.Message,
 		GeneratedResources: podResourceStatuses,
-	}
+	}, nil
 }

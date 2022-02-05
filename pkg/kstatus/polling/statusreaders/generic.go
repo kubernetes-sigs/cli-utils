@@ -48,16 +48,12 @@ func (g *genericStatusReader) Supports(schema.GroupKind) bool {
 	return true
 }
 
-func (g *genericStatusReader) ReadStatusForObject(_ context.Context, _ engine.ClusterReader, resource *unstructured.Unstructured) *event.ResourceStatus {
+func (g *genericStatusReader) ReadStatusForObject(_ context.Context, _ engine.ClusterReader, resource *unstructured.Unstructured) (*event.ResourceStatus, error) {
 	identifier := object.UnstructuredToObjMetadata(resource)
 
 	res, err := g.statusFunc(resource)
 	if err != nil {
-		return &event.ResourceStatus{
-			Identifier: identifier,
-			Status:     status.UnknownStatus,
-			Error:      err,
-		}
+		return errResourceToResourceStatus(err, resource)
 	}
 
 	return &event.ResourceStatus{
@@ -65,5 +61,5 @@ func (g *genericStatusReader) ReadStatusForObject(_ context.Context, _ engine.Cl
 		Status:     res.Status,
 		Resource:   resource,
 		Message:    res.Message,
-	}
+	}, nil
 }

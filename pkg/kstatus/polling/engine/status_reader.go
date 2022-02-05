@@ -26,10 +26,18 @@ type StatusReader interface {
 	// ReadStatus will fetch the resource identified by the given identifier
 	// from the cluster and return an ResourceStatus that will contain
 	// information about the latest state of the resource, its computed status
-	// and information about any generated resources.
-	ReadStatus(ctx context.Context, reader ClusterReader, resource object.ObjMetadata) *event.ResourceStatus
+	// and information about any generated resources. Errors would usually be
+	// added to the event.ResourceStatus, but in the case of fatal errors
+	// that aren't connected to the particular resource, an error can also
+	// be returned. Currently, only context cancellation and deadline exceeded
+	// will cause an error to be returned.
+	ReadStatus(ctx context.Context, reader ClusterReader, resource object.ObjMetadata) (*event.ResourceStatus, error)
 
 	// ReadStatusForObject is similar to ReadStatus, but instead of looking up the
 	// resource based on an identifier, it will use the passed-in resource.
-	ReadStatusForObject(ctx context.Context, reader ClusterReader, object *unstructured.Unstructured) *event.ResourceStatus
+	// Errors would usually be added to the event.ResourceStatus, but in the case
+	// of fatal errors that aren't connected to the particular resource, an error
+	// can also be returned. Currently, only context cancellation and deadline exceeded
+	// will cause an error to be returned.
+	ReadStatusForObject(ctx context.Context, reader ClusterReader, object *unstructured.Unstructured) (*event.ResourceStatus, error)
 }
