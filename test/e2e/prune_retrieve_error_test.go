@@ -28,10 +28,11 @@ func pruneRetrieveErrorTest(ctx context.Context, c client.Client, invConfig Inve
 
 	pod1Obj := withNamespace(manifestToUnstructured(pod1), namespaceName)
 	resource1 := []*unstructured.Unstructured{
+		inv,
 		pod1Obj,
 	}
 
-	applierEvents := runCollect(applier.Run(ctx, inv, resource1, apply.ApplierOptions{
+	applierEvents := runCollect(applier.Run(ctx, resource1, apply.ApplierOptions{
 		EmitStatusEvents: false,
 	}))
 
@@ -162,10 +163,11 @@ func pruneRetrieveErrorTest(ctx context.Context, c client.Client, invConfig Inve
 	By("apply a different resource, and validate the inventory accurately reflects only this object")
 	pod2Obj := withNamespace(manifestToUnstructured(pod2), namespaceName)
 	resource2 := []*unstructured.Unstructured{
+		inv,
 		pod2Obj,
 	}
 
-	applierEvents2 := runCollect(applier.Run(ctx, inv, resource2, apply.ApplierOptions{
+	applierEvents2 := runCollect(applier.Run(ctx, resource2, apply.ApplierOptions{
 		EmitStatusEvents: false,
 	}))
 
@@ -297,7 +299,7 @@ func pruneRetrieveErrorTest(ctx context.Context, c client.Client, invConfig Inve
 	destroyer := invConfig.DestroyerFactoryFunc()
 
 	options := apply.DestroyerOptions{InventoryPolicy: inventory.AdoptIfNoInventory}
-	destroyerEvents := runCollect(destroyer.Run(ctx, inv, options))
+	destroyerEvents := runCollect(destroyer.Run(ctx, resource2, options))
 
 	expEvents3 := []testutil.ExpEvent{
 		{

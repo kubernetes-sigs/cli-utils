@@ -22,14 +22,15 @@ func reconciliationFailed(ctx context.Context, invConfig InventoryConfig, invent
 	applier := invConfig.ApplierFactoryFunc()
 	inventoryID := fmt.Sprintf("%s-%s", inventoryName, namespaceName)
 
-	inventoryInfo := createInventoryInfo(invConfig, inventoryName, namespaceName, inventoryID)
+	inventoryObj := createInventoryInfo(invConfig, inventoryName, namespaceName, inventoryID)
 
 	podObj := withNodeSelector(withNamespace(manifestToUnstructured(pod1), namespaceName), "foo", "bar")
 	resources := []*unstructured.Unstructured{
+		inventoryObj,
 		podObj,
 	}
 
-	applierEvents := runCollect(applier.Run(ctx, inventoryInfo, resources, apply.ApplierOptions{
+	applierEvents := runCollect(applier.Run(ctx, resources, apply.ApplierOptions{
 		ReconcileTimeout: 2 * time.Minute,
 		EmitStatusEvents: false,
 	}))
@@ -45,14 +46,15 @@ func reconciliationTimeout(ctx context.Context, invConfig InventoryConfig, inven
 	applier := invConfig.ApplierFactoryFunc()
 	inventoryID := fmt.Sprintf("%s-%s", inventoryName, namespaceName)
 
-	inventoryInfo := createInventoryInfo(invConfig, inventoryName, namespaceName, inventoryID)
+	inventoryObj := createInventoryInfo(invConfig, inventoryName, namespaceName, inventoryID)
 
 	podObj := podWithImage(withNamespace(manifestToUnstructured(pod1), namespaceName), "kubernetes-pause", "does-not-exist")
 	resources := []*unstructured.Unstructured{
+		inventoryObj,
 		podObj,
 	}
 
-	applierEvents := runCollect(applier.Run(ctx, inventoryInfo, resources, apply.ApplierOptions{
+	applierEvents := runCollect(applier.Run(ctx, resources, apply.ApplierOptions{
 		ReconcileTimeout: 30 * time.Second,
 		EmitStatusEvents: false,
 	}))

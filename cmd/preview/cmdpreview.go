@@ -120,12 +120,6 @@ func (r *PreviewRunner) RunE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	invObj, objs, err := inventory.SplitUnstructureds(objs)
-	if err != nil {
-		return err
-	}
-	inv := inventory.WrapInventoryInfoObj(invObj)
-
 	invClient, err := r.invFactory.NewInventoryClient(r.factory)
 	if err != nil {
 		return err
@@ -148,7 +142,7 @@ func (r *PreviewRunner) RunE(cmd *cobra.Command, args []string) error {
 
 		// Run the applier. It will return a channel where we can receive updates
 		// to keep track of progress and any issues.
-		ch = a.Run(ctx, inv, objs, apply.ApplierOptions{
+		ch = a.Run(ctx, objs, apply.ApplierOptions{
 			EmitStatusEvents:  false,
 			NoPrune:           noPrune,
 			DryRunStrategy:    drs,
@@ -160,7 +154,7 @@ func (r *PreviewRunner) RunE(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return err
 		}
-		ch = d.Run(ctx, inv, apply.DestroyerOptions{
+		ch = d.Run(ctx, objs, apply.DestroyerOptions{
 			InventoryPolicy: inventoryPolicy,
 			DryRunStrategy:  drs,
 		})

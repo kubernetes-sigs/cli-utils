@@ -36,7 +36,7 @@ func mutationTest(ctx context.Context, c client.Client, invConfig InventoryConfi
 	By("apply resources in order with substitutions based on apply-time-mutation annotation")
 	applier := invConfig.ApplierFactoryFunc()
 
-	inv := invConfig.InvWrapperFunc(invConfig.InventoryFactoryFunc(inventoryName, namespaceName, "test"))
+	inv := invConfig.InventoryFactoryFunc(inventoryName, namespaceName, "test")
 
 	fields := struct{ Namespace string }{Namespace: namespaceName}
 	podAObj := templateToUnstructured(podATemplate, fields)
@@ -45,11 +45,12 @@ func mutationTest(ctx context.Context, c client.Client, invConfig InventoryConfi
 	// Dependency order: podA -> podB
 	// Apply order: podB, podA
 	resources := []*unstructured.Unstructured{
+		inv,
 		podAObj,
 		podBObj,
 	}
 
-	applierEvents := runCollect(applier.Run(ctx, inv, resources, apply.ApplierOptions{
+	applierEvents := runCollect(applier.Run(ctx, resources, apply.ApplierOptions{
 		EmitStatusEvents: false,
 	}))
 
@@ -257,7 +258,7 @@ func mutationTest(ctx context.Context, c client.Client, invConfig InventoryConfi
 	By("destroy resources in opposite order")
 	destroyer := invConfig.DestroyerFactoryFunc()
 	options := apply.DestroyerOptions{InventoryPolicy: inventory.AdoptIfNoInventory}
-	destroyerEvents := runCollect(destroyer.Run(ctx, inv, options))
+	destroyerEvents := runCollect(destroyer.Run(ctx, resources, options))
 
 	expEvents = []testutil.ExpEvent{
 		{

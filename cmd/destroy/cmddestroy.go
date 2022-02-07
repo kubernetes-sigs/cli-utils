@@ -108,12 +108,6 @@ func (r *DestroyRunner) RunE(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	invObj, _, err := inventory.SplitUnstructureds(objs)
-	if err != nil {
-		return err
-	}
-	inv := inventory.WrapInventoryInfoObj(invObj)
-
 	invClient, err := r.invFactory.NewInventoryClient(r.factory)
 	if err != nil {
 		return err
@@ -130,7 +124,7 @@ func (r *DestroyRunner) RunE(cmd *cobra.Command, args []string) error {
 
 	// Run the destroyer. It will return a channel where we can receive updates
 	// to keep track of progress and any issues.
-	ch := d.Run(ctx, inv, apply.DestroyerOptions{
+	ch := d.Run(ctx, objs, apply.DestroyerOptions{
 		DeleteTimeout:           r.deleteTimeout,
 		DeletePropagationPolicy: deletePropPolicy,
 		InventoryPolicy:         inventoryPolicy,

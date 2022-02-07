@@ -128,12 +128,6 @@ func (r *ApplyRunner) RunE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	invObj, objs, err := inventory.SplitUnstructureds(objs)
-	if err != nil {
-		return err
-	}
-	inv := inventory.WrapInventoryInfoObj(invObj)
-
 	invClient, err := r.invFactory.NewInventoryClient(r.factory)
 	if err != nil {
 		return err
@@ -154,7 +148,7 @@ func (r *ApplyRunner) RunE(cmd *cobra.Command, args []string) error {
 		r.printStatusEvents = true
 	}
 
-	ch := a.Run(ctx, inv, objs, apply.ApplierOptions{
+	ch := a.Run(ctx, objs, apply.ApplierOptions{
 		ServerSideOptions: r.serverSideOptions,
 		PollInterval:      r.period,
 		ReconcileTimeout:  r.reconcileTimeout,

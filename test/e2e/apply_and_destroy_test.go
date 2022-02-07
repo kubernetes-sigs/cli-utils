@@ -29,10 +29,11 @@ func applyAndDestroyTest(ctx context.Context, c client.Client, invConfig Invento
 
 	deployment1Obj := withNamespace(manifestToUnstructured(deployment1), namespaceName)
 	resources := []*unstructured.Unstructured{
+		inventoryInfo,
 		deployment1Obj,
 	}
 
-	applierEvents := runCollect(applier.Run(ctx, inventoryInfo, resources, apply.ApplierOptions{
+	applierEvents := runCollect(applier.Run(ctx, resources, apply.ApplierOptions{
 		ReconcileTimeout: 2 * time.Minute,
 		EmitStatusEvents: true,
 	}))
@@ -193,7 +194,7 @@ func applyAndDestroyTest(ctx context.Context, c client.Client, invConfig Invento
 	destroyer := invConfig.DestroyerFactoryFunc()
 
 	options := apply.DestroyerOptions{InventoryPolicy: inventory.AdoptIfNoInventory}
-	destroyerEvents := runCollect(destroyer.Run(ctx, inventoryInfo, options))
+	destroyerEvents := runCollect(destroyer.Run(ctx, resources, options))
 
 	expEvents = []testutil.ExpEvent{
 		{
@@ -291,12 +292,12 @@ func applyAndDestroyTest(ctx context.Context, c client.Client, invConfig Invento
 	assertUnstructuredDoesNotExist(ctx, c, deployment1Obj)
 }
 
-func createInventoryInfo(invConfig InventoryConfig, inventoryName, namespaceName, inventoryID string) inventory.InventoryInfo {
+func createInventoryInfo(invConfig InventoryConfig, inventoryName, namespaceName, inventoryID string) *unstructured.Unstructured {
 	switch invConfig.InventoryStrategy {
 	case inventory.NameStrategy:
-		return invConfig.InvWrapperFunc(invConfig.InventoryFactoryFunc(inventoryName, namespaceName, randomString("inventory-")))
+		return invConfig.InventoryFactoryFunc(inventoryName, namespaceName, randomString("inventory-"))
 	case inventory.LabelStrategy:
-		return invConfig.InvWrapperFunc(invConfig.InventoryFactoryFunc(randomString("inventory-"), namespaceName, inventoryID))
+		return invConfig.InventoryFactoryFunc(randomString("inventory-"), namespaceName, inventoryID)
 	default:
 		panic(fmt.Errorf("unknown inventory strategy %q", invConfig.InventoryStrategy))
 	}

@@ -25,26 +25,28 @@ func inventoryPolicyMustMatchTest(ctx context.Context, c client.Client, invConfi
 	applier := invConfig.ApplierFactoryFunc()
 
 	firstInvName := randomString("first-inv-")
-	firstInv := invConfig.InvWrapperFunc(invConfig.InventoryFactoryFunc(firstInvName, namespaceName, firstInvName))
+	firstInv := invConfig.InventoryFactoryFunc(firstInvName, namespaceName, firstInvName)
 	deployment1Obj := withNamespace(manifestToUnstructured(deployment1), namespaceName)
 	firstResources := []*unstructured.Unstructured{
+		firstInv,
 		deployment1Obj,
 	}
 
-	runWithNoErr(applier.Run(ctx, firstInv, firstResources, apply.ApplierOptions{
+	runWithNoErr(applier.Run(ctx, firstResources, apply.ApplierOptions{
 		ReconcileTimeout: 2 * time.Minute,
 		EmitStatusEvents: true,
 	}))
 
 	By("Apply second set of resources")
 	secondInvName := randomString("second-inv-")
-	secondInv := invConfig.InvWrapperFunc(invConfig.InventoryFactoryFunc(secondInvName, namespaceName, secondInvName))
+	secondInv := invConfig.InventoryFactoryFunc(secondInvName, namespaceName, secondInvName)
 	deployment1Obj = withNamespace(manifestToUnstructured(deployment1), namespaceName)
 	secondResources := []*unstructured.Unstructured{
+		secondInv,
 		withReplicas(deployment1Obj, 6),
 	}
 
-	applierEvents := runCollect(applier.Run(ctx, secondInv, secondResources, apply.ApplierOptions{
+	applierEvents := runCollect(applier.Run(ctx, secondResources, apply.ApplierOptions{
 		ReconcileTimeout: 2 * time.Minute,
 		EmitStatusEvents: true,
 		InventoryPolicy:  inventory.InventoryPolicyMustMatch,
@@ -196,13 +198,14 @@ func inventoryPolicyAdoptIfNoInventoryTest(ctx context.Context, c client.Client,
 	applier := invConfig.ApplierFactoryFunc()
 
 	invName := randomString("test-inv-")
-	inv := invConfig.InvWrapperFunc(invConfig.InventoryFactoryFunc(invName, namespaceName, invName))
+	inv := invConfig.InventoryFactoryFunc(invName, namespaceName, invName)
 	deployment1Obj = withNamespace(manifestToUnstructured(deployment1), namespaceName)
 	resources := []*unstructured.Unstructured{
+		inv,
 		withReplicas(deployment1Obj, 6),
 	}
 
-	applierEvents := runCollect(applier.Run(ctx, inv, resources, apply.ApplierOptions{
+	applierEvents := runCollect(applier.Run(ctx, resources, apply.ApplierOptions{
 		ReconcileTimeout: 2 * time.Minute,
 		EmitStatusEvents: true,
 		InventoryPolicy:  inventory.AdoptIfNoInventory,
@@ -365,26 +368,28 @@ func inventoryPolicyAdoptAllTest(ctx context.Context, c client.Client, invConfig
 	applier := invConfig.ApplierFactoryFunc()
 
 	firstInvName := randomString("first-inv-")
-	firstInv := invConfig.InvWrapperFunc(invConfig.InventoryFactoryFunc(firstInvName, namespaceName, firstInvName))
+	firstInv := invConfig.InventoryFactoryFunc(firstInvName, namespaceName, firstInvName)
 	deployment1Obj := withNamespace(manifestToUnstructured(deployment1), namespaceName)
 	firstResources := []*unstructured.Unstructured{
+		firstInv,
 		deployment1Obj,
 	}
 
-	runWithNoErr(applier.Run(ctx, firstInv, firstResources, apply.ApplierOptions{
+	runWithNoErr(applier.Run(ctx, firstResources, apply.ApplierOptions{
 		ReconcileTimeout: 2 * time.Minute,
 		EmitStatusEvents: true,
 	}))
 
 	By("Apply resources")
 	secondInvName := randomString("test-inv-")
-	secondInv := invConfig.InvWrapperFunc(invConfig.InventoryFactoryFunc(secondInvName, namespaceName, secondInvName))
+	secondInv := invConfig.InventoryFactoryFunc(secondInvName, namespaceName, secondInvName)
 	deployment1Obj = withNamespace(manifestToUnstructured(deployment1), namespaceName)
 	secondResources := []*unstructured.Unstructured{
+		secondInv,
 		withReplicas(deployment1Obj, 6),
 	}
 
-	applierEvents := runCollect(applier.Run(ctx, secondInv, secondResources, apply.ApplierOptions{
+	applierEvents := runCollect(applier.Run(ctx, secondResources, apply.ApplierOptions{
 		ReconcileTimeout: 2 * time.Minute,
 		EmitStatusEvents: true,
 		InventoryPolicy:  inventory.AdoptAll,

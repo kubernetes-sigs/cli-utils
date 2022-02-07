@@ -24,17 +24,18 @@ func crdTest(ctx context.Context, _ client.Client, invConfig InventoryConfig, in
 	By("apply a set of resources that includes both a crd and a cr")
 	applier := invConfig.ApplierFactoryFunc()
 
-	inv := invConfig.InvWrapperFunc(invConfig.InventoryFactoryFunc(inventoryName, namespaceName, "test"))
+	inv := invConfig.InventoryFactoryFunc(inventoryName, namespaceName, "test")
 
 	crdObj := manifestToUnstructured(crd)
 	crObj := manifestToUnstructured(cr)
 
 	resources := []*unstructured.Unstructured{
+		inv,
 		crObj,
 		crdObj,
 	}
 
-	applierEvents := runCollect(applier.Run(ctx, inv, resources, apply.ApplierOptions{
+	applierEvents := runCollect(applier.Run(ctx, resources, apply.ApplierOptions{
 		ReconcileTimeout: 2 * time.Minute,
 		EmitStatusEvents: false,
 	}))
@@ -215,7 +216,7 @@ func crdTest(ctx context.Context, _ client.Client, invConfig InventoryConfig, in
 	By("destroy the resources, including the crd")
 	destroyer := invConfig.DestroyerFactoryFunc()
 	options := apply.DestroyerOptions{InventoryPolicy: inventory.AdoptIfNoInventory}
-	destroyerEvents := runCollect(destroyer.Run(ctx, inv, options))
+	destroyerEvents := runCollect(destroyer.Run(ctx, resources, options))
 
 	expEvents = []testutil.ExpEvent{
 		{

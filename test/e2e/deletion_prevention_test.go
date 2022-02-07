@@ -22,15 +22,17 @@ func deletionPreventionTest(ctx context.Context, c client.Client, invConfig Inve
 	applier := invConfig.ApplierFactoryFunc()
 	inventoryID := fmt.Sprintf("%s-%s", inventoryName, namespaceName)
 
-	inventoryInfo := createInventoryInfo(invConfig, inventoryName, namespaceName, inventoryID)
+	inventoryObj := createInventoryInfo(invConfig, inventoryName, namespaceName, inventoryID)
+	inventoryInfo := invConfig.InvWrapperFunc(inventoryObj)
 
 	resources := []*unstructured.Unstructured{
+		inventoryObj,
 		withNamespace(manifestToUnstructured(deployment1), namespaceName),
 		withAnnotation(withNamespace(manifestToUnstructured(pod1), namespaceName), common.OnRemoveAnnotation, common.OnRemoveKeep),
 		withAnnotation(withNamespace(manifestToUnstructured(pod2), namespaceName), common.LifecycleDeleteAnnotation, common.PreventDeletion),
 	}
 
-	runCollect(applier.Run(ctx, inventoryInfo, resources, apply.ApplierOptions{
+	runCollect(applier.Run(ctx, resources, apply.ApplierOptions{
 		ReconcileTimeout: 2 * time.Minute,
 	}))
 
@@ -51,10 +53,11 @@ func deletionPreventionTest(ctx context.Context, c client.Client, invConfig Inve
 
 	By("Dry-run apply resources")
 	resources = []*unstructured.Unstructured{
+		inventoryObj,
 		withNamespace(manifestToUnstructured(deployment1), namespaceName),
 	}
 
-	runCollect(applier.Run(ctx, inventoryInfo, resources, apply.ApplierOptions{
+	runCollect(applier.Run(ctx, resources, apply.ApplierOptions{
 		ReconcileTimeout: 2 * time.Minute,
 		DryRunStrategy:   common.DryRunClient,
 	}))
@@ -76,10 +79,11 @@ func deletionPreventionTest(ctx context.Context, c client.Client, invConfig Inve
 
 	By("Apply resources")
 	resources = []*unstructured.Unstructured{
+		inventoryObj,
 		withNamespace(manifestToUnstructured(deployment1), namespaceName),
 	}
 
-	runCollect(applier.Run(ctx, inventoryInfo, resources, apply.ApplierOptions{
+	runCollect(applier.Run(ctx, resources, apply.ApplierOptions{
 		ReconcileTimeout: 2 * time.Minute,
 	}))
 

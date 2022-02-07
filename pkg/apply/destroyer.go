@@ -9,6 +9,7 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/cli-utils/pkg/apply/cache"
@@ -42,20 +43,22 @@ func NewDestroyer(factory cmdutil.Factory, invClient inventory.InventoryClient) 
 		return nil, err
 	}
 	return &Destroyer{
-		pruner:       pruner,
-		StatusPoller: statusPoller,
-		factory:      factory,
-		invClient:    invClient,
+		pruner:           pruner,
+		StatusPoller:     statusPoller,
+		factory:          factory,
+		invClient:        invClient,
+		WrapInventoryObj: inventory.WrapInventoryInfoObj,
 	}, nil
 }
 
 // Destroyer performs the step of grabbing all the previous inventory objects and
 // prune them. This also deletes all the previous inventory objects
 type Destroyer struct {
-	pruner       *prune.Pruner
-	StatusPoller poller.Poller
-	factory      cmdutil.Factory
-	invClient    inventory.InventoryClient
+	pruner           *prune.Pruner
+	StatusPoller     poller.Poller
+	factory          cmdutil.Factory
+	invClient        inventory.InventoryClient
+	WrapInventoryObj func(*unstructured.Unstructured) inventory.InventoryInfo
 }
 
 type DestroyerOptions struct {
@@ -99,11 +102,25 @@ func setDestroyerDefaults(o *DestroyerOptions) {
 // Run performs the destroy step. Passes the inventory object. This
 // happens asynchronously on progress and any errors are reported
 // back on the event channel.
-func (d *Destroyer) Run(ctx context.Context, inv inventory.InventoryInfo, options DestroyerOptions) <-chan event.Event {
+func (d *Destroyer) Run(ctx context.Context, objects object.UnstructuredSet, options DestroyerOptions) <-chan event.Event {
 	eventChannel := make(chan event.Event)
 	setDestroyerDefaults(&options)
 	go func() {
 		defer close(eventChannel)
+
+		// TODO(seans): Currently assumes there is an inventory object.
+		// Change the algorithm to delete without assuming inventory object.
+		invObj, _, err := inventory.SplitUnstructureds(objects)
+		if err != nil {
+			handleError(eventChannel, err)
+			return
+		}
+		if invObj == nil {
+			handleError(eventChannel, fmt.Errorf("missing inventory object"))
+			return
+		}
+		inv := d.WrapInventoryObj(invObj)
+
 		// Retrieve the objects to be deleted from the cluster. Second parameter is empty
 		// because no local objects returns all inventory objects for deletion.
 		emptyLocalObjs := object.UnstructuredSet{}

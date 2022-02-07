@@ -20,13 +20,14 @@ func applyWithExistingInvTest(ctx context.Context, c client.Client, invConfig In
 	applier := invConfig.ApplierFactoryFunc()
 	orgInventoryID := fmt.Sprintf("%s-%s", inventoryName, namespaceName)
 
-	orgApplyInv := invConfig.InvWrapperFunc(invConfig.InventoryFactoryFunc(inventoryName, namespaceName, orgInventoryID))
+	orgApplyInv := invConfig.InventoryFactoryFunc(inventoryName, namespaceName, orgInventoryID)
 
 	resources := []*unstructured.Unstructured{
+		orgApplyInv,
 		withNamespace(manifestToUnstructured(deployment1), namespaceName),
 	}
 
-	runWithNoErr(applier.Run(ctx, orgApplyInv, resources, apply.ApplierOptions{
+	runWithNoErr(applier.Run(ctx, resources, apply.ApplierOptions{
 		ReconcileTimeout: 2 * time.Minute,
 		EmitStatusEvents: true,
 	}))
@@ -36,9 +37,13 @@ func applyWithExistingInvTest(ctx context.Context, c client.Client, invConfig In
 
 	By("Apply second set of resources, using same inventory name but different ID")
 	secondInventoryID := fmt.Sprintf("%s-%s-2", inventoryName, namespaceName)
-	secondApplyInv := invConfig.InvWrapperFunc(invConfig.InventoryFactoryFunc(inventoryName, namespaceName, secondInventoryID))
+	secondApplyInv := invConfig.InventoryFactoryFunc(inventoryName, namespaceName, secondInventoryID)
+	resources = []*unstructured.Unstructured{
+		secondApplyInv,
+		withNamespace(manifestToUnstructured(deployment1), namespaceName),
+	}
 
-	err := run(applier.Run(ctx, secondApplyInv, resources, apply.ApplierOptions{
+	err := run(applier.Run(ctx, resources, apply.ApplierOptions{
 		ReconcileTimeout: 2 * time.Minute,
 		EmitStatusEvents: true,
 	}))

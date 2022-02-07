@@ -22,7 +22,7 @@ func dependsOnTest(ctx context.Context, c client.Client, invConfig InventoryConf
 	By("apply resources in order based on depends-on annotation")
 	applier := invConfig.ApplierFactoryFunc()
 
-	inv := invConfig.InvWrapperFunc(invConfig.InventoryFactoryFunc(inventoryName, namespaceName, "test"))
+	inv := invConfig.InventoryFactoryFunc(inventoryName, namespaceName, "test")
 
 	pod1Obj := withDependsOn(withNamespace(manifestToUnstructured(pod1), namespaceName), fmt.Sprintf("/namespaces/%s/Pod/pod3", namespaceName))
 	pod2Obj := withNamespace(manifestToUnstructured(pod2), namespaceName)
@@ -31,12 +31,13 @@ func dependsOnTest(ctx context.Context, c client.Client, invConfig InventoryConf
 	// Dependency order: pod1 -> pod3 -> pod2
 	// Apply order: pod2, pod3, pod1
 	resources := []*unstructured.Unstructured{
+		inv,
 		pod1Obj,
 		pod2Obj,
 		pod3Obj,
 	}
 
-	applierEvents := runCollect(applier.Run(ctx, inv, resources, apply.ApplierOptions{
+	applierEvents := runCollect(applier.Run(ctx, resources, apply.ApplierOptions{
 		EmitStatusEvents: false,
 	}))
 
@@ -301,7 +302,7 @@ func dependsOnTest(ctx context.Context, c client.Client, invConfig InventoryConf
 	By("destroy resources in opposite order")
 	destroyer := invConfig.DestroyerFactoryFunc()
 	options := apply.DestroyerOptions{InventoryPolicy: inventory.AdoptIfNoInventory}
-	destroyerEvents := runCollect(destroyer.Run(ctx, inv, options))
+	destroyerEvents := runCollect(destroyer.Run(ctx, resources, options))
 
 	expEvents = []testutil.ExpEvent{
 		{

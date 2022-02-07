@@ -1447,7 +1447,10 @@ func TestApplier(t *testing.T) {
 			testCtx, testCancel := context.WithTimeout(context.Background(), testTimeout)
 			defer testCancel() // cleanup
 
-			eventChannel := applier.Run(runCtx, tc.invInfo.toWrapped(), tc.resources, tc.options)
+			invObj := tc.invInfo.toUnstructured()
+			objs := tc.resources
+			objs = append(objs, invObj)
+			eventChannel := applier.Run(runCtx, objs, tc.options)
 
 			// only start sending events once
 			var once sync.Once
@@ -1887,7 +1890,10 @@ func TestApplierCancel(t *testing.T) {
 			testCtx, testCancel := context.WithTimeout(context.Background(), tc.testTimeout)
 			defer testCancel() // cleanup
 
-			eventChannel := applier.Run(runCtx, tc.invInfo.toWrapped(), tc.resources, tc.options)
+			invObj := tc.invInfo.toUnstructured()
+			objs := tc.resources
+			objs = append(objs, invObj)
+			eventChannel := applier.Run(runCtx, objs, tc.options)
 
 			// only start sending events once
 			var once sync.Once

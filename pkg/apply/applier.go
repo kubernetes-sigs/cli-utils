@@ -11,6 +11,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
@@ -44,13 +45,14 @@ const defaultPollInterval = 2 * time.Second
 // parameters and/or the set of resources that needs to be applied to the
 // cluster, different sets of tasks might be needed.
 type Applier struct {
-	pruner        *prune.Pruner
-	statusPoller  poller.Poller
-	invClient     inventory.InventoryClient
-	client        dynamic.Interface
-	openAPIGetter discovery.OpenAPISchemaInterface
-	mapper        meta.RESTMapper
-	infoHelper    info.InfoHelper
+	pruner           *prune.Pruner
+	statusPoller     poller.Poller
+	invClient        inventory.InventoryClient
+	client           dynamic.Interface
+	openAPIGetter    discovery.OpenAPISchemaInterface
+	mapper           meta.RESTMapper
+	infoHelper       info.InfoHelper
+	wrapInventoryObj func(*unstructured.Unstructured) inventory.InventoryInfo
 }
 
 // prepareObjects returns the set of objects to apply and to prune or
@@ -105,12 +107,26 @@ func (a *Applier) prepareObjects(localInv inventory.InventoryInfo, localObjs obj
 // before all the given resources have been applied to the cluster. Any
 // cancellation or timeout will only affect how long we Wait for the
 // resources to become current.
-func (a *Applier) Run(ctx context.Context, invInfo inventory.InventoryInfo, objects object.UnstructuredSet, options ApplierOptions) <-chan event.Event {
+func (a *Applier) Run(ctx context.Context, objects object.UnstructuredSet, options ApplierOptions) <-chan event.Event {
 	klog.V(4).Infof("apply run for %d objects", len(objects))
 	eventChannel := make(chan event.Event)
 	setDefaults(&options)
 	go func() {
 		defer close(eventChannel)
+
+		// TODO(seans): Currently assumes there is an inventory object.
+		// Change the algorithm to apply without assuming inventory object.
+		invObj, objects, err := inventory.SplitUnstructureds(objects)
+		if err != nil {
+			handleError(eventChannel, err)
+			return
+		}
+		if invObj == nil {
+			handleError(eventChannel, fmt.Errorf("missing inventory object"))
+			return
+		}
+		invInfo := a.wrapInventoryObj(invObj)
+
 		// Validate the resources to make sure we catch those problems early
 		// before anything has been updated in the cluster.
 		vCollector := &validation.Collector{}

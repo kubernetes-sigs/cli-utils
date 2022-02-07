@@ -21,13 +21,14 @@ func serversideApplyTest(ctx context.Context, c client.Client, invConfig Invento
 	By("Apply a Deployment and an APIService by server-side apply")
 	applier := invConfig.ApplierFactoryFunc()
 
-	inv := invConfig.InvWrapperFunc(invConfig.InventoryFactoryFunc(inventoryName, namespaceName, "test"))
+	inv := invConfig.InventoryFactoryFunc(inventoryName, namespaceName, "test")
 	firstResources := []*unstructured.Unstructured{
+		inv,
 		withNamespace(manifestToUnstructured(deployment1), namespaceName),
 		manifestToUnstructured(apiservice1),
 	}
 
-	runWithNoErr(applier.Run(ctx, inv, firstResources, apply.ApplierOptions{
+	runWithNoErr(applier.Run(ctx, firstResources, apply.ApplierOptions{
 		ReconcileTimeout: 2 * time.Minute,
 		EmitStatusEvents: true,
 		ServerSideOptions: common.ServerSideOptions{

@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
@@ -32,12 +33,14 @@ type ApplierBuilder struct {
 	restConfig                   *rest.Config
 	unstructuredClientForMapping func(*meta.RESTMapping) (resource.RESTClient, error)
 	statusPoller                 poller.Poller
+	wrapInventoryFunc            func(*unstructured.Unstructured) inventory.InventoryInfo
 }
 
 // NewApplierBuilder returns a new ApplierBuilder.
 func NewApplierBuilder() *ApplierBuilder {
 	return &ApplierBuilder{
 		// Defaults, if any, go here.
+		wrapInventoryFunc: inventory.WrapInventoryInfoObj,
 	}
 }
 
@@ -52,12 +55,13 @@ func (b *ApplierBuilder) Build() (*Applier, error) {
 			Client:    bx.client,
 			Mapper:    bx.mapper,
 		},
-		statusPoller:  bx.statusPoller,
-		invClient:     bx.invClient,
-		client:        bx.client,
-		openAPIGetter: bx.discoClient,
-		mapper:        bx.mapper,
-		infoHelper:    info.NewInfoHelper(bx.mapper, bx.unstructuredClientForMapping),
+		statusPoller:     bx.statusPoller,
+		invClient:        bx.invClient,
+		client:           bx.client,
+		openAPIGetter:    bx.discoClient,
+		mapper:           bx.mapper,
+		infoHelper:       info.NewInfoHelper(bx.mapper, bx.unstructuredClientForMapping),
+		wrapInventoryObj: bx.wrapInventoryFunc,
 	}, nil
 }
 
@@ -126,6 +130,11 @@ func (b *ApplierBuilder) WithFactory(factory util.Factory) *ApplierBuilder {
 
 func (b *ApplierBuilder) WithInventoryClient(invClient inventory.InventoryClient) *ApplierBuilder {
 	b.invClient = invClient
+	return b
+}
+
+func (b *ApplierBuilder) WithWrapInventoryFunc(wrapInv func(*unstructured.Unstructured) inventory.InventoryInfo) *ApplierBuilder {
+	b.wrapInventoryFunc = wrapInv
 	return b
 }
 

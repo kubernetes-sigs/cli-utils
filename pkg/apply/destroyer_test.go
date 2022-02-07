@@ -329,7 +329,10 @@ func TestDestroyerCancel(t *testing.T) {
 			testCtx, testCancel := context.WithTimeout(context.Background(), tc.testTimeout)
 			defer testCancel() // cleanup
 
-			eventChannel := destroyer.Run(runCtx, invInfo, tc.options)
+			invObj := tc.invInfo.toUnstructured()
+			objs := tc.clusterObjs
+			objs = append(objs, invObj)
+			eventChannel := destroyer.Run(runCtx, objs, tc.options)
 
 			// only start poller once per run
 			var once sync.Once
