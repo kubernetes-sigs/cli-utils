@@ -57,7 +57,7 @@ func (atm *ApplyTimeMutator) Mutate(ctx context.Context, obj *unstructured.Unstr
 		return mutated, reason, fmt.Errorf("failed to read annotation in resource (%s): %w", targetRef, err)
 	}
 
-	klog.V(4).Infof("target resource (%s):\n%s", targetRef, object.YamlStringer{O: obj})
+	klog.V(7).Infof("target resource (%s):\n%s", targetRef, object.YamlStringer{O: obj})
 
 	// validate no self-references
 	// Early validation to avoid GETs, but won't catch sources with implicit namespace.
@@ -93,7 +93,7 @@ func (atm *ApplyTimeMutator) Mutate(ctx context.Context, obj *unstructured.Unstr
 			return mutated, reason, fmt.Errorf("failed to get source resource (%s): %w", sourceRef, err)
 		}
 
-		klog.V(4).Infof("source resource (%s):\n%s", sourceRef, object.YamlStringer{O: sourceObj})
+		klog.V(7).Infof("source resource (%s):\n%s", sourceRef, object.YamlStringer{O: sourceObj})
 
 		// lookup target field in target resource
 		targetValue, _, err := readFieldValue(obj, sub.TargetPath)
@@ -145,7 +145,7 @@ func (atm *ApplyTimeMutator) Mutate(ctx context.Context, obj *unstructured.Unstr
 	}
 
 	if mutated {
-		klog.V(4).Infof("mutated target resource (%s):\n%s", targetRef, object.YamlStringer{O: obj})
+		klog.V(7).Infof("mutated target resource (%s):\n%s", targetRef, object.YamlStringer{O: obj})
 	}
 
 	return mutated, reason, nil

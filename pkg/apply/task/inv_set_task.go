@@ -16,8 +16,7 @@ import (
 // inventory references at the end of the apply/prune.
 type InvSetTask struct {
 	TaskName      string
-	InvClient     inventory.InventoryClient
-	InvInfo       inventory.InventoryInfo
+	InvClient     inventory.Client
 	PrevInventory object.ObjMetadataSet
 	DryRun        common.DryRunStrategy
 }
@@ -59,7 +58,6 @@ func (i *InvSetTask) Start(taskContext *taskrunner.TaskContext) {
 		klog.V(2).Infof("inventory set task starting (name: %q)", i.Name())
 		invObjs := object.ObjMetadataSet{}
 
-		// TODO: Just use InventoryManager.Store()
 		im := taskContext.InventoryManager()
 
 		// If an object applied successfully, keep or add it to the inventory.
@@ -115,7 +113,11 @@ func (i *InvSetTask) Start(taskContext *taskrunner.TaskContext) {
 		invObjs = invObjs.Union(invalidObjects)
 
 		klog.V(4).Infof("set inventory %d total objects", len(invObjs))
-		err := i.InvClient.Replace(i.InvInfo, invObjs, i.DryRun)
+		inv := im.Inventory()
+		// TODO: move these inventory updates to the other tasks
+		inv.Spec.Objects = inventory.ObjectReferencesFromObjMetadataSet(invObjs)
+		// TODO: update inventory status?
+		err := i.InvClient.Store(inv)
 
 		klog.V(2).Infof("inventory set task completing (name: %q)", i.Name())
 		taskContext.TaskChannel() <- taskrunner.TaskResult{Err: err}

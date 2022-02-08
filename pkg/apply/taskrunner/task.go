@@ -149,6 +149,9 @@ func (w *WaitTask) startInner(taskContext *TaskContext) {
 
 	pending := object.ObjMetadataSet{}
 	for _, id := range w.Ids {
+		objStatus, found := taskContext.InventoryManager().ObjectStatus(id)
+		klog.V(4).Infof("WaitTask.startInner: id: %q, found: %v, status: %v", id, found, objStatus)
+
 		switch {
 		case w.skipped(taskContext, id):
 			err := taskContext.InventoryManager().SetSkippedReconcile(id)

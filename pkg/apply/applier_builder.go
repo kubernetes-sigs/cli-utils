@@ -25,13 +25,14 @@ import (
 type ApplierBuilder struct {
 	// factory is only used to retrieve things that have not been provided explicitly.
 	factory                      util.Factory
-	invClient                    inventory.InventoryClient
+	invClient                    inventory.Client
 	client                       dynamic.Interface
 	discoClient                  discovery.CachedDiscoveryInterface
 	mapper                       meta.RESTMapper
 	restConfig                   *rest.Config
 	unstructuredClientForMapping func(*meta.RESTMapping) (resource.RESTClient, error)
 	statusPoller                 poller.Poller
+	invObjManager                *inventory.ObjectManager
 }
 
 // NewApplierBuilder returns a new ApplierBuilder.
@@ -48,9 +49,8 @@ func (b *ApplierBuilder) Build() (*Applier, error) {
 	}
 	return &Applier{
 		pruner: &prune.Pruner{
-			InvClient: bx.invClient,
-			Client:    bx.client,
-			Mapper:    bx.mapper,
+			Client: bx.client,
+			Mapper: bx.mapper,
 		},
 		statusPoller:  bx.statusPoller,
 		invClient:     bx.invClient,
@@ -58,6 +58,7 @@ func (b *ApplierBuilder) Build() (*Applier, error) {
 		openAPIGetter: bx.discoClient,
 		mapper:        bx.mapper,
 		infoHelper:    info.NewInfoHelper(bx.mapper, bx.unstructuredClientForMapping),
+		invObjManager: bx.invObjManager,
 	}, nil
 }
 
@@ -116,6 +117,12 @@ func (b *ApplierBuilder) finalize() (*ApplierBuilder, error) {
 		}
 		bx.statusPoller = polling.NewStatusPoller(c, bx.mapper, polling.Options{})
 	}
+	if bx.invObjManager == nil {
+		bx.invObjManager = &inventory.ObjectManager{
+			Mapper:        bx.mapper,
+			DynamicClient: bx.client,
+		}
+	}
 	return &bx, nil
 }
 
@@ -124,7 +131,7 @@ func (b *ApplierBuilder) WithFactory(factory util.Factory) *ApplierBuilder {
 	return b
 }
 
-func (b *ApplierBuilder) WithInventoryClient(invClient inventory.InventoryClient) *ApplierBuilder {
+func (b *ApplierBuilder) WithInventoryClient(invClient inventory.Client) *ApplierBuilder {
 	b.invClient = invClient
 	return b
 }

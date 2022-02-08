@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"strings"
 	"text/template"
 	"time"
 
@@ -25,6 +24,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
 	"sigs.k8s.io/cli-utils/pkg/object/dependson"
 	"sigs.k8s.io/cli-utils/pkg/object/mutation"
+	"sigs.k8s.io/cli-utils/test/e2e/customprovider"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -295,12 +295,8 @@ func cmInventoryManifest(name, namespace, id string) *unstructured.Unstructured 
 }
 
 func customInventoryManifest(name, namespace, id string) *unstructured.Unstructured {
-	u := manifestToUnstructured([]byte(strings.TrimSpace(`
-apiVersion: cli-utils.example.io/v1alpha1
-kind: Inventory
-metadata:
-  name: PLACEHOLDER
-`)))
+	u := &unstructured.Unstructured{}
+	u.SetGroupVersionKind(customprovider.InventoryGVK)
 	u.SetName(name)
 	u.SetNamespace(namespace)
 	u.SetLabels(map[string]string{

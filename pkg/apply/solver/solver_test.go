@@ -420,13 +420,12 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 				}
 			}
 
-			applyIds := object.UnstructuredSetToObjMetadataSet(tc.applyObjs)
-			fakeInvClient := inventory.NewFakeInventoryClient(applyIds)
+			invClient := &inventory.InMemoryClient{}
 			vCollector := &validation.Collector{}
 			tqb := TaskQueueBuilder{
 				Pruner:    pruner,
 				Mapper:    mapper,
-				InvClient: fakeInvClient,
+				InvClient: invClient,
 				Collector: vCollector,
 			}
 			var filters []filter.ValidationFilter
@@ -785,13 +784,12 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 				}
 			}
 
-			pruneIds := object.UnstructuredSetToObjMetadataSet(tc.pruneObjs)
-			fakeInvClient := inventory.NewFakeInventoryClient(pruneIds)
+			invClient := &inventory.InMemoryClient{}
 			vCollector := &validation.Collector{}
 			tqb := TaskQueueBuilder{
 				Pruner:    pruner,
 				Mapper:    mapper,
-				InvClient: fakeInvClient,
+				InvClient: invClient,
 				Collector: vCollector,
 			}
 			var emptyPruneFilters []filter.ValidationFilter

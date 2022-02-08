@@ -4,7 +4,8 @@
 package task
 
 import (
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"fmt"
+
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
@@ -19,8 +20,7 @@ import (
 // resources have been deleted.
 type DeleteInvTask struct {
 	TaskName  string
-	InvClient inventory.InventoryClient
-	InvInfo   inventory.InventoryInfo
+	InvClient inventory.Client
 	DryRun    common.DryRunStrategy
 }
 
@@ -40,13 +40,64 @@ func (i *DeleteInvTask) Identifiers() object.ObjMetadataSet {
 func (i *DeleteInvTask) Start(taskContext *taskrunner.TaskContext) {
 	go func() {
 		klog.V(2).Infof("delete inventory task starting (name: %q)", i.Name())
-		err := i.InvClient.DeleteInventoryObj(i.InvInfo, i.DryRun)
-		// Not found is not error, since this means it was already deleted.
-		if apierrors.IsNotFound(err) {
-			err = nil
+
+		var invObjIds object.ObjMetadataSet
+
+		im := taskContext.InventoryManager()
+
+		failedDeletes := im.FailedDeletes()
+		if len(failedDeletes) > 0 {
+			invObjIds = append(invObjIds, failedDeletes...)
 		}
-		klog.V(2).Infof("delete inventory task completing (name: %q)", i.Name())
-		taskContext.TaskChannel() <- taskrunner.TaskResult{Err: err}
+
+		skippedDeletes := im.SkippedDeletes()
+		if len(skippedDeletes) > 0 {
+			invObjIds = append(invObjIds, skippedDeletes...)
+		}
+
+		failedRecs := im.FailedReconciles()
+		if len(failedRecs) > 0 {
+			invObjIds = append(invObjIds, failedRecs...)
+		}
+
+		skippedRecs := im.SkippedReconciles()
+		if len(skippedRecs) > 0 {
+			invObjIds = append(invObjIds, skippedRecs...)
+		}
+
+		timeoutRecs := im.TimeoutReconciles()
+		if len(timeoutRecs) > 0 {
+			invObjIds = append(invObjIds, timeoutRecs...)
+		}
+
+		if len(invObjIds) > 0 {
+			invObjIds = invObjIds.Unique()
+
+			klog.V(4).Infof("set inventory %d total objects", len(invObjIds))
+			inv := im.Inventory()
+			// TODO: move these inventory updates to the other tasks
+			inv.Spec.Objects = inventory.ObjectReferencesFromObjMetadataSet(invObjIds)
+			// TODO: update inventory status?
+			err := i.InvClient.Store(inv)
+			if err != nil {
+				err = fmt.Errorf("failed to update inventory: %w", err)
+				i.sendTaskResult(taskContext, err)
+				return
+			}
+
+			i.sendTaskResult(taskContext, nil)
+			return
+		}
+
+		invInfo := inventory.InventoryInfoFromObject(im.Inventory())
+		err := i.InvClient.Delete(invInfo)
+		if err != nil {
+			err = fmt.Errorf("failed to delete inventory: %w", err)
+			i.sendTaskResult(taskContext, err)
+			return
+		}
+
+		i.sendTaskResult(taskContext, nil)
 	}()
 }
 
@@ -55,3 +106,10 @@ func (i *DeleteInvTask) Cancel(_ *taskrunner.TaskContext) {}
 
 // StatusUpdate is not supported by the DeleteInvTask.
 func (i *DeleteInvTask) StatusUpdate(_ *taskrunner.TaskContext, _ object.ObjMetadata) {}
+
+func (i *DeleteInvTask) sendTaskResult(taskContext *taskrunner.TaskContext, err error) {
+	klog.V(2).Infof("delete inventory task completing (name: %q)", i.Name())
+	taskContext.TaskChannel() <- taskrunner.TaskResult{
+		Err: err,
+	}
+}

@@ -1,18 +1,20 @@
 // Copyright 2021 The Kubernetes Authors.
 // SPDX-License-Identifier: Apache-2.0
 
-package inventory
+package actuation
 
-import "k8s.io/apimachinery/pkg/types"
+import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+)
 
 // Inventory represents the inventory object in memory.
 // Inventory is currently only used for in-memory storage and not serialized to
 // disk or to the API server.
-// TODO: Replace InventoryInfo with Inventory.TypeMeta & Inventory.ObjectMeta
-// TODO: Replace object.ObjMetadataSet in Storage interface with Inventory.Spec
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type Inventory struct {
-	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty"`
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	Spec   InventorySpec   `json:"spec,omitempty"`
 	Status InventoryStatus `json:"status,omitempty"`
@@ -106,29 +108,3 @@ const (
 	ReconcileFailed                           // Failed
 	ReconcileTimeout                          // Timeout
 )
-
-// TypeMeta describes a REST resource.
-type TypeMeta struct {
-	// Kind is a string value representing the REST resource this object represents.
-	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
-	Kind string `json:"kind,omitempty"`
-
-	// APIVersion defines the versioned schema of this representation of an object.
-	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
-	APIVersion string `json:"apiVersion,omitempty"`
-}
-
-// ObjectMeta describes an individual object instance of a REST resource.
-// TODO: Do we need other fields, like UID, Generation, ResourceVersion, and CreationTimestamp?
-type ObjectMeta struct {
-	// Name identifies an object instance of a REST resource.
-	// More info: http://kubernetes.io/docs/user-guide/identifiers#names
-	Name string `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
-
-	// Namespace identifies a group of objects across REST resources.
-	// If namespace is specified, the resource must be namespace-scoped.
-	// If namespace is omitted, the resource must be cluster-scoped.
-	// More info: http://kubernetes.io/docs/user-guide/namespaces
-	// +optional
-	Namespace string `json:"namespace,omitempty" protobuf:"bytes,3,opt,name=namespace"`
-}

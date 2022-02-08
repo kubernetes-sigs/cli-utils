@@ -43,7 +43,7 @@ type TaskQueueBuilder struct {
 	OpenAPIGetter discovery.OpenAPISchemaInterface
 	InfoHelper    info.InfoHelper
 	Mapper        meta.RESTMapper
-	InvClient     inventory.InventoryClient
+	InvClient     inventory.Client
 	// Collector is used to collect validation errors and invalid objects.
 	// Invalid objects will be filtered and not be injected into tasks.
 	Collector *validation.Collector
@@ -102,16 +102,19 @@ func (t *TaskQueueBuilder) Build() *TaskQueue {
 
 // AppendInvAddTask appends an inventory add task to the task queue.
 // Returns a pointer to the Builder to chain function calls.
-func (t *TaskQueueBuilder) AppendInvAddTask(inv inventory.InventoryInfo, applyObjs object.UnstructuredSet,
+func (t *TaskQueueBuilder) AppendInvAddTask(
+	applyObjs, pruneObjs object.UnstructuredSet,
 	dryRun common.DryRunStrategy) *TaskQueueBuilder {
 	applyObjs = t.Collector.FilterInvalidObjects(applyObjs)
-	klog.V(2).Infoln("adding inventory add task (%d objects)", len(applyObjs))
+	klog.V(2).Infof("adding inventory add task (%d objects)", len(applyObjs))
 	t.tasks = append(t.tasks, &task.InvAddTask{
-		TaskName:  fmt.Sprintf("inventory-add-%d", t.invAddCounter),
-		InvClient: t.InvClient,
-		InvInfo:   inv,
-		Objects:   applyObjs,
-		DryRun:    dryRun,
+		TaskName:      fmt.Sprintf("inventory-add-%d", t.invAddCounter),
+		InvClient:     t.InvClient,
+		DynamicClient: t.DynamicClient,
+		Mapper:        t.Mapper,
+		ApplyObjects:  applyObjs,
+		PruneObjects:  pruneObjs,
+		DryRun:        dryRun,
 	})
 	t.invAddCounter += 1
 	return t
@@ -119,14 +122,13 @@ func (t *TaskQueueBuilder) AppendInvAddTask(inv inventory.InventoryInfo, applyOb
 
 // AppendInvSetTask appends an inventory set task to the task queue.
 // Returns a pointer to the Builder to chain function calls.
-func (t *TaskQueueBuilder) AppendInvSetTask(inv inventory.InventoryInfo, dryRun common.DryRunStrategy) *TaskQueueBuilder {
+func (t *TaskQueueBuilder) AppendInvSetTask(invObjs object.UnstructuredSet,
+	dryRun common.DryRunStrategy) *TaskQueueBuilder {
 	klog.V(2).Infoln("adding inventory set task")
-	prevInvIds, _ := t.InvClient.GetClusterObjs(inv)
 	t.tasks = append(t.tasks, &task.InvSetTask{
 		TaskName:      fmt.Sprintf("inventory-set-%d", t.invSetCounter),
 		InvClient:     t.InvClient,
-		InvInfo:       inv,
-		PrevInventory: prevInvIds,
+		PrevInventory: object.UnstructuredSetToObjMetadataSet(invObjs),
 		DryRun:        dryRun,
 	})
 	t.invSetCounter += 1
@@ -135,12 +137,11 @@ func (t *TaskQueueBuilder) AppendInvSetTask(inv inventory.InventoryInfo, dryRun 
 
 // AppendDeleteInvTask appends to the task queue a task to delete the inventory object.
 // Returns a pointer to the Builder to chain function calls.
-func (t *TaskQueueBuilder) AppendDeleteInvTask(inv inventory.InventoryInfo, dryRun common.DryRunStrategy) *TaskQueueBuilder {
+func (t *TaskQueueBuilder) AppendDeleteInvTask(dryRun common.DryRunStrategy) *TaskQueueBuilder {
 	klog.V(2).Infoln("adding delete inventory task")
 	t.tasks = append(t.tasks, &task.DeleteInvTask{
 		TaskName:  fmt.Sprintf("delete-inventory-%d", t.deleteInvCounter),
 		InvClient: t.InvClient,
-		InvInfo:   inv,
 		DryRun:    dryRun,
 	})
 	t.deleteInvCounter += 1
@@ -218,6 +219,7 @@ func (t *TaskQueueBuilder) AppendApplyWaitTasks(applyObjs object.UnstructuredSet
 	if err != nil {
 		t.Collector.Collect(err)
 	}
+	klog.V(2).Infof("sorting generated %d apply task action groups", len(applySets))
 	for _, applySet := range applySets {
 		applySet = t.Collector.FilterInvalidObjects(applySet)
 		if len(applySet) == 0 {
@@ -245,6 +247,7 @@ func (t *TaskQueueBuilder) AppendPruneWaitTasks(pruneObjs object.UnstructuredSet
 		if err != nil {
 			t.Collector.Collect(err)
 		}
+		klog.V(2).Infof("sorting generated %d prune task action groups", len(pruneSets))
 		for _, pruneSet := range pruneSets {
 			pruneSet = t.Collector.FilterInvalidObjects(pruneSet)
 			if len(pruneSet) == 0 {

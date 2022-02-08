@@ -8,7 +8,9 @@ import (
 	"fmt"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/cli-utils/pkg/apply/cache"
@@ -32,7 +34,7 @@ import (
 // the ApplyOptions were responsible for printing progress. This is now
 // handled by a separate printer with the KubectlPrinterAdapter bridging
 // between the two.
-func NewDestroyer(factory cmdutil.Factory, invClient inventory.InventoryClient) (*Destroyer, error) {
+func NewDestroyer(factory cmdutil.Factory, invClient inventory.Client) (*Destroyer, error) {
 	pruner, err := prune.NewPruner(factory, invClient)
 	if err != nil {
 		return nil, fmt.Errorf("error setting up PruneOptions: %w", err)
@@ -41,21 +43,39 @@ func NewDestroyer(factory cmdutil.Factory, invClient inventory.InventoryClient) 
 	if err != nil {
 		return nil, err
 	}
+	client, err := factory.DynamicClient()
+	if err != nil {
+		return nil, fmt.Errorf("error getting dynamic client: %v", err)
+	}
+	mapper, err := factory.ToRESTMapper()
+	if err != nil {
+		return nil, fmt.Errorf("error getting rest mapper: %v", err)
+	}
+	invObjManager := &inventory.ObjectManager{
+		Mapper:        mapper,
+		DynamicClient: client,
+	}
 	return &Destroyer{
-		pruner:       pruner,
-		StatusPoller: statusPoller,
-		factory:      factory,
-		invClient:    invClient,
+		pruner:        pruner,
+		StatusPoller:  statusPoller,
+		factory:       factory,
+		invClient:     invClient,
+		client:        client,
+		mapper:        mapper,
+		invObjManager: invObjManager,
 	}, nil
 }
 
 // Destroyer performs the step of grabbing all the previous inventory objects and
 // prune them. This also deletes all the previous inventory objects
 type Destroyer struct {
-	pruner       *prune.Pruner
-	StatusPoller poller.Poller
-	factory      cmdutil.Factory
-	invClient    inventory.InventoryClient
+	pruner        *prune.Pruner
+	StatusPoller  poller.Poller
+	factory       cmdutil.Factory
+	invClient     inventory.Client
+	client        dynamic.Interface
+	mapper        meta.RESTMapper
+	invObjManager *inventory.ObjectManager
 }
 
 type DestroyerOptions struct {
@@ -96,36 +116,66 @@ func setDestroyerDefaults(o *DestroyerOptions) {
 	}
 }
 
+// prepareObjects returns the set of objects to prune or an error if one occurred.
+func (d *Destroyer) prepareObjects(
+	ctx context.Context,
+	invInfo inventory.InventoryInfo,
+) (pruneObjs, invObjs object.UnstructuredSet, err error) {
+	// Load the inventory from storage
+	inv, err := d.invClient.Load(invInfo)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to load inventory: %w", err)
+	}
+	if inv == nil {
+		return nil, nil, fmt.Errorf("inventory not found: %v", invInfo)
+	}
+
+	if d.invObjManager == nil {
+		return nil, nil, fmt.Errorf("missing inventory client")
+	}
+
+	// Get the inventory objects from the cluster (exclude NotFound).
+	invObjs, err = d.invObjManager.GetSpecObjects(ctx, inv)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if d.invObjManager == nil {
+		return nil, nil, fmt.Errorf("missing inventory object manager")
+	}
+
+	// delete all inventory objects (deep copy)
+	pruneObjs = make(object.UnstructuredSet, len(invObjs))
+	for i, obj := range invObjs {
+		pruneObjs[i] = obj.DeepCopy()
+	}
+
+	return pruneObjs, invObjs, nil
+}
+
 // Run performs the destroy step. Passes the inventory object. This
 // happens asynchronously on progress and any errors are reported
 // back on the event channel.
-func (d *Destroyer) Run(ctx context.Context, inv inventory.InventoryInfo, options DestroyerOptions) <-chan event.Event {
+func (d *Destroyer) Run(ctx context.Context, invInfo inventory.InventoryInfo, options DestroyerOptions) <-chan event.Event {
 	eventChannel := make(chan event.Event)
 	setDestroyerDefaults(&options)
 	go func() {
 		defer close(eventChannel)
-		// Retrieve the objects to be deleted from the cluster. Second parameter is empty
-		// because no local objects returns all inventory objects for deletion.
-		emptyLocalObjs := object.UnstructuredSet{}
-		deleteObjs, err := d.pruner.GetPruneObjs(inv, emptyLocalObjs, prune.Options{
-			DryRunStrategy: options.DryRunStrategy,
-		})
+
+		// Decide which objects to prune
+		deleteObjs, _, err := d.prepareObjects(ctx, invInfo)
 		if err != nil {
 			handleError(eventChannel, err)
 			return
 		}
-		mapper, err := d.factory.ToRESTMapper()
-		if err != nil {
-			handleError(eventChannel, err)
-			return
-		}
+		klog.V(4).Infof("calculated %d delete objs", len(deleteObjs))
 
 		// Validate the resources to make sure we catch those problems early
 		// before anything has been updated in the cluster.
 		vCollector := &validation.Collector{}
 		validator := &validation.Validator{
 			Collector: vCollector,
-			Mapper:    mapper,
+			Mapper:    d.mapper,
 		}
 		validator.Validate(deleteObjs)
 
@@ -139,8 +189,8 @@ func (d *Destroyer) Run(ctx context.Context, inv inventory.InventoryInfo, option
 			Pruner:        d.pruner,
 			DynamicClient: dynamicClient,
 			OpenAPIGetter: d.factory.OpenAPIGetter(),
-			InfoHelper:    info.NewInfoHelper(mapper, d.factory.UnstructuredClientForMapping),
-			Mapper:        mapper,
+			InfoHelper:    info.NewInfoHelper(d.mapper, d.factory.UnstructuredClientForMapping),
+			Mapper:        d.mapper,
 			InvClient:     d.invClient,
 			Destroy:       true,
 			Collector:     vCollector,
@@ -154,7 +204,7 @@ func (d *Destroyer) Run(ctx context.Context, inv inventory.InventoryInfo, option
 		deleteFilters := []filter.ValidationFilter{
 			filter.PreventRemoveFilter{},
 			filter.InventoryPolicyFilter{
-				Inv:       inv,
+				InvInfo:   invInfo,
 				InvPolicy: options.InventoryPolicy,
 			},
 		}
@@ -162,7 +212,7 @@ func (d *Destroyer) Run(ctx context.Context, inv inventory.InventoryInfo, option
 		// Build the ordered set of tasks to execute.
 		taskQueue := taskBuilder.
 			AppendPruneWaitTasks(deleteObjs, deleteFilters, opts).
-			AppendDeleteInvTask(inv, options.DryRunStrategy).
+			AppendDeleteInvTask(options.DryRunStrategy).
 			Build()
 
 		klog.V(4).Infof("validation errors: %d", len(vCollector.Errors))
@@ -188,6 +238,13 @@ func (d *Destroyer) Run(ctx context.Context, inv inventory.InventoryInfo, option
 		// Build a TaskContext for passing info between tasks
 		resourceCache := cache.NewResourceCacheMap()
 		taskContext := taskrunner.NewTaskContext(eventChannel, resourceCache)
+
+		// initialize inventory in the task context
+		inv := taskContext.InventoryManager().Inventory()
+		inv.SetGroupVersionKind(d.invClient.GroupVersionKind())
+		inv.SetName(invInfo.Name)
+		inv.SetNamespace(invInfo.Namespace)
+		inventory.SetInventoryLabel(inv, invInfo.ID)
 
 		// Register invalid objects to be retained in the inventory, if present.
 		for _, id := range vCollector.InvalidIds {

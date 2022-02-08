@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"sigs.k8s.io/cli-utils/pkg/apis/actuation"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	pollevent "sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
@@ -21,7 +23,7 @@ import (
 func TestDestroyerCancel(t *testing.T) {
 	testCases := map[string]struct {
 		// inventory input to destroyer
-		invInfo inventoryInfo
+		invObjs object.ObjMetadataSet
 		// objects in the cluster
 		clusterObjs object.UnstructuredSet
 		// options input to destroyer.Run
@@ -43,16 +45,13 @@ func TestDestroyerCancel(t *testing.T) {
 			expectRunTimeout: true,
 			runTimeout:       2 * time.Second,
 			testTimeout:      30 * time.Second,
-			invInfo: inventoryInfo{
-				name:      "abc-123",
-				namespace: "test",
-				id:        "test",
-				set: object.ObjMetadataSet{
-					testutil.ToIdentifier(t, resources["deployment"]),
-				},
+			invObjs: object.ObjMetadataSet{
+				object.UnstructuredToObjMetadata(
+					testutil.Unstructured(t, resources["deployment"]),
+				),
 			},
 			clusterObjs: object.UnstructuredSet{
-				testutil.Unstructured(t, resources["deployment"], testutil.AddOwningInv(t, "test")),
+				testutil.Unstructured(t, resources["deployment"], testutil.AddOwningInv(t, inventoryID)),
 			},
 			options: DestroyerOptions{
 				EmitStatusEvents: true,
@@ -66,7 +65,7 @@ func TestDestroyerCancel(t *testing.T) {
 					Resource: &pollevent.ResourceStatus{
 						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
 						Status:     status.InProgressStatus,
-						Resource:   testutil.Unstructured(t, resources["deployment"], testutil.AddOwningInv(t, "test")),
+						Resource:   testutil.Unstructured(t, resources["deployment"], testutil.AddOwningInv(t, inventoryID)),
 					},
 				},
 				{
@@ -74,7 +73,7 @@ func TestDestroyerCancel(t *testing.T) {
 					Resource: &pollevent.ResourceStatus{
 						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
 						Status:     status.InProgressStatus,
-						Resource:   testutil.Unstructured(t, resources["deployment"], testutil.AddOwningInv(t, "test")),
+						Resource:   testutil.Unstructured(t, resources["deployment"], testutil.AddOwningInv(t, inventoryID)),
 					},
 				},
 				// Resource never becomes NotFound, blocking destroyer.Run from exiting
@@ -166,16 +165,13 @@ func TestDestroyerCancel(t *testing.T) {
 			expectRunTimeout: false,
 			runTimeout:       10 * time.Second,
 			testTimeout:      30 * time.Second,
-			invInfo: inventoryInfo{
-				name:      "abc-123",
-				namespace: "test",
-				id:        "test",
-				set: object.ObjMetadataSet{
-					testutil.ToIdentifier(t, resources["deployment"]),
-				},
+			invObjs: object.ObjMetadataSet{
+				object.UnstructuredToObjMetadata(
+					testutil.Unstructured(t, resources["deployment"]),
+				),
 			},
 			clusterObjs: object.UnstructuredSet{
-				testutil.Unstructured(t, resources["deployment"], testutil.AddOwningInv(t, "test")),
+				testutil.Unstructured(t, resources["deployment"], testutil.AddOwningInv(t, inventoryID)),
 			},
 			options: DestroyerOptions{
 				EmitStatusEvents: true,
@@ -188,7 +184,7 @@ func TestDestroyerCancel(t *testing.T) {
 					Resource: &pollevent.ResourceStatus{
 						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
 						Status:     status.InProgressStatus,
-						Resource:   testutil.Unstructured(t, resources["deployment"], testutil.AddOwningInv(t, "test")),
+						Resource:   testutil.Unstructured(t, resources["deployment"], testutil.AddOwningInv(t, inventoryID)),
 					},
 				},
 				{
@@ -312,12 +308,22 @@ func TestDestroyerCancel(t *testing.T) {
 		t.Run(tn, func(t *testing.T) {
 			poller := newFakePoller(tc.statusEvents)
 
-			invInfo := tc.invInfo.toWrapped()
+			inv := &actuation.Inventory{
+				TypeMeta:   invTypeMeta,
+				ObjectMeta: invObjMeta,
+				Spec: actuation.InventorySpec{
+					Objects: inventory.ObjectReferencesFromObjMetadataSet(tc.invObjs),
+				},
+			}
+
+			// Add the inventory to the cluster (for ConfigMap client and to allow deletion)
+			cm, err := inventory.InventoryToConfigMap(inv)
+			require.NoError(t, err)
+			tc.clusterObjs = append(tc.clusterObjs, cm)
 
 			destroyer := newTestDestroyer(t,
-				tc.invInfo,
-				// Add the inventory to the cluster (to allow deletion)
-				append(tc.clusterObjs, inventory.InvInfoToConfigMap(invInfo)),
+				inv,
+				tc.clusterObjs,
 				poller,
 			)
 

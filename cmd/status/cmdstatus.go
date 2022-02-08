@@ -24,7 +24,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/manifestreader"
 )
 
-func GetStatusRunner(factory cmdutil.Factory, invFactory inventory.InventoryClientFactory, loader manifestreader.ManifestLoader) *StatusRunner {
+func GetStatusRunner(factory cmdutil.Factory, invFactory inventory.ClientFactory, loader manifestreader.ManifestLoader) *StatusRunner {
 	r := &StatusRunner{
 		factory:           factory,
 		invFactory:        invFactory,
@@ -47,7 +47,7 @@ func GetStatusRunner(factory cmdutil.Factory, invFactory inventory.InventoryClie
 	return r
 }
 
-func StatusCommand(f cmdutil.Factory, invFactory inventory.InventoryClientFactory, loader manifestreader.ManifestLoader) *cobra.Command {
+func StatusCommand(f cmdutil.Factory, invFactory inventory.ClientFactory, loader manifestreader.ManifestLoader) *cobra.Command {
 	return GetStatusRunner(f, invFactory, loader).Command
 }
 
@@ -56,7 +56,7 @@ func StatusCommand(f cmdutil.Factory, invFactory inventory.InventoryClientFactor
 type StatusRunner struct {
 	Command    *cobra.Command
 	factory    cmdutil.Factory
-	invFactory inventory.InventoryClientFactory
+	invFactory inventory.ClientFactory
 	loader     manifestreader.ManifestLoader
 
 	period    time.Duration
@@ -89,19 +89,22 @@ func (r *StatusRunner) runE(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	inv := inventory.WrapInventoryInfoObj(invObj)
+	invInfo := inventory.InventoryInfoFromObject(invObj)
 
-	invClient, err := r.invFactory.NewInventoryClient(r.factory)
+	invClient, err := r.invFactory.NewClient(r.factory)
 	if err != nil {
 		return err
 	}
 
 	// Based on the inventory template manifest we look up the inventory
 	// from the live state using the inventory client.
-	identifiers, err := invClient.GetClusterObjs(inv)
+	inv, err := invClient.Load(invInfo)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to load inventory: %w", err)
 	}
+
+	// Get objects from inventory
+	identifiers := inventory.ObjMetadataSetFromObjectReferences(inv.Spec.Objects)
 
 	// Exit here if the inventory is empty.
 	if len(identifiers) == 0 {

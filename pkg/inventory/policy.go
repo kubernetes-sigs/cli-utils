@@ -80,23 +80,24 @@ const (
 	NoMatch
 )
 
-func InventoryIDMatch(inv InventoryInfo, obj *unstructured.Unstructured) inventoryIDMatchStatus {
+func InventoryIDMatch(invInfo InventoryInfo, obj *unstructured.Unstructured) inventoryIDMatchStatus {
 	annotations := obj.GetAnnotations()
 	value, found := annotations[OwningInventoryKey]
 	if !found {
 		return Empty
 	}
-	if value == inv.ID() {
+
+	if value == invInfo.ID {
 		return Match
 	}
 	return NoMatch
 }
 
-func CanApply(inv InventoryInfo, obj *unstructured.Unstructured, policy InventoryPolicy) (bool, error) {
+func CanApply(invInfo InventoryInfo, obj *unstructured.Unstructured, policy InventoryPolicy) (bool, error) {
 	if obj == nil {
 		return true, nil
 	}
-	matchStatus := InventoryIDMatch(inv, obj)
+	matchStatus := InventoryIDMatch(invInfo, obj)
 	switch matchStatus {
 	case Empty:
 		if policy != InventoryPolicyMustMatch {
@@ -117,11 +118,11 @@ func CanApply(inv InventoryInfo, obj *unstructured.Unstructured, policy Inventor
 	return false, nil
 }
 
-func CanPrune(inv InventoryInfo, obj *unstructured.Unstructured, policy InventoryPolicy) bool {
+func CanPrune(invInfo InventoryInfo, obj *unstructured.Unstructured, policy InventoryPolicy) bool {
 	if obj == nil {
 		return false
 	}
-	matchStatus := InventoryIDMatch(inv, obj)
+	matchStatus := InventoryIDMatch(invInfo, obj)
 	switch matchStatus {
 	case Empty:
 		return policy == AdoptIfNoInventory || policy == AdoptAll
@@ -133,12 +134,35 @@ func CanPrune(inv InventoryInfo, obj *unstructured.Unstructured, policy Inventor
 	return false
 }
 
-func AddInventoryIDAnnotation(obj *unstructured.Unstructured, inv InventoryInfo) {
+// OwningInventoryAnnotation returns the string value of the OwningInventoryKey
+// for the passed object. Returns empty string if not found.
+func OwningInventoryAnnotation(obj *unstructured.Unstructured) string {
+	annotations := obj.GetAnnotations()
+	if annotations == nil {
+		return ""
+	}
+	return annotations[OwningInventoryKey]
+}
+
+// SetOwningInventoryAnnotation updates the string value of the
+// OwningInventoryKey for the passed object.
+func SetOwningInventoryAnnotation(obj *unstructured.Unstructured, id string) {
 	annotations := obj.GetAnnotations()
 	if annotations == nil {
 		annotations = make(map[string]string)
 	}
-	annotations[OwningInventoryKey] = inv.ID()
+	annotations[OwningInventoryKey] = id
+	obj.SetAnnotations(annotations)
+}
+
+// DeleteOwningInventoryAnnotation removes the OwningInventoryKey annotation
+// in the passed object.
+func DeleteOwningInventoryAnnotation(obj *unstructured.Unstructured) {
+	annotations := obj.GetAnnotations()
+	if annotations == nil {
+		return
+	}
+	delete(annotations, OwningInventoryKey)
 	obj.SetAnnotations(annotations)
 }
 

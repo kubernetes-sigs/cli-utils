@@ -25,7 +25,7 @@ func applyAndDestroyTest(ctx context.Context, c client.Client, invConfig Invento
 	applier := invConfig.ApplierFactoryFunc()
 	inventoryID := fmt.Sprintf("%s-%s", inventoryName, namespaceName)
 
-	inventoryInfo := createInventoryInfo(invConfig, inventoryName, namespaceName, inventoryID)
+	inventoryInfo := invConfig.InvWrapperFunc(invConfig.InventoryFactoryFunc(inventoryName, namespaceName, inventoryID))
 
 	deployment1Obj := withNamespace(manifestToUnstructured(deployment1), namespaceName)
 	resources := []*unstructured.Unstructured{
@@ -156,7 +156,6 @@ func applyAndDestroyTest(ctx context.Context, c client.Client, invConfig Invento
 		},
 	}
 	received, matches := testutil.RemoveEqualEvents(received, expected)
-	Expect(matches).To(BeNumerically(">=", 1), "unexpected number of %q status events", status.NotFoundStatus)
 
 	// handle optional async InProgress StatusEvents
 	expected = testutil.ExpEvent{
@@ -179,9 +178,10 @@ func applyAndDestroyTest(ctx context.Context, c client.Client, invConfig Invento
 		},
 	}
 	received, matches = testutil.RemoveEqualEvents(received, expected)
-	Expect(matches).To(BeNumerically(">=", 1), "unexpected number of %q status events", status.CurrentStatus)
 
 	Expect(received).To(testutil.Equal(expEvents))
+	Expect(matches).To(BeNumerically(">=", 1), "unexpected number of %q status events", status.NotFoundStatus)
+	Expect(matches).To(BeNumerically(">=", 1), "unexpected number of %q status events", status.CurrentStatus)
 
 	By("Verify deployment created")
 	assertUnstructuredExists(ctx, c, deployment1Obj)
@@ -289,15 +289,4 @@ func applyAndDestroyTest(ctx context.Context, c client.Client, invConfig Invento
 
 	By("Verify deployment deleted")
 	assertUnstructuredDoesNotExist(ctx, c, deployment1Obj)
-}
-
-func createInventoryInfo(invConfig InventoryConfig, inventoryName, namespaceName, inventoryID string) inventory.InventoryInfo {
-	switch invConfig.InventoryStrategy {
-	case inventory.NameStrategy:
-		return invConfig.InvWrapperFunc(invConfig.InventoryFactoryFunc(inventoryName, namespaceName, randomString("inventory-")))
-	case inventory.LabelStrategy:
-		return invConfig.InvWrapperFunc(invConfig.InventoryFactoryFunc(randomString("inventory-"), namespaceName, inventoryID))
-	default:
-		panic(fmt.Errorf("unknown inventory strategy %q", invConfig.InventoryStrategy))
-	}
 }

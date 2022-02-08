@@ -9,6 +9,8 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/resource"
+	"sigs.k8s.io/cli-utils/pkg/apis/actuation"
+	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
@@ -62,6 +64,17 @@ func less(i, j object.ObjMetadata) bool {
 		return i.Namespace < j.Namespace
 	}
 	return i.Name < j.Name
+}
+
+type SortableObjectReferences []actuation.ObjectReference
+
+var _ sort.Interface = SortableObjectReferences{}
+
+func (a SortableObjectReferences) Len() int      { return len(a) }
+func (a SortableObjectReferences) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
+func (a SortableObjectReferences) Less(i, j int) bool {
+	return less(inventory.ObjMetadataFromObjectReference(a[i]),
+		inventory.ObjMetadataFromObjectReference(a[j]))
 }
 
 var groupKind2index = computeGroupKind2index()

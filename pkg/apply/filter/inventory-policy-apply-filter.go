@@ -22,7 +22,7 @@ import (
 type InventoryPolicyApplyFilter struct {
 	Client    dynamic.Interface
 	Mapper    meta.RESTMapper
-	Inv       inventory.InventoryInfo
+	InvInfo   inventory.InventoryInfo
 	InvPolicy inventory.InventoryPolicy
 }
 
@@ -49,11 +49,13 @@ func (ipaf InventoryPolicyApplyFilter) Filter(obj *unstructured.Unstructured) (b
 	}
 	// Check the inventory id "match" and the adopt policy to determine
 	// if an object should be applied.
-	canApply, err := inventory.CanApply(ipaf.Inv, clusterObj, ipaf.InvPolicy)
+	canApply, err := inventory.CanApply(ipaf.InvInfo, clusterObj, ipaf.InvPolicy)
 	if !canApply {
-		invMatch := inventory.InventoryIDMatch(ipaf.Inv, clusterObj)
-		reason := fmt.Sprintf("inventory policy prevented apply (inventoryIDMatchStatus: %q, inventoryPolicy: %q)",
-			invMatch, ipaf.InvPolicy)
+		invMatch := inventory.InventoryIDMatch(ipaf.InvInfo, clusterObj)
+		found := inventory.OwningInventoryAnnotation(clusterObj)
+		expected := ipaf.InvInfo.ID
+		reason := fmt.Sprintf("inventory policy prevented apply (inventoryIDMatchStatus: %q, inventoryPolicy: %q, found: %q, expected: %q)",
+			invMatch, ipaf.InvPolicy, found, expected)
 		return true, reason, err
 	}
 	return false, "", nil

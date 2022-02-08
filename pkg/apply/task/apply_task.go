@@ -171,7 +171,9 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 				taskContext.InventoryManager().AddFailedApply(id)
 			} else if info.Object != nil {
 				acc, err := meta.Accessor(info.Object)
-				if err == nil {
+				if err != nil {
+					klog.Errorf("error reading applied object uid and generation (%s/%s) %s", info.Namespace, info.Name, err)
+				} else {
 					uid := acc.GetUID()
 					gen := acc.GetGeneration()
 					taskContext.InventoryManager().AddSuccessfulApply(id, uid, gen)
@@ -210,9 +212,9 @@ func newApplyOptions(taskName string, eventChannel chan<- event.Event, serverSid
 		FieldManager:    serverSideOptions.FieldManager,
 		DryRunStrategy:  strategy.Strategy(),
 		ToPrinter: (&KubectlPrinterAdapter{
-			ch:        eventChannel,
-			groupName: taskName,
-		}).toPrinterFunc(),
+			EventChannel: eventChannel,
+			GroupName:    taskName,
+		}).ToPrinterFunc(),
 		DynamicClient:  dynamicClient,
 		DryRunVerifier: resource.NewDryRunVerifier(dynamicClient, openAPIGetter),
 	}

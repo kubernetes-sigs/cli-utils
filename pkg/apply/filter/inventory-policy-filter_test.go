@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 )
 
@@ -75,20 +74,17 @@ func TestInventoryPolicyFilter(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			invIDLabel := map[string]string{
-				common.InventoryLabel: tc.inventoryID,
-			}
-			invObj := inventoryObj.DeepCopy()
-			invObj.SetLabels(invIDLabel)
+			// set owning-inventory annotation
+			obj := defaultObj.DeepCopy()
+			inventory.SetOwningInventoryAnnotation(obj, tc.objInventoryID)
+
+			invInfo := inventory.InventoryInfoFromObject(inventoryObj)
+			invInfo.ID = tc.inventoryID
+
 			filter := InventoryPolicyFilter{
-				Inv:       inventory.WrapInventoryInfoObj(invObj),
+				InvInfo:   invInfo,
 				InvPolicy: tc.policy,
 			}
-			objIDAnnotation := map[string]string{
-				"config.k8s.io/owning-inventory": tc.objInventoryID,
-			}
-			obj := defaultObj.DeepCopy()
-			obj.SetAnnotations(objIDAnnotation)
 			actual, reason, err := filter.Filter(obj)
 			if err != nil {
 				t.Fatalf("InventoryPolicyFilter unexpected error (%s)", err)

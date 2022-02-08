@@ -10,7 +10,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/kubectl/pkg/scheme"
-	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 )
 
@@ -86,21 +85,18 @@ func TestInventoryPolicyApplyFilter(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
+			// set owning-inventory annotation
 			obj := defaultObj.DeepCopy()
-			objIDAnnotation := map[string]string{
-				"config.k8s.io/owning-inventory": tc.objInventoryID,
-			}
-			obj.SetAnnotations(objIDAnnotation)
-			invIDLabel := map[string]string{
-				common.InventoryLabel: tc.inventoryID,
-			}
-			invObj := invObjTemplate.DeepCopy()
-			invObj.SetLabels(invIDLabel)
+			inventory.SetOwningInventoryAnnotation(obj, tc.objInventoryID)
+
+			invInfo := inventory.InventoryInfoFromObject(inventoryObj)
+			invInfo.ID = tc.inventoryID
+
 			filter := InventoryPolicyApplyFilter{
 				Client: dynamicfake.NewSimpleDynamicClient(scheme.Scheme, obj),
 				Mapper: testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme,
 					scheme.Scheme.PrioritizedVersionsAllGroups()...),
-				Inv:       inventory.WrapInventoryInfoObj(invObj),
+				InvInfo:   invInfo,
 				InvPolicy: tc.policy,
 			}
 			actual, reason, err := filter.Filter(obj)

@@ -21,7 +21,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/printers"
 )
 
-func GetApplyRunner(factory cmdutil.Factory, invFactory inventory.InventoryClientFactory,
+func GetApplyRunner(factory cmdutil.Factory, invFactory inventory.ClientFactory,
 	loader manifestreader.ManifestLoader, ioStreams genericclioptions.IOStreams) *ApplyRunner {
 	r := &ApplyRunner{
 		ioStreams:  ioStreams,
@@ -67,7 +67,7 @@ func GetApplyRunner(factory cmdutil.Factory, invFactory inventory.InventoryClien
 	return r
 }
 
-func ApplyCommand(f cmdutil.Factory, invFactory inventory.InventoryClientFactory, loader manifestreader.ManifestLoader,
+func ApplyCommand(f cmdutil.Factory, invFactory inventory.ClientFactory, loader manifestreader.ManifestLoader,
 	ioStreams genericclioptions.IOStreams) *cobra.Command {
 	return GetApplyRunner(f, invFactory, loader, ioStreams).Command
 }
@@ -76,7 +76,7 @@ type ApplyRunner struct {
 	Command    *cobra.Command
 	ioStreams  genericclioptions.IOStreams
 	factory    cmdutil.Factory
-	invFactory inventory.InventoryClientFactory
+	invFactory inventory.ClientFactory
 	loader     manifestreader.ManifestLoader
 
 	serverSideOptions      common.ServerSideOptions
@@ -132,9 +132,9 @@ func (r *ApplyRunner) RunE(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	inv := inventory.WrapInventoryInfoObj(invObj)
+	inv := inventory.InventoryInfoFromObject(invObj)
 
-	invClient, err := r.invFactory.NewInventoryClient(r.factory)
+	invClient, err := r.invFactory.NewClient(r.factory)
 	if err != nil {
 		return err
 	}

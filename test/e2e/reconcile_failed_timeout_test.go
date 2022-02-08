@@ -22,7 +22,7 @@ func reconciliationFailed(ctx context.Context, invConfig InventoryConfig, invent
 	applier := invConfig.ApplierFactoryFunc()
 	inventoryID := fmt.Sprintf("%s-%s", inventoryName, namespaceName)
 
-	inventoryInfo := createInventoryInfo(invConfig, inventoryName, namespaceName, inventoryID)
+	inventoryInfo := invConfig.InvWrapperFunc(invConfig.InventoryFactoryFunc(inventoryName, namespaceName, inventoryID))
 
 	podObj := withNodeSelector(withNamespace(manifestToUnstructured(pod1), namespaceName), "foo", "bar")
 	resources := []*unstructured.Unstructured{
@@ -45,7 +45,7 @@ func reconciliationTimeout(ctx context.Context, invConfig InventoryConfig, inven
 	applier := invConfig.ApplierFactoryFunc()
 	inventoryID := fmt.Sprintf("%s-%s", inventoryName, namespaceName)
 
-	inventoryInfo := createInventoryInfo(invConfig, inventoryName, namespaceName, inventoryID)
+	inventoryInfo := invConfig.InvWrapperFunc(invConfig.InventoryFactoryFunc(inventoryName, namespaceName, inventoryID))
 
 	podObj := podWithImage(withNamespace(manifestToUnstructured(pod1), namespaceName), "kubernetes-pause", "does-not-exist")
 	resources := []*unstructured.Unstructured{

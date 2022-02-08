@@ -35,8 +35,16 @@ install-addlicense:
 install-lint:
 	(which $(GOPATH)/bin/golangci-lint || go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.40.1)
 
-generate: install-stringer
+install-deepcopy-gen:
+	(which $(GOPATH)/bin/deepcopy-gen || go install k8s.io/code-generator/cmd/deepcopy-gen@v0.23.3)
+
+install-conversion-gen:
+	(which $(GOPATH)/bin/conversion-gen || go install k8s.io/code-generator/cmd/conversion-gen@v0.23.3)
+
+generate: install-stringer install-deepcopy-gen install-conversion-gen
 	go generate ./...
+	hack/run-in-gopath.sh deepcopy-gen --input-dirs ./pkg/apis/... -O zz_generated.deepcopy --go-header-file LICENSE_TEMPLATE_GEN
+#	hack/run-in-gopath.sh conversion-gen --input-dirs ./pkg/apis/... -O zz_generated.conversion --go-header-file LICENSE_TEMPLATE_GEN
 
 license: install-addlicense
 	$(GOPATH)/bin/addlicense -v -y 2021 -c "The Kubernetes Authors." -f LICENSE_TEMPLATE .

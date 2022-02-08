@@ -6,7 +6,9 @@ package task
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/cli-utils/pkg/apply/cache"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
@@ -58,9 +60,10 @@ func TestInvSetTask(t *testing.T) {
 		},
 		"one apply objs, one prune failures; one inventory": {
 			// aritifical use case: applies and prunes are mutually exclusive
+			// Delete overwrites Apply in Inventory.Status.Objects[].Strategy
 			appliedObjs:   object.ObjMetadataSet{id3},
 			failedDeletes: object.ObjMetadataSet{id3},
-			expectedObjs:  object.ObjMetadataSet{id3},
+			expectedObjs:  object.ObjMetadataSet{},
 		},
 		"two apply objs, two prune failures; three inventory": {
 			// aritifical use case: applies and prunes are mutually exclusive
@@ -163,15 +166,22 @@ func TestInvSetTask(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			client := inventory.NewFakeInventoryClient(object.ObjMetadataSet{})
+			//client := inventory.NewFakeInventoryClient(object.ObjMetadataSet{})
+			client := &inventory.InMemoryClient{}
 			eventChannel := make(chan event.Event)
 			resourceCache := cache.NewResourceCacheMap()
 			context := taskrunner.NewTaskContext(eventChannel, resourceCache)
 
+			// initialize inventory reference in context
+			inv := context.InventoryManager().Inventory()
+			inv.SetGroupVersionKind(inventoryObj.GroupVersionKind())
+			inv.SetName(inventoryObj.GetName())
+			inv.SetNamespace(inventoryObj.GetNamespace())
+			inv.SetLabels(inventoryObj.GetLabels())
+
 			task := InvSetTask{
 				TaskName:      taskName,
 				InvClient:     client,
-				InvInfo:       nil,
 				PrevInventory: tc.prevInventory,
 			}
 			im := context.InventoryManager()
@@ -201,13 +211,19 @@ func TestInvSetTask(t *testing.T) {
 			}
 			task.Start(context)
 			result := <-context.TaskChannel()
-			if result.Err != nil {
-				t.Errorf("unexpected error running InvAddTask: %s", result.Err)
-			}
-			actual, _ := client.GetClusterObjs(nil)
+			require.NoError(t, result.Err)
+
+			inv, err := client.Load(inventoryInfo)
+			require.NoError(t, err)
+			require.NotNil(t, inv)
+
+			actual := inventory.ObjMetadataSetFromObjectReferences(inv.Spec.Objects)
 			testutil.AssertEqual(t, tc.expectedObjs, actual,
-				"Actual cluster objects (%d) do not match expected cluster objects (%d)",
+				"Actual inventory objects (%d) do not match expected inventory objects (%d)",
 				len(actual), len(tc.expectedObjs))
+
+			klog.Infof("%#v", inv.Spec.Objects)
+			// TODO: validate status is stored from the inventory
 		})
 	}
 }

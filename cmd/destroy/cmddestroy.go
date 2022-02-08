@@ -22,7 +22,7 @@ import (
 )
 
 // GetDestroyRunner creates and returns the DestroyRunner which stores the cobra command.
-func GetDestroyRunner(factory cmdutil.Factory, invFactory inventory.InventoryClientFactory,
+func GetDestroyRunner(factory cmdutil.Factory, invFactory inventory.ClientFactory,
 	loader manifestreader.ManifestLoader, ioStreams genericclioptions.IOStreams) *DestroyRunner {
 	r := &DestroyRunner{
 		ioStreams:  ioStreams,
@@ -56,7 +56,7 @@ func GetDestroyRunner(factory cmdutil.Factory, invFactory inventory.InventoryCli
 }
 
 // DestroyCommand creates the DestroyRunner, returning the cobra command associated with it.
-func DestroyCommand(f cmdutil.Factory, invFactory inventory.InventoryClientFactory, loader manifestreader.ManifestLoader,
+func DestroyCommand(f cmdutil.Factory, invFactory inventory.ClientFactory, loader manifestreader.ManifestLoader,
 	ioStreams genericclioptions.IOStreams) *cobra.Command {
 	return GetDestroyRunner(f, invFactory, loader, ioStreams).Command
 }
@@ -66,7 +66,7 @@ type DestroyRunner struct {
 	Command    *cobra.Command
 	ioStreams  genericclioptions.IOStreams
 	factory    cmdutil.Factory
-	invFactory inventory.InventoryClientFactory
+	invFactory inventory.ClientFactory
 	loader     manifestreader.ManifestLoader
 
 	output                  string
@@ -112,9 +112,9 @@ func (r *DestroyRunner) RunE(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	inv := inventory.WrapInventoryInfoObj(invObj)
+	inv := inventory.InventoryInfoFromObject(invObj)
 
-	invClient, err := r.invFactory.NewInventoryClient(r.factory)
+	invClient, err := r.invFactory.NewClient(r.factory)
 	if err != nil {
 		return err
 	}

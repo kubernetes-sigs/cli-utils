@@ -19,11 +19,11 @@ func TestKubectlPrinterAdapter(t *testing.T) {
 	operation := "serverside-applied"
 
 	adapter := KubectlPrinterAdapter{
-		ch:        ch,
-		groupName: "test-0",
+		EventChannel: ch,
+		GroupName:    "test-0",
 	}
 
-	toPrinterFunc := adapter.toPrinterFunc()
+	toPrinterFunc := adapter.ToPrinterFunc()
 	resourcePrinter, err := toPrinterFunc(operation)
 	assert.NoError(t, err)
 

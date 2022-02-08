@@ -22,7 +22,7 @@ func deletionPreventionTest(ctx context.Context, c client.Client, invConfig Inve
 	applier := invConfig.ApplierFactoryFunc()
 	inventoryID := fmt.Sprintf("%s-%s", inventoryName, namespaceName)
 
-	inventoryInfo := createInventoryInfo(invConfig, inventoryName, namespaceName, inventoryID)
+	inventoryInfo := invConfig.InvWrapperFunc(invConfig.InventoryFactoryFunc(inventoryName, namespaceName, inventoryID))
 
 	resources := []*unstructured.Unstructured{
 		withNamespace(manifestToUnstructured(deployment1), namespaceName),
@@ -36,15 +36,15 @@ func deletionPreventionTest(ctx context.Context, c client.Client, invConfig Inve
 
 	By("Verify deployment created")
 	obj := assertUnstructuredExists(ctx, c, withNamespace(manifestToUnstructured(deployment1), namespaceName))
-	Expect(obj.GetAnnotations()[inventory.OwningInventoryKey]).To(Equal(inventoryInfo.ID()))
+	Expect(obj.GetAnnotations()[inventory.OwningInventoryKey]).To(Equal(inventoryInfo.ID))
 
 	By("Verify pod1 created")
 	obj = assertUnstructuredExists(ctx, c, withNamespace(manifestToUnstructured(pod1), namespaceName))
-	Expect(obj.GetAnnotations()[inventory.OwningInventoryKey]).To(Equal(inventoryInfo.ID()))
+	Expect(obj.GetAnnotations()[inventory.OwningInventoryKey]).To(Equal(inventoryInfo.ID))
 
 	By("Verify pod2 created")
 	obj = assertUnstructuredExists(ctx, c, withNamespace(manifestToUnstructured(pod2), namespaceName))
-	Expect(obj.GetAnnotations()[inventory.OwningInventoryKey]).To(Equal(inventoryInfo.ID()))
+	Expect(obj.GetAnnotations()[inventory.OwningInventoryKey]).To(Equal(inventoryInfo.ID))
 
 	By("Verify the inventory size is 3")
 	invConfig.InvSizeVerifyFunc(ctx, c, inventoryName, namespaceName, inventoryID, 3)
@@ -61,15 +61,15 @@ func deletionPreventionTest(ctx context.Context, c client.Client, invConfig Inve
 
 	By("Verify deployment still exists and has the config.k8s.io/owning-inventory annotation")
 	obj = assertUnstructuredExists(ctx, c, withNamespace(manifestToUnstructured(deployment1), namespaceName))
-	Expect(obj.GetAnnotations()[inventory.OwningInventoryKey]).To(Equal(inventoryInfo.ID()))
+	Expect(obj.GetAnnotations()[inventory.OwningInventoryKey]).To(Equal(inventoryInfo.ID))
 
 	By("Verify pod1 still exits and does not have the config.k8s.io/owning-inventory annotation")
 	obj = assertUnstructuredExists(ctx, c, withNamespace(manifestToUnstructured(pod1), namespaceName))
-	Expect(obj.GetAnnotations()[inventory.OwningInventoryKey]).To(Equal(inventoryInfo.ID()))
+	Expect(obj.GetAnnotations()[inventory.OwningInventoryKey]).To(Equal(inventoryInfo.ID))
 
 	By("Verify pod2 still exits and does not have the config.k8s.io/owning-inventory annotation")
 	obj = assertUnstructuredExists(ctx, c, withNamespace(manifestToUnstructured(pod2), namespaceName))
-	Expect(obj.GetAnnotations()[inventory.OwningInventoryKey]).To(Equal(inventoryInfo.ID()))
+	Expect(obj.GetAnnotations()[inventory.OwningInventoryKey]).To(Equal(inventoryInfo.ID))
 
 	By("Verify the inventory size is still 3")
 	invConfig.InvSizeVerifyFunc(ctx, c, inventoryName, namespaceName, inventoryID, 3)
@@ -85,7 +85,7 @@ func deletionPreventionTest(ctx context.Context, c client.Client, invConfig Inve
 
 	By("Verify deployment still exists and has the config.k8s.io/owning-inventory annotation")
 	obj = assertUnstructuredExists(ctx, c, withNamespace(manifestToUnstructured(deployment1), namespaceName))
-	Expect(obj.GetAnnotations()[inventory.OwningInventoryKey]).To(Equal(inventoryInfo.ID()))
+	Expect(obj.GetAnnotations()[inventory.OwningInventoryKey]).To(Equal(inventoryInfo.ID))
 
 	By("Verify pod1 still exits and does not have the config.k8s.io/owning-inventory annotation")
 	obj = assertUnstructuredExists(ctx, c, withNamespace(manifestToUnstructured(pod1), namespaceName))

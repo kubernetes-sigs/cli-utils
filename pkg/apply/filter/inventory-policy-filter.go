@@ -14,7 +14,7 @@ import (
 // if an object should be pruned (deleted) because of the InventoryPolicy
 // and if the objects owning inventory identifier matchs the inventory id.
 type InventoryPolicyFilter struct {
-	Inv       inventory.InventoryInfo
+	InvInfo   inventory.InventoryInfo
 	InvPolicy inventory.InventoryPolicy
 }
 
@@ -29,10 +29,12 @@ func (ipf InventoryPolicyFilter) Name() string {
 func (ipf InventoryPolicyFilter) Filter(obj *unstructured.Unstructured) (bool, string, error) {
 	// Check the inventory id "match" and the adopt policy to determine
 	// if an object should be pruned (deleted).
-	if !inventory.CanPrune(ipf.Inv, obj, ipf.InvPolicy) {
-		invMatch := inventory.InventoryIDMatch(ipf.Inv, obj)
-		reason := fmt.Sprintf("inventory policy prevented deletion (inventoryIDMatchStatus: %q, inventoryPolicy: %q)",
-			invMatch, ipf.InvPolicy)
+	if !inventory.CanPrune(ipf.InvInfo, obj, ipf.InvPolicy) {
+		invMatch := inventory.InventoryIDMatch(ipf.InvInfo, obj)
+		found := inventory.OwningInventoryAnnotation(obj)
+		expected := ipf.InvInfo.ID
+		reason := fmt.Sprintf("inventory policy prevented deletion (inventoryIDMatchStatus: %q, inventoryPolicy: %q, found: %q, expected: %q)",
+			invMatch, ipf.InvPolicy, found, expected)
 		return true, reason, nil
 	}
 	return false, "", nil

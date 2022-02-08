@@ -31,14 +31,13 @@ import (
 )
 
 type inventoryFactoryFunc func(name, namespace, id string) *unstructured.Unstructured
-type invWrapperFunc func(*unstructured.Unstructured) inventory.InventoryInfo
+type invWrapperFunc func(client.Object) inventory.InventoryInfo
 type applierFactoryFunc func() *apply.Applier
 type destroyerFactoryFunc func() *apply.Destroyer
 type invSizeVerifyFunc func(ctx context.Context, c client.Client, name, namespace, id string, count int)
 type invCountVerifyFunc func(ctx context.Context, c client.Client, namespace string, count int)
 
 type InventoryConfig struct {
-	InventoryStrategy    inventory.InventoryStrategy
 	InventoryFactoryFunc inventoryFactoryFunc
 	InvWrapperFunc       invWrapperFunc
 	ApplierFactoryFunc   applierFactoryFunc
@@ -54,18 +53,16 @@ const (
 
 var inventoryConfigs = map[string]InventoryConfig{
 	ConfigMapTypeInvConfig: {
-		InventoryStrategy:    inventory.LabelStrategy,
 		InventoryFactoryFunc: cmInventoryManifest,
-		InvWrapperFunc:       inventory.WrapInventoryInfoObj,
+		InvWrapperFunc:       inventory.InventoryInfoFromObject,
 		ApplierFactoryFunc:   newDefaultInvApplier,
 		DestroyerFactoryFunc: newDefaultInvDestroyer,
 		InvSizeVerifyFunc:    defaultInvSizeVerifyFunc,
 		InvCountVerifyFunc:   defaultInvCountVerifyFunc,
 	},
 	CustomTypeInvConfig: {
-		InventoryStrategy:    inventory.NameStrategy,
 		InventoryFactoryFunc: customInventoryManifest,
-		InvWrapperFunc:       customprovider.WrapInventoryInfoObj,
+		InvWrapperFunc:       inventory.InventoryInfoFromObject,
 		ApplierFactoryFunc:   newCustomInvApplier,
 		DestroyerFactoryFunc: newCustomInvDestroyer,
 		InvSizeVerifyFunc:    customInvSizeVerifyFunc,
@@ -325,11 +322,11 @@ func deleteNamespace(ctx context.Context, c client.Client, namespace *v1.Namespa
 }
 
 func newDefaultInvApplier() *apply.Applier {
-	return newApplierFromInvFactory(inventory.ClusterInventoryClientFactory{})
+	return newApplierFromInvFactory(inventory.ConfigMapClientFactory{})
 }
 
 func newDefaultInvDestroyer() *apply.Destroyer {
-	return newDestroyerFromInvFactory(inventory.ClusterInventoryClientFactory{})
+	return newDestroyerFromInvFactory(inventory.ConfigMapClientFactory{})
 }
 
 func defaultInvSizeVerifyFunc(ctx context.Context, c client.Client, name, namespace, id string, count int) {
@@ -396,9 +393,9 @@ func customInvCountVerifyFunc(ctx context.Context, c client.Client, namespace st
 	Expect(len(u.Items)).To(Equal(count))
 }
 
-func newApplierFromInvFactory(invFactory inventory.InventoryClientFactory) *apply.Applier {
+func newApplierFromInvFactory(invFactory inventory.ClientFactory) *apply.Applier {
 	f := newFactory()
-	invClient, err := invFactory.NewInventoryClient(f)
+	invClient, err := invFactory.NewClient(f)
 	Expect(err).NotTo(HaveOccurred())
 
 	a, err := apply.NewApplierBuilder().
@@ -409,9 +406,9 @@ func newApplierFromInvFactory(invFactory inventory.InventoryClientFactory) *appl
 	return a
 }
 
-func newDestroyerFromInvFactory(invFactory inventory.InventoryClientFactory) *apply.Destroyer {
+func newDestroyerFromInvFactory(invFactory inventory.ClientFactory) *apply.Destroyer {
 	f := newFactory()
-	invClient, err := invFactory.NewInventoryClient(f)
+	invClient, err := invFactory.NewClient(f)
 	Expect(err).NotTo(HaveOccurred())
 
 	d, err := apply.NewDestroyer(f, invClient)

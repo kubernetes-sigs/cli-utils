@@ -28,7 +28,7 @@ var (
 )
 
 // GetPreviewRunner creates and returns the PreviewRunner which stores the cobra command.
-func GetPreviewRunner(factory cmdutil.Factory, invFactory inventory.InventoryClientFactory,
+func GetPreviewRunner(factory cmdutil.Factory, invFactory inventory.ClientFactory,
 	loader manifestreader.ManifestLoader, ioStreams genericclioptions.IOStreams) *PreviewRunner {
 	r := &PreviewRunner{
 		factory:    factory,
@@ -65,7 +65,7 @@ func GetPreviewRunner(factory cmdutil.Factory, invFactory inventory.InventoryCli
 }
 
 // PreviewCommand creates the PreviewRunner, returning the cobra command associated with it.
-func PreviewCommand(f cmdutil.Factory, invFactory inventory.InventoryClientFactory, loader manifestreader.ManifestLoader,
+func PreviewCommand(f cmdutil.Factory, invFactory inventory.ClientFactory, loader manifestreader.ManifestLoader,
 	ioStreams genericclioptions.IOStreams) *cobra.Command {
 	return GetPreviewRunner(f, invFactory, loader, ioStreams).Command
 }
@@ -74,7 +74,7 @@ func PreviewCommand(f cmdutil.Factory, invFactory inventory.InventoryClientFacto
 type PreviewRunner struct {
 	Command    *cobra.Command
 	factory    cmdutil.Factory
-	invFactory inventory.InventoryClientFactory
+	invFactory inventory.ClientFactory
 	loader     manifestreader.ManifestLoader
 	ioStreams  genericclioptions.IOStreams
 
@@ -124,9 +124,9 @@ func (r *PreviewRunner) RunE(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	inv := inventory.WrapInventoryInfoObj(invObj)
+	inv := inventory.InventoryInfoFromObject(invObj)
 
-	invClient, err := r.invFactory.NewInventoryClient(r.factory)
+	invClient, err := r.invFactory.NewClient(r.factory)
 	if err != nil {
 		return err
 	}

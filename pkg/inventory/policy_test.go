@@ -9,26 +9,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-type fakeInventoryInfo struct {
-	id string
-}
-
-func (i *fakeInventoryInfo) Name() string {
-	return ""
-}
-
-func (i *fakeInventoryInfo) Namespace() string {
-	return ""
-}
-
-func (i *fakeInventoryInfo) ID() string {
-	return i.id
-}
-
-func (i *fakeInventoryInfo) Strategy() InventoryStrategy {
-	return NameStrategy
-}
-
 func testObjectWithAnnotation(key, val string) *unstructured.Unstructured {
 	obj := &unstructured.Unstructured{
 		Object: map[string]interface{}{
@@ -58,19 +38,19 @@ func TestInventoryIDMatch(t *testing.T) {
 		{
 			name:     "empty",
 			obj:      testObjectWithAnnotation("", ""),
-			inv:      &fakeInventoryInfo{id: "random-id"},
+			inv:      InventoryInfo{ID: "random-id"},
 			expected: Empty,
 		},
 		{
 			name:     "matched",
 			obj:      testObjectWithAnnotation(OwningInventoryKey, "matched"),
-			inv:      &fakeInventoryInfo{id: "matched"},
+			inv:      InventoryInfo{ID: "matched"},
 			expected: Match,
 		},
 		{
 			name:     "unmatched",
 			obj:      testObjectWithAnnotation(OwningInventoryKey, "unmatched"),
-			inv:      &fakeInventoryInfo{id: "random-id"},
+			inv:      InventoryInfo{ID: "random-id"},
 			expected: NoMatch,
 		},
 	}
@@ -93,69 +73,69 @@ func TestCanApply(t *testing.T) {
 		{
 			name:     "nil object",
 			obj:      nil,
-			inv:      &fakeInventoryInfo{id: "random-id"},
+			inv:      InventoryInfo{ID: "random-id"},
 			canApply: true,
 		},
 		{
 			name:     "empty with AdoptIfNoInventory",
 			obj:      testObjectWithAnnotation("", ""),
-			inv:      &fakeInventoryInfo{id: "random-id"},
+			inv:      InventoryInfo{ID: "random-id"},
 			policy:   AdoptIfNoInventory,
 			canApply: true,
 		},
 		{
 			name:     "empty with AdoptAll",
 			obj:      testObjectWithAnnotation("", ""),
-			inv:      &fakeInventoryInfo{id: "random-id"},
+			inv:      InventoryInfo{ID: "random-id"},
 			policy:   AdoptAll,
 			canApply: true,
 		},
 		{
 			name:     "empty with InventoryPolicyMustMatch",
 			obj:      testObjectWithAnnotation("", ""),
-			inv:      &fakeInventoryInfo{id: "random-id"},
+			inv:      InventoryInfo{ID: "random-id"},
 			policy:   InventoryPolicyMustMatch,
 			canApply: false,
 		},
 		{
 			name:     "matched with InventoryPolicyMustMatch",
 			obj:      testObjectWithAnnotation(OwningInventoryKey, "matched"),
-			inv:      &fakeInventoryInfo{id: "matched"},
+			inv:      InventoryInfo{ID: "matched"},
 			policy:   InventoryPolicyMustMatch,
 			canApply: true,
 		},
 		{
 			name:     "matched with AdoptIfNoInventory",
 			obj:      testObjectWithAnnotation(OwningInventoryKey, "matched"),
-			inv:      &fakeInventoryInfo{id: "matched"},
+			inv:      InventoryInfo{ID: "matched"},
 			policy:   AdoptIfNoInventory,
 			canApply: true,
 		},
 		{
 			name:     "matched with AloptAll",
 			obj:      testObjectWithAnnotation(OwningInventoryKey, "matched"),
-			inv:      &fakeInventoryInfo{id: "matched"},
+			inv:      InventoryInfo{ID: "matched"},
 			policy:   AdoptAll,
 			canApply: true,
 		},
 		{
 			name:     "unmatched with InventoryPolicyMustMatch",
 			obj:      testObjectWithAnnotation(OwningInventoryKey, "unmatched"),
-			inv:      &fakeInventoryInfo{id: "random-id"},
+			inv:      InventoryInfo{ID: "random-id"},
 			policy:   InventoryPolicyMustMatch,
 			canApply: false,
 		},
 		{
 			name:     "unmatched with AdoptIfNoInventory",
 			obj:      testObjectWithAnnotation(OwningInventoryKey, "unmatched"),
-			inv:      &fakeInventoryInfo{id: "random-id"},
+			inv:      InventoryInfo{ID: "random-id"},
 			policy:   AdoptIfNoInventory,
 			canApply: false,
 		},
 		{
 			name:     "unmatched with AdoptAll",
 			obj:      testObjectWithAnnotation(OwningInventoryKey, "unmatched"),
-			inv:      &fakeInventoryInfo{id: "random-id"},
+			inv:      InventoryInfo{ID: "random-id"},
 			policy:   AdoptAll,
 			canApply: true,
 		},
@@ -179,69 +159,69 @@ func TestCanPrune(t *testing.T) {
 		{
 			name:     "nil object",
 			obj:      nil,
-			inv:      &fakeInventoryInfo{id: "random-id"},
+			inv:      InventoryInfo{ID: "random-id"},
 			canPrune: false,
 		},
 		{
 			name:     "empty with AdoptIfNoInventory",
 			obj:      testObjectWithAnnotation("", ""),
-			inv:      &fakeInventoryInfo{id: "random-id"},
+			inv:      InventoryInfo{ID: "random-id"},
 			policy:   AdoptIfNoInventory,
 			canPrune: true,
 		},
 		{
 			name:     "empty with AdoptAll",
 			obj:      testObjectWithAnnotation("", ""),
-			inv:      &fakeInventoryInfo{id: "random-id"},
+			inv:      InventoryInfo{ID: "random-id"},
 			policy:   AdoptAll,
 			canPrune: true,
 		},
 		{
 			name:     "empty with InventoryPolicyMustMatch",
 			obj:      testObjectWithAnnotation("", ""),
-			inv:      &fakeInventoryInfo{id: "random-id"},
+			inv:      InventoryInfo{ID: "random-id"},
 			policy:   InventoryPolicyMustMatch,
 			canPrune: false,
 		},
 		{
 			name:     "matched with InventoryPolicyMustMatch",
 			obj:      testObjectWithAnnotation(OwningInventoryKey, "matched"),
-			inv:      &fakeInventoryInfo{id: "matched"},
+			inv:      InventoryInfo{ID: "matched"},
 			policy:   InventoryPolicyMustMatch,
 			canPrune: true,
 		},
 		{
 			name:     "matched with AdoptIfNoInventory",
 			obj:      testObjectWithAnnotation(OwningInventoryKey, "matched"),
-			inv:      &fakeInventoryInfo{id: "matched"},
+			inv:      InventoryInfo{ID: "matched"},
 			policy:   AdoptIfNoInventory,
 			canPrune: true,
 		},
 		{
 			name:     "matched with AloptAll",
 			obj:      testObjectWithAnnotation(OwningInventoryKey, "matched"),
-			inv:      &fakeInventoryInfo{id: "matched"},
+			inv:      InventoryInfo{ID: "matched"},
 			policy:   AdoptAll,
 			canPrune: true,
 		},
 		{
 			name:     "unmatched with InventoryPolicyMustMatch",
 			obj:      testObjectWithAnnotation(OwningInventoryKey, "unmatched"),
-			inv:      &fakeInventoryInfo{id: "random-id"},
+			inv:      InventoryInfo{ID: "random-id"},
 			policy:   InventoryPolicyMustMatch,
 			canPrune: false,
 		},
 		{
 			name:     "unmatched with AdoptIfNoInventory",
 			obj:      testObjectWithAnnotation(OwningInventoryKey, "unmatched"),
-			inv:      &fakeInventoryInfo{id: "random-id"},
+			inv:      InventoryInfo{ID: "random-id"},
 			policy:   AdoptIfNoInventory,
 			canPrune: false,
 		},
 		{
 			name:     "unmatched with AdoptAll",
 			obj:      testObjectWithAnnotation(OwningInventoryKey, "unmatched"),
-			inv:      &fakeInventoryInfo{id: "random-id"},
+			inv:      InventoryInfo{ID: "random-id"},
 			policy:   AdoptAll,
 			canPrune: true,
 		},

@@ -221,7 +221,7 @@ deployment.apps/foo is InProgress: inProgress
 			loader := manifestreader.NewFakeLoader(tf, tc.inventory)
 			runner := &StatusRunner{
 				factory:    tf,
-				invFactory: inventory.FakeInventoryClientFactory(tc.inventory),
+				invFactory: inventory.FakeClientFactory(tc.inventory),
 				loader:     loader,
 				pollerFactoryFunc: func(c cmdutil.Factory) (poller.Poller, error) {
 					return &fakePoller{tc.events}, nil

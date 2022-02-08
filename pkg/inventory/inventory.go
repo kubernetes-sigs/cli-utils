@@ -12,43 +12,20 @@
 package inventory
 
 import (
-	"fmt"
-	"strings"
-
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/klog/v2"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/object"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // The default inventory name stored in the inventory template.
 const legacyInvName = "inventory"
 
-// Storage describes methods necessary for an object which
-// can persist the object metadata for pruning and other group
-// operations.
-type Storage interface {
-	// Load retrieves the set of object metadata from the inventory object
-	Load() (object.ObjMetadataSet, error)
-	// Store the set of object metadata in the inventory object
-	Store(objs object.ObjMetadataSet) error
-	// GetObject returns the object that stores the inventory
-	GetObject() (*unstructured.Unstructured, error)
-}
-
-// StorageFactoryFunc creates the object which implements the Inventory
-// interface from the passed info object.
-type StorageFactoryFunc func(*unstructured.Unstructured) Storage
-
-// InventoryToUnstructuredFunc returns the unstructured object for the
-// given InventoryInfo.
-type InventoryToUnstructuredFunc func(InventoryInfo) *unstructured.Unstructured
-
 // FindInventoryObj returns the "Inventory" object (ConfigMap with
 // inventory label) if it exists, or nil if it does not exist.
 func FindInventoryObj(objs object.UnstructuredSet) *unstructured.Unstructured {
 	for _, obj := range objs {
-		if IsInventoryObject(obj) {
+		if obj != nil && IsInventoryObject(obj) {
 			return obj
 		}
 	}
@@ -57,26 +34,35 @@ func FindInventoryObj(objs object.UnstructuredSet) *unstructured.Unstructured {
 
 // IsInventoryObject returns true if the passed object has the
 // inventory label.
-func IsInventoryObject(obj *unstructured.Unstructured) bool {
+func IsInventoryObject(obj client.Object) bool {
 	if obj == nil {
 		return false
 	}
-	inventoryLabel, err := retrieveInventoryLabel(obj)
-	if err == nil && len(inventoryLabel) > 0 {
+	if len(InventoryLabel(obj)) > 0 {
 		return true
 	}
 	return false
 }
 
-// retrieveInventoryLabel returns the string value of the InventoryLabel
-// for the passed inventory object. Returns error if the passed object is nil or
-// is not a inventory object.
-func retrieveInventoryLabel(obj *unstructured.Unstructured) (string, error) {
-	inventoryLabel, exists := obj.GetLabels()[common.InventoryLabel]
-	if !exists {
-		return "", fmt.Errorf("inventory label does not exist for inventory object: %s", common.InventoryLabel)
+// InventoryLabel returns the string value of the InventoryLabel
+// for the passed inventory object. Returns empty string if not found.
+func InventoryLabel(obj client.Object) string {
+	labels := obj.GetLabels()
+	if labels == nil {
+		return ""
 	}
-	return inventoryLabel, nil
+	return labels[common.InventoryLabel]
+}
+
+// SetInventoryLabel updates the string value of the InventoryLabel
+// for the passed inventory object.
+func SetInventoryLabel(obj client.Object, id string) {
+	labels := obj.GetLabels()
+	if labels == nil {
+		labels = make(map[string]string, 1)
+	}
+	labels[common.InventoryLabel] = id
+	obj.SetLabels(labels)
 }
 
 // ValidateNoInventory takes a set of unstructured.Unstructured objects and
@@ -121,42 +107,4 @@ func SplitUnstructureds(objs object.UnstructuredSet) (*unstructured.Unstructured
 		}
 	}
 	return inv, resources, err
-}
-
-// addSuffixToName adds the passed suffix (usually a hash) as a suffix
-// to the name of the passed object stored in the Info struct. Returns
-// an error if name stored in the object differs from the name in
-// the Info struct.
-func addSuffixToName(obj *unstructured.Unstructured, suffix string) error {
-	suffix = strings.TrimSpace(suffix)
-	if len(suffix) == 0 {
-		return fmt.Errorf("passed empty suffix")
-	}
-
-	name := obj.GetName()
-	if name != obj.GetName() {
-		return fmt.Errorf("inventory object (%s) and resource.Info (%s) have different names", name, obj.GetName())
-	}
-	// Error if name already has suffix.
-	suffix = "-" + suffix
-	if strings.HasSuffix(name, suffix) {
-		return fmt.Errorf("name already has suffix: %s", name)
-	}
-	name += suffix
-	obj.SetName(name)
-
-	return nil
-}
-
-// fixLegacyInventoryName modifies the inventory name if it is
-// the legacy default name (i.e. inventory) by adding a random suffix.
-// This fixes a problem where inventory object names collide if
-// they are created in the same namespace.
-func fixLegacyInventoryName(obj *unstructured.Unstructured) error {
-	if obj.GetName() == legacyInvName {
-		klog.V(4).Infof("renaming legacy inventory name")
-		randomSuffix := common.RandomStr()
-		return addSuffixToName(obj, randomSuffix)
-	}
-	return nil
 }
