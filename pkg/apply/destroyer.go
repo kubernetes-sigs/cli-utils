@@ -139,7 +139,7 @@ func (d *Destroyer) Run(ctx context.Context, inv inventory.InventoryInfo, option
 			Pruner:        d.pruner,
 			DynamicClient: dynamicClient,
 			OpenAPIGetter: d.factory.OpenAPIGetter(),
-			InfoHelper:    info.NewInfoHelper(mapper, d.factory.UnstructuredClientForMapping),
+			InfoHelper:    info.NewHelper(mapper, d.factory.UnstructuredClientForMapping),
 			Mapper:        mapper,
 			InvClient:     d.invClient,
 			Destroy:       true,

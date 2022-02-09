@@ -57,7 +57,7 @@ func (b *ApplierBuilder) Build() (*Applier, error) {
 		client:        bx.client,
 		openAPIGetter: bx.discoClient,
 		mapper:        bx.mapper,
-		infoHelper:    info.NewInfoHelper(bx.mapper, bx.unstructuredClientForMapping),
+		infoHelper:    info.NewHelper(bx.mapper, bx.unstructuredClientForMapping),
 	}, nil
 }
 

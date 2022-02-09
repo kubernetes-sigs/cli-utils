@@ -48,7 +48,7 @@ type Applier struct {
 	client        dynamic.Interface
 	openAPIGetter discovery.OpenAPISchemaInterface
 	mapper        meta.RESTMapper
-	infoHelper    info.InfoHelper
+	infoHelper    info.Helper
 }
 
 // prepareObjects returns the set of objects to apply and to prune or

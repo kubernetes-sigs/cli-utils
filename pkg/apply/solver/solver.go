@@ -41,7 +41,7 @@ type TaskQueueBuilder struct {
 	Pruner        *prune.Pruner
 	DynamicClient dynamic.Interface
 	OpenAPIGetter discovery.OpenAPISchemaInterface
-	InfoHelper    info.InfoHelper
+	InfoHelper    info.Helper
 	Mapper        meta.RESTMapper
 	InvClient     inventory.InventoryClient
 	// Collector is used to collect validation errors and invalid objects.
