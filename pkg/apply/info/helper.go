@@ -20,7 +20,7 @@ type Helper interface {
 	BuildInfo(obj *unstructured.Unstructured) (*resource.Info, error)
 }
 
-func NewHelper(mapper meta.RESTMapper, unstructuredClientForMapping func(*meta.RESTMapping) (resource.RESTClient, error)) *helper {
+func NewHelper(mapper meta.RESTMapper, unstructuredClientForMapping func(*meta.RESTMapping) (resource.RESTClient, error)) Helper {
 	return &helper{
 		mapper:                       mapper,
 		unstructuredClientForMapping: unstructuredClientForMapping,

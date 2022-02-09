@@ -85,9 +85,9 @@ var (
 		ColumnWidth:  12,
 		PrintResourceFunc: func(w io.Writer, width int, r table.Resource) (int,
 			error) {
-			var resInfo *ResourceInfo
+			var resInfo *resourceInfo
 			switch res := r.(type) {
-			case *ResourceInfo:
+			case *resourceInfo:
 				resInfo = res
 			default:
 				return 0, nil
@@ -122,9 +122,9 @@ var (
 			int,
 			error,
 		) {
-			var resInfo *ResourceInfo
+			var resInfo *resourceInfo
 			switch res := r.(type) {
-			case *ResourceInfo:
+			case *resourceInfo:
 				resInfo = res
 			default:
 				return 0, nil
@@ -158,7 +158,7 @@ var (
 
 // runPrintLoop starts a new goroutine that will regularly fetch the
 // latest state from the collector and update the table.
-func (t *Printer) runPrintLoop(coll *ResourceStateCollector, stop chan struct{}) chan struct{} {
+func (t *Printer) runPrintLoop(coll *resourceStateCollector, stop chan struct{}) chan struct{} {
 	finished := make(chan struct{})
 
 	baseTablePrinter := table.BaseTablePrinter{

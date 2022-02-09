@@ -48,11 +48,11 @@ const testMessage = "test message for ResourceStatus"
 func TestResourceStateCollector_New(t *testing.T) {
 	testCases := map[string]struct {
 		resourceGroups []event.ActionGroup
-		resourceInfos  map[object.ObjMetadata]*ResourceInfo
+		resourceInfos  map[object.ObjMetadata]*resourceInfo
 	}{
 		"no resources": {
 			resourceGroups: []event.ActionGroup{},
-			resourceInfos:  map[object.ObjMetadata]*ResourceInfo{},
+			resourceInfos:  map[object.ObjMetadata]*resourceInfo{},
 		},
 		"several resources for apply": {
 			resourceGroups: []event.ActionGroup{
@@ -63,7 +63,7 @@ func TestResourceStateCollector_New(t *testing.T) {
 					},
 				},
 			},
-			resourceInfos: map[object.ObjMetadata]*ResourceInfo{
+			resourceInfos: map[object.ObjMetadata]*resourceInfo{
 				depID: {
 					ResourceAction: event.ApplyAction,
 				},
@@ -87,7 +87,7 @@ func TestResourceStateCollector_New(t *testing.T) {
 					},
 				},
 			},
-			resourceInfos: map[object.ObjMetadata]*ResourceInfo{
+			resourceInfos: map[object.ObjMetadata]*resourceInfo{
 				depID: {
 					ResourceAction: event.PruneAction,
 				},
