@@ -4,6 +4,7 @@
 package inventory
 
 import (
+	"context"
 	"errors"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -26,7 +27,7 @@ func (imc *InMemoryClient) GroupVersionKind() schema.GroupVersionKind {
 	}
 }
 
-func (imc *InMemoryClient) Load(invInfo InventoryInfo) (*actuation.Inventory, error) {
+func (imc *InMemoryClient) Load(_ context.Context, invInfo InventoryInfo) (*actuation.Inventory, error) {
 	klog.V(4).Infof("loading inventory in memory: %v", NewInfoStringer(invInfo))
 
 	imc.lazyInit()
@@ -37,7 +38,7 @@ func (imc *InMemoryClient) Load(invInfo InventoryInfo) (*actuation.Inventory, er
 	return nil, nil
 }
 
-func (imc *InMemoryClient) Store(inv *actuation.Inventory, dryRun common.DryRunStrategy) error {
+func (imc *InMemoryClient) Store(_ context.Context, inv *actuation.Inventory, dryRun common.DryRunStrategy) error {
 	if inv == nil {
 		return errors.New("inventory must not be nil")
 	}
@@ -54,7 +55,7 @@ func (imc *InMemoryClient) Store(inv *actuation.Inventory, dryRun common.DryRunS
 	return nil
 }
 
-func (imc *InMemoryClient) Delete(invInfo InventoryInfo, dryRun common.DryRunStrategy) error {
+func (imc *InMemoryClient) Delete(_ context.Context, invInfo InventoryInfo, dryRun common.DryRunStrategy) error {
 	if dryRun.ClientOrServerDryRun() {
 		klog.V(4).Infoln("deleting object in memory (dry-run): %v", NewInfoStringer(invInfo))
 		return nil

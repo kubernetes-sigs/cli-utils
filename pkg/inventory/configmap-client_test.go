@@ -4,6 +4,7 @@
 package inventory
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -97,7 +98,7 @@ func TestStoreCreate(t *testing.T) {
 				Objects: ObjectReferencesFromObjMetadataSet(tc.localObjs),
 			}
 
-			err = invClient.Store(inv, tc.dryRun)
+			err = invClient.Store(context.TODO(), inv, tc.dryRun)
 			if tc.expectedError != nil {
 				assert.EqualError(t, err, tc.expectedError.Error())
 			} else {
@@ -218,7 +219,7 @@ func TestStoreUpdate(t *testing.T) {
 				Objects: ObjectReferencesFromObjMetadataSet(tc.localObjs),
 			}
 
-			err = invClient.Store(inv, common.DryRunNone)
+			err = invClient.Store(context.TODO(), inv, common.DryRunNone)
 			require.NoError(t, err)
 
 			expectedInventory := tc.localObjs.ToStringMap()
@@ -286,7 +287,7 @@ func TestLoad(t *testing.T) {
 				Converter:     ConfigMapConverter{},
 			}
 
-			inv, err := invClient.Load(tc.invInfo)
+			inv, err := invClient.Load(context.TODO(), tc.invInfo)
 			if tc.isError {
 				require.Error(t, err)
 				return
@@ -362,7 +363,7 @@ func TestDelete(t *testing.T) {
 				Converter:     ConfigMapConverter{},
 			}
 
-			err = invClient.Delete(tc.invInfo, common.DryRunNone)
+			err = invClient.Delete(context.TODO(), tc.invInfo, common.DryRunNone)
 			if tc.isError {
 				require.Error(t, err)
 				return

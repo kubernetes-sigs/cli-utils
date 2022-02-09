@@ -1969,11 +1969,12 @@ func TestReadAndPrepareObjects(t *testing.T) {
 				newFakePoller([]pollevent.Event{}),
 			)
 
+			ctx := context.TODO()
+
 			// initialize inventory contents
-			err := applier.invClient.Store(inv, common.DryRunNone)
+			err := applier.invClient.Store(ctx, inv, common.DryRunNone)
 			require.NoError(t, err)
 
-			ctx := context.TODO()
 			applyObjs, _, invObjs, err := applier.prepareObjects(ctx, invInfo, tc.localObjs, ApplierOptions{})
 			if tc.isError {
 				require.Error(t, err)

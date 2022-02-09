@@ -4,6 +4,7 @@
 package task
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -170,10 +171,10 @@ func TestInvSetTask(t *testing.T) {
 			client := &inventory.InMemoryClient{}
 			eventChannel := make(chan event.Event)
 			resourceCache := cache.NewResourceCacheMap()
-			context := taskrunner.NewTaskContext(eventChannel, resourceCache)
+			taskContext := taskrunner.NewTaskContext(eventChannel, resourceCache)
 
 			// initialize inventory reference in context
-			inv := context.InventoryManager().Inventory()
+			inv := taskContext.InventoryManager().Inventory()
 			inv.SetGroupVersionKind(inventoryObj.GroupVersionKind())
 			inv.SetName(inventoryObj.GetName())
 			inv.SetNamespace(inventoryObj.GetNamespace())
@@ -184,7 +185,7 @@ func TestInvSetTask(t *testing.T) {
 				InvClient:     client,
 				PrevInventory: tc.prevInventory,
 			}
-			im := context.InventoryManager()
+			im := taskContext.InventoryManager()
 			for _, applyObj := range tc.appliedObjs {
 				im.AddSuccessfulApply(applyObj, "unusued-uid", int64(0))
 			}
@@ -201,19 +202,19 @@ func TestInvSetTask(t *testing.T) {
 				im.AddSkippedDelete(skippedDelete)
 			}
 			for _, abandonedObj := range tc.abandonedObjs {
-				context.AddAbandonedObject(abandonedObj)
+				taskContext.AddAbandonedObject(abandonedObj)
 			}
 			for _, invalidObj := range tc.invalidObjs {
-				context.AddInvalidObject(invalidObj)
+				taskContext.AddInvalidObject(invalidObj)
 			}
 			if taskName != task.Name() {
 				t.Errorf("expected task name (%s), got (%s)", taskName, task.Name())
 			}
-			task.Start(context)
-			result := <-context.TaskChannel()
+			task.Start(taskContext)
+			result := <-taskContext.TaskChannel()
 			require.NoError(t, result.Err)
 
-			inv, err := client.Load(inventoryInfo)
+			inv, err := client.Load(context.TODO(), inventoryInfo)
 			require.NoError(t, err)
 			require.NotNil(t, inv)
 

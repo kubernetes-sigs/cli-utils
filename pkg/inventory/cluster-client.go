@@ -38,7 +38,7 @@ func (cc *ClusterClient) GroupVersionKind() schema.GroupVersionKind {
 }
 
 // Load the inventory from a ConfigMap.
-func (cc *ClusterClient) Load(invInfo InventoryInfo) (*actuation.Inventory, error) {
+func (cc *ClusterClient) Load(ctx context.Context, invInfo InventoryInfo) (*actuation.Inventory, error) {
 	infoGK := GroupKindFromObjectReference(invInfo.ObjectReference)
 	gvk := cc.GroupVersionKind()
 	gk := gvk.GroupKind()
@@ -56,7 +56,7 @@ func (cc *ClusterClient) Load(invInfo InventoryInfo) (*actuation.Inventory, erro
 	}
 
 	id := ObjMetadataFromObjectReference(invInfo.ObjectReference)
-	obj, err := cc.getObject(context.TODO(), id, mapping)
+	obj, err := cc.getObject(ctx, id, mapping)
 	if err != nil {
 		return nil, err
 	}
@@ -79,7 +79,7 @@ func (cc *ClusterClient) Load(invInfo InventoryInfo) (*actuation.Inventory, erro
 }
 
 // Store the inventory as a ConfigMap.
-func (cc *ClusterClient) Store(inv *actuation.Inventory, dryRun common.DryRunStrategy) error {
+func (cc *ClusterClient) Store(ctx context.Context, inv *actuation.Inventory, dryRun common.DryRunStrategy) error {
 	invGK := inv.GroupVersionKind().GroupKind()
 	gvk := cc.GroupVersionKind()
 	gk := gvk.GroupKind()
@@ -102,7 +102,7 @@ func (cc *ClusterClient) Store(inv *actuation.Inventory, dryRun common.DryRunStr
 	}
 	id := object.UnstructuredToObjMetadata(obj)
 	// TODO: use kubectl code to get SSA and CSA impl
-	oldObj, err := cc.getObject(context.TODO(), id, mapping)
+	oldObj, err := cc.getObject(ctx, id, mapping)
 	if err != nil {
 		return err
 	}
@@ -114,12 +114,12 @@ func (cc *ClusterClient) Store(inv *actuation.Inventory, dryRun common.DryRunStr
 		obj.SetUID(oldObj.GetUID())
 		obj.SetResourceVersion(oldObj.GetResourceVersion())
 		// TODO: should any other metadata be copied/merged?
-		out, err = cc.updateObject(context.TODO(), obj, mapping, dryRun)
+		out, err = cc.updateObject(ctx, obj, mapping, dryRun)
 		if err != nil {
 			return err
 		}
 	} else {
-		out, err = cc.createObject(context.TODO(), obj, mapping, dryRun)
+		out, err = cc.createObject(ctx, obj, mapping, dryRun)
 		if err != nil {
 			return err
 		}
@@ -128,7 +128,7 @@ func (cc *ClusterClient) Store(inv *actuation.Inventory, dryRun common.DryRunStr
 	return nil
 }
 
-func (cc *ClusterClient) Delete(invInfo InventoryInfo, dryRun common.DryRunStrategy) error {
+func (cc *ClusterClient) Delete(ctx context.Context, invInfo InventoryInfo, dryRun common.DryRunStrategy) error {
 	infoGK := GroupKindFromObjectReference(invInfo.ObjectReference)
 	gvk := cc.GroupVersionKind()
 	gk := gvk.GroupKind()
@@ -146,7 +146,7 @@ func (cc *ClusterClient) Delete(invInfo InventoryInfo, dryRun common.DryRunStrat
 	}
 
 	id := ObjMetadataFromObjectReference(invInfo.ObjectReference)
-	err = cc.deleteObject(context.TODO(), id, mapping, dryRun)
+	err = cc.deleteObject(ctx, id, mapping, dryRun)
 	if err != nil {
 		return err
 	}

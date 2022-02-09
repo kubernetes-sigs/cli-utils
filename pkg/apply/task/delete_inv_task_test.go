@@ -4,6 +4,7 @@
 package task
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -116,10 +117,10 @@ func TestDeleteInvTask(t *testing.T) {
 			//client.Err = tc.err
 			eventChannel := make(chan event.Event)
 			resourceCache := cache.NewResourceCacheMap()
-			context := taskrunner.NewTaskContext(eventChannel, resourceCache)
+			taskContext := taskrunner.NewTaskContext(eventChannel, resourceCache)
 
 			// initialize inventory in context
-			inv := context.InventoryManager().Inventory()
+			inv := taskContext.InventoryManager().Inventory()
 			tc.contextInventory.DeepCopyInto(inv)
 
 			task := DeleteInvTask{
@@ -130,15 +131,15 @@ func TestDeleteInvTask(t *testing.T) {
 			if taskName != task.Name() {
 				t.Errorf("expected task name (%s), got (%s)", taskName, task.Name())
 			}
-			task.Start(context)
-			result := <-context.TaskChannel()
+			task.Start(taskContext)
+			result := <-taskContext.TaskChannel()
 			if tc.expectedError != nil {
 				assert.EqualError(t, result.Err, tc.expectedError.Error())
 				return
 			}
 			assert.NoError(t, result.Err)
 
-			inv, err := client.Load(inventoryInfo)
+			inv, err := client.Load(context.TODO(), inventoryInfo)
 			assert.NoError(t, err)
 			testutil.AssertEqual(t, tc.expectedInventory, inv)
 		})

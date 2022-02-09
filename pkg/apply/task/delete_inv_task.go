@@ -4,6 +4,7 @@
 package task
 
 import (
+	"context"
 	"fmt"
 
 	"k8s.io/klog/v2"
@@ -40,6 +41,8 @@ func (i *DeleteInvTask) Identifiers() object.ObjMetadataSet {
 func (i *DeleteInvTask) Start(taskContext *taskrunner.TaskContext) {
 	go func() {
 		klog.V(2).Infof("delete inventory task starting (name: %q)", i.Name())
+		// TODO: pipe Context through TaskContext
+		ctx := context.TODO()
 
 		var invObjIds object.ObjMetadataSet
 
@@ -78,7 +81,7 @@ func (i *DeleteInvTask) Start(taskContext *taskrunner.TaskContext) {
 			// TODO: move these inventory updates to the other tasks
 			inv.Spec.Objects = inventory.ObjectReferencesFromObjMetadataSet(invObjIds)
 			// TODO: update inventory status?
-			err := i.InvClient.Store(inv, i.DryRun)
+			err := i.InvClient.Store(ctx, inv, i.DryRun)
 			if err != nil {
 				err = fmt.Errorf("failed to update inventory: %w", err)
 				i.sendTaskResult(taskContext, err)
@@ -90,7 +93,7 @@ func (i *DeleteInvTask) Start(taskContext *taskrunner.TaskContext) {
 		}
 
 		invInfo := inventory.InventoryInfoFromObject(im.Inventory())
-		err := i.InvClient.Delete(invInfo, i.DryRun)
+		err := i.InvClient.Delete(ctx, invInfo, i.DryRun)
 		if err != nil {
 			err = fmt.Errorf("failed to delete inventory: %w", err)
 			i.sendTaskResult(taskContext, err)

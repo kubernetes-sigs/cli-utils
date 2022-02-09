@@ -122,7 +122,7 @@ func (d *Destroyer) prepareObjects(
 	invInfo inventory.InventoryInfo,
 ) (pruneObjs, invObjs object.UnstructuredSet, err error) {
 	// Load the inventory from storage
-	inv, err := d.invClient.Load(invInfo)
+	inv, err := d.invClient.Load(ctx, invInfo)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to load inventory: %w", err)
 	}

@@ -4,6 +4,7 @@
 package inventory
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -75,7 +76,7 @@ func TestInMemoryClient(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			client := &InMemoryClient{}
 
-			err := client.Store(tc.input, common.DryRunNone)
+			err := client.Store(context.TODO(), tc.input, common.DryRunNone)
 			if tc.expectedStoreErr != nil {
 				assert.EqualError(t, err, tc.expectedStoreErr.Error())
 				return
@@ -83,7 +84,7 @@ func TestInMemoryClient(t *testing.T) {
 			assert.NoError(t, err)
 
 			invInfo := InventoryInfoFromObject(tc.input)
-			inv, err := client.Load(invInfo)
+			inv, err := client.Load(context.TODO(), invInfo)
 			assert.Equal(t, tc.expected, inv)
 		})
 	}

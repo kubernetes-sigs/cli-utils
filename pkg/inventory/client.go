@@ -4,6 +4,8 @@
 package inventory
 
 import (
+	"context"
+
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/cli-utils/pkg/apis/actuation"
 	"sigs.k8s.io/cli-utils/pkg/common"
@@ -13,9 +15,9 @@ import (
 // TODO: pass DryRun to Client methods
 type Client interface {
 	GroupVersionKind() schema.GroupVersionKind
-	Load(InventoryInfo) (*actuation.Inventory, error)
-	Store(*actuation.Inventory, common.DryRunStrategy) error
-	Delete(InventoryInfo, common.DryRunStrategy) error
+	Load(context.Context, InventoryInfo) (*actuation.Inventory, error)
+	Store(context.Context, *actuation.Inventory, common.DryRunStrategy) error
+	Delete(context.Context, InventoryInfo, common.DryRunStrategy) error
 }
 
 // InventoryInfo provides enough information for the Client to uniquely

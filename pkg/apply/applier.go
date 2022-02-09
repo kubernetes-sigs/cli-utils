@@ -79,7 +79,7 @@ func (a *Applier) prepareObjects(
 	}
 
 	// Load the inventory from storage
-	inv, err := a.invClient.Load(invInfo)
+	inv, err := a.invClient.Load(ctx, invInfo)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to load inventory: %w", err)
 	}

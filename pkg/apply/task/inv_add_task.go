@@ -117,7 +117,7 @@ func (i *InvAddTask) Start(taskContext *taskrunner.TaskContext) {
 		inv.Status.Objects = objStatusSet
 
 		// Update the inventory
-		err := i.InvClient.Store(inv, i.DryRun)
+		err := i.InvClient.Store(ctx, inv, i.DryRun)
 		if err != nil {
 			err = fmt.Errorf("failed to update inventory: %w", err)
 			i.sendTaskResult(taskContext, err)

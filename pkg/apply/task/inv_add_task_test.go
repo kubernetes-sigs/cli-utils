@@ -4,6 +4,7 @@
 package task
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -163,10 +164,10 @@ func TestInvAddTask(t *testing.T) {
 			client := &inventory.InMemoryClient{}
 			eventChannel := make(chan event.Event)
 			resourceCache := cache.NewResourceCacheMap()
-			context := taskrunner.NewTaskContext(eventChannel, resourceCache)
+			taskContext := taskrunner.NewTaskContext(eventChannel, resourceCache)
 
 			// initialize inventory reference in context
-			inv := context.InventoryManager().Inventory()
+			inv := taskContext.InventoryManager().Inventory()
 			inv.SetGroupVersionKind(inventoryObj.GroupVersionKind())
 			inv.SetName(inventoryObj.GetName())
 			inv.SetNamespace(inventoryObj.GetNamespace())
@@ -181,15 +182,15 @@ func TestInvAddTask(t *testing.T) {
 			assert.Equal(t, taskName, task.Name())
 			testutil.AssertEqual(t, tc.expectedIds, task.Identifiers())
 
-			task.Start(context)
-			result := <-context.TaskChannel()
+			task.Start(taskContext)
+			result := <-taskContext.TaskChannel()
 			if tc.expectedError != nil {
 				assert.EqualError(t, result.Err, tc.expectedError.Error())
 				return
 			}
 			assert.NoError(t, result.Err)
 
-			inv, err := client.Load(inventoryInfo)
+			inv, err := client.Load(context.TODO(), inventoryInfo)
 			assert.NoError(t, err)
 			testutil.AssertEqual(t, tc.expectedSpecObjs, inv.Spec.Objects)
 			testutil.AssertEqual(t, tc.expectedStatusObjs, inv.Status.Objects)

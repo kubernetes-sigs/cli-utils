@@ -71,6 +71,17 @@ type StatusRunner struct {
 // poller to compute status for each of the resources. One of the printer
 // implementations takes care of printing the output.
 func (r *StatusRunner) runE(cmd *cobra.Command, args []string) error {
+	// If the user has specified a timeout, we create a context with timeout,
+	// otherwise we create a context with cancel.
+	ctx := cmd.Context()
+	var cancel func()
+	if r.timeout != 0 {
+		ctx, cancel = context.WithTimeout(ctx, r.timeout)
+	} else {
+		ctx, cancel = context.WithCancel(ctx)
+	}
+	defer cancel()
+
 	_, err := common.DemandOneDirectory(args)
 	if err != nil {
 		return err
@@ -98,7 +109,7 @@ func (r *StatusRunner) runE(cmd *cobra.Command, args []string) error {
 
 	// Based on the inventory template manifest we look up the inventory
 	// from the live state using the inventory client.
-	inv, err := invClient.Load(invInfo)
+	inv, err := invClient.Load(ctx, invInfo)
 	if err != nil {
 		return fmt.Errorf("failed to load inventory: %w", err)
 	}
@@ -127,17 +138,6 @@ func (r *StatusRunner) runE(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("error creating printer: %w", err)
 	}
-
-	// If the user has specified a timeout, we create a context with timeout,
-	// otherwise we create a context with cancel.
-	ctx := cmd.Context()
-	var cancel func()
-	if r.timeout != 0 {
-		ctx, cancel = context.WithTimeout(ctx, r.timeout)
-	} else {
-		ctx, cancel = context.WithCancel(ctx)
-	}
-	defer cancel()
 
 	// Choose the appropriate ObserverFunc based on the criteria for when
 	// the command should exit.
