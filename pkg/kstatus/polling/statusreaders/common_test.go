@@ -15,6 +15,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	fakecr "sigs.k8s.io/cli-utils/pkg/kstatus/polling/clusterreader/fake"
+	fakesr "sigs.k8s.io/cli-utils/pkg/kstatus/polling/statusreaders/fake"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/testutil"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	fakemapper "sigs.k8s.io/cli-utils/pkg/testutil"
@@ -23,6 +25,7 @@ import (
 var (
 	deploymentGVK = appsv1.SchemeGroupVersion.WithKind("Deployment")
 	deploymentGVR = appsv1.SchemeGroupVersion.WithResource("deployments")
+	replicaSetGVK = appsv1.SchemeGroupVersion.WithKind("ReplicaSet")
 
 	rsGVK = appsv1.SchemeGroupVersion.WithKind("ReplicaSet")
 )
@@ -67,12 +70,18 @@ func TestLookupResource(t *testing.T) {
 		"getting resource succeeds": {
 			identifier: deploymentIdentifier,
 		},
+		"context cancelled": {
+			identifier:         deploymentIdentifier,
+			readerErr:          context.Canceled,
+			expectErr:          true,
+			expectedErrMessage: context.Canceled.Error(),
+		},
 	}
 
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
-			fakeReader := &fakeClusterReader{
-				getErr: tc.readerErr,
+			fakeReader := &fakecr.FakeClusterReader{
+				GetErr: tc.readerErr,
 			}
 			fakeMapper := fakemapper.NewFakeRESTMapper(deploymentGVK)
 
@@ -192,14 +201,14 @@ spec:
 
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
-			fakeClusterReader := &fakeClusterReader{
-				listResources: &unstructured.UnstructuredList{
+			fakeClusterReader := &fakecr.FakeClusterReader{
+				ListResources: &unstructured.UnstructuredList{
 					Items: tc.listObjects,
 				},
-				listErr: tc.listErr,
+				ListErr: tc.listErr,
 			}
 			fakeMapper := fakemapper.NewFakeRESTMapper(rsGVK)
-			fakeStatusReader := &fakeStatusReader{}
+			fakeStatusReader := &fakesr.FakeStatusReader{}
 
 			object := testutil.YamlToUnstructured(t, tc.manifest)
 

@@ -15,8 +15,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	fakecr "sigs.k8s.io/cli-utils/pkg/kstatus/polling/clusterreader/fake"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
-	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/testutil"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	fakemapper "sigs.k8s.io/cli-utils/pkg/testutil"
@@ -113,7 +113,7 @@ func TestStatusPollerRunner(t *testing.T) {
 				DefaultStatusReader: tc.defaultStatusReader,
 				StatusReaders:       []StatusReader{},
 				ClusterReaderFactory: ClusterReaderFactoryFunc(func(client.Reader, meta.RESTMapper, object.ObjMetadataSet) (ClusterReader, error) {
-					return testutil.NewNoopClusterReader(), nil
+					return fakecr.NewNoopClusterReader(), nil
 				}),
 			}
 
@@ -146,7 +146,7 @@ func TestNewStatusPollerRunnerCancellation(t *testing.T) {
 
 	engine := PollerEngine{
 		ClusterReaderFactory: ClusterReaderFactoryFunc(func(client.Reader, meta.RESTMapper, object.ObjMetadataSet) (ClusterReader, error) {
-			return testutil.NewNoopClusterReader(), nil
+			return fakecr.NewNoopClusterReader(), nil
 		}),
 	}
 
@@ -168,6 +168,69 @@ func TestNewStatusPollerRunnerCancellation(t *testing.T) {
 	}
 }
 
+func TestNewStatusPollerRunnerCancellationWithMultipleResources(t *testing.T) {
+	identifiers := object.ObjMetadataSet{
+		{
+			GroupKind: schema.GroupKind{
+				Group: "apps",
+				Kind:  "Deployment",
+			},
+			Name:      "foo",
+			Namespace: "default",
+		},
+		{
+			GroupKind: schema.GroupKind{
+				Group: "apps",
+				Kind:  "StatefulSet",
+			},
+			Name:      "bar",
+			Namespace: "default",
+		},
+	}
+
+	fakeMapper := fakemapper.NewFakeRESTMapper(
+		appsv1.SchemeGroupVersion.WithKind("Deployment"),
+		appsv1.SchemeGroupVersion.WithKind("StatefulSet"),
+	)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	timer := time.NewTimer(10 * time.Second)
+
+	engine := PollerEngine{
+		Mapper: fakeMapper,
+		ClusterReaderFactory: ClusterReaderFactoryFunc(func(client.Reader, meta.RESTMapper, object.ObjMetadataSet) (ClusterReader, error) {
+			return &fakecr.FakeClusterReader{
+				SyncErr: context.Canceled,
+			}, nil
+		}),
+	}
+
+	options := Options{
+		PollInterval: 1 * time.Second,
+	}
+
+	eventChannel := engine.Poll(ctx, identifiers, options)
+
+	var events []event.Event
+loop:
+	for {
+		select {
+		case e, ok := <-eventChannel:
+			if !ok {
+				timer.Stop()
+				break loop
+			}
+			events = append(events, e)
+		case <-timer.C:
+			t.Errorf("expected runner to time out, but it didn't")
+			return
+		}
+	}
+	assert.Equal(t, 0, len(events))
+}
+
 func TestNewStatusPollerRunnerIdentifierValidation(t *testing.T) {
 	identifiers := object.ObjMetadataSet{
 		{
@@ -184,7 +247,7 @@ func TestNewStatusPollerRunnerIdentifierValidation(t *testing.T) {
 			appsv1.SchemeGroupVersion.WithKind("Deployment"),
 		),
 		ClusterReaderFactory: ClusterReaderFactoryFunc(func(client.Reader, meta.RESTMapper, object.ObjMetadataSet) (ClusterReader, error) {
-			return testutil.NewNoopClusterReader(), nil
+			return fakecr.NewNoopClusterReader(), nil
 		}),
 	}
 
@@ -217,7 +280,7 @@ func (f *fakeStatusReader) Supports(schema.GroupKind) bool {
 	return true
 }
 
-func (f *fakeStatusReader) ReadStatus(_ context.Context, _ ClusterReader, identifier object.ObjMetadata) *event.ResourceStatus {
+func (f *fakeStatusReader) ReadStatus(_ context.Context, _ ClusterReader, identifier object.ObjMetadata) (*event.ResourceStatus, error) {
 	count := f.resourceStatusCount[identifier.GroupKind]
 	resourceStatusSlice := f.resourceStatuses[identifier.GroupKind]
 	var resourceStatus status.Status
@@ -230,9 +293,9 @@ func (f *fakeStatusReader) ReadStatus(_ context.Context, _ ClusterReader, identi
 	return &event.ResourceStatus{
 		Identifier: identifier,
 		Status:     resourceStatus,
-	}
+	}, nil
 }
 
-func (f *fakeStatusReader) ReadStatusForObject(_ context.Context, _ ClusterReader, _ *unstructured.Unstructured) *event.ResourceStatus {
-	return nil
+func (f *fakeStatusReader) ReadStatusForObject(_ context.Context, _ ClusterReader, _ *unstructured.Unstructured) (*event.ResourceStatus, error) {
+	return nil, nil
 }

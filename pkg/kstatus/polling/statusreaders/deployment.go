@@ -43,18 +43,14 @@ func (d *deploymentResourceReader) Supports(gk schema.GroupKind) bool {
 	return gk == appsv1.SchemeGroupVersion.WithKind("Deployment").GroupKind()
 }
 
-func (d *deploymentResourceReader) ReadStatusForObject(ctx context.Context, reader engine.ClusterReader, deployment *unstructured.Unstructured) *event.ResourceStatus {
+func (d *deploymentResourceReader) ReadStatusForObject(ctx context.Context, reader engine.ClusterReader,
+	deployment *unstructured.Unstructured) (*event.ResourceStatus, error) {
 	identifier := object.UnstructuredToObjMetadata(deployment)
 
 	replicaSetStatuses, err := statusForGeneratedResources(ctx, d.mapper, reader, d.rsStatusReader, deployment,
 		appsv1.SchemeGroupVersion.WithKind("ReplicaSet").GroupKind(), "spec", "selector")
 	if err != nil {
-		return &event.ResourceStatus{
-			Identifier: identifier,
-			Status:     status.UnknownStatus,
-			Resource:   deployment,
-			Error:      err,
-		}
+		return errResourceToResourceStatus(err, deployment)
 	}
 
 	// Currently this engine just uses the status library for computing
@@ -63,12 +59,7 @@ func (d *deploymentResourceReader) ReadStatusForObject(ctx context.Context, read
 	// rules can be improved to take advantage of this information.
 	res, err := status.Compute(deployment)
 	if err != nil {
-		return &event.ResourceStatus{
-			Identifier:         identifier,
-			Status:             status.UnknownStatus,
-			Error:              err,
-			GeneratedResources: replicaSetStatuses,
-		}
+		return errResourceToResourceStatus(err, deployment, replicaSetStatuses...)
 	}
 
 	return &event.ResourceStatus{
@@ -77,5 +68,5 @@ func (d *deploymentResourceReader) ReadStatusForObject(ctx context.Context, read
 		Resource:           deployment,
 		Message:            res.Message,
 		GeneratedResources: replicaSetStatuses,
-	}
+	}, nil
 }

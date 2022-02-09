@@ -39,6 +39,6 @@ func (r *replicaSetStatusReader) Supports(gk schema.GroupKind) bool {
 	return gk == appsv1.SchemeGroupVersion.WithKind("ReplicaSet").GroupKind()
 }
 
-func (r *replicaSetStatusReader) ReadStatusForObject(ctx context.Context, reader engine.ClusterReader, rs *unstructured.Unstructured) *event.ResourceStatus {
+func (r *replicaSetStatusReader) ReadStatusForObject(ctx context.Context, reader engine.ClusterReader, rs *unstructured.Unstructured) (*event.ResourceStatus, error) {
 	return newPodControllerStatusReader(r.mapper, r.podStatusReader).readStatus(ctx, reader, rs)
 }

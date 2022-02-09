@@ -5,10 +5,11 @@ package clusterreader
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
@@ -169,7 +170,7 @@ func (c *CachingClusterReader) Get(_ context.Context, key client.ObjectKey, obj 
 			return nil
 		}
 	}
-	return errors.NewNotFound(mapping.Resource.GroupResource(), key.Name)
+	return apierrors.NewNotFound(mapping.Resource.GroupResource(), key.Name)
 }
 
 // ListNamespaceScoped lists all resource identifier by the GVK of the list, the namespace and the selector
@@ -239,7 +240,12 @@ func (c *CachingClusterReader) Sync(ctx context.Context) error {
 		list.SetGroupVersionKind(mapping.GroupVersionKind)
 		err = c.reader.List(ctx, &list, listOptions...)
 		if err != nil {
-			// We continue even if there is an error. Whenever any pollers
+			// If the context was cancelled, we just stop the work and return
+			// the error.
+			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+				return err
+			}
+			// For other errors, we just keep it the error. Whenever any pollers
 			// request a resource covered by this gns, we just return the
 			// error.
 			cache[gn] = cacheEntry{

@@ -10,9 +10,12 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/apps/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	fakecr "sigs.k8s.io/cli-utils/pkg/kstatus/polling/clusterreader/fake"
+	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/engine"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
-	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/testutil"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	fakemapper "sigs.k8s.io/cli-utils/pkg/testutil"
@@ -78,7 +81,7 @@ func TestPodControllerStatusReader(t *testing.T) {
 
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
-			fakeReader := testutil.NewNoopClusterReader()
+			fakeReader := fakecr.NewNoopClusterReader()
 			fakeMapper := fakemapper.NewFakeRESTMapper()
 			podControllerStatusReader := &podControllerStatusReader{
 				mapper: fakeMapper,
@@ -93,10 +96,18 @@ func TestPodControllerStatusReader(t *testing.T) {
 			rs.SetName(name)
 			rs.SetNamespace(namespace)
 
-			resourceStatus := podControllerStatusReader.readStatus(context.Background(), fakeReader, rs)
+			resourceStatus, err := podControllerStatusReader.readStatus(context.Background(), fakeReader, rs)
 
+			assert.NoError(t, err)
 			assert.Equal(t, tc.expectedIdentifier, resourceStatus.Identifier)
 			assert.Equal(t, tc.expectedStatus, resourceStatus.Status)
 		})
+	}
+}
+
+func fakeStatusForGenResourcesFunc(resourceStatuses event.ResourceStatuses, err error) statusForGenResourcesFunc {
+	return func(_ context.Context, _ meta.RESTMapper, _ engine.ClusterReader, _ resourceTypeStatusReader,
+		_ *unstructured.Unstructured, _ schema.GroupKind, _ ...string) (event.ResourceStatuses, error) {
+		return resourceStatuses, err
 	}
 }

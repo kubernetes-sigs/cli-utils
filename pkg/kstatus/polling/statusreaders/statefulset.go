@@ -39,6 +39,7 @@ func (s *statefulSetResourceReader) Supports(gk schema.GroupKind) bool {
 	return gk == appsv1.SchemeGroupVersion.WithKind("StatefulSet").GroupKind()
 }
 
-func (s *statefulSetResourceReader) ReadStatusForObject(ctx context.Context, reader engine.ClusterReader, statefulSet *unstructured.Unstructured) *event.ResourceStatus {
+func (s *statefulSetResourceReader) ReadStatusForObject(ctx context.Context, reader engine.ClusterReader,
+	statefulSet *unstructured.Unstructured) (*event.ResourceStatus, error) {
 	return newPodControllerStatusReader(s.mapper, s.podResourceReader).readStatus(ctx, reader, statefulSet)
 }

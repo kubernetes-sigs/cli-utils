@@ -5,6 +5,7 @@ package engine
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -167,10 +168,7 @@ func (r *statusPollerRunner) Run() {
 
 	err := r.syncAndPoll()
 	if err != nil {
-		r.eventChannel <- event.Event{
-			EventType: event.ErrorEvent,
-			Error:     err,
-		}
+		r.handleSyncAndPollErr(err)
 		return
 	}
 
@@ -182,13 +180,25 @@ func (r *statusPollerRunner) Run() {
 			// First sync and then compute status for all resources.
 			err := r.syncAndPoll()
 			if err != nil {
-				r.eventChannel <- event.Event{
-					EventType: event.ErrorEvent,
-					Error:     err,
-				}
+				r.handleSyncAndPollErr(err)
 				return
 			}
 		}
+	}
+}
+
+// handleSyncAndPollErr decides what to do if we encounter an error while
+// fetching resources to compute status. Errors are usually returned
+// as an ErrorEvent, but we handle context cancellation or deadline exceeded
+// differently since they aren't really errors, but a signal that the
+// process should shut down.
+func (r *statusPollerRunner) handleSyncAndPollErr(err error) {
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return
+	}
+	r.eventChannel <- event.Event{
+		EventType: event.ErrorEvent,
+		Error:     err,
 	}
 }
 
@@ -204,17 +214,25 @@ func (r *statusPollerRunner) syncAndPoll() error {
 	// Poll all resources and compute status. If the polling of resources has completed (based
 	// on information from the StatusAggregator and the value of pollUntilCancelled), we send
 	// a CompletedEvent and return.
-	r.pollStatusForAllResources()
-	return nil
+	return r.pollStatusForAllResources()
 }
 
 // pollStatusForAllResources iterates over all the resources in the set and delegates
 // to the appropriate engine to compute the status.
-func (r *statusPollerRunner) pollStatusForAllResources() {
+func (r *statusPollerRunner) pollStatusForAllResources() error {
 	for _, id := range r.identifiers {
+		// Check if the context has been cancelled on every iteration.
+		select {
+		case <-r.ctx.Done():
+			return r.ctx.Err()
+		default:
+		}
 		gk := id.GroupKind
 		statusReader := r.statusReaderForGroupKind(gk)
-		resourceStatus := statusReader.ReadStatus(r.ctx, r.clusterReader, id)
+		resourceStatus, err := statusReader.ReadStatus(r.ctx, r.clusterReader, id)
+		if err != nil {
+			return err
+		}
 		if r.isUpdatedResourceStatus(resourceStatus) {
 			r.previousResourceStatuses[id] = resourceStatus
 			r.eventChannel <- event.Event{
@@ -223,6 +241,7 @@ func (r *statusPollerRunner) pollStatusForAllResources() {
 			}
 		}
 	}
+	return nil
 }
 
 func (r *statusPollerRunner) statusReaderForGroupKind(gk schema.GroupKind) StatusReader {
