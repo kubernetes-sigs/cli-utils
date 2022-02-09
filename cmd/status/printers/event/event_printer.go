@@ -14,16 +14,16 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
-// eventPrinter implements the Printer interface and outputs the resource
+// EventPrinter implements the Printer interface and outputs the resource
 // status information as a list of events as they happen.
-type eventPrinter struct {
-	ioStreams genericclioptions.IOStreams
+type EventPrinter struct {
+	IOStreams genericclioptions.IOStreams
 }
 
 // NewEventPrinter returns a new instance of the eventPrinter.
-func NewEventPrinter(ioStreams genericclioptions.IOStreams) *eventPrinter {
-	return &eventPrinter{
-		ioStreams: ioStreams,
+func NewEventPrinter(ioStreams genericclioptions.IOStreams) *EventPrinter {
+	return &EventPrinter{
+		IOStreams: ioStreams,
 	}
 }
 
@@ -31,7 +31,7 @@ func NewEventPrinter(ioStreams genericclioptions.IOStreams) *eventPrinter {
 // until the channel is closed. The provided cancelFunc is consulted on
 // every event and is responsible for stopping the poller when appropriate.
 // This function will block.
-func (ep *eventPrinter) Print(ch <-chan pollevent.Event, identifiers object.ObjMetadataSet,
+func (ep *EventPrinter) Print(ch <-chan pollevent.Event, identifiers object.ObjMetadataSet,
 	cancelFunc collector.ObserverFunc) error {
 	coll := collector.NewResourceStatusCollector(identifiers)
 	// The actual work is done by the collector, which will invoke the
@@ -52,15 +52,15 @@ func (ep *eventPrinter) Print(ch <-chan pollevent.Event, identifiers object.ObjM
 	return err
 }
 
-func (ep *eventPrinter) printStatusEvent(se pollevent.Event) {
+func (ep *EventPrinter) printStatusEvent(se pollevent.Event) {
 	switch se.Type {
 	case pollevent.ResourceUpdateEvent:
 		id := se.Resource.Identifier
-		printResourceStatus(id, se, ep.ioStreams)
+		printResourceStatus(id, se, ep.IOStreams)
 	case pollevent.ErrorEvent:
 		id := se.Resource.Identifier
 		gk := id.GroupKind
-		fmt.Fprintf(ep.ioStreams.Out, "%s error: %s\n", resourceIDToString(gk, id.Name),
+		fmt.Fprintf(ep.IOStreams.Out, "%s error: %s\n", resourceIDToString(gk, id.Name),
 			se.Error.Error())
 	}
 }
