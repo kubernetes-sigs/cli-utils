@@ -317,7 +317,7 @@ func TestDestroyerCancel(t *testing.T) {
 			}
 
 			// Add the inventory to the cluster (for ConfigMap client and to allow deletion)
-			cm, err := inventory.InventoryToConfigMap(inv)
+			cm, err := inventory.ConfigMapConverter{}.From(inv)
 			require.NoError(t, err)
 			tc.clusterObjs = append(tc.clusterObjs, cm)
 

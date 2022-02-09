@@ -24,5 +24,9 @@ func (cmcf ConfigMapClientFactory) NewClient(factory cmdutil.Factory) (Client, e
 		return nil, fmt.Errorf("error getting rest mapper: %v", err)
 	}
 
-	return NewConfigMapClient(client, mapper), nil
+	return &ClusterClient{
+		DynamicClient: client,
+		Mapper:        mapper,
+		Converter:     ConfigMapConverter{},
+	}, nil
 }

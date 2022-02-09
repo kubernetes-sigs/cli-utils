@@ -63,13 +63,15 @@ func TestStoreCreate(t *testing.T) {
 			mapper, err := tf.ToRESTMapper()
 			require.NoError(t, err)
 
-			invClient := NewConfigMapClient(client, mapper)
+			invClient := &ClusterClient{
+				DynamicClient: client,
+				Mapper:        mapper,
+				Converter:     ConfigMapConverter{},
+			}
 
 			inv := &actuation.Inventory{}
 			inv.SetGroupVersionKind(inventoryObj.GroupVersionKind())
-			inv.SetName(inventoryObj.GetName())
-			inv.SetNamespace(inventoryObj.GetNamespace())
-			SetInventoryLabel(inv, InventoryLabel(inventoryObj))
+			object.DeepCopyObjectMetaInto(inventoryObj, inv)
 			inv.Spec = actuation.InventorySpec{
 				Objects: ObjectReferencesFromObjMetadataSet(tc.localObjs),
 			}
@@ -168,13 +170,15 @@ func TestStoreUpdate(t *testing.T) {
 			mapper, err := tf.ToRESTMapper()
 			require.NoError(t, err)
 
-			invClient := NewConfigMapClient(client, mapper)
+			invClient := &ClusterClient{
+				DynamicClient: client,
+				Mapper:        mapper,
+				Converter:     ConfigMapConverter{},
+			}
 
 			inv := &actuation.Inventory{}
 			inv.SetGroupVersionKind(inventoryObj.GroupVersionKind())
-			inv.SetName(inventoryObj.GetName())
-			inv.SetNamespace(inventoryObj.GetNamespace())
-			SetInventoryLabel(inv, InventoryLabel(inventoryObj))
+			object.DeepCopyObjectMetaInto(inventoryObj, inv)
 			inv.Spec = actuation.InventorySpec{
 				Objects: ObjectReferencesFromObjMetadataSet(tc.localObjs),
 			}
@@ -240,7 +244,11 @@ func TestLoad(t *testing.T) {
 			mapper, err := tf.ToRESTMapper()
 			require.NoError(t, err)
 
-			invClient := NewConfigMapClient(client, mapper)
+			invClient := &ClusterClient{
+				DynamicClient: client,
+				Mapper:        mapper,
+				Converter:     ConfigMapConverter{},
+			}
 
 			inv, err := invClient.Load(tc.invInfo)
 			if tc.isError {
@@ -312,7 +320,11 @@ func TestDelete(t *testing.T) {
 			client, err := tf.DynamicClient()
 			require.NoError(t, err)
 
-			invClient := NewConfigMapClient(client, mapper)
+			invClient := &ClusterClient{
+				DynamicClient: client,
+				Mapper:        mapper,
+				Converter:     ConfigMapConverter{},
+			}
 
 			err = invClient.Delete(tc.invInfo)
 			if tc.isError {

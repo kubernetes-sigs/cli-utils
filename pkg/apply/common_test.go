@@ -118,13 +118,9 @@ func newTestInventory(
 	tf *cmdtesting.TestFactory,
 	inv *actuation.Inventory,
 ) inventory.Client {
-	client, err := tf.DynamicClient()
+	invClient, err := inventory.ConfigMapClientFactory{}.NewClient(tf)
 	require.NoError(t, err)
-
-	mapper, err := tf.ToRESTMapper()
-	require.NoError(t, err)
-
-	return inventory.NewConfigMapClient(client, mapper)
+	return invClient
 }
 
 func newTestFactory(

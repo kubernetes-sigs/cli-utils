@@ -1386,7 +1386,7 @@ func TestApplier(t *testing.T) {
 			}
 
 			// Add the inventory to the cluster (for ConfigMap client)
-			cm, err := inventory.InventoryToConfigMap(inv)
+			cm, err := inventory.ConfigMapConverter{}.From(inv)
 			require.NoError(t, err)
 			tc.clusterObjs = append(tc.clusterObjs, cm)
 
