@@ -20,6 +20,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/cli-utils/pkg/apis/actuation"
+	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
@@ -78,7 +79,7 @@ func (cc *ClusterClient) Load(invInfo InventoryInfo) (*actuation.Inventory, erro
 }
 
 // Store the inventory as a ConfigMap.
-func (cc *ClusterClient) Store(inv *actuation.Inventory) error {
+func (cc *ClusterClient) Store(inv *actuation.Inventory, dryRun common.DryRunStrategy) error {
 	invGK := inv.GroupVersionKind().GroupKind()
 	gvk := cc.GroupVersionKind()
 	gk := gvk.GroupKind()
@@ -113,12 +114,12 @@ func (cc *ClusterClient) Store(inv *actuation.Inventory) error {
 		obj.SetUID(oldObj.GetUID())
 		obj.SetResourceVersion(oldObj.GetResourceVersion())
 		// TODO: should any other metadata be copied/merged?
-		out, err = cc.updateObject(context.TODO(), obj, mapping)
+		out, err = cc.updateObject(context.TODO(), obj, mapping, dryRun)
 		if err != nil {
 			return err
 		}
 	} else {
-		out, err = cc.createObject(context.TODO(), obj, mapping)
+		out, err = cc.createObject(context.TODO(), obj, mapping, dryRun)
 		if err != nil {
 			return err
 		}
@@ -127,7 +128,7 @@ func (cc *ClusterClient) Store(inv *actuation.Inventory) error {
 	return nil
 }
 
-func (cc *ClusterClient) Delete(invInfo InventoryInfo) error {
+func (cc *ClusterClient) Delete(invInfo InventoryInfo, dryRun common.DryRunStrategy) error {
 	infoGK := GroupKindFromObjectReference(invInfo.ObjectReference)
 	gvk := cc.GroupVersionKind()
 	gk := gvk.GroupKind()
@@ -145,7 +146,7 @@ func (cc *ClusterClient) Delete(invInfo InventoryInfo) error {
 	}
 
 	id := ObjMetadataFromObjectReference(invInfo.ObjectReference)
-	err = cc.deleteObject(context.TODO(), id, mapping)
+	err = cc.deleteObject(context.TODO(), id, mapping, dryRun)
 	if err != nil {
 		return err
 	}
@@ -166,9 +167,14 @@ func (cc *ClusterClient) getObject(ctx context.Context, id object.ObjMetadata, m
 	return obj, nil
 }
 
-func (cc *ClusterClient) createObject(ctx context.Context, obj *unstructured.Unstructured, mapping *meta.RESTMapping) (*unstructured.Unstructured, error) {
+func (cc *ClusterClient) createObject(ctx context.Context, obj *unstructured.Unstructured, mapping *meta.RESTMapping, dryRun common.DryRunStrategy) (*unstructured.Unstructured, error) {
 	id := object.UnstructuredToObjMetadata(obj)
-	klog.V(4).Infof("updating object in cluster: %v", id)
+	if dryRun.ClientOrServerDryRun() {
+		// TODO: impl server-side dry-run
+		klog.V(4).Infoln("creating object in cluster (dry-run): %v", id)
+		return nil, nil
+	}
+	klog.V(4).Infof("creating object in cluster: %v", id)
 	out, err := cc.DynamicClient.Resource(mapping.Resource).
 		Namespace(id.Namespace).
 		Create(ctx, obj, metav1.CreateOptions{})
@@ -178,9 +184,15 @@ func (cc *ClusterClient) createObject(ctx context.Context, obj *unstructured.Uns
 	return out, nil
 }
 
-func (cc *ClusterClient) updateObject(ctx context.Context, obj *unstructured.Unstructured, mapping *meta.RESTMapping) (*unstructured.Unstructured, error) {
+func (cc *ClusterClient) updateObject(ctx context.Context, obj *unstructured.Unstructured, mapping *meta.RESTMapping, dryRun common.DryRunStrategy) (*unstructured.Unstructured, error) {
 	id := object.UnstructuredToObjMetadata(obj)
+	if dryRun.ClientOrServerDryRun() {
+		// TODO: impl server-side dry-run
+		klog.V(4).Infoln("updating object in cluster (dry-run): %v", id)
+		return nil, nil
+	}
 	klog.V(4).Infof("updating object in cluster: %v", id)
+
 	out, err := cc.DynamicClient.Resource(mapping.Resource).
 		Namespace(id.Namespace).
 		Update(ctx, obj, metav1.UpdateOptions{})
@@ -190,8 +202,14 @@ func (cc *ClusterClient) updateObject(ctx context.Context, obj *unstructured.Uns
 	return out, nil
 }
 
-func (cc *ClusterClient) deleteObject(ctx context.Context, id object.ObjMetadata, mapping *meta.RESTMapping) error {
+func (cc *ClusterClient) deleteObject(ctx context.Context, id object.ObjMetadata, mapping *meta.RESTMapping, dryRun common.DryRunStrategy) error {
+	if dryRun.ClientOrServerDryRun() {
+		// TODO: impl server-side dry-run
+		klog.V(4).Infoln("deleting object in cluster (dry-run): %v", id)
+		return nil
+	}
 	klog.V(4).Infof("deleting object in cluster: %v", id)
+
 	err := cc.DynamicClient.Resource(mapping.Resource).
 		Namespace(id.Namespace).
 		Delete(ctx, id.Name, metav1.DeleteOptions{})

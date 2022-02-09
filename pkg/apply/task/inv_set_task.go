@@ -117,7 +117,7 @@ func (i *InvSetTask) Start(taskContext *taskrunner.TaskContext) {
 		// TODO: move these inventory updates to the other tasks
 		inv.Spec.Objects = inventory.ObjectReferencesFromObjMetadataSet(invObjs)
 		// TODO: update inventory status?
-		err := i.InvClient.Store(inv)
+		err := i.InvClient.Store(inv, i.DryRun)
 
 		klog.V(2).Infof("inventory set task completing (name: %q)", i.Name())
 		taskContext.TaskChannel() <- taskrunner.TaskResult{Err: err}

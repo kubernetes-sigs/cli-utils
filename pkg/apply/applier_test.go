@@ -17,6 +17,7 @@ import (
 	"k8s.io/kubectl/pkg/scheme"
 	"sigs.k8s.io/cli-utils/pkg/apis/actuation"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
+	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	pollevent "sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
@@ -1969,7 +1970,7 @@ func TestReadAndPrepareObjects(t *testing.T) {
 			)
 
 			// initialize inventory contents
-			err := applier.invClient.Store(inv)
+			err := applier.invClient.Store(inv, common.DryRunNone)
 			require.NoError(t, err)
 
 			ctx := context.TODO()

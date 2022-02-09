@@ -9,6 +9,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"sigs.k8s.io/cli-utils/pkg/apis/actuation"
+	"sigs.k8s.io/cli-utils/pkg/common"
 )
 
 func TestInMemoryClient(t *testing.T) {
@@ -74,7 +75,7 @@ func TestInMemoryClient(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			client := &InMemoryClient{}
 
-			err := client.Store(tc.input)
+			err := client.Store(tc.input, common.DryRunNone)
 			if tc.expectedStoreErr != nil {
 				assert.EqualError(t, err, tc.expectedStoreErr.Error())
 				return

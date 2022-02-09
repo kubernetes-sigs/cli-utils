@@ -78,7 +78,7 @@ func (i *DeleteInvTask) Start(taskContext *taskrunner.TaskContext) {
 			// TODO: move these inventory updates to the other tasks
 			inv.Spec.Objects = inventory.ObjectReferencesFromObjMetadataSet(invObjIds)
 			// TODO: update inventory status?
-			err := i.InvClient.Store(inv)
+			err := i.InvClient.Store(inv, i.DryRun)
 			if err != nil {
 				err = fmt.Errorf("failed to update inventory: %w", err)
 				i.sendTaskResult(taskContext, err)
@@ -90,7 +90,7 @@ func (i *DeleteInvTask) Start(taskContext *taskrunner.TaskContext) {
 		}
 
 		invInfo := inventory.InventoryInfoFromObject(im.Inventory())
-		err := i.InvClient.Delete(invInfo)
+		err := i.InvClient.Delete(invInfo, i.DryRun)
 		if err != nil {
 			err = fmt.Errorf("failed to delete inventory: %w", err)
 			i.sendTaskResult(taskContext, err)

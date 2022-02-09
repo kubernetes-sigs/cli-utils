@@ -6,6 +6,7 @@ package inventory
 import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/cli-utils/pkg/apis/actuation"
+	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
@@ -46,7 +47,7 @@ func (fc *FakeClient) Load(invInfo InventoryInfo) (*actuation.Inventory, error) 
 
 // Store the stored cluster inventory objs with the passed inv.Spec.Objects,
 // or error if one is set up.
-func (fc *FakeClient) Store(inv *actuation.Inventory) error {
+func (fc *FakeClient) Store(inv *actuation.Inventory, _ common.DryRunStrategy) error {
 	if fc.Err != nil {
 		return fc.Err
 	}
@@ -55,7 +56,7 @@ func (fc *FakeClient) Store(inv *actuation.Inventory) error {
 }
 
 // Delete returns an error if one is forced; does nothing otherwise.
-func (fc *FakeClient) Delete(InventoryInfo) error {
+func (fc *FakeClient) Delete(_ InventoryInfo, _ common.DryRunStrategy) error {
 	if fc.Err != nil {
 		return fc.Err
 	}

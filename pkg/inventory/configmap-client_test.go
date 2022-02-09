@@ -14,20 +14,27 @@ import (
 	clienttesting "k8s.io/client-go/testing"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	"sigs.k8s.io/cli-utils/pkg/apis/actuation"
+	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
 func TestStoreCreate(t *testing.T) {
 	tests := map[string]struct {
+		dryRun        common.DryRunStrategy
 		invObjs       object.ObjMetadataSet
 		localObjs     object.ObjMetadataSet
+		expectedObjs  object.ObjMetadataSet
 		expectedError error
 	}{
 		"Empty local inventory object": {
-			localObjs: object.ObjMetadataSet{},
+			localObjs:    object.ObjMetadataSet{},
+			expectedObjs: object.ObjMetadataSet{},
 		},
 		"Local inventory with a single object": {
 			localObjs: object.ObjMetadataSet{
+				object.UnstructuredToObjMetadata(pod2),
+			},
+			expectedObjs: object.ObjMetadataSet{
 				object.UnstructuredToObjMetadata(pod2),
 			},
 		},
@@ -37,6 +44,20 @@ func TestStoreCreate(t *testing.T) {
 				object.UnstructuredToObjMetadata(pod2),
 				object.UnstructuredToObjMetadata(pod3),
 			},
+			expectedObjs: object.ObjMetadataSet{
+				object.UnstructuredToObjMetadata(pod1),
+				object.UnstructuredToObjMetadata(pod2),
+				object.UnstructuredToObjMetadata(pod3),
+			},
+		},
+		"DryRunClient": {
+			dryRun: common.DryRunClient,
+			localObjs: object.ObjMetadataSet{
+				object.UnstructuredToObjMetadata(pod1),
+				object.UnstructuredToObjMetadata(pod2),
+				object.UnstructuredToObjMetadata(pod3),
+			},
+			expectedObjs: object.ObjMetadataSet{},
 		},
 	}
 
@@ -76,14 +97,14 @@ func TestStoreCreate(t *testing.T) {
 				Objects: ObjectReferencesFromObjMetadataSet(tc.localObjs),
 			}
 
-			err = invClient.Store(inv)
+			err = invClient.Store(inv, tc.dryRun)
 			if tc.expectedError != nil {
 				assert.EqualError(t, err, tc.expectedError.Error())
 			} else {
 				assert.NoError(t, err)
 			}
 
-			expectedInventory := tc.localObjs.ToStringMap()
+			expectedInventory := tc.expectedObjs.ToStringMap()
 			// handle empty inventories special to avoid problems with empty vs nil maps
 			if len(expectedInventory) != 0 || len(storedInventory) != 0 {
 				assert.Equal(t, expectedInventory, storedInventory)
@@ -94,12 +115,15 @@ func TestStoreCreate(t *testing.T) {
 
 func TestStoreUpdate(t *testing.T) {
 	tests := map[string]struct {
-		localObjs object.ObjMetadataSet
-		invObjs   object.ObjMetadataSet
+		dryRun       common.DryRunStrategy
+		localObjs    object.ObjMetadataSet
+		invObjs      object.ObjMetadataSet
+		expectedObjs object.ObjMetadataSet
 	}{
 		"Cluster and local inventories empty": {
-			localObjs: object.ObjMetadataSet{},
-			invObjs:   object.ObjMetadataSet{},
+			localObjs:    object.ObjMetadataSet{},
+			invObjs:      object.ObjMetadataSet{},
+			expectedObjs: object.ObjMetadataSet{},
 		},
 		"Cluster and local inventories same": {
 			localObjs: object.ObjMetadataSet{
@@ -108,12 +132,19 @@ func TestStoreUpdate(t *testing.T) {
 			invObjs: object.ObjMetadataSet{
 				object.UnstructuredToObjMetadata(pod1),
 			},
+			expectedObjs: object.ObjMetadataSet{
+				object.UnstructuredToObjMetadata(pod1),
+			},
 		},
 		"Cluster two obj, local one": {
 			localObjs: object.ObjMetadataSet{
 				object.UnstructuredToObjMetadata(pod1),
 			},
 			invObjs: object.ObjMetadataSet{
+				object.UnstructuredToObjMetadata(pod1),
+				object.UnstructuredToObjMetadata(pod3),
+			},
+			expectedObjs: object.ObjMetadataSet{
 				object.UnstructuredToObjMetadata(pod1),
 				object.UnstructuredToObjMetadata(pod3),
 			},
@@ -127,27 +158,31 @@ func TestStoreUpdate(t *testing.T) {
 				object.UnstructuredToObjMetadata(pod2),
 				object.UnstructuredToObjMetadata(pod3),
 			},
+			expectedObjs: object.ObjMetadataSet{
+				object.UnstructuredToObjMetadata(pod1),
+				object.UnstructuredToObjMetadata(pod2),
+				object.UnstructuredToObjMetadata(pod3),
+			},
+		},
+		"DryRunClient": {
+			dryRun: common.DryRunClient,
+			localObjs: object.ObjMetadataSet{
+				object.UnstructuredToObjMetadata(pod2),
+			},
+			invObjs: object.ObjMetadataSet{
+				object.UnstructuredToObjMetadata(pod1),
+				object.UnstructuredToObjMetadata(pod2),
+				object.UnstructuredToObjMetadata(pod3),
+			},
+			expectedObjs: object.ObjMetadataSet{},
 		},
 	}
 
-	tf := cmdtesting.NewTestFactory().WithNamespace(testNamespace)
-	defer tf.Cleanup()
-
-	// TODO: add support for DryRuns
-	// Client and server dry-run do not throw errors.
-	// invClient, err := NewInventoryConfigMap(tf, WrapInventoryObj, InvInfoToConfigMap)
-	// require.NoError(t, err)
-	// err = invClient.Replace(copyInventory(), object.ObjMetadataSet{}, common.DryRunClient)
-	// if err != nil {
-	// 	t.Fatalf("unexpected error received: %s", err)
-	// }
-	// err = invClient.Replace(copyInventory(), object.ObjMetadataSet{}, common.DryRunServer)
-	// if err != nil {
-	// 	t.Fatalf("unexpected error received: %s", err)
-	// }
-
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
+			tf := cmdtesting.NewTestFactory().WithNamespace(testNamespace)
+			defer tf.Cleanup()
+
 			tf.FakeDynamicClient.PrependReactor("get", "configmaps", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
 				obj := inventoryObj.DeepCopy()
 				err = unstructured.SetNestedStringMap(obj.Object, tc.invObjs.ToStringMap(), "data")
@@ -183,7 +218,7 @@ func TestStoreUpdate(t *testing.T) {
 				Objects: ObjectReferencesFromObjMetadataSet(tc.localObjs),
 			}
 
-			err = invClient.Store(inv)
+			err = invClient.Store(inv, common.DryRunNone)
 			require.NoError(t, err)
 
 			expectedInventory := tc.localObjs.ToStringMap()
@@ -229,6 +264,7 @@ func TestLoad(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			tf := cmdtesting.NewTestFactory().WithNamespace(testNamespace)
 			defer tf.Cleanup()
+
 			tf.FakeDynamicClient.PrependReactor("get", "configmaps", func(action clienttesting.Action) (bool, runtime.Object, error) {
 				obj := inventoryObj.DeepCopy()
 				err := unstructured.SetNestedStringMap(obj.Object, tc.invObjs.ToStringMap(), "data")
@@ -326,7 +362,7 @@ func TestDelete(t *testing.T) {
 				Converter:     ConfigMapConverter{},
 			}
 
-			err = invClient.Delete(tc.invInfo)
+			err = invClient.Delete(tc.invInfo, common.DryRunNone)
 			if tc.isError {
 				require.Error(t, err)
 				return
