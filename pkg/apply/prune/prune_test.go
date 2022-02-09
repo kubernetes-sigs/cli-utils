@@ -33,25 +33,10 @@ import (
 )
 
 var testNamespace = "test-inventory-namespace"
-var inventoryObjName = "test-inventory-obj"
 var podName = "pod-1"
 var pdbName = "pdb"
 
 var testInventoryLabel = "test-app-label"
-
-var inventoryObj = &unstructured.Unstructured{
-	Object: map[string]interface{}{
-		"apiVersion": "v1",
-		"kind":       "ConfigMap",
-		"metadata": map[string]interface{}{
-			"name":      inventoryObjName,
-			"namespace": testNamespace,
-			"labels": map[string]interface{}{
-				common.InventoryLabel: testInventoryLabel,
-			},
-		},
-	},
-}
 
 var namespace = &unstructured.Unstructured{
 	Object: map[string]interface{}{
