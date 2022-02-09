@@ -775,38 +775,8 @@ func TestApplier(t *testing.T) {
 				InventoryPolicy:  inventory.InventoryPolicyMustMatch,
 				EmitStatusEvents: true,
 			},
-			statusEvents: []pollevent.Event{
-				{
-					EventType: pollevent.ResourceUpdateEvent,
-					Resource: &pollevent.ResourceStatus{
-						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
-						Status:     status.InProgressStatus,
-					},
-				},
-				{
-					EventType: pollevent.ResourceUpdateEvent,
-					Resource: &pollevent.ResourceStatus{
-						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
-						Status:     status.CurrentStatus,
-					},
-				},
-			},
-			expectedStatusEvents: []testutil.ExpEvent{
-				{
-					EventType: event.StatusType,
-					StatusEvent: &testutil.ExpStatusEvent{
-						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
-						Status:     status.InProgressStatus,
-					},
-				},
-				{
-					EventType: event.StatusType,
-					StatusEvent: &testutil.ExpStatusEvent{
-						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
-						Status:     status.CurrentStatus,
-					},
-				},
-			},
+			statusEvents:         []pollevent.Event{},
+			expectedStatusEvents: []testutil.ExpEvent{},
 			expectedEvents: []testutil.ExpEvent{
 				{
 					EventType: event.InitType,
