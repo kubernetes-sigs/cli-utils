@@ -78,7 +78,7 @@ func TestCommand(t *testing.T) {
 			},
 			events: []pollevent.Event{
 				{
-					EventType: pollevent.ResourceUpdateEvent,
+					Type: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
 						Identifier: depObject,
 						Status:     status.InProgressStatus,
@@ -86,7 +86,7 @@ func TestCommand(t *testing.T) {
 					},
 				},
 				{
-					EventType: pollevent.ResourceUpdateEvent,
+					Type: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
 						Identifier: stsObject,
 						Status:     status.CurrentStatus,
@@ -109,7 +109,7 @@ statefulset.apps/bar is Current: current
 			},
 			events: []pollevent.Event{
 				{
-					EventType: pollevent.ResourceUpdateEvent,
+					Type: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
 						Identifier: depObject,
 						Status:     status.InProgressStatus,
@@ -117,7 +117,7 @@ statefulset.apps/bar is Current: current
 					},
 				},
 				{
-					EventType: pollevent.ResourceUpdateEvent,
+					Type: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
 						Identifier: stsObject,
 						Status:     status.InProgressStatus,
@@ -125,7 +125,7 @@ statefulset.apps/bar is Current: current
 					},
 				},
 				{
-					EventType: pollevent.ResourceUpdateEvent,
+					Type: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
 						Identifier: stsObject,
 						Status:     status.CurrentStatus,
@@ -133,7 +133,7 @@ statefulset.apps/bar is Current: current
 					},
 				},
 				{
-					EventType: pollevent.ResourceUpdateEvent,
+					Type: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
 						Identifier: depObject,
 						Status:     status.CurrentStatus,
@@ -158,7 +158,7 @@ deployment.apps/foo is Current: current
 			},
 			events: []pollevent.Event{
 				{
-					EventType: pollevent.ResourceUpdateEvent,
+					Type: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
 						Identifier: stsObject,
 						Status:     status.NotFoundStatus,
@@ -166,7 +166,7 @@ deployment.apps/foo is Current: current
 					},
 				},
 				{
-					EventType: pollevent.ResourceUpdateEvent,
+					Type: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
 						Identifier: depObject,
 						Status:     status.NotFoundStatus,
@@ -190,7 +190,7 @@ deployment.apps/foo is NotFound: notFound
 			},
 			events: []pollevent.Event{
 				{
-					EventType: pollevent.ResourceUpdateEvent,
+					Type: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
 						Identifier: stsObject,
 						Status:     status.InProgressStatus,
@@ -198,7 +198,7 @@ deployment.apps/foo is NotFound: notFound
 					},
 				},
 				{
-					EventType: pollevent.ResourceUpdateEvent,
+					Type: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
 						Identifier: depObject,
 						Status:     status.InProgressStatus,

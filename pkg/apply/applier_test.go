@@ -234,7 +234,7 @@ func TestApplier(t *testing.T) {
 			},
 			statusEvents: []pollevent.Event{
 				{
-					EventType: pollevent.ResourceUpdateEvent,
+					Type: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
 						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
 						Status:     status.InProgressStatus,
@@ -242,7 +242,7 @@ func TestApplier(t *testing.T) {
 					},
 				},
 				{
-					EventType: pollevent.ResourceUpdateEvent,
+					Type: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
 						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
 						Status:     status.CurrentStatus,
@@ -250,7 +250,7 @@ func TestApplier(t *testing.T) {
 					},
 				},
 				{
-					EventType: pollevent.ResourceUpdateEvent,
+					Type: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
 						Identifier: testutil.ToIdentifier(t, resources["secret"]),
 						Status:     status.CurrentStatus,
@@ -430,7 +430,7 @@ func TestApplier(t *testing.T) {
 			},
 			statusEvents: []pollevent.Event{
 				{
-					EventType: pollevent.ResourceUpdateEvent,
+					Type: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
 						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
 						Status:     status.CurrentStatus,
@@ -438,7 +438,7 @@ func TestApplier(t *testing.T) {
 					},
 				},
 				{
-					EventType: pollevent.ResourceUpdateEvent,
+					Type: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
 						Identifier: testutil.ToIdentifier(t, resources["secret"]),
 						Status:     status.CurrentStatus,
@@ -611,28 +611,28 @@ func TestApplier(t *testing.T) {
 			},
 			statusEvents: []pollevent.Event{
 				{
-					EventType: pollevent.ResourceUpdateEvent,
+					Type: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
 						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
 						Status:     status.InProgressStatus,
 					},
 				},
 				{
-					EventType: pollevent.ResourceUpdateEvent,
+					Type: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
 						Identifier: testutil.ToIdentifier(t, resources["secret"]),
 						Status:     status.InProgressStatus,
 					},
 				},
 				{
-					EventType: pollevent.ResourceUpdateEvent,
+					Type: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
 						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
 						Status:     status.NotFoundStatus,
 					},
 				},
 				{
-					EventType: pollevent.ResourceUpdateEvent,
+					Type: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
 						Identifier: testutil.ToIdentifier(t, resources["secret"]),
 						Status:     status.NotFoundStatus,
@@ -811,14 +811,14 @@ func TestApplier(t *testing.T) {
 			},
 			statusEvents: []pollevent.Event{
 				{
-					EventType: pollevent.ResourceUpdateEvent,
+					Type: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
 						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
 						Status:     status.InProgressStatus,
 					},
 				},
 				{
-					EventType: pollevent.ResourceUpdateEvent,
+					Type: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
 						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
 						Status:     status.CurrentStatus,
@@ -1057,14 +1057,14 @@ func TestApplier(t *testing.T) {
 			},
 			statusEvents: []pollevent.Event{
 				{
-					EventType: pollevent.ResourceUpdateEvent,
+					Type: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
 						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
 						Status:     status.InProgressStatus,
 					},
 				},
 				{
-					EventType: pollevent.ResourceUpdateEvent,
+					Type: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
 						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
 						Status:     status.NotFoundStatus,
@@ -1207,7 +1207,7 @@ func TestApplier(t *testing.T) {
 			},
 			statusEvents: []pollevent.Event{
 				{
-					EventType: pollevent.ResourceUpdateEvent,
+					Type: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
 						Identifier: testutil.ToIdentifier(t, resources["secret"]),
 						Status:     status.CurrentStatus,
@@ -1568,7 +1568,7 @@ func TestApplierCancel(t *testing.T) {
 			},
 			statusEvents: []pollevent.Event{
 				{
-					EventType: pollevent.ResourceUpdateEvent,
+					Type: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
 						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
 						Status:     status.InProgressStatus,
@@ -1576,7 +1576,7 @@ func TestApplierCancel(t *testing.T) {
 					},
 				},
 				{
-					EventType: pollevent.ResourceUpdateEvent,
+					Type: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
 						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
 						Status:     status.InProgressStatus,
@@ -1726,7 +1726,7 @@ func TestApplierCancel(t *testing.T) {
 			},
 			statusEvents: []pollevent.Event{
 				{
-					EventType: pollevent.ResourceUpdateEvent,
+					Type: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
 						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
 						Status:     status.InProgressStatus,
@@ -1734,7 +1734,7 @@ func TestApplierCancel(t *testing.T) {
 					},
 				},
 				{
-					EventType: pollevent.ResourceUpdateEvent,
+					Type: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
 						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
 						Status:     status.CurrentStatus,

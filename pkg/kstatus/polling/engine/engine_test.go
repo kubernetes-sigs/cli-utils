@@ -27,7 +27,7 @@ func TestStatusPollerRunner(t *testing.T) {
 	testCases := map[string]struct {
 		identifiers         object.ObjMetadataSet
 		defaultStatusReader StatusReader
-		expectedEventTypes  []event.EventType
+		expectedEventTypes  []event.Type
 	}{
 		"single resource": {
 			identifiers: object.ObjMetadataSet{
@@ -49,7 +49,7 @@ func TestStatusPollerRunner(t *testing.T) {
 				},
 				resourceStatusCount: make(map[schema.GroupKind]int),
 			},
-			expectedEventTypes: []event.EventType{
+			expectedEventTypes: []event.Type{
 				event.ResourceUpdateEvent,
 				event.ResourceUpdateEvent,
 			},
@@ -87,7 +87,7 @@ func TestStatusPollerRunner(t *testing.T) {
 				},
 				resourceStatusCount: make(map[schema.GroupKind]int),
 			},
-			expectedEventTypes: []event.EventType{
+			expectedEventTypes: []event.Type{
 				event.ResourceUpdateEvent,
 				event.ResourceUpdateEvent,
 				event.ResourceUpdateEvent,
@@ -123,9 +123,9 @@ func TestStatusPollerRunner(t *testing.T) {
 
 			eventChannel := engine.Poll(ctx, identifiers, options)
 
-			var eventTypes []event.EventType
+			var eventTypes []event.Type
 			for ch := range eventChannel {
-				eventTypes = append(eventTypes, ch.EventType)
+				eventTypes = append(eventTypes, ch.Type)
 				if len(eventTypes) == len(tc.expectedEventTypes) {
 					cancel()
 				}
@@ -257,8 +257,8 @@ func TestNewStatusPollerRunnerIdentifierValidation(t *testing.T) {
 	defer timer.Stop()
 	select {
 	case e := <-eventChannel:
-		if e.EventType != event.ErrorEvent {
-			t.Errorf("expected an error event, but got %s", e.EventType.String())
+		if e.Type != event.ErrorEvent {
+			t.Errorf("expected an error event, but got %s", e.Type.String())
 			return
 		}
 		err := e.Error

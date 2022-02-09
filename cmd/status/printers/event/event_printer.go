@@ -53,7 +53,7 @@ func (ep *eventPrinter) Print(ch <-chan pollevent.Event, identifiers object.ObjM
 }
 
 func (ep *eventPrinter) printStatusEvent(se pollevent.Event) {
-	switch se.EventType {
+	switch se.Type {
 	case pollevent.ResourceUpdateEvent:
 		id := se.Resource.Identifier
 		printResourceStatus(id, se, ep.ioStreams)

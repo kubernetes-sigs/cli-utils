@@ -113,7 +113,7 @@ func (tsr *taskStatusRunner) Run(
 			// An error event on the statusChannel means the StatusPoller
 			// has encountered a problem so it can't continue. This means
 			// the statusChannel will be closed soon.
-			if statusEvent.EventType == pollevent.ErrorEvent {
+			if statusEvent.Type == pollevent.ErrorEvent {
 				abort = true
 				abortReason = fmt.Errorf("polling for status failed: %v",
 					statusEvent.Error)

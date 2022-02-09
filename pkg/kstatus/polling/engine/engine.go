@@ -78,8 +78,8 @@ func (s *PollerEngine) Poll(ctx context.Context, identifiers object.ObjMetadataS
 
 func handleError(eventChannel chan event.Event, err error) {
 	eventChannel <- event.Event{
-		EventType: event.ErrorEvent,
-		Error:     err,
+		Type:  event.ErrorEvent,
+		Error: err,
 	}
 }
 
@@ -197,8 +197,8 @@ func (r *statusPollerRunner) handleSyncAndPollErr(err error) {
 		return
 	}
 	r.eventChannel <- event.Event{
-		EventType: event.ErrorEvent,
-		Error:     err,
+		Type:  event.ErrorEvent,
+		Error: err,
 	}
 }
 
@@ -236,8 +236,8 @@ func (r *statusPollerRunner) pollStatusForAllResources() error {
 		if r.isUpdatedResourceStatus(resourceStatus) {
 			r.previousResourceStatuses[id] = resourceStatus
 			r.eventChannel <- event.Event{
-				EventType: event.ResourceUpdateEvent,
-				Resource:  resourceStatus,
+				Type:     event.ResourceUpdateEvent,
+				Resource: resourceStatus,
 			}
 		}
 	}

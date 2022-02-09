@@ -51,7 +51,7 @@ func (o ObserverFunc) Notify(rsc *ResourceStatusCollector, e event.Event) {
 type ResourceStatusCollector struct {
 	mux sync.RWMutex
 
-	LastEventType event.EventType
+	LastEventType event.Type
 
 	ResourceStatuses map[object.ObjMetadata]*event.ResourceStatus
 
@@ -99,12 +99,12 @@ func (o *ResourceStatusCollector) ListenWithObserver(eventChannel <-chan event.E
 func (o *ResourceStatusCollector) processEvent(e event.Event) error {
 	o.mux.Lock()
 	defer o.mux.Unlock()
-	o.LastEventType = e.EventType
-	if e.EventType == event.ErrorEvent {
+	o.LastEventType = e.Type
+	if e.Type == event.ErrorEvent {
 		o.Error = e.Error
 		return e.Error
 	}
-	if e.EventType == event.ResourceUpdateEvent {
+	if e.Type == event.ResourceUpdateEvent {
 		resourceStatus := e.Resource
 		o.ResourceStatuses[resourceStatus.Identifier] = resourceStatus
 	}
@@ -114,7 +114,7 @@ func (o *ResourceStatusCollector) processEvent(e event.Event) error {
 // Observation contains the latest state known by the collector as returned
 // by a call to the LatestObservation function.
 type Observation struct {
-	LastEventType event.EventType
+	LastEventType event.Type
 
 	ResourceStatuses []*event.ResourceStatus
 
