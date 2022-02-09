@@ -24,7 +24,7 @@ func crdTest(ctx context.Context, _ client.Client, invConfig InventoryConfig, in
 	By("apply a set of resources that includes both a crd and a cr")
 	applier := invConfig.ApplierFactoryFunc()
 
-	inv := invConfig.InvWrapperFunc(invConfig.InventoryFactoryFunc(inventoryName, namespaceName, "test"))
+	inv := inventory.InventoryInfoFromObject(inventoryFactoryFunc(invConfig, inventoryName, namespaceName, "test"))
 
 	crdObj := manifestToUnstructured(crd)
 	crObj := manifestToUnstructured(cr)

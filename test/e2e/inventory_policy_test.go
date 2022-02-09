@@ -25,7 +25,7 @@ func inventoryPolicyMustMatchTest(ctx context.Context, c client.Client, invConfi
 	applier := invConfig.ApplierFactoryFunc()
 
 	firstInvName := randomString("first-inv-")
-	firstInv := invConfig.InvWrapperFunc(invConfig.InventoryFactoryFunc(firstInvName, namespaceName, firstInvName))
+	firstInv := inventory.InventoryInfoFromObject(inventoryFactoryFunc(invConfig, firstInvName, namespaceName, firstInvName))
 	deployment1Obj := withNamespace(manifestToUnstructured(deployment1), namespaceName)
 	firstResources := []*unstructured.Unstructured{
 		deployment1Obj,
@@ -38,7 +38,7 @@ func inventoryPolicyMustMatchTest(ctx context.Context, c client.Client, invConfi
 
 	By("Apply second set of resources")
 	secondInvName := randomString("second-inv-")
-	secondInv := invConfig.InvWrapperFunc(invConfig.InventoryFactoryFunc(secondInvName, namespaceName, secondInvName))
+	secondInv := inventory.InventoryInfoFromObject(inventoryFactoryFunc(invConfig, secondInvName, namespaceName, secondInvName))
 	deployment1Obj = withNamespace(manifestToUnstructured(deployment1), namespaceName)
 	secondResources := []*unstructured.Unstructured{
 		withReplicas(deployment1Obj, 6),
@@ -184,7 +184,7 @@ func inventoryPolicyMustMatchTest(ctx context.Context, c client.Client, invConfi
 	Expect(found).To(BeTrue())
 	Expect(replicas).To(Equal(int64(4)))
 
-	invConfig.InvCountVerifyFunc(ctx, c, namespaceName, 2)
+	invCountVerifyFunc(ctx, c, invConfig, namespaceName, 2)
 }
 
 func inventoryPolicyAdoptIfNoInventoryTest(ctx context.Context, c client.Client, invConfig InventoryConfig, namespaceName string) {
@@ -196,7 +196,7 @@ func inventoryPolicyAdoptIfNoInventoryTest(ctx context.Context, c client.Client,
 	applier := invConfig.ApplierFactoryFunc()
 
 	invName := randomString("test-inv-")
-	inv := invConfig.InvWrapperFunc(invConfig.InventoryFactoryFunc(invName, namespaceName, invName))
+	inv := inventory.InventoryInfoFromObject(inventoryFactoryFunc(invConfig, invName, namespaceName, invName))
 	deployment1Obj = withNamespace(manifestToUnstructured(deployment1), namespaceName)
 	resources := []*unstructured.Unstructured{
 		withReplicas(deployment1Obj, 6),
@@ -356,8 +356,8 @@ func inventoryPolicyAdoptIfNoInventoryTest(ctx context.Context, c client.Client,
 	Expect(found).To(BeTrue())
 	Expect(value).To(Equal(invName))
 
-	invConfig.InvCountVerifyFunc(ctx, c, namespaceName, 1)
-	invConfig.InvSizeVerifyFunc(ctx, c, invName, namespaceName, invName, 1)
+	invCountVerifyFunc(ctx, c, invConfig, namespaceName, 1)
+	invSizeVerifyFunc(ctx, c, invConfig, invName, namespaceName, invName, 1)
 }
 
 func inventoryPolicyAdoptAllTest(ctx context.Context, c client.Client, invConfig InventoryConfig, namespaceName string) {
@@ -365,7 +365,7 @@ func inventoryPolicyAdoptAllTest(ctx context.Context, c client.Client, invConfig
 	applier := invConfig.ApplierFactoryFunc()
 
 	firstInvName := randomString("first-inv-")
-	firstInv := invConfig.InvWrapperFunc(invConfig.InventoryFactoryFunc(firstInvName, namespaceName, firstInvName))
+	firstInv := inventory.InventoryInfoFromObject(inventoryFactoryFunc(invConfig, firstInvName, namespaceName, firstInvName))
 	deployment1Obj := withNamespace(manifestToUnstructured(deployment1), namespaceName)
 	firstResources := []*unstructured.Unstructured{
 		deployment1Obj,
@@ -378,7 +378,7 @@ func inventoryPolicyAdoptAllTest(ctx context.Context, c client.Client, invConfig
 
 	By("Apply resources")
 	secondInvName := randomString("test-inv-")
-	secondInv := invConfig.InvWrapperFunc(invConfig.InventoryFactoryFunc(secondInvName, namespaceName, secondInvName))
+	secondInv := inventory.InventoryInfoFromObject(inventoryFactoryFunc(invConfig, secondInvName, namespaceName, secondInvName))
 	deployment1Obj = withNamespace(manifestToUnstructured(deployment1), namespaceName)
 	secondResources := []*unstructured.Unstructured{
 		withReplicas(deployment1Obj, 6),
@@ -538,5 +538,5 @@ func inventoryPolicyAdoptAllTest(ctx context.Context, c client.Client, invConfig
 	Expect(found).To(BeTrue())
 	Expect(value).To(Equal(secondInvName))
 
-	invConfig.InvCountVerifyFunc(ctx, c, namespaceName, 2)
+	invCountVerifyFunc(ctx, c, invConfig, namespaceName, 2)
 }

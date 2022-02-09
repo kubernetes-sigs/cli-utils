@@ -25,7 +25,7 @@ func applyAndDestroyTest(ctx context.Context, c client.Client, invConfig Invento
 	applier := invConfig.ApplierFactoryFunc()
 	inventoryID := fmt.Sprintf("%s-%s", inventoryName, namespaceName)
 
-	inventoryInfo := invConfig.InvWrapperFunc(invConfig.InventoryFactoryFunc(inventoryName, namespaceName, inventoryID))
+	inventoryInfo := inventory.InventoryInfoFromObject(inventoryFactoryFunc(invConfig, inventoryName, namespaceName, inventoryID))
 
 	deployment1Obj := withNamespace(manifestToUnstructured(deployment1), namespaceName)
 	resources := []*unstructured.Unstructured{
@@ -187,7 +187,7 @@ func applyAndDestroyTest(ctx context.Context, c client.Client, invConfig Invento
 	assertUnstructuredExists(ctx, c, deployment1Obj)
 
 	By("Verify inventory")
-	invConfig.InvSizeVerifyFunc(ctx, c, inventoryName, namespaceName, inventoryID, 1)
+	invSizeVerifyFunc(ctx, c, invConfig, inventoryName, namespaceName, inventoryID, 1)
 
 	By("Destroy resources")
 	destroyer := invConfig.DestroyerFactoryFunc()

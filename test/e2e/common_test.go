@@ -12,11 +12,9 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
@@ -24,7 +22,6 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
 	"sigs.k8s.io/cli-utils/pkg/object/dependson"
 	"sigs.k8s.io/cli-utils/pkg/object/mutation"
-	"sigs.k8s.io/cli-utils/test/e2e/customprovider"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -269,40 +266,6 @@ func runCollectNoErr(ch <-chan event.Event) []event.Event {
 		Expect(e.Type).NotTo(Equal(event.ErrorType))
 	}
 	return events
-}
-
-func cmInventoryManifest(name, namespace, id string) *unstructured.Unstructured {
-	cm := &v1.ConfigMap{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: v1.SchemeGroupVersion.String(),
-			Kind:       "ConfigMap",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
-			Labels: map[string]string{
-				common.InventoryLabel: id,
-			},
-		},
-	}
-	u, err := runtime.DefaultUnstructuredConverter.ToUnstructured(cm)
-	if err != nil {
-		panic(err)
-	}
-	return &unstructured.Unstructured{
-		Object: u,
-	}
-}
-
-func customInventoryManifest(name, namespace, id string) *unstructured.Unstructured {
-	u := &unstructured.Unstructured{}
-	u.SetGroupVersionKind(customprovider.InventoryGVK)
-	u.SetName(name)
-	u.SetNamespace(namespace)
-	u.SetLabels(map[string]string{
-		common.InventoryLabel: id,
-	})
-	return u
 }
 
 func manifestToUnstructured(manifest []byte) *unstructured.Unstructured {

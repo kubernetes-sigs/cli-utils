@@ -36,7 +36,7 @@ func mutationTest(ctx context.Context, c client.Client, invConfig InventoryConfi
 	By("apply resources in order with substitutions based on apply-time-mutation annotation")
 	applier := invConfig.ApplierFactoryFunc()
 
-	inv := invConfig.InvWrapperFunc(invConfig.InventoryFactoryFunc(inventoryName, namespaceName, "test"))
+	inv := inventory.InventoryInfoFromObject(inventoryFactoryFunc(invConfig, inventoryName, namespaceName, "test"))
 
 	fields := struct{ Namespace string }{Namespace: namespaceName}
 	podAObj := templateToUnstructured(podATemplate, fields)

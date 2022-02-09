@@ -21,6 +21,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
+	"sigs.k8s.io/cli-utils/pkg/apis/actuation"
 	"sigs.k8s.io/cli-utils/pkg/apply"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
@@ -30,20 +31,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 )
 
-type inventoryFactoryFunc func(name, namespace, id string) *unstructured.Unstructured
-type invWrapperFunc func(client.Object) inventory.InventoryInfo
 type applierFactoryFunc func() *apply.Applier
 type destroyerFactoryFunc func() *apply.Destroyer
-type invSizeVerifyFunc func(ctx context.Context, c client.Client, name, namespace, id string, count int)
-type invCountVerifyFunc func(ctx context.Context, c client.Client, namespace string, count int)
 
 type InventoryConfig struct {
-	InventoryFactoryFunc inventoryFactoryFunc
-	InvWrapperFunc       invWrapperFunc
 	ApplierFactoryFunc   applierFactoryFunc
 	DestroyerFactoryFunc destroyerFactoryFunc
-	InvSizeVerifyFunc    invSizeVerifyFunc
-	InvCountVerifyFunc   invCountVerifyFunc
+	Converter            inventory.Converter
 }
 
 const (
@@ -53,20 +47,14 @@ const (
 
 var inventoryConfigs = map[string]InventoryConfig{
 	ConfigMapTypeInvConfig: {
-		InventoryFactoryFunc: cmInventoryManifest,
-		InvWrapperFunc:       inventory.InventoryInfoFromObject,
 		ApplierFactoryFunc:   newDefaultInvApplier,
 		DestroyerFactoryFunc: newDefaultInvDestroyer,
-		InvSizeVerifyFunc:    defaultInvSizeVerifyFunc,
-		InvCountVerifyFunc:   defaultInvCountVerifyFunc,
+		Converter:            inventory.ConfigMapConverter{},
 	},
 	CustomTypeInvConfig: {
-		InventoryFactoryFunc: customInventoryManifest,
-		InvWrapperFunc:       inventory.InventoryInfoFromObject,
 		ApplierFactoryFunc:   newCustomInvApplier,
 		DestroyerFactoryFunc: newCustomInvDestroyer,
-		InvSizeVerifyFunc:    customInvSizeVerifyFunc,
-		InvCountVerifyFunc:   customInvCountVerifyFunc,
+		Converter:            customprovider.CustomConverter{},
 	},
 }
 
@@ -329,26 +317,33 @@ func newDefaultInvDestroyer() *apply.Destroyer {
 	return newDestroyerFromInvFactory(inventory.ConfigMapClientFactory{})
 }
 
-func defaultInvSizeVerifyFunc(ctx context.Context, c client.Client, name, namespace, id string, count int) {
-	var cmList v1.ConfigMapList
-	err := c.List(ctx, &cmList,
-		client.MatchingLabels(map[string]string{common.InventoryLabel: id}),
-		client.InNamespace(namespace))
-	Expect(err).ToNot(HaveOccurred())
-
-	Expect(len(cmList.Items)).To(Equal(1))
-	cm := cmList.Items[0]
-	Expect(err).ToNot(HaveOccurred())
-
-	data := cm.Data
-	Expect(len(data)).To(Equal(count))
+func inventoryFactoryFunc(invConfig InventoryConfig, name, namespace, id string) *unstructured.Unstructured {
+	inv := &actuation.Inventory{}
+	inv.SetGroupVersionKind(invConfig.Converter.GroupVersionKind())
+	inv.SetName(name)
+	inv.SetNamespace(namespace)
+	inv.SetLabels(map[string]string{
+		common.InventoryLabel: id,
+	})
+	u, err := invConfig.Converter.From(inv)
+	Expect(err).NotTo(HaveOccurred())
+	return u
 }
 
-func defaultInvCountVerifyFunc(ctx context.Context, c client.Client, namespace string, count int) {
-	var cmList v1.ConfigMapList
-	err := c.List(ctx, &cmList, client.InNamespace(namespace), client.HasLabels{common.InventoryLabel})
+func invSizeVerifyFunc(ctx context.Context, c client.Client, invConfig InventoryConfig, name, namespace, id string, count int) {
+	obj := inventoryFactoryFunc(invConfig, name, namespace, id)
+	obj = assertUnstructuredExists(ctx, c, obj)
+	inv, err := invConfig.Converter.To(obj)
 	Expect(err).NotTo(HaveOccurred())
-	Expect(len(cmList.Items)).To(Equal(count))
+	Expect(inv.Spec.Objects).To(HaveLen(count))
+}
+
+func invCountVerifyFunc(ctx context.Context, c client.Client, invConfig InventoryConfig, namespace string, count int) {
+	var u unstructured.UnstructuredList
+	u.SetGroupVersionKind(invConfig.Converter.GroupVersionKind())
+	err := c.List(ctx, &u, client.InNamespace(namespace), client.HasLabels{common.InventoryLabel})
+	Expect(err).NotTo(HaveOccurred())
+	Expect(len(u.Items)).To(Equal(count))
 }
 
 func newCustomInvApplier() *apply.Applier {
@@ -363,34 +358,6 @@ func newFactory() util.Factory {
 	kubeConfigFlags := genericclioptions.NewConfigFlags(true).WithDeprecatedPasswordFlag()
 	matchVersionKubeConfigFlags := util.NewMatchVersionFlags(kubeConfigFlags)
 	return util.NewFactory(matchVersionKubeConfigFlags)
-}
-
-func customInvSizeVerifyFunc(ctx context.Context, c client.Client, name, namespace, _ string, count int) {
-	var u unstructured.Unstructured
-	u.SetGroupVersionKind(customprovider.InventoryGVK)
-	err := c.Get(ctx, types.NamespacedName{
-		Name:      name,
-		Namespace: namespace,
-	}, &u)
-	Expect(err).ToNot(HaveOccurred())
-
-	s, found, err := unstructured.NestedSlice(u.Object, "spec", "inventory")
-	Expect(err).ToNot(HaveOccurred())
-
-	if !found {
-		Expect(count).To(Equal(0))
-		return
-	}
-
-	Expect(len(s)).To(Equal(count))
-}
-
-func customInvCountVerifyFunc(ctx context.Context, c client.Client, namespace string, count int) {
-	var u unstructured.UnstructuredList
-	u.SetGroupVersionKind(customprovider.InventoryGVK)
-	err := c.List(ctx, &u, client.InNamespace(namespace))
-	Expect(err).NotTo(HaveOccurred())
-	Expect(len(u.Items)).To(Equal(count))
 }
 
 func newApplierFromInvFactory(invFactory inventory.ClientFactory) *apply.Applier {

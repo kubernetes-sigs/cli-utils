@@ -13,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/cli-utils/pkg/apply"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
+	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/testutil"
 )
@@ -22,7 +23,7 @@ func reconciliationFailed(ctx context.Context, invConfig InventoryConfig, invent
 	applier := invConfig.ApplierFactoryFunc()
 	inventoryID := fmt.Sprintf("%s-%s", inventoryName, namespaceName)
 
-	inventoryInfo := invConfig.InvWrapperFunc(invConfig.InventoryFactoryFunc(inventoryName, namespaceName, inventoryID))
+	inventoryInfo := inventory.InventoryInfoFromObject(inventoryFactoryFunc(invConfig, inventoryName, namespaceName, inventoryID))
 
 	podObj := withNodeSelector(withNamespace(manifestToUnstructured(pod1), namespaceName), "foo", "bar")
 	resources := []*unstructured.Unstructured{
@@ -45,7 +46,7 @@ func reconciliationTimeout(ctx context.Context, invConfig InventoryConfig, inven
 	applier := invConfig.ApplierFactoryFunc()
 	inventoryID := fmt.Sprintf("%s-%s", inventoryName, namespaceName)
 
-	inventoryInfo := invConfig.InvWrapperFunc(invConfig.InventoryFactoryFunc(inventoryName, namespaceName, inventoryID))
+	inventoryInfo := inventory.InventoryInfoFromObject(inventoryFactoryFunc(invConfig, inventoryName, namespaceName, inventoryID))
 
 	podObj := podWithImage(withNamespace(manifestToUnstructured(pod1), namespaceName), "kubernetes-pause", "does-not-exist")
 	resources := []*unstructured.Unstructured{

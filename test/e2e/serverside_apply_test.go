@@ -13,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/cli-utils/pkg/apply"
 	"sigs.k8s.io/cli-utils/pkg/common"
+	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -21,7 +22,7 @@ func serversideApplyTest(ctx context.Context, c client.Client, invConfig Invento
 	By("Apply a Deployment and an APIService by server-side apply")
 	applier := invConfig.ApplierFactoryFunc()
 
-	inv := invConfig.InvWrapperFunc(invConfig.InventoryFactoryFunc(inventoryName, namespaceName, "test"))
+	inv := inventory.InventoryInfoFromObject(inventoryFactoryFunc(invConfig, inventoryName, namespaceName, "test"))
 	firstResources := []*unstructured.Unstructured{
 		withNamespace(manifestToUnstructured(deployment1), namespaceName),
 		manifestToUnstructured(apiservice1),

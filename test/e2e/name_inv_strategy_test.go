@@ -12,6 +12,7 @@ import (
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/cli-utils/pkg/apply"
+	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -20,7 +21,7 @@ func applyWithExistingInvTest(ctx context.Context, c client.Client, invConfig In
 	applier := invConfig.ApplierFactoryFunc()
 	orgInventoryID := fmt.Sprintf("%s-%s", inventoryName, namespaceName)
 
-	orgApplyInv := invConfig.InvWrapperFunc(invConfig.InventoryFactoryFunc(inventoryName, namespaceName, orgInventoryID))
+	orgApplyInv := inventory.InventoryInfoFromObject(inventoryFactoryFunc(invConfig, inventoryName, namespaceName, orgInventoryID))
 
 	resources := []*unstructured.Unstructured{
 		withNamespace(manifestToUnstructured(deployment1), namespaceName),
@@ -32,11 +33,12 @@ func applyWithExistingInvTest(ctx context.Context, c client.Client, invConfig In
 	}))
 
 	By("Verify inventory")
-	invConfig.InvSizeVerifyFunc(ctx, c, inventoryName, namespaceName, orgInventoryID, 1)
+
+	invSizeVerifyFunc(ctx, c, invConfig, inventoryName, namespaceName, orgInventoryID, 1)
 
 	By("Apply second set of resources, using same inventory name but different ID")
 	secondInventoryID := fmt.Sprintf("%s-%s-2", inventoryName, namespaceName)
-	secondApplyInv := invConfig.InvWrapperFunc(invConfig.InventoryFactoryFunc(inventoryName, namespaceName, secondInventoryID))
+	secondApplyInv := inventory.InventoryInfoFromObject(inventoryFactoryFunc(invConfig, inventoryName, namespaceName, secondInventoryID))
 
 	err := run(applier.Run(ctx, secondApplyInv, resources, apply.ApplierOptions{
 		ReconcileTimeout: 2 * time.Minute,

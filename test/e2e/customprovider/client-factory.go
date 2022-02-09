@@ -16,7 +16,6 @@ type CustomInventoryClientFactory struct {
 }
 
 func (CustomInventoryClientFactory) NewClient(factory util.Factory) (inventory.Client, error) {
-	// return inventory.NewInventoryClient(factory, WrapInventoryObj, invToUnstructuredFunc)
 	client, err := factory.DynamicClient()
 	if err != nil {
 		return nil, fmt.Errorf("error getting dynamic client: %v", err)
@@ -26,8 +25,9 @@ func (CustomInventoryClientFactory) NewClient(factory util.Factory) (inventory.C
 	if err != nil {
 		return nil, fmt.Errorf("error getting rest mapper: %v", err)
 	}
-	return &CustomInventoryClient{
+	return &inventory.ClusterClient{
 		DynamicClient: client,
 		Mapper:        mapper,
+		Converter:     CustomConverter{},
 	}, nil
 }
