@@ -1876,9 +1876,10 @@ func TestApplierCancel(t *testing.T) {
 	}
 }
 
+//nolint:dogsled // ignore 3 black identifiers in test
 func TestReadAndPrepareObjectsEmptyInv(t *testing.T) {
 	applier := Applier{}
-	_, _, _, err := applier.prepareObjects(context.TODO(), inventory.InventoryInfo{}, object.UnstructuredSet{}, ApplierOptions{})
+	_, _, _, err := applier.prepareObjects(context.TODO(), inventory.InventoryInfo{}, object.UnstructuredSet{})
 	assert.Error(t, err)
 }
 
@@ -1975,7 +1976,7 @@ func TestReadAndPrepareObjects(t *testing.T) {
 			err := applier.invClient.Store(ctx, inv, common.DryRunNone)
 			require.NoError(t, err)
 
-			applyObjs, _, invObjs, err := applier.prepareObjects(ctx, invInfo, tc.localObjs, ApplierOptions{})
+			applyObjs, pruneObjs, invObjs, err := applier.prepareObjects(ctx, invInfo, tc.localObjs)
 			if tc.isError {
 				require.Error(t, err)
 				return
@@ -1990,9 +1991,9 @@ func TestReadAndPrepareObjects(t *testing.T) {
 				"Actual inventory objects (%d) do not match expected inventory objects (%d)",
 				len(invObjs), len(tc.invObjs))
 
-			// testutil.AssertEqual(t, tc.pruneObjs, pruneObjs,
-			// 	"Actual pruned objects (%d) do not match expected pruned objects (%d)",
-			// 	len(pruneObjs), len(tc.pruneObjs))
+			testutil.AssertEqual(t, tc.pruneObjs, pruneObjs,
+				"Actual pruned objects (%d) do not match expected pruned objects (%d)",
+				len(pruneObjs), len(tc.pruneObjs))
 		})
 	}
 }

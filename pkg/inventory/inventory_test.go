@@ -71,15 +71,6 @@ var pod1 = &unstructured.Unstructured{
 	},
 }
 
-var pod1Info = &resource.Info{
-	Namespace: testNamespace,
-	Name:      pod1Name,
-	Mapping: &meta.RESTMapping{
-		Scope: meta.RESTScopeNamespace,
-	},
-	Object: pod1,
-}
-
 var pod2 = &unstructured.Unstructured{
 	Object: map[string]interface{}{
 		"apiVersion": "v1",
@@ -111,15 +102,6 @@ var pod3 = &unstructured.Unstructured{
 			"uid":       "uid3",
 		},
 	},
-}
-
-var pod3Info = &resource.Info{
-	Namespace: testNamespace,
-	Name:      pod3Name,
-	Mapping: &meta.RESTMapping{
-		Scope: meta.RESTScopeNamespace,
-	},
-	Object: pod3,
 }
 
 func TestFindInventoryObj(t *testing.T) {

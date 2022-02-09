@@ -15,7 +15,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -52,17 +51,6 @@ var inventoryObj = &unstructured.Unstructured{
 			},
 		},
 	},
-}
-
-var invTypeMeta = v1.TypeMeta{
-	APIVersion: inventoryObj.GetAPIVersion(),
-	Kind:       inventoryObj.GetKind(),
-}
-
-var invObjMeta = v1.ObjectMeta{
-	Name:      inventoryObj.GetName(),
-	Namespace: inventoryObj.GetNamespace(),
-	Labels:    inventoryObj.GetLabels(),
 }
 
 var namespace = &unstructured.Unstructured{

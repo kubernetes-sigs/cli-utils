@@ -155,7 +155,7 @@ func applyAndDestroyTest(ctx context.Context, c client.Client, invConfig Invento
 			Error:      nil,
 		},
 	}
-	received, matches := testutil.RemoveEqualEvents(received, expected)
+	received, notFoundCount := testutil.RemoveEqualEvents(received, expected)
 
 	// handle optional async InProgress StatusEvents
 	expected = testutil.ExpEvent{
@@ -177,11 +177,11 @@ func applyAndDestroyTest(ctx context.Context, c client.Client, invConfig Invento
 			Error:      nil,
 		},
 	}
-	received, matches = testutil.RemoveEqualEvents(received, expected)
+	received, currentCount := testutil.RemoveEqualEvents(received, expected)
 
 	Expect(received).To(testutil.Equal(expEvents))
-	Expect(matches).To(BeNumerically(">=", 1), "unexpected number of %q status events", status.NotFoundStatus)
-	Expect(matches).To(BeNumerically(">=", 1), "unexpected number of %q status events", status.CurrentStatus)
+	Expect(notFoundCount).To(BeNumerically(">=", 1), "unexpected number of %q status events", status.NotFoundStatus)
+	Expect(currentCount).To(BeNumerically(">=", 1), "unexpected number of %q status events", status.CurrentStatus)
 
 	By("Verify deployment created")
 	assertUnstructuredExists(ctx, c, deployment1Obj)

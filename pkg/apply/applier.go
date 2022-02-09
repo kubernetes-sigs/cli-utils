@@ -58,7 +58,6 @@ func (a *Applier) prepareObjects(
 	ctx context.Context,
 	invInfo inventory.InventoryInfo,
 	localObjs object.UnstructuredSet,
-	o ApplierOptions,
 ) (applyObjs, pruneObjs, invObjs object.UnstructuredSet, err error) {
 	// TODO: move to validator
 	if err := inventory.ValidateNoInventory(localObjs); err != nil {
@@ -138,7 +137,7 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.InventoryInfo, obje
 		validator.Validate(objects)
 
 		// Decide which objects to apply and which to prune
-		applyObjs, pruneObjs, invObjs, err := a.prepareObjects(ctx, invInfo, objects, options)
+		applyObjs, pruneObjs, invObjs, err := a.prepareObjects(ctx, invInfo, objects)
 		if err != nil {
 			handleError(eventChannel, err)
 			return

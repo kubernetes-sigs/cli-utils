@@ -153,7 +153,11 @@ func (cc *ClusterClient) Delete(ctx context.Context, invInfo InventoryInfo, dryR
 	return nil
 }
 
-func (cc *ClusterClient) getObject(ctx context.Context, id object.ObjMetadata, mapping *meta.RESTMapping) (*unstructured.Unstructured, error) {
+func (cc *ClusterClient) getObject(
+	ctx context.Context,
+	id object.ObjMetadata,
+	mapping *meta.RESTMapping,
+) (*unstructured.Unstructured, error) {
 	klog.V(4).Infof("getting object from cluster: %v", id)
 	obj, err := cc.DynamicClient.Resource(mapping.Resource).
 		Namespace(id.Namespace).
@@ -167,7 +171,12 @@ func (cc *ClusterClient) getObject(ctx context.Context, id object.ObjMetadata, m
 	return obj, nil
 }
 
-func (cc *ClusterClient) createObject(ctx context.Context, obj *unstructured.Unstructured, mapping *meta.RESTMapping, dryRun common.DryRunStrategy) (*unstructured.Unstructured, error) {
+func (cc *ClusterClient) createObject(
+	ctx context.Context,
+	obj *unstructured.Unstructured,
+	mapping *meta.RESTMapping,
+	dryRun common.DryRunStrategy,
+) (*unstructured.Unstructured, error) {
 	id := object.UnstructuredToObjMetadata(obj)
 	if dryRun.ClientOrServerDryRun() {
 		// TODO: impl server-side dry-run
@@ -184,7 +193,12 @@ func (cc *ClusterClient) createObject(ctx context.Context, obj *unstructured.Uns
 	return out, nil
 }
 
-func (cc *ClusterClient) updateObject(ctx context.Context, obj *unstructured.Unstructured, mapping *meta.RESTMapping, dryRun common.DryRunStrategy) (*unstructured.Unstructured, error) {
+func (cc *ClusterClient) updateObject(
+	ctx context.Context,
+	obj *unstructured.Unstructured,
+	mapping *meta.RESTMapping,
+	dryRun common.DryRunStrategy,
+) (*unstructured.Unstructured, error) {
 	id := object.UnstructuredToObjMetadata(obj)
 	if dryRun.ClientOrServerDryRun() {
 		// TODO: impl server-side dry-run
@@ -202,7 +216,12 @@ func (cc *ClusterClient) updateObject(ctx context.Context, obj *unstructured.Uns
 	return out, nil
 }
 
-func (cc *ClusterClient) deleteObject(ctx context.Context, id object.ObjMetadata, mapping *meta.RESTMapping, dryRun common.DryRunStrategy) error {
+func (cc *ClusterClient) deleteObject(
+	ctx context.Context,
+	id object.ObjMetadata,
+	mapping *meta.RESTMapping,
+	dryRun common.DryRunStrategy,
+) error {
 	if dryRun.ClientOrServerDryRun() {
 		// TODO: impl server-side dry-run
 		klog.V(4).Infoln("deleting object in cluster (dry-run): %v", id)

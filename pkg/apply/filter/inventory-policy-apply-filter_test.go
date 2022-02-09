@@ -7,22 +7,10 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/kubectl/pkg/scheme"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 )
-
-var invObjTemplate = &unstructured.Unstructured{
-	Object: map[string]interface{}{
-		"apiVersion": "v1",
-		"kind":       "ConfigMap",
-		"metadata": map[string]interface{}{
-			"name":      "inventory-name",
-			"namespace": "inventory-namespace",
-		},
-	},
-}
 
 func TestInventoryPolicyApplyFilter(t *testing.T) {
 	tests := map[string]struct {

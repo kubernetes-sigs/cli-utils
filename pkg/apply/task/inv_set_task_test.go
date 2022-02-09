@@ -9,7 +9,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/klog/v2"
 	"sigs.k8s.io/cli-utils/pkg/apply/cache"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
@@ -167,7 +166,7 @@ func TestInvSetTask(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			//client := inventory.NewFakeInventoryClient(object.ObjMetadataSet{})
+			// client := inventory.NewFakeInventoryClient(object.ObjMetadataSet{})
 			client := &inventory.InMemoryClient{}
 			eventChannel := make(chan event.Event)
 			resourceCache := cache.NewResourceCacheMap()
@@ -223,7 +222,6 @@ func TestInvSetTask(t *testing.T) {
 				"Actual inventory objects (%d) do not match expected inventory objects (%d)",
 				len(actual), len(tc.expectedObjs))
 
-			klog.Infof("%#v", inv.Spec.Objects)
 			// TODO: validate status is stored from the inventory
 		})
 	}

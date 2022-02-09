@@ -9,7 +9,7 @@ import (
 
 // DeepCopyObjectMetaInto copies all the fields supported by metav1.Object.
 // If the metav1.Object interface ever changes, this will need to change too!
-// But this implimentation at least avoids reflection and json round trip.
+// But this implementation at least avoids reflection and json round trip.
 func DeepCopyObjectMetaInto(from, to metav1.Object) {
 	to.SetNamespace(from.GetNamespace())
 	to.SetName(from.GetName())
@@ -30,7 +30,8 @@ func DeepCopyObjectMetaInto(from, to metav1.Object) {
 
 	deletionGracePeriodSeconds := from.GetDeletionGracePeriodSeconds()
 	if deletionGracePeriodSeconds != nil {
-		to.SetDeletionGracePeriodSeconds(&(*deletionGracePeriodSeconds))
+		c := *deletionGracePeriodSeconds
+		to.SetDeletionGracePeriodSeconds(&c)
 	} else {
 		to.SetDeletionGracePeriodSeconds(nil)
 	}

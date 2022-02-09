@@ -114,7 +114,7 @@ func TestDeleteInvTask(t *testing.T) {
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			client := &inventory.InMemoryClient{}
-			//client.Err = tc.err
+			// client.Err = tc.err
 			eventChannel := make(chan event.Event)
 			resourceCache := cache.NewResourceCacheMap()
 			taskContext := taskrunner.NewTaskContext(eventChannel, resourceCache)

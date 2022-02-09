@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"sigs.k8s.io/cli-utils/pkg/apis/actuation"
 	"sigs.k8s.io/cli-utils/pkg/common"
 )
@@ -78,13 +79,14 @@ func TestInMemoryClient(t *testing.T) {
 
 			err := client.Store(context.TODO(), tc.input, common.DryRunNone)
 			if tc.expectedStoreErr != nil {
-				assert.EqualError(t, err, tc.expectedStoreErr.Error())
+				require.EqualError(t, err, tc.expectedStoreErr.Error())
 				return
 			}
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			invInfo := InventoryInfoFromObject(tc.input)
 			inv, err := client.Load(context.TODO(), invInfo)
+			require.NoError(t, err)
 			assert.Equal(t, tc.expected, inv)
 		})
 	}

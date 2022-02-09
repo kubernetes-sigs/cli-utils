@@ -79,7 +79,7 @@ func newTestApplier(
 		factory: tf,
 	}
 
-	invClient := newTestInventory(t, tf, inv)
+	invClient := newTestInventory(t, tf)
 
 	applier, err := NewApplierBuilder().
 		WithFactory(tf).
@@ -104,7 +104,7 @@ func newTestDestroyer(
 	tf := newTestFactory(t, inv, object.UnstructuredSet{}, clusterObjs)
 	defer tf.Cleanup()
 
-	invClient := newTestInventory(t, tf, inv)
+	invClient := newTestInventory(t, tf)
 
 	destroyer, err := NewDestroyer(tf, invClient)
 	require.NoError(t, err)
@@ -116,7 +116,6 @@ func newTestDestroyer(
 func newTestInventory(
 	t *testing.T,
 	tf *cmdtesting.TestFactory,
-	inv *actuation.Inventory,
 ) inventory.Client {
 	invClient, err := inventory.ConfigMapClientFactory{}.NewClient(tf)
 	require.NoError(t, err)
