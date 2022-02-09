@@ -170,7 +170,7 @@ var (
 						if err != nil {
 							return realLength, err
 						}
-						realLength += 1
+						realLength++
 					}
 				}
 				return realLength, nil

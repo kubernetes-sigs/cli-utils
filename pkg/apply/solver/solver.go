@@ -113,7 +113,7 @@ func (t *TaskQueueBuilder) AppendInvAddTask(inv inventory.InventoryInfo, applyOb
 		Objects:   applyObjs,
 		DryRun:    dryRun,
 	})
-	t.invAddCounter += 1
+	t.invAddCounter++
 	return t
 }
 
@@ -129,7 +129,7 @@ func (t *TaskQueueBuilder) AppendInvSetTask(inv inventory.InventoryInfo, dryRun 
 		PrevInventory: prevInvIds,
 		DryRun:        dryRun,
 	})
-	t.invSetCounter += 1
+	t.invSetCounter++
 	return t
 }
 
@@ -143,7 +143,7 @@ func (t *TaskQueueBuilder) AppendDeleteInvTask(inv inventory.InventoryInfo, dryR
 		InvInfo:   inv,
 		DryRun:    dryRun,
 	})
-	t.deleteInvCounter += 1
+	t.deleteInvCounter++
 	return t
 }
 
@@ -165,7 +165,7 @@ func (t *TaskQueueBuilder) AppendApplyTask(applyObjs object.UnstructuredSet,
 		InfoHelper:        t.InfoHelper,
 		Mapper:            t.Mapper,
 	})
-	t.applyCounter += 1
+	t.applyCounter++
 	return t
 }
 
@@ -182,7 +182,7 @@ func (t *TaskQueueBuilder) AppendWaitTask(waitIds object.ObjMetadataSet, conditi
 		waitTimeout,
 		t.Mapper),
 	)
-	t.waitCounter += 1
+	t.waitCounter++
 	return t
 }
 
@@ -203,7 +203,7 @@ func (t *TaskQueueBuilder) AppendPruneTask(pruneObjs object.UnstructuredSet,
 			Destroy:           t.Destroy,
 		},
 	)
-	t.pruneCounter += 1
+	t.pruneCounter++
 	return t
 }
 
