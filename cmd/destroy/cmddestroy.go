@@ -21,10 +21,10 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/printers"
 )
 
-// GetDestroyRunner creates and returns the DestroyRunner which stores the cobra command.
-func GetDestroyRunner(factory cmdutil.Factory, invFactory inventory.InventoryClientFactory,
-	loader manifestreader.ManifestLoader, ioStreams genericclioptions.IOStreams) *DestroyRunner {
-	r := &DestroyRunner{
+// GetRunner creates and returns the Runner which stores the cobra command.
+func GetRunner(factory cmdutil.Factory, invFactory inventory.InventoryClientFactory,
+	loader manifestreader.ManifestLoader, ioStreams genericclioptions.IOStreams) *Runner {
+	r := &Runner{
 		ioStreams:  ioStreams,
 		factory:    factory,
 		invFactory: invFactory,
@@ -55,14 +55,14 @@ func GetDestroyRunner(factory cmdutil.Factory, invFactory inventory.InventoryCli
 	return r
 }
 
-// DestroyCommand creates the DestroyRunner, returning the cobra command associated with it.
-func DestroyCommand(f cmdutil.Factory, invFactory inventory.InventoryClientFactory, loader manifestreader.ManifestLoader,
+// Command creates the Runner, returning the cobra command associated with it.
+func Command(f cmdutil.Factory, invFactory inventory.InventoryClientFactory, loader manifestreader.ManifestLoader,
 	ioStreams genericclioptions.IOStreams) *cobra.Command {
-	return GetDestroyRunner(f, invFactory, loader, ioStreams).Command
+	return GetRunner(f, invFactory, loader, ioStreams).Command
 }
 
-// DestroyRunner encapsulates data necessary to run the destroy command.
-type DestroyRunner struct {
+// Runner encapsulates data necessary to run the destroy command.
+type Runner struct {
 	Command    *cobra.Command
 	ioStreams  genericclioptions.IOStreams
 	factory    cmdutil.Factory
@@ -77,7 +77,7 @@ type DestroyRunner struct {
 	printStatusEvents       bool
 }
 
-func (r *DestroyRunner) RunE(cmd *cobra.Command, args []string) error {
+func (r *Runner) RunE(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
 	// If specified, cancel with timeout.
 	if r.timeout != 0 {

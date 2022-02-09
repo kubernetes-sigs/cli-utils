@@ -27,10 +27,10 @@ var (
 	previewDestroy = false
 )
 
-// GetPreviewRunner creates and returns the PreviewRunner which stores the cobra command.
-func GetPreviewRunner(factory cmdutil.Factory, invFactory inventory.InventoryClientFactory,
-	loader manifestreader.ManifestLoader, ioStreams genericclioptions.IOStreams) *PreviewRunner {
-	r := &PreviewRunner{
+// GetRunner creates and returns the Runner which stores the cobra command.
+func GetRunner(factory cmdutil.Factory, invFactory inventory.InventoryClientFactory,
+	loader manifestreader.ManifestLoader, ioStreams genericclioptions.IOStreams) *Runner {
+	r := &Runner{
 		factory:    factory,
 		invFactory: invFactory,
 		loader:     loader,
@@ -64,14 +64,14 @@ func GetPreviewRunner(factory cmdutil.Factory, invFactory inventory.InventoryCli
 	return r
 }
 
-// PreviewCommand creates the PreviewRunner, returning the cobra command associated with it.
-func PreviewCommand(f cmdutil.Factory, invFactory inventory.InventoryClientFactory, loader manifestreader.ManifestLoader,
+// Command creates the Runner, returning the cobra command associated with it.
+func Command(f cmdutil.Factory, invFactory inventory.InventoryClientFactory, loader manifestreader.ManifestLoader,
 	ioStreams genericclioptions.IOStreams) *cobra.Command {
-	return GetPreviewRunner(f, invFactory, loader, ioStreams).Command
+	return GetRunner(f, invFactory, loader, ioStreams).Command
 }
 
-// PreviewRunner encapsulates data necessary to run the preview command.
-type PreviewRunner struct {
+// Runner encapsulates data necessary to run the preview command.
+type Runner struct {
 	Command    *cobra.Command
 	factory    cmdutil.Factory
 	invFactory inventory.InventoryClientFactory
@@ -85,7 +85,7 @@ type PreviewRunner struct {
 }
 
 // RunE is the function run from the cobra command.
-func (r *PreviewRunner) RunE(cmd *cobra.Command, args []string) error {
+func (r *Runner) RunE(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
 	// If specified, cancel with timeout.
 	if r.timeout != 0 {

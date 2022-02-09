@@ -53,7 +53,7 @@ metadata:
 	}
 )
 
-func TestStatusCommand(t *testing.T) {
+func TestCommand(t *testing.T) {
 	testCases := map[string]struct {
 		pollUntil      string
 		printer        string
@@ -219,7 +219,7 @@ deployment.apps/foo is InProgress: inProgress
 			defer tf.Cleanup()
 
 			loader := manifestreader.NewFakeLoader(tf, tc.inventory)
-			runner := &StatusRunner{
+			runner := &Runner{
 				factory:    tf,
 				invFactory: inventory.FakeInventoryClientFactory(tc.inventory),
 				loader:     loader,

@@ -21,9 +21,9 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/printers"
 )
 
-func GetApplyRunner(factory cmdutil.Factory, invFactory inventory.InventoryClientFactory,
-	loader manifestreader.ManifestLoader, ioStreams genericclioptions.IOStreams) *ApplyRunner {
-	r := &ApplyRunner{
+func GetRunner(factory cmdutil.Factory, invFactory inventory.InventoryClientFactory,
+	loader manifestreader.ManifestLoader, ioStreams genericclioptions.IOStreams) *Runner {
+	r := &Runner{
 		ioStreams:  ioStreams,
 		factory:    factory,
 		invFactory: invFactory,
@@ -67,12 +67,12 @@ func GetApplyRunner(factory cmdutil.Factory, invFactory inventory.InventoryClien
 	return r
 }
 
-func ApplyCommand(f cmdutil.Factory, invFactory inventory.InventoryClientFactory, loader manifestreader.ManifestLoader,
+func Command(f cmdutil.Factory, invFactory inventory.InventoryClientFactory, loader manifestreader.ManifestLoader,
 	ioStreams genericclioptions.IOStreams) *cobra.Command {
-	return GetApplyRunner(f, invFactory, loader, ioStreams).Command
+	return GetRunner(f, invFactory, loader, ioStreams).Command
 }
 
-type ApplyRunner struct {
+type Runner struct {
 	Command    *cobra.Command
 	ioStreams  genericclioptions.IOStreams
 	factory    cmdutil.Factory
@@ -91,7 +91,7 @@ type ApplyRunner struct {
 	printStatusEvents      bool
 }
 
-func (r *ApplyRunner) RunE(cmd *cobra.Command, args []string) error {
+func (r *Runner) RunE(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
 	// If specified, cancel with timeout.
 	if r.timeout != 0 {

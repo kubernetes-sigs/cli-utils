@@ -19,10 +19,10 @@ import (
 
 const tmpDirPrefix = "diff-cmd"
 
-// NewCmdDiff returns cobra command to implement client-side diff of package
+// NewCommand returns cobra command to implement client-side diff of package
 // directory. For each local config file, get the resource in the cluster
 // and diff the local config resource against the resource in the cluster.
-func NewCmdDiff(f util.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+func NewCommand(f util.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	options := diff.NewDiffOptions(ioStreams)
 	cmd := &cobra.Command{
 		Use:                   "diff (DIRECTORY | STDIN)",
