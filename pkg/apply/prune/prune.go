@@ -31,14 +31,14 @@ import (
 // Pruner implements GetPruneObjs to calculate which objects to prune and Prune
 // to delete them.
 type Pruner struct {
-	InvClient inventory.InventoryClient
+	InvClient inventory.Client
 	Client    dynamic.Interface
 	Mapper    meta.RESTMapper
 }
 
 // NewPruner returns a new Pruner.
 // Returns an error if dependency injection fails using the factory.
-func NewPruner(factory util.Factory, invClient inventory.InventoryClient) (*Pruner, error) {
+func NewPruner(factory util.Factory, invClient inventory.Client) (*Pruner, error) {
 	// Client/Builder fields from the Factory.
 	client, err := factory.DynamicClient()
 	if err != nil {
@@ -204,7 +204,7 @@ func (p *Pruner) removeInventoryAnnotation(obj *unstructured.Unstructured) (*uns
 // objects minus the set of currently applied objects. Returns an error
 // if one occurs.
 func (p *Pruner) GetPruneObjs(
-	inv inventory.InventoryInfo,
+	inv inventory.Info,
 	objs object.UnstructuredSet,
 	opts Options,
 ) (object.UnstructuredSet, error) {

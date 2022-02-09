@@ -33,16 +33,16 @@ func ConvertPropagationPolicy(propagationPolicy string) (metav1.DeletionPropagat
 	}
 }
 
-func ConvertInventoryPolicy(policy string) (inventory.InventoryPolicy, error) {
+func ConvertInventoryPolicy(policy string) (inventory.Policy, error) {
 	switch policy {
 	case InventoryPolicyStrict:
-		return inventory.InventoryPolicyMustMatch, nil
+		return inventory.PolicyMustMatch, nil
 	case InventoryPolicyAdopt:
-		return inventory.AdoptIfNoInventory, nil
+		return inventory.PolicyAdoptIfNoInventory, nil
 	case InventoryPolicyForceAdopt:
-		return inventory.AdoptAll, nil
+		return inventory.PolicyAdoptAll, nil
 	default:
-		return inventory.InventoryPolicyMustMatch, fmt.Errorf(
+		return inventory.PolicyMustMatch, fmt.Errorf(
 			"inventory policy must be one of strict, adopt")
 	}
 }

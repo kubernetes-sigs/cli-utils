@@ -31,15 +31,15 @@ import (
 )
 
 type inventoryFactoryFunc func(name, namespace, id string) *unstructured.Unstructured
-type invWrapperFunc func(*unstructured.Unstructured) inventory.InventoryInfo
+type invWrapperFunc func(*unstructured.Unstructured) inventory.Info
 type applierFactoryFunc func() *apply.Applier
 type destroyerFactoryFunc func() *apply.Destroyer
 type invSizeVerifyFunc func(ctx context.Context, c client.Client, name, namespace, id string, count int)
 type invCountVerifyFunc func(ctx context.Context, c client.Client, namespace string, count int)
 
 type InventoryConfig struct {
-	InventoryStrategy    inventory.InventoryStrategy
-	InventoryFactoryFunc inventoryFactoryFunc
+	Strategy             inventory.Strategy
+	FactoryFunc          inventoryFactoryFunc
 	InvWrapperFunc       invWrapperFunc
 	ApplierFactoryFunc   applierFactoryFunc
 	DestroyerFactoryFunc destroyerFactoryFunc
@@ -54,8 +54,8 @@ const (
 
 var inventoryConfigs = map[string]InventoryConfig{
 	ConfigMapTypeInvConfig: {
-		InventoryStrategy:    inventory.LabelStrategy,
-		InventoryFactoryFunc: cmInventoryManifest,
+		Strategy:             inventory.LabelStrategy,
+		FactoryFunc:          cmInventoryManifest,
 		InvWrapperFunc:       inventory.WrapInventoryInfoObj,
 		ApplierFactoryFunc:   newDefaultInvApplier,
 		DestroyerFactoryFunc: newDefaultInvDestroyer,
@@ -63,8 +63,8 @@ var inventoryConfigs = map[string]InventoryConfig{
 		InvCountVerifyFunc:   defaultInvCountVerifyFunc,
 	},
 	CustomTypeInvConfig: {
-		InventoryStrategy:    inventory.NameStrategy,
-		InventoryFactoryFunc: customInventoryManifest,
+		Strategy:             inventory.NameStrategy,
+		FactoryFunc:          customInventoryManifest,
 		InvWrapperFunc:       customprovider.WrapInventoryInfoObj,
 		ApplierFactoryFunc:   newCustomInvApplier,
 		DestroyerFactoryFunc: newCustomInvDestroyer,
@@ -243,7 +243,7 @@ var _ = Describe("Applier", func() {
 		})
 	}
 
-	Context("InventoryStrategy: Name", func() {
+	Context("Strategy: Name", func() {
 		var namespace *v1.Namespace
 		var inventoryName string
 		var ctx context.Context
@@ -325,11 +325,11 @@ func deleteNamespace(ctx context.Context, c client.Client, namespace *v1.Namespa
 }
 
 func newDefaultInvApplier() *apply.Applier {
-	return newApplierFromInvFactory(inventory.ClusterInventoryClientFactory{})
+	return newApplierFromInvFactory(inventory.ClusterClientFactory{})
 }
 
 func newDefaultInvDestroyer() *apply.Destroyer {
-	return newDestroyerFromInvFactory(inventory.ClusterInventoryClientFactory{})
+	return newDestroyerFromInvFactory(inventory.ClusterClientFactory{})
 }
 
 func defaultInvSizeVerifyFunc(ctx context.Context, c client.Client, name, namespace, id string, count int) {
@@ -355,11 +355,11 @@ func defaultInvCountVerifyFunc(ctx context.Context, c client.Client, namespace s
 }
 
 func newCustomInvApplier() *apply.Applier {
-	return newApplierFromInvFactory(customprovider.CustomInventoryClientFactory{})
+	return newApplierFromInvFactory(customprovider.CustomClientFactory{})
 }
 
 func newCustomInvDestroyer() *apply.Destroyer {
-	return newDestroyerFromInvFactory(customprovider.CustomInventoryClientFactory{})
+	return newDestroyerFromInvFactory(customprovider.CustomClientFactory{})
 }
 
 func newFactory() util.Factory {
@@ -396,9 +396,9 @@ func customInvCountVerifyFunc(ctx context.Context, c client.Client, namespace st
 	Expect(len(u.Items)).To(Equal(count))
 }
 
-func newApplierFromInvFactory(invFactory inventory.InventoryClientFactory) *apply.Applier {
+func newApplierFromInvFactory(invFactory inventory.ClientFactory) *apply.Applier {
 	f := newFactory()
-	invClient, err := invFactory.NewInventoryClient(f)
+	invClient, err := invFactory.NewClient(f)
 	Expect(err).NotTo(HaveOccurred())
 
 	a, err := apply.NewApplierBuilder().
@@ -409,9 +409,9 @@ func newApplierFromInvFactory(invFactory inventory.InventoryClientFactory) *appl
 	return a
 }
 
-func newDestroyerFromInvFactory(invFactory inventory.InventoryClientFactory) *apply.Destroyer {
+func newDestroyerFromInvFactory(invFactory inventory.ClientFactory) *apply.Destroyer {
 	f := newFactory()
-	invClient, err := invFactory.NewInventoryClient(f)
+	invClient, err := invFactory.NewClient(f)
 	Expect(err).NotTo(HaveOccurred())
 
 	d, err := apply.NewDestroyer(f, invClient)

@@ -24,7 +24,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/manifestreader"
 )
 
-func GetRunner(factory cmdutil.Factory, invFactory inventory.InventoryClientFactory, loader manifestreader.ManifestLoader) *Runner {
+func GetRunner(factory cmdutil.Factory, invFactory inventory.ClientFactory, loader manifestreader.ManifestLoader) *Runner {
 	r := &Runner{
 		factory:           factory,
 		invFactory:        invFactory,
@@ -47,7 +47,7 @@ func GetRunner(factory cmdutil.Factory, invFactory inventory.InventoryClientFact
 	return r
 }
 
-func Command(f cmdutil.Factory, invFactory inventory.InventoryClientFactory, loader manifestreader.ManifestLoader) *cobra.Command {
+func Command(f cmdutil.Factory, invFactory inventory.ClientFactory, loader manifestreader.ManifestLoader) *cobra.Command {
 	return GetRunner(f, invFactory, loader).Command
 }
 
@@ -56,7 +56,7 @@ func Command(f cmdutil.Factory, invFactory inventory.InventoryClientFactory, loa
 type Runner struct {
 	Command    *cobra.Command
 	factory    cmdutil.Factory
-	invFactory inventory.InventoryClientFactory
+	invFactory inventory.ClientFactory
 	loader     manifestreader.ManifestLoader
 
 	period    time.Duration
@@ -91,7 +91,7 @@ func (r *Runner) runE(cmd *cobra.Command, args []string) error {
 	}
 	inv := inventory.WrapInventoryInfoObj(invObj)
 
-	invClient, err := r.invFactory.NewInventoryClient(r.factory)
+	invClient, err := r.invFactory.NewClient(r.factory)
 	if err != nil {
 		return err
 	}

@@ -43,7 +43,7 @@ type TaskQueueBuilder struct {
 	OpenAPIGetter discovery.OpenAPISchemaInterface
 	InfoHelper    info.Helper
 	Mapper        meta.RESTMapper
-	InvClient     inventory.InventoryClient
+	InvClient     inventory.Client
 	// Collector is used to collect validation errors and invalid objects.
 	// Invalid objects will be filtered and not be injected into tasks.
 	Collector *validation.Collector
@@ -92,7 +92,7 @@ type Options struct {
 	DryRunStrategy         common.DryRunStrategy
 	PrunePropagationPolicy metav1.DeletionPropagation
 	PruneTimeout           time.Duration
-	InventoryPolicy        inventory.InventoryPolicy
+	InventoryPolicy        inventory.Policy
 }
 
 // Build returns the queue of tasks that have been created
@@ -102,7 +102,7 @@ func (t *TaskQueueBuilder) Build() *TaskQueue {
 
 // AppendInvAddTask appends an inventory add task to the task queue.
 // Returns a pointer to the Builder to chain function calls.
-func (t *TaskQueueBuilder) AppendInvAddTask(inv inventory.InventoryInfo, applyObjs object.UnstructuredSet,
+func (t *TaskQueueBuilder) AppendInvAddTask(inv inventory.Info, applyObjs object.UnstructuredSet,
 	dryRun common.DryRunStrategy) *TaskQueueBuilder {
 	applyObjs = t.Collector.FilterInvalidObjects(applyObjs)
 	klog.V(2).Infoln("adding inventory add task (%d objects)", len(applyObjs))
@@ -119,7 +119,7 @@ func (t *TaskQueueBuilder) AppendInvAddTask(inv inventory.InventoryInfo, applyOb
 
 // AppendInvSetTask appends an inventory set task to the task queue.
 // Returns a pointer to the Builder to chain function calls.
-func (t *TaskQueueBuilder) AppendInvSetTask(inv inventory.InventoryInfo, dryRun common.DryRunStrategy) *TaskQueueBuilder {
+func (t *TaskQueueBuilder) AppendInvSetTask(inv inventory.Info, dryRun common.DryRunStrategy) *TaskQueueBuilder {
 	klog.V(2).Infoln("adding inventory set task")
 	prevInvIds, _ := t.InvClient.GetClusterObjs(inv)
 	t.tasks = append(t.tasks, &task.InvSetTask{
@@ -135,7 +135,7 @@ func (t *TaskQueueBuilder) AppendInvSetTask(inv inventory.InventoryInfo, dryRun 
 
 // AppendDeleteInvTask appends to the task queue a task to delete the inventory object.
 // Returns a pointer to the Builder to chain function calls.
-func (t *TaskQueueBuilder) AppendDeleteInvTask(inv inventory.InventoryInfo, dryRun common.DryRunStrategy) *TaskQueueBuilder {
+func (t *TaskQueueBuilder) AppendDeleteInvTask(inv inventory.Info, dryRun common.DryRunStrategy) *TaskQueueBuilder {
 	klog.V(2).Infoln("adding delete inventory task")
 	t.tasks = append(t.tasks, &task.DeleteInvTask{
 		TaskName:  fmt.Sprintf("delete-inventory-%d", t.deleteInvCounter),

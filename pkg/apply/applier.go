@@ -44,7 +44,7 @@ const defaultPollInterval = 2 * time.Second
 type Applier struct {
 	pruner        *prune.Pruner
 	statusPoller  poller.Poller
-	invClient     inventory.InventoryClient
+	invClient     inventory.Client
 	client        dynamic.Interface
 	openAPIGetter discovery.OpenAPISchemaInterface
 	mapper        meta.RESTMapper
@@ -53,7 +53,7 @@ type Applier struct {
 
 // prepareObjects returns the set of objects to apply and to prune or
 // an error if one occurred.
-func (a *Applier) prepareObjects(localInv inventory.InventoryInfo, localObjs object.UnstructuredSet,
+func (a *Applier) prepareObjects(localInv inventory.Info, localObjs object.UnstructuredSet,
 	o ApplierOptions) (object.UnstructuredSet, object.UnstructuredSet, error) {
 	if localInv == nil {
 		return nil, nil, fmt.Errorf("the local inventory can't be nil")
@@ -102,7 +102,7 @@ func (a *Applier) prepareObjects(localInv inventory.InventoryInfo, localObjs obj
 // before all the given resources have been applied to the cluster. Any
 // cancellation or timeout will only affect how long we Wait for the
 // resources to become current.
-func (a *Applier) Run(ctx context.Context, invInfo inventory.InventoryInfo, objects object.UnstructuredSet, options ApplierOptions) <-chan event.Event {
+func (a *Applier) Run(ctx context.Context, invInfo inventory.Info, objects object.UnstructuredSet, options ApplierOptions) <-chan event.Event {
 	klog.V(4).Infof("apply run for %d objects", len(objects))
 	eventChannel := make(chan event.Event)
 	setDefaults(&options)
@@ -274,7 +274,7 @@ type ApplierOptions struct {
 	PruneTimeout time.Duration
 
 	// InventoryPolicy defines the inventory policy of apply.
-	InventoryPolicy inventory.InventoryPolicy
+	InventoryPolicy inventory.Policy
 
 	// ValidationPolicy defines how to handle invalid objects.
 	ValidationPolicy validation.Policy
@@ -304,7 +304,7 @@ func handleError(eventChannel chan event.Event, err error) {
 // for the passed non cluster-scoped localObjs, plus the namespace
 // of the passed inventory object. This is used to skip deleting
 // namespaces which have currently applied objects in them.
-func localNamespaces(localInv inventory.InventoryInfo, localObjs []object.ObjMetadata) sets.String {
+func localNamespaces(localInv inventory.Info, localObjs []object.ObjMetadata) sets.String {
 	namespaces := sets.NewString()
 	for _, obj := range localObjs {
 		if obj.Namespace != "" {

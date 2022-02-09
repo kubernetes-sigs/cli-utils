@@ -16,8 +16,8 @@ import (
 // inventory references at the end of the apply/prune.
 type InvSetTask struct {
 	TaskName      string
-	InvClient     inventory.InventoryClient
-	InvInfo       inventory.InventoryInfo
+	InvClient     inventory.Client
+	InvInfo       inventory.Info
 	PrevInventory object.ObjMetadataSet
 	DryRun        common.DryRunStrategy
 }

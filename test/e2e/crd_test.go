@@ -24,7 +24,7 @@ func crdTest(ctx context.Context, _ client.Client, invConfig InventoryConfig, in
 	By("apply a set of resources that includes both a crd and a cr")
 	applier := invConfig.ApplierFactoryFunc()
 
-	inv := invConfig.InvWrapperFunc(invConfig.InventoryFactoryFunc(inventoryName, namespaceName, "test"))
+	inv := invConfig.InvWrapperFunc(invConfig.FactoryFunc(inventoryName, namespaceName, "test"))
 
 	crdObj := manifestToUnstructured(crd)
 	crObj := manifestToUnstructured(cr)
@@ -214,7 +214,7 @@ func crdTest(ctx context.Context, _ client.Client, invConfig InventoryConfig, in
 
 	By("destroy the resources, including the crd")
 	destroyer := invConfig.DestroyerFactoryFunc()
-	options := apply.DestroyerOptions{InventoryPolicy: inventory.AdoptIfNoInventory}
+	options := apply.DestroyerOptions{InventoryPolicy: inventory.PolicyAdoptIfNoInventory}
 	destroyerEvents := runCollect(destroyer.Run(ctx, inv, options))
 
 	expEvents = []testutil.ExpEvent{

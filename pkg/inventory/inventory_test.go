@@ -416,12 +416,12 @@ func copyInventoryInfo() *unstructured.Unstructured {
 	return inventoryObj.DeepCopy()
 }
 
-func copyInventory() InventoryInfo {
+func copyInventory() Info {
 	u := inventoryObj.DeepCopy()
 	return WrapInventoryInfoObj(u)
 }
 
-func storeObjsInInventory(info InventoryInfo, objs object.ObjMetadataSet) *unstructured.Unstructured {
+func storeObjsInInventory(info Info, objs object.ObjMetadataSet) *unstructured.Unstructured {
 	wrapped := WrapInventoryObj(InvInfoToConfigMap(info))
 	_ = wrapped.Store(objs)
 	inv, _ := wrapped.GetObject()

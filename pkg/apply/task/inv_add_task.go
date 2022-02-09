@@ -23,8 +23,8 @@ var (
 // before the actual object is applied.
 type InvAddTask struct {
 	TaskName  string
-	InvClient inventory.InventoryClient
-	InvInfo   inventory.InventoryInfo
+	InvClient inventory.Client
+	InvInfo   inventory.Info
 	Objects   object.UnstructuredSet
 	DryRun    common.DryRunStrategy
 }
@@ -74,7 +74,7 @@ func (i *InvAddTask) StatusUpdate(_ *taskrunner.TaskContext, _ object.ObjMetadat
 // inventoryNamespaceInSet returns the the namespace the passed inventory
 // object will be applied to, or nil if this namespace object does not exist
 // in the passed slice "infos" or the inventory object is cluster-scoped.
-func inventoryNamespaceInSet(inv inventory.InventoryInfo, objs object.UnstructuredSet) *unstructured.Unstructured {
+func inventoryNamespaceInSet(inv inventory.Info, objs object.UnstructuredSet) *unstructured.Unstructured {
 	if inv == nil {
 		return nil
 	}

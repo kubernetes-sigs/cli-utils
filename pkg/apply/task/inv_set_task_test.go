@@ -163,7 +163,7 @@ func TestInvSetTask(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			client := inventory.NewFakeInventoryClient(object.ObjMetadataSet{})
+			client := inventory.NewFakeClient(object.ObjMetadataSet{})
 			eventChannel := make(chan event.Event)
 			resourceCache := cache.NewResourceCacheMap()
 			context := taskrunner.NewTaskContext(eventChannel, resourceCache)

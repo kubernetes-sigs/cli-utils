@@ -20,49 +20,48 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
-// InventoryClient expresses an interface for interacting with
+// Client expresses an interface for interacting with
 // objects which store references to objects (inventory objects).
-type InventoryClient interface {
+type Client interface {
 	// GetClusterObjs returns the set of previously applied objects as ObjMetadata,
 	// or an error if one occurred. This set of previously applied object references
 	// is stored in the inventory objects living in the cluster.
-	GetClusterObjs(inv InventoryInfo) (object.ObjMetadataSet, error)
+	GetClusterObjs(inv Info) (object.ObjMetadataSet, error)
 	// Merge applies the union of the passed objects with the currently
 	// stored objects in the inventory object. Returns the set of
 	// objects which are not in the passed objects (objects to be pruned).
 	// Otherwise, returns an error if one happened.
-	Merge(inv InventoryInfo, objs object.ObjMetadataSet, dryRun common.DryRunStrategy) (object.ObjMetadataSet, error)
+	Merge(inv Info, objs object.ObjMetadataSet, dryRun common.DryRunStrategy) (object.ObjMetadataSet, error)
 	// Replace replaces the set of objects stored in the inventory
 	// object with the passed set of objects, or an error if one occurs.
-	Replace(inv InventoryInfo, objs object.ObjMetadataSet, dryRun common.DryRunStrategy) error
+	Replace(inv Info, objs object.ObjMetadataSet, dryRun common.DryRunStrategy) error
 	// DeleteInventoryObj deletes the passed inventory object from the APIServer.
-	DeleteInventoryObj(inv InventoryInfo, dryRun common.DryRunStrategy) error
+	DeleteInventoryObj(inv Info, dryRun common.DryRunStrategy) error
 	// ApplyInventoryNamespace applies the Namespace that the inventory object should be in.
 	ApplyInventoryNamespace(invNamespace *unstructured.Unstructured, dryRun common.DryRunStrategy) error
 	// GetClusterInventoryInfo returns the cluster inventory object.
-	GetClusterInventoryInfo(inv InventoryInfo) (*unstructured.Unstructured, error)
+	GetClusterInventoryInfo(inv Info) (*unstructured.Unstructured, error)
 	// GetClusterInventoryObjs looks up the inventory objects from the cluster.
-	GetClusterInventoryObjs(inv InventoryInfo) (object.UnstructuredSet, error)
+	GetClusterInventoryObjs(inv Info) (object.UnstructuredSet, error)
 }
 
-// ClusterInventoryClient is a concrete implementation of the
-// InventoryClient interface.
-type ClusterInventoryClient struct {
+// ClusterClient is a concrete implementation of the
+// Client interface.
+type ClusterClient struct {
 	dc                    dynamic.Interface
 	discoveryClient       discovery.CachedDiscoveryInterface
 	mapper                meta.RESTMapper
 	InventoryFactoryFunc  StorageFactoryFunc
-	invToUnstructuredFunc InventoryToUnstructuredFunc
+	invToUnstructuredFunc ToUnstructuredFunc
 }
 
-var _ InventoryClient = &ClusterInventoryClient{}
-var _ InventoryClient = &ClusterInventoryClient{}
+var _ Client = &ClusterClient{}
 
-// NewInventoryClient returns a concrete implementation of the
-// InventoryClient interface or an error.
-func NewInventoryClient(factory cmdutil.Factory,
+// NewClient returns a concrete implementation of the
+// Client interface or an error.
+func NewClient(factory cmdutil.Factory,
 	invFunc StorageFactoryFunc,
-	invToUnstructuredFunc InventoryToUnstructuredFunc) (*ClusterInventoryClient, error) {
+	invToUnstructuredFunc ToUnstructuredFunc) (*ClusterClient, error) {
 	dc, err := factory.DynamicClient()
 	if err != nil {
 		return nil, err
@@ -75,14 +74,14 @@ func NewInventoryClient(factory cmdutil.Factory,
 	if err != nil {
 		return nil, err
 	}
-	clusterInventoryClient := ClusterInventoryClient{
+	clusterClient := ClusterClient{
 		dc:                    dc,
 		discoveryClient:       discoveryClinet,
 		mapper:                mapper,
 		InventoryFactoryFunc:  invFunc,
 		invToUnstructuredFunc: invToUnstructuredFunc,
 	}
-	return &clusterInventoryClient, nil
+	return &clusterClient, nil
 }
 
 // Merge stores the union of the passed objects with the objects currently
@@ -92,7 +91,7 @@ func NewInventoryClient(factory cmdutil.Factory,
 // to prune. Creates the initial cluster inventory object storing the passed
 // objects if an inventory object does not exist. Returns an error if one
 // occurred.
-func (cic *ClusterInventoryClient) Merge(localInv InventoryInfo, objs object.ObjMetadataSet, dryRun common.DryRunStrategy) (object.ObjMetadataSet, error) {
+func (cic *ClusterClient) Merge(localInv Info, objs object.ObjMetadataSet, dryRun common.DryRunStrategy) (object.ObjMetadataSet, error) {
 	pruneIds := object.ObjMetadataSet{}
 	invObj := cic.invToUnstructuredFunc(localInv)
 	clusterInv, err := cic.GetClusterInventoryInfo(localInv)
@@ -159,7 +158,7 @@ func (cic *ClusterInventoryClient) Merge(localInv InventoryInfo, objs object.Obj
 
 // Replace stores the passed objects in the cluster inventory object, or
 // an error if one occurred.
-func (cic *ClusterInventoryClient) Replace(localInv InventoryInfo, objs object.ObjMetadataSet, dryRun common.DryRunStrategy) error {
+func (cic *ClusterClient) Replace(localInv Info, objs object.ObjMetadataSet, dryRun common.DryRunStrategy) error {
 	// Skip entire function for dry-run.
 	if dryRun.ClientOrServerDryRun() {
 		klog.V(4).Infoln("dry-run replace inventory object: not applied")
@@ -194,7 +193,7 @@ func (cic *ClusterInventoryClient) Replace(localInv InventoryInfo, objs object.O
 }
 
 // replaceInventory stores the passed objects into the passed inventory object.
-func (cic *ClusterInventoryClient) replaceInventory(inv *unstructured.Unstructured, objs object.ObjMetadataSet) (*unstructured.Unstructured, error) {
+func (cic *ClusterClient) replaceInventory(inv *unstructured.Unstructured, objs object.ObjMetadataSet) (*unstructured.Unstructured, error) {
 	wrappedInv := cic.InventoryFactoryFunc(inv)
 	if err := wrappedInv.Store(objs); err != nil {
 		return nil, err
@@ -207,7 +206,7 @@ func (cic *ClusterInventoryClient) replaceInventory(inv *unstructured.Unstructur
 }
 
 // DeleteInventoryObj deletes the inventory object from the cluster.
-func (cic *ClusterInventoryClient) DeleteInventoryObj(localInv InventoryInfo, dryRun common.DryRunStrategy) error {
+func (cic *ClusterClient) DeleteInventoryObj(localInv Info, dryRun common.DryRunStrategy) error {
 	if localInv == nil {
 		return fmt.Errorf("retrieving cluster inventory object with nil local inventory")
 	}
@@ -221,7 +220,7 @@ func (cic *ClusterInventoryClient) DeleteInventoryObj(localInv InventoryInfo, dr
 	}
 }
 
-func (cic *ClusterInventoryClient) deleteInventoryObjsByLabel(inv InventoryInfo, dryRun common.DryRunStrategy) error {
+func (cic *ClusterClient) deleteInventoryObjsByLabel(inv Info, dryRun common.DryRunStrategy) error {
 	clusterInvObjs, err := cic.getClusterInventoryObjsByLabel(inv)
 	if err != nil {
 		return err
@@ -236,7 +235,7 @@ func (cic *ClusterInventoryClient) deleteInventoryObjsByLabel(inv InventoryInfo,
 
 // GetClusterObjs returns the objects stored in the cluster inventory object, or
 // an error if one occurred.
-func (cic *ClusterInventoryClient) GetClusterObjs(localInv InventoryInfo) (object.ObjMetadataSet, error) {
+func (cic *ClusterClient) GetClusterObjs(localInv Info) (object.ObjMetadataSet, error) {
 	var objs object.ObjMetadataSet
 	clusterInv, err := cic.GetClusterInventoryInfo(localInv)
 	if err != nil {
@@ -259,7 +258,7 @@ func (cic *ClusterInventoryClient) GetClusterObjs(localInv InventoryInfo) (objec
 //
 // TODO(seans3): Remove the special case code to merge multiple cluster inventory
 // objects once we've determined that this case is no longer possible.
-func (cic *ClusterInventoryClient) GetClusterInventoryInfo(inv InventoryInfo) (*unstructured.Unstructured, error) {
+func (cic *ClusterClient) GetClusterInventoryInfo(inv Info) (*unstructured.Unstructured, error) {
 	clusterInvObjects, err := cic.GetClusterInventoryObjs(inv)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read inventory objects from cluster: %w", err)
@@ -274,7 +273,7 @@ func (cic *ClusterInventoryClient) GetClusterInventoryInfo(inv InventoryInfo) (*
 	return clusterInv, nil
 }
 
-func (cic *ClusterInventoryClient) getClusterInventoryObjsByLabel(inv InventoryInfo) (object.UnstructuredSet, error) {
+func (cic *ClusterClient) getClusterInventoryObjsByLabel(inv Info) (object.UnstructuredSet, error) {
 	localInv := cic.invToUnstructuredFunc(inv)
 	if localInv == nil {
 		return nil, fmt.Errorf("retrieving cluster inventory object with nil local inventory")
@@ -306,7 +305,7 @@ func (cic *ClusterInventoryClient) getClusterInventoryObjsByLabel(inv InventoryI
 	return invList, nil
 }
 
-func (cic *ClusterInventoryClient) getClusterInventoryObjsByName(inv InventoryInfo) (object.UnstructuredSet, error) {
+func (cic *ClusterClient) getClusterInventoryObjsByName(inv Info) (object.UnstructuredSet, error) {
 	localInv := cic.invToUnstructuredFunc(inv)
 	if localInv == nil {
 		return nil, fmt.Errorf("retrieving cluster inventory object with nil local inventory")
@@ -329,7 +328,7 @@ func (cic *ClusterInventoryClient) getClusterInventoryObjsByName(inv InventoryIn
 	return object.UnstructuredSet{clusterInv}, nil
 }
 
-func (cic *ClusterInventoryClient) GetClusterInventoryObjs(inv InventoryInfo) (object.UnstructuredSet, error) {
+func (cic *ClusterClient) GetClusterInventoryObjs(inv Info) (object.UnstructuredSet, error) {
 	if inv == nil {
 		return nil, fmt.Errorf("inventoryInfo must be specified")
 	}
@@ -348,7 +347,7 @@ func (cic *ClusterInventoryClient) GetClusterInventoryObjs(inv InventoryInfo) (o
 }
 
 // applyInventoryObj applies the passed inventory object to the APIServer.
-func (cic *ClusterInventoryClient) applyInventoryObj(obj *unstructured.Unstructured, dryRun common.DryRunStrategy) (*unstructured.Unstructured, error) {
+func (cic *ClusterClient) applyInventoryObj(obj *unstructured.Unstructured, dryRun common.DryRunStrategy) (*unstructured.Unstructured, error) {
 	if dryRun.ClientOrServerDryRun() {
 		klog.V(4).Infof("dry-run apply inventory object: not applied")
 		return obj.DeepCopy(), nil
@@ -368,7 +367,7 @@ func (cic *ClusterInventoryClient) applyInventoryObj(obj *unstructured.Unstructu
 }
 
 // createInventoryObj creates the passed inventory object on the APIServer.
-func (cic *ClusterInventoryClient) createInventoryObj(obj *unstructured.Unstructured, dryRun common.DryRunStrategy) (*unstructured.Unstructured, error) {
+func (cic *ClusterClient) createInventoryObj(obj *unstructured.Unstructured, dryRun common.DryRunStrategy) (*unstructured.Unstructured, error) {
 	if dryRun.ClientOrServerDryRun() {
 		klog.V(4).Infof("dry-run create inventory object: not created")
 		return obj.DeepCopy(), nil
@@ -395,7 +394,7 @@ func (cic *ClusterInventoryClient) createInventoryObj(obj *unstructured.Unstruct
 
 // deleteInventoryObjByName deletes the passed inventory object from the APIServer, or
 // an error if one occurs.
-func (cic *ClusterInventoryClient) deleteInventoryObjByName(obj *unstructured.Unstructured, dryRun common.DryRunStrategy) error {
+func (cic *ClusterClient) deleteInventoryObjByName(obj *unstructured.Unstructured, dryRun common.DryRunStrategy) error {
 	if dryRun.ClientOrServerDryRun() {
 		klog.V(4).Infof("dry-run delete inventory object: not deleted")
 		return nil
@@ -416,7 +415,7 @@ func (cic *ClusterInventoryClient) deleteInventoryObjByName(obj *unstructured.Un
 
 // ApplyInventoryNamespace creates the passed namespace if it does not already
 // exist, or returns an error if one happened. NOTE: No error if already exists.
-func (cic *ClusterInventoryClient) ApplyInventoryNamespace(obj *unstructured.Unstructured, dryRun common.DryRunStrategy) error {
+func (cic *ClusterClient) ApplyInventoryNamespace(obj *unstructured.Unstructured, dryRun common.DryRunStrategy) error {
 	if dryRun.ClientOrServerDryRun() {
 		klog.V(4).Infof("dry-run apply inventory namespace (%s): not applied", obj.GetName())
 		return nil
@@ -439,11 +438,11 @@ func (cic *ClusterInventoryClient) ApplyInventoryNamespace(obj *unstructured.Uns
 }
 
 // getMapping returns the RESTMapping for the provided resource.
-func (cic *ClusterInventoryClient) getMapping(obj *unstructured.Unstructured) (*meta.RESTMapping, error) {
+func (cic *ClusterClient) getMapping(obj *unstructured.Unstructured) (*meta.RESTMapping, error) {
 	return cic.mapper.RESTMapping(obj.GroupVersionKind().GroupKind(), obj.GroupVersionKind().Version)
 }
 
-func (cic *ClusterInventoryClient) updateStatus(obj *unstructured.Unstructured, dryRun common.DryRunStrategy) error {
+func (cic *ClusterClient) updateStatus(obj *unstructured.Unstructured, dryRun common.DryRunStrategy) error {
 	if dryRun.ClientOrServerDryRun() {
 		klog.V(4).Infof("dry-run update inventory status: not updated")
 		return nil
@@ -481,7 +480,7 @@ func (cic *ClusterInventoryClient) updateStatus(obj *unstructured.Unstructured, 
 }
 
 // hasSubResource checks if a resource has the given subresource using the discovery client.
-func (cic *ClusterInventoryClient) hasSubResource(groupVersion, resource, subresource string) (bool, error) {
+func (cic *ClusterClient) hasSubResource(groupVersion, resource, subresource string) (bool, error) {
 	resources, err := cic.discoveryClient.ServerResourcesForGroupVersion(groupVersion)
 	if err != nil {
 		return false, err

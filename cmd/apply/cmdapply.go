@@ -21,7 +21,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/printers"
 )
 
-func GetRunner(factory cmdutil.Factory, invFactory inventory.InventoryClientFactory,
+func GetRunner(factory cmdutil.Factory, invFactory inventory.ClientFactory,
 	loader manifestreader.ManifestLoader, ioStreams genericclioptions.IOStreams) *Runner {
 	r := &Runner{
 		ioStreams:  ioStreams,
@@ -67,7 +67,7 @@ func GetRunner(factory cmdutil.Factory, invFactory inventory.InventoryClientFact
 	return r
 }
 
-func Command(f cmdutil.Factory, invFactory inventory.InventoryClientFactory, loader manifestreader.ManifestLoader,
+func Command(f cmdutil.Factory, invFactory inventory.ClientFactory, loader manifestreader.ManifestLoader,
 	ioStreams genericclioptions.IOStreams) *cobra.Command {
 	return GetRunner(f, invFactory, loader, ioStreams).Command
 }
@@ -76,7 +76,7 @@ type Runner struct {
 	Command    *cobra.Command
 	ioStreams  genericclioptions.IOStreams
 	factory    cmdutil.Factory
-	invFactory inventory.InventoryClientFactory
+	invFactory inventory.ClientFactory
 	loader     manifestreader.ManifestLoader
 
 	serverSideOptions      common.ServerSideOptions
@@ -134,7 +134,7 @@ func (r *Runner) RunE(cmd *cobra.Command, args []string) error {
 	}
 	inv := inventory.WrapInventoryInfoObj(invObj)
 
-	invClient, err := r.invFactory.NewInventoryClient(r.factory)
+	invClient, err := r.invFactory.NewClient(r.factory)
 	if err != nil {
 		return err
 	}

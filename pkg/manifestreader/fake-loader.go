@@ -15,7 +15,7 @@ import (
 
 type fakeLoader struct {
 	factory   util.Factory
-	InvClient *inventory.FakeInventoryClient
+	InvClient *inventory.FakeClient
 }
 
 var _ ManifestLoader = &fakeLoader{}
@@ -23,7 +23,7 @@ var _ ManifestLoader = &fakeLoader{}
 func NewFakeLoader(f util.Factory, objs object.ObjMetadataSet) *fakeLoader {
 	return &fakeLoader{
 		factory:   f,
-		InvClient: inventory.NewFakeInventoryClient(objs),
+		InvClient: inventory.NewFakeClient(objs),
 	}
 }
 
@@ -44,7 +44,7 @@ func (f *fakeLoader) ManifestReader(reader io.Reader, _ string) (ManifestReader,
 	}, nil
 }
 
-func (f *fakeLoader) InventoryInfo(objs []*unstructured.Unstructured) (inventory.InventoryInfo, []*unstructured.Unstructured, error) {
+func (f *fakeLoader) InventoryInfo(objs []*unstructured.Unstructured) (inventory.Info, []*unstructured.Unstructured, error) {
 	inv, objs, err := inventory.SplitUnstructureds(objs)
 	return inventory.WrapInventoryInfoObj(inv), objs, err
 }

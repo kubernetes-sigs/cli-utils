@@ -28,7 +28,7 @@ var (
 )
 
 // GetRunner creates and returns the Runner which stores the cobra command.
-func GetRunner(factory cmdutil.Factory, invFactory inventory.InventoryClientFactory,
+func GetRunner(factory cmdutil.Factory, invFactory inventory.ClientFactory,
 	loader manifestreader.ManifestLoader, ioStreams genericclioptions.IOStreams) *Runner {
 	r := &Runner{
 		factory:    factory,
@@ -65,7 +65,7 @@ func GetRunner(factory cmdutil.Factory, invFactory inventory.InventoryClientFact
 }
 
 // Command creates the Runner, returning the cobra command associated with it.
-func Command(f cmdutil.Factory, invFactory inventory.InventoryClientFactory, loader manifestreader.ManifestLoader,
+func Command(f cmdutil.Factory, invFactory inventory.ClientFactory, loader manifestreader.ManifestLoader,
 	ioStreams genericclioptions.IOStreams) *cobra.Command {
 	return GetRunner(f, invFactory, loader, ioStreams).Command
 }
@@ -74,7 +74,7 @@ func Command(f cmdutil.Factory, invFactory inventory.InventoryClientFactory, loa
 type Runner struct {
 	Command    *cobra.Command
 	factory    cmdutil.Factory
-	invFactory inventory.InventoryClientFactory
+	invFactory inventory.ClientFactory
 	loader     manifestreader.ManifestLoader
 	ioStreams  genericclioptions.IOStreams
 
@@ -126,7 +126,7 @@ func (r *Runner) RunE(cmd *cobra.Command, args []string) error {
 	}
 	inv := inventory.WrapInventoryInfoObj(invObj)
 
-	invClient, err := r.invFactory.NewInventoryClient(r.factory)
+	invClient, err := r.invFactory.NewClient(r.factory)
 	if err != nil {
 		return err
 	}

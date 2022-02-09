@@ -13,20 +13,20 @@ import (
 func TestConvertInventoryPolicy(t *testing.T) {
 	testcases := []struct {
 		value  string
-		policy inventory.InventoryPolicy
+		policy inventory.Policy
 		err    error
 	}{
 		{
 			value:  "strict",
-			policy: inventory.InventoryPolicyMustMatch,
+			policy: inventory.PolicyMustMatch,
 		},
 		{
 			value:  "adopt",
-			policy: inventory.AdoptIfNoInventory,
+			policy: inventory.PolicyAdoptIfNoInventory,
 		},
 		{
 			value:  "force-adopt",
-			policy: inventory.AdoptAll,
+			policy: inventory.PolicyAdoptAll,
 		},
 		{
 			value: "random",

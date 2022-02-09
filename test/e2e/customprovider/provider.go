@@ -74,16 +74,16 @@ var InventoryGVK = schema.GroupVersionKind{
 	Kind:    "Inventory",
 }
 
-var _ inventory.InventoryClientFactory = CustomInventoryClientFactory{}
+var _ inventory.ClientFactory = CustomClientFactory{}
 
-type CustomInventoryClientFactory struct {
+type CustomClientFactory struct {
 }
 
-func (CustomInventoryClientFactory) NewInventoryClient(factory util.Factory) (inventory.InventoryClient, error) {
-	return inventory.NewInventoryClient(factory, WrapInventoryObj, invToUnstructuredFunc)
+func (CustomClientFactory) NewClient(factory util.Factory) (inventory.Client, error) {
+	return inventory.NewClient(factory, WrapInventoryObj, invToUnstructuredFunc)
 }
 
-func invToUnstructuredFunc(inv inventory.InventoryInfo) *unstructured.Unstructured {
+func invToUnstructuredFunc(inv inventory.Info) *unstructured.Unstructured {
 	switch invInfo := inv.(type) {
 	case *InventoryCustomType:
 		return invInfo.inv
@@ -96,12 +96,12 @@ func WrapInventoryObj(obj *unstructured.Unstructured) inventory.Storage {
 	return &InventoryCustomType{inv: obj}
 }
 
-func WrapInventoryInfoObj(obj *unstructured.Unstructured) inventory.InventoryInfo {
+func WrapInventoryInfoObj(obj *unstructured.Unstructured) inventory.Info {
 	return &InventoryCustomType{inv: obj}
 }
 
 var _ inventory.Storage = &InventoryCustomType{}
-var _ inventory.InventoryInfo = &InventoryCustomType{}
+var _ inventory.Info = &InventoryCustomType{}
 
 type InventoryCustomType struct {
 	inv *unstructured.Unstructured
@@ -115,7 +115,7 @@ func (i InventoryCustomType) Name() string {
 	return i.inv.GetName()
 }
 
-func (i InventoryCustomType) Strategy() inventory.InventoryStrategy {
+func (i InventoryCustomType) Strategy() inventory.Strategy {
 	return inventory.NameStrategy
 }
 

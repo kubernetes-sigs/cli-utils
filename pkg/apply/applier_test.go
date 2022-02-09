@@ -122,7 +122,7 @@ func TestApplier(t *testing.T) {
 			clusterObjs: object.UnstructuredSet{},
 			options: ApplierOptions{
 				NoPrune:         true,
-				InventoryPolicy: inventory.InventoryPolicyMustMatch,
+				InventoryPolicy: inventory.PolicyMustMatch,
 			},
 			expectedEvents: []testutil.ExpEvent{
 				{
@@ -229,7 +229,7 @@ func TestApplier(t *testing.T) {
 			clusterObjs: object.UnstructuredSet{},
 			options: ApplierOptions{
 				ReconcileTimeout: time.Minute,
-				InventoryPolicy:  inventory.InventoryPolicyMustMatch,
+				InventoryPolicy:  inventory.PolicyMustMatch,
 				EmitStatusEvents: true,
 			},
 			statusEvents: []pollevent.Event{
@@ -425,7 +425,7 @@ func TestApplier(t *testing.T) {
 			},
 			options: ApplierOptions{
 				ReconcileTimeout: time.Minute,
-				InventoryPolicy:  inventory.AdoptIfNoInventory,
+				InventoryPolicy:  inventory.PolicyAdoptIfNoInventory,
 				EmitStatusEvents: true,
 			},
 			statusEvents: []pollevent.Event{
@@ -606,7 +606,7 @@ func TestApplier(t *testing.T) {
 				testutil.Unstructured(t, resources["secret"], testutil.AddOwningInv(t, "test")),
 			},
 			options: ApplierOptions{
-				InventoryPolicy:  inventory.InventoryPolicyMustMatch,
+				InventoryPolicy:  inventory.PolicyMustMatch,
 				EmitStatusEvents: true,
 			},
 			statusEvents: []pollevent.Event{
@@ -806,7 +806,7 @@ func TestApplier(t *testing.T) {
 			},
 			options: ApplierOptions{
 				ReconcileTimeout: time.Minute,
-				InventoryPolicy:  inventory.InventoryPolicyMustMatch,
+				InventoryPolicy:  inventory.PolicyMustMatch,
 				EmitStatusEvents: true,
 			},
 			statusEvents: []pollevent.Event{
@@ -945,7 +945,7 @@ func TestApplier(t *testing.T) {
 				testutil.Unstructured(t, resources["deployment"], testutil.AddOwningInv(t, "unmatched")),
 			},
 			options: ApplierOptions{
-				InventoryPolicy:  inventory.InventoryPolicyMustMatch,
+				InventoryPolicy:  inventory.PolicyMustMatch,
 				EmitStatusEvents: true,
 			},
 			expectedEvents: []testutil.ExpEvent{
@@ -1052,7 +1052,7 @@ func TestApplier(t *testing.T) {
 				testutil.Unstructured(t, resources["deployment"], testutil.AddOwningInv(t, "test")),
 			},
 			options: ApplierOptions{
-				InventoryPolicy:  inventory.InventoryPolicyMustMatch,
+				InventoryPolicy:  inventory.PolicyMustMatch,
 				EmitStatusEvents: true,
 			},
 			statusEvents: []pollevent.Event{
@@ -1201,7 +1201,7 @@ func TestApplier(t *testing.T) {
 			clusterObjs: object.UnstructuredSet{},
 			options: ApplierOptions{
 				ReconcileTimeout: time.Minute,
-				InventoryPolicy:  inventory.AdoptIfNoInventory,
+				InventoryPolicy:  inventory.PolicyAdoptIfNoInventory,
 				EmitStatusEvents: true,
 				ValidationPolicy: validation.SkipInvalid,
 			},
@@ -1382,7 +1382,7 @@ func TestApplier(t *testing.T) {
 			clusterObjs: object.UnstructuredSet{},
 			options: ApplierOptions{
 				ReconcileTimeout: time.Minute,
-				InventoryPolicy:  inventory.AdoptIfNoInventory,
+				InventoryPolicy:  inventory.PolicyAdoptIfNoInventory,
 				EmitStatusEvents: true,
 				ValidationPolicy: validation.ExitEarly,
 			},
@@ -1562,7 +1562,7 @@ func TestApplierCancel(t *testing.T) {
 				// EmitStatusEvents required to test event output
 				EmitStatusEvents: true,
 				NoPrune:          true,
-				InventoryPolicy:  inventory.InventoryPolicyMustMatch,
+				InventoryPolicy:  inventory.PolicyMustMatch,
 				// ReconcileTimeout required to enable WaitTasks
 				ReconcileTimeout: 1 * time.Minute,
 			},
@@ -1720,7 +1720,7 @@ func TestApplierCancel(t *testing.T) {
 				// EmitStatusEvents required to test event output
 				EmitStatusEvents: true,
 				NoPrune:          true,
-				InventoryPolicy:  inventory.InventoryPolicyMustMatch,
+				InventoryPolicy:  inventory.PolicyMustMatch,
 				// ReconcileTimeout required to enable WaitTasks
 				ReconcileTimeout: 1 * time.Minute,
 			},

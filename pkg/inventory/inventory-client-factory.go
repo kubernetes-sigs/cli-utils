@@ -6,18 +6,18 @@ package inventory
 import cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
 var (
-	_ InventoryClientFactory = ClusterInventoryClientFactory{}
+	_ ClientFactory = ClusterClientFactory{}
 )
 
-// InventoryClientFactory is a factory that constructs new InventoryClient instances.
-type InventoryClientFactory interface {
-	NewInventoryClient(factory cmdutil.Factory) (InventoryClient, error)
+// ClientFactory is a factory that constructs new Client instances.
+type ClientFactory interface {
+	NewClient(factory cmdutil.Factory) (Client, error)
 }
 
-// ClusterInventoryClientFactory is a factory that creates instances of ClusterInventoryClient inventory client.
-type ClusterInventoryClientFactory struct {
+// ClusterClientFactory is a factory that creates instances of ClusterClient inventory client.
+type ClusterClientFactory struct {
 }
 
-func (ClusterInventoryClientFactory) NewInventoryClient(factory cmdutil.Factory) (InventoryClient, error) {
-	return NewInventoryClient(factory, WrapInventoryObj, InvInfoToConfigMap)
+func (ClusterClientFactory) NewClient(factory cmdutil.Factory) (Client, error) {
+	return NewClient(factory, WrapInventoryObj, InvInfoToConfigMap)
 }

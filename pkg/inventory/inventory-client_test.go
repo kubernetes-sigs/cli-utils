@@ -19,7 +19,7 @@ import (
 
 func TestGetClusterInventoryInfo(t *testing.T) {
 	tests := map[string]struct {
-		inv       InventoryInfo
+		inv       Info
 		localObjs object.ObjMetadataSet
 		isError   bool
 	}{
@@ -55,7 +55,7 @@ func TestGetClusterInventoryInfo(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			invClient, err := NewInventoryClient(tf,
+			invClient, err := NewClient(tf,
 				WrapInventoryObj, InvInfoToConfigMap)
 			require.NoError(t, err)
 
@@ -89,7 +89,7 @@ func TestGetClusterInventoryInfo(t *testing.T) {
 
 func TestMerge(t *testing.T) {
 	tests := map[string]struct {
-		localInv    InventoryInfo
+		localInv    Info
 		localObjs   object.ObjMetadataSet
 		clusterObjs object.ObjMetadataSet
 		pruneObjs   object.ObjMetadataSet
@@ -160,7 +160,7 @@ func TestMerge(t *testing.T) {
 
 				tf.FakeDynamicClient.PrependReactor("list", "configmaps", toReactionFunc(tc.clusterObjs))
 				// Create the local inventory object storing "tc.localObjs"
-				invClient, err := NewInventoryClient(tf,
+				invClient, err := NewClient(tf,
 					WrapInventoryObj, InvInfoToConfigMap)
 				require.NoError(t, err)
 
@@ -185,7 +185,7 @@ func TestMerge(t *testing.T) {
 
 func TestCreateInventory(t *testing.T) {
 	tests := map[string]struct {
-		inv       InventoryInfo
+		inv       Info
 		localObjs object.ObjMetadataSet
 		error     string
 	}{
@@ -225,7 +225,7 @@ func TestCreateInventory(t *testing.T) {
 				return true, nil, nil
 			})
 
-			invClient, err := NewInventoryClient(tf,
+			invClient, err := NewClient(tf,
 				WrapInventoryObj, InvInfoToConfigMap)
 			require.NoError(t, err)
 			inv := invClient.invToUnstructuredFunc(tc.inv)
@@ -289,7 +289,7 @@ func TestReplace(t *testing.T) {
 	defer tf.Cleanup()
 
 	// Client and server dry-run do not throw errors.
-	invClient, err := NewInventoryClient(tf, WrapInventoryObj, InvInfoToConfigMap)
+	invClient, err := NewClient(tf, WrapInventoryObj, InvInfoToConfigMap)
 	require.NoError(t, err)
 	err = invClient.Replace(copyInventory(), object.ObjMetadataSet{}, common.DryRunClient)
 	if err != nil {
@@ -303,7 +303,7 @@ func TestReplace(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			// Create inventory client, and store the cluster objs in the inventory object.
-			invClient, err := NewInventoryClient(tf,
+			invClient, err := NewClient(tf,
 				WrapInventoryObj, InvInfoToConfigMap)
 			require.NoError(t, err)
 			wrappedInv := invClient.InventoryFactoryFunc(inventoryObj)
@@ -334,7 +334,7 @@ func TestReplace(t *testing.T) {
 
 func TestGetClusterObjs(t *testing.T) {
 	tests := map[string]struct {
-		localInv    InventoryInfo
+		localInv    Info
 		clusterObjs object.ObjMetadataSet
 		isError     bool
 	}{
@@ -366,7 +366,7 @@ func TestGetClusterObjs(t *testing.T) {
 			defer tf.Cleanup()
 			tf.FakeDynamicClient.PrependReactor("list", "configmaps", toReactionFunc(tc.clusterObjs))
 
-			invClient, err := NewInventoryClient(tf,
+			invClient, err := NewClient(tf,
 				WrapInventoryObj, InvInfoToConfigMap)
 			require.NoError(t, err)
 			clusterObjs, err := invClient.GetClusterObjs(tc.localInv)
@@ -388,7 +388,7 @@ func TestGetClusterObjs(t *testing.T) {
 
 func TestDeleteInventoryObj(t *testing.T) {
 	tests := map[string]struct {
-		inv       InventoryInfo
+		inv       Info
 		localObjs object.ObjMetadataSet
 	}{
 		"Nil local inventory object is an error": {
@@ -421,7 +421,7 @@ func TestDeleteInventoryObj(t *testing.T) {
 				tf := cmdtesting.NewTestFactory().WithNamespace(testNamespace)
 				defer tf.Cleanup()
 
-				invClient, err := NewInventoryClient(tf,
+				invClient, err := NewClient(tf,
 					WrapInventoryObj, InvInfoToConfigMap)
 				require.NoError(t, err)
 				inv := invClient.invToUnstructuredFunc(tc.inv)
