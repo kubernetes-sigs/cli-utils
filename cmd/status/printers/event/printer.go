@@ -14,15 +14,15 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
-// EventPrinter implements the Printer interface and outputs the resource
+// Printer implements the Printer interface and outputs the resource
 // status information as a list of events as they happen.
-type EventPrinter struct {
+type Printer struct {
 	IOStreams genericclioptions.IOStreams
 }
 
-// NewEventPrinter returns a new instance of the eventPrinter.
-func NewEventPrinter(ioStreams genericclioptions.IOStreams) *EventPrinter {
-	return &EventPrinter{
+// NewPrinter returns a new instance of the eventPrinter.
+func NewPrinter(ioStreams genericclioptions.IOStreams) *Printer {
+	return &Printer{
 		IOStreams: ioStreams,
 	}
 }
@@ -31,7 +31,7 @@ func NewEventPrinter(ioStreams genericclioptions.IOStreams) *EventPrinter {
 // until the channel is closed. The provided cancelFunc is consulted on
 // every event and is responsible for stopping the poller when appropriate.
 // This function will block.
-func (ep *EventPrinter) Print(ch <-chan pollevent.Event, identifiers object.ObjMetadataSet,
+func (ep *Printer) Print(ch <-chan pollevent.Event, identifiers object.ObjMetadataSet,
 	cancelFunc collector.ObserverFunc) error {
 	coll := collector.NewResourceStatusCollector(identifiers)
 	// The actual work is done by the collector, which will invoke the
@@ -52,7 +52,7 @@ func (ep *EventPrinter) Print(ch <-chan pollevent.Event, identifiers object.ObjM
 	return err
 }
 
-func (ep *EventPrinter) printStatusEvent(se pollevent.Event) {
+func (ep *Printer) printStatusEvent(se pollevent.Event) {
 	switch se.Type {
 	case pollevent.ResourceUpdateEvent:
 		id := se.Resource.Identifier
