@@ -6,14 +6,16 @@ package inventory
 import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"sigs.k8s.io/cli-utils/pkg/apis/actuation"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
 // FakeClient is a testing implementation of the Client interface.
 type FakeClient struct {
-	Objs object.ObjMetadataSet
-	Err  error
+	Objs   object.ObjMetadataSet
+	Status []actuation.ObjectStatus
+	Err    error
 }
 
 var (
@@ -57,12 +59,13 @@ func (fic *FakeClient) Merge(_ Info, objs object.ObjMetadataSet, _ common.DryRun
 
 // Replace the stored cluster inventory objs with the passed obj, or an
 // error if one is set up.
-
-func (fic *FakeClient) Replace(_ Info, objs object.ObjMetadataSet, _ common.DryRunStrategy) error {
+func (fic *FakeClient) Replace(_ Info, objs object.ObjMetadataSet, status []actuation.ObjectStatus,
+	_ common.DryRunStrategy) error {
 	if fic.Err != nil {
 		return fic.Err
 	}
 	fic.Objs = objs
+	fic.Status = status
 	return nil
 }
 

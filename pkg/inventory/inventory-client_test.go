@@ -4,8 +4,10 @@
 package inventory
 
 import (
+	"fmt"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -13,14 +15,31 @@ import (
 	"k8s.io/cli-runtime/pkg/resource"
 	clienttesting "k8s.io/client-go/testing"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
+	"sigs.k8s.io/cli-utils/pkg/apis/actuation"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
+
+func podStatus(info *resource.Info) actuation.ObjectStatus {
+	return actuation.ObjectStatus{
+		ObjectReference: ObjectReferenceFromObjMetadata(ignoreErrInfoToObjMeta(info)),
+		Strategy:        actuation.ActuationStrategyApply,
+		Actuation:       actuation.ActuationSucceeded,
+		Reconcile:       actuation.ReconcileSucceeded,
+	}
+}
+
+func podData(name string) map[string]string {
+	return map[string]string{
+		fmt.Sprintf("test-inventory-namespace_%s__Pod", name): "{\"actuation\":\"Succeeded\",\"reconcile\":\"Succeeded\",\"strategy\":\"Apply\"}",
+	}
+}
 
 func TestGetClusterInventoryInfo(t *testing.T) {
 	tests := map[string]struct {
 		inv       Info
 		localObjs object.ObjMetadataSet
+		objStatus []actuation.ObjectStatus
 		isError   bool
 	}{
 		"Nil local inventory object is an error": {
@@ -38,7 +57,8 @@ func TestGetClusterInventoryInfo(t *testing.T) {
 			localObjs: object.ObjMetadataSet{
 				ignoreErrInfoToObjMeta(pod2Info),
 			},
-			isError: false,
+			objStatus: []actuation.ObjectStatus{podStatus(pod2Info)},
+			isError:   false,
 		},
 		"Local inventory with multiple objects": {
 			inv: localInv,
@@ -46,6 +66,11 @@ func TestGetClusterInventoryInfo(t *testing.T) {
 				ignoreErrInfoToObjMeta(pod1Info),
 				ignoreErrInfoToObjMeta(pod2Info),
 				ignoreErrInfoToObjMeta(pod3Info)},
+			objStatus: []actuation.ObjectStatus{
+				podStatus(pod1Info),
+				podStatus(pod2Info),
+				podStatus(pod3Info),
+			},
 			isError: false,
 		},
 	}
@@ -61,7 +86,7 @@ func TestGetClusterInventoryInfo(t *testing.T) {
 
 			var inv *unstructured.Unstructured
 			if tc.inv != nil {
-				inv = storeObjsInInventory(tc.inv, tc.localObjs)
+				inv = storeObjsInInventory(tc.inv, tc.localObjs, tc.objStatus)
 			}
 			clusterInv, err := invClient.GetClusterInventoryInfo(WrapInventoryInfoObj(inv))
 			if tc.isError {
@@ -188,6 +213,7 @@ func TestCreateInventory(t *testing.T) {
 		inv       Info
 		localObjs object.ObjMetadataSet
 		error     string
+		objStatus []actuation.ObjectStatus
 	}{
 		"Nil local inventory object is an error": {
 			inv:       nil,
@@ -203,6 +229,7 @@ func TestCreateInventory(t *testing.T) {
 			localObjs: object.ObjMetadataSet{
 				ignoreErrInfoToObjMeta(pod2Info),
 			},
+			objStatus: []actuation.ObjectStatus{podStatus(pod2Info)},
 		},
 		"Local inventory with multiple objects": {
 			inv: localInv,
@@ -210,6 +237,11 @@ func TestCreateInventory(t *testing.T) {
 				ignoreErrInfoToObjMeta(pod1Info),
 				ignoreErrInfoToObjMeta(pod2Info),
 				ignoreErrInfoToObjMeta(pod3Info)},
+			objStatus: []actuation.ObjectStatus{
+				podStatus(pod1Info),
+				podStatus(pod2Info),
+				podStatus(pod3Info),
+			},
 		},
 	}
 
@@ -230,7 +262,7 @@ func TestCreateInventory(t *testing.T) {
 			require.NoError(t, err)
 			inv := invClient.invToUnstructuredFunc(tc.inv)
 			if inv != nil {
-				inv = storeObjsInInventory(tc.inv, tc.localObjs)
+				inv = storeObjsInInventory(tc.inv, tc.localObjs, tc.objStatus)
 			}
 			_, err = invClient.createInventoryObj(inv, common.DryRunNone)
 			if tc.error != "" {
@@ -242,7 +274,11 @@ func TestCreateInventory(t *testing.T) {
 			expectedInventory := tc.localObjs.ToStringMap()
 			// handle empty inventories special to avoid problems with empty vs nil maps
 			if len(expectedInventory) != 0 || len(storedInventory) != 0 {
-				assert.Equal(t, expectedInventory, storedInventory)
+				for key := range expectedInventory {
+					if _, found := storedInventory[key]; !found {
+						t.Errorf("%s not found in the stored inventory", key)
+					}
+				}
 			}
 		})
 	}
@@ -252,10 +288,13 @@ func TestReplace(t *testing.T) {
 	tests := map[string]struct {
 		localObjs   object.ObjMetadataSet
 		clusterObjs object.ObjMetadataSet
+		objStatus   []actuation.ObjectStatus
+		data        map[string]string
 	}{
 		"Cluster and local inventories empty": {
 			localObjs:   object.ObjMetadataSet{},
 			clusterObjs: object.ObjMetadataSet{},
+			data:        map[string]string{},
 		},
 		"Cluster and local inventories same": {
 			localObjs: object.ObjMetadataSet{
@@ -264,6 +303,8 @@ func TestReplace(t *testing.T) {
 			clusterObjs: object.ObjMetadataSet{
 				ignoreErrInfoToObjMeta(pod1Info),
 			},
+			objStatus: []actuation.ObjectStatus{podStatus(pod1Info)},
+			data:      podData("pod-1"),
 		},
 		"Cluster two obj, local one": {
 			localObjs: object.ObjMetadataSet{
@@ -273,6 +314,8 @@ func TestReplace(t *testing.T) {
 				ignoreErrInfoToObjMeta(pod1Info),
 				ignoreErrInfoToObjMeta(pod3Info),
 			},
+			objStatus: []actuation.ObjectStatus{podStatus(pod1Info), podStatus(pod3Info)},
+			data:      podData("pod-1"),
 		},
 		"Cluster multiple objs, local multiple different objs": {
 			localObjs: object.ObjMetadataSet{
@@ -282,6 +325,8 @@ func TestReplace(t *testing.T) {
 				ignoreErrInfoToObjMeta(pod1Info),
 				ignoreErrInfoToObjMeta(pod2Info),
 				ignoreErrInfoToObjMeta(pod3Info)},
+			objStatus: []actuation.ObjectStatus{podStatus(pod2Info), podStatus(pod1Info), podStatus(pod3Info)},
+			data:      podData("pod-2"),
 		},
 	}
 
@@ -291,11 +336,11 @@ func TestReplace(t *testing.T) {
 	// Client and server dry-run do not throw errors.
 	invClient, err := NewClient(tf, WrapInventoryObj, InvInfoToConfigMap)
 	require.NoError(t, err)
-	err = invClient.Replace(copyInventory(), object.ObjMetadataSet{}, common.DryRunClient)
+	err = invClient.Replace(copyInventory(), object.ObjMetadataSet{}, nil, common.DryRunClient)
 	if err != nil {
 		t.Fatalf("unexpected error received: %s", err)
 	}
-	err = invClient.Replace(copyInventory(), object.ObjMetadataSet{}, common.DryRunServer)
+	err = invClient.Replace(copyInventory(), object.ObjMetadataSet{}, nil, common.DryRunServer)
 	if err != nil {
 		t.Fatalf("unexpected error received: %s", err)
 	}
@@ -307,7 +352,7 @@ func TestReplace(t *testing.T) {
 				WrapInventoryObj, InvInfoToConfigMap)
 			require.NoError(t, err)
 			wrappedInv := invClient.InventoryFactoryFunc(inventoryObj)
-			if err := wrappedInv.Store(tc.clusterObjs); err != nil {
+			if err := wrappedInv.Store(tc.clusterObjs, tc.objStatus); err != nil {
 				t.Fatalf("unexpected error storing inventory objects: %s", err)
 			}
 			inv, err := wrappedInv.GetObject()
@@ -315,7 +360,7 @@ func TestReplace(t *testing.T) {
 				t.Fatalf("unexpected error storing inventory objects: %s", err)
 			}
 			// Call replaceInventory with the new set of "localObjs"
-			inv, err = invClient.replaceInventory(inv, tc.localObjs)
+			inv, err = invClient.replaceInventory(inv, tc.localObjs, tc.objStatus)
 			if err != nil {
 				t.Fatalf("unexpected error received: %s", err)
 			}
@@ -327,6 +372,13 @@ func TestReplace(t *testing.T) {
 			}
 			if !tc.localObjs.Equal(actualObjs) {
 				t.Errorf("expected objects (%s), got (%s)", tc.localObjs, actualObjs)
+			}
+			data, _, err := unstructured.NestedStringMap(inv.Object, "data")
+			if err != nil {
+				t.Fatalf("unexpected error received: %s", err)
+			}
+			if diff := cmp.Diff(data, tc.data); diff != "" {
+				t.Fatalf(diff)
 			}
 		})
 	}
@@ -390,6 +442,7 @@ func TestDeleteInventoryObj(t *testing.T) {
 	tests := map[string]struct {
 		inv       Info
 		localObjs object.ObjMetadataSet
+		objStatus []actuation.ObjectStatus
 	}{
 		"Nil local inventory object is an error": {
 			inv:       nil,
@@ -404,6 +457,7 @@ func TestDeleteInventoryObj(t *testing.T) {
 			localObjs: object.ObjMetadataSet{
 				ignoreErrInfoToObjMeta(pod2Info),
 			},
+			objStatus: []actuation.ObjectStatus{podStatus(pod2Info)},
 		},
 		"Local inventory with multiple objects": {
 			inv: localInv,
@@ -411,6 +465,11 @@ func TestDeleteInventoryObj(t *testing.T) {
 				ignoreErrInfoToObjMeta(pod1Info),
 				ignoreErrInfoToObjMeta(pod2Info),
 				ignoreErrInfoToObjMeta(pod3Info)},
+			objStatus: []actuation.ObjectStatus{
+				podStatus(pod1Info),
+				podStatus(pod2Info),
+				podStatus(pod3Info),
+			},
 		},
 	}
 
@@ -426,7 +485,7 @@ func TestDeleteInventoryObj(t *testing.T) {
 				require.NoError(t, err)
 				inv := invClient.invToUnstructuredFunc(tc.inv)
 				if inv != nil {
-					inv = storeObjsInInventory(tc.inv, tc.localObjs)
+					inv = storeObjsInInventory(tc.inv, tc.localObjs, tc.objStatus)
 				}
 				err = invClient.deleteInventoryObjByName(inv, drs)
 				if err != nil {
@@ -453,4 +512,11 @@ func toReactionFunc(objs object.ObjMetadataSet) clienttesting.ReactionFunc {
 		list.Items = []unstructured.Unstructured{*u}
 		return true, list, err
 	}
+}
+
+func storeObjsInInventory(info Info, objs object.ObjMetadataSet, status []actuation.ObjectStatus) *unstructured.Unstructured {
+	wrapped := WrapInventoryObj(InvInfoToConfigMap(info))
+	_ = wrapped.Store(objs, status)
+	inv, _ := wrapped.GetObject()
+	return inv
 }

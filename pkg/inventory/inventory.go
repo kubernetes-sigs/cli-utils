@@ -17,6 +17,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/klog/v2"
+	"sigs.k8s.io/cli-utils/pkg/apis/actuation"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
@@ -31,7 +32,7 @@ type Storage interface {
 	// Load retrieves the set of object metadata from the inventory object
 	Load() (object.ObjMetadataSet, error)
 	// Store the set of object metadata in the inventory object
-	Store(objs object.ObjMetadataSet) error
+	Store(objs object.ObjMetadataSet, status []actuation.ObjectStatus) error
 	// GetObject returns the object that stores the inventory
 	GetObject() (*unstructured.Unstructured, error)
 }
