@@ -5,11 +5,13 @@ package taskrunner
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
@@ -150,6 +152,9 @@ func (w *WaitTask) startInner(taskContext *TaskContext) {
 	pending := object.ObjMetadataSet{}
 	for _, id := range w.Ids {
 		switch {
+		case w.changedUID(taskContext, id):
+			// replaced
+			w.handleChangedUID(taskContext, id)
 		case w.skipped(taskContext, id):
 			err := taskContext.InventoryManager().SetSkippedReconcile(id)
 			if err != nil {
@@ -226,6 +231,77 @@ func (w *WaitTask) failedByID(taskContext *TaskContext, id object.ObjMetadata) b
 	return cached.Status == status.FailedStatus
 }
 
+// changedUID returns true if the UID of the object has changed since it was
+// applied or deleted. This indicates that the object was deleted and recreated.
+func (w *WaitTask) changedUID(taskContext *TaskContext, id object.ObjMetadata) bool {
+	var oldUID, newUID types.UID
+
+	// Get the uid from the ApplyTask/PruneTask
+	taskObj, found := taskContext.InventoryManager().ObjectStatus(id)
+	if !found {
+		klog.Errorf("Unknown object UID from InventoryManager: %v", id)
+		return false
+	}
+	oldUID = taskObj.UID
+	if oldUID == "" {
+		// All objects should have been given a UID by the apiserver
+		klog.Errorf("Empty object UID from InventoryManager: %v", id)
+		return false
+	}
+
+	// Get the uid from the StatusPoller
+	pollerObj := taskContext.ResourceCache().Get(id)
+	if pollerObj.Resource == nil {
+		switch pollerObj.Status {
+		case status.UnknownStatus:
+			// Resource is expected to be nil when Unknown.
+		case status.NotFoundStatus:
+			// Resource is expected to be nil when NotFound.
+			// K8s DELETE API doesn't always return an object.
+		default:
+			// For all other statuses, nil Resource is probably a bug.
+			klog.Errorf("Unknown object UID from ResourceCache (status: %v): %v", pollerObj.Status, id)
+		}
+		return false
+	}
+	newUID = pollerObj.Resource.GetUID()
+	if newUID == "" {
+		// All objects should have been given a UID by the apiserver
+		klog.Errorf("Empty object UID from ResourceCache (status: %v): %v", pollerObj.Status, id)
+		return false
+	}
+
+	return (oldUID != newUID)
+}
+
+// handleChangedUID updates the object status and sends an event
+func (w *WaitTask) handleChangedUID(taskContext *TaskContext, id object.ObjMetadata) {
+	switch w.Condition {
+	case AllNotFound:
+		// Object recreated by another actor after deletion.
+		// Treat as success.
+		klog.Infof("UID change detected: deleted object have been recreated: marking reconcile successful: %v", id)
+		err := taskContext.InventoryManager().SetSuccessfulReconcile(id)
+		if err != nil {
+			// Object never applied or deleted!
+			klog.Errorf("Failed to mark object as successful reconcile: %v", err)
+		}
+		w.sendEvent(taskContext, id, event.Reconciled)
+	case AllCurrent:
+		// Object deleted and recreated by another actor after apply.
+		// Treat as failure (unverifiable).
+		klog.Infof("UID change detected: applied object has been deleted and recreated: marking reconcile failed: %v", id)
+		err := taskContext.InventoryManager().SetFailedReconcile(id)
+		if err != nil {
+			// Object never applied or deleted!
+			klog.Errorf("Failed to mark object as failed reconcile: %v", err)
+		}
+		w.sendEvent(taskContext, id, event.ReconcileFailed)
+	default:
+		panic(fmt.Sprintf("Invalid wait condition: %v", w.Condition))
+	}
+}
+
 // Cancel exits early with a timeout error
 func (w *WaitTask) Cancel(_ *TaskContext) {
 	w.cancelFunc()
@@ -246,7 +322,10 @@ func (w *WaitTask) StatusUpdate(taskContext *TaskContext, id object.ObjMetadata)
 	switch {
 	case w.pending.Contains(id):
 		switch {
-		// pending - check if reconciled
+		case w.changedUID(taskContext, id):
+			// replaced
+			w.handleChangedUID(taskContext, id)
+			w.pending = w.pending.Remove(id)
 		case w.reconciledByID(taskContext, id):
 			// reconciled - remove from pending & send event
 			err := taskContext.InventoryManager().SetSuccessfulReconcile(id)
