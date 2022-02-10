@@ -87,14 +87,22 @@ func TestWaitTask_CompleteEventually(t *testing.T) {
 	taskContext := NewTaskContext(eventChannel, resourceCache)
 	defer close(eventChannel)
 
-	// mark deployment 1 & 2 as applied
-	taskContext.InventoryManager().AddSuccessfulApply(testDeployment1ID, "unused", 1)
-	taskContext.InventoryManager().AddSuccessfulApply(testDeployment2ID, "unused", 1)
+	// Update metadata on successfully applied objects
+	testDeployment1.SetUID("a")
+	testDeployment1.SetGeneration(1)
+	testDeployment2.SetUID("b")
+	testDeployment2.SetGeneration(1)
 
-	// mark deployment 3 as failed
+	// mark deployment 1 & 2 as apply succeeded
+	taskContext.InventoryManager().AddSuccessfulApply(testDeployment1ID,
+		testDeployment1.GetUID(), testDeployment1.GetGeneration())
+	taskContext.InventoryManager().AddSuccessfulApply(testDeployment2ID,
+		testDeployment2.GetUID(), testDeployment2.GetGeneration())
+
+	// mark deployment 3 as apply failed
 	taskContext.InventoryManager().AddFailedApply(testDeployment3ID)
 
-	// mark deployment 4 as skipped
+	// mark deployment 4 as apply skipped
 	taskContext.InventoryManager().AddSkippedApply(testDeployment4ID)
 
 	// run task async, to let the test collect events
@@ -215,16 +223,16 @@ loop:
 					Strategy:        inventory.ActuationStrategyApply,
 					Actuation:       inventory.ActuationSucceeded,
 					Reconcile:       inventory.ReconcileSucceeded,
-					UID:             "unused",
-					Generation:      1,
+					UID:             testDeployment1.GetUID(),
+					Generation:      testDeployment1.GetGeneration(),
 				},
 				{
 					ObjectReference: inventory.ObjectReferenceFromObjMetadata(testDeployment2ID),
 					Strategy:        inventory.ActuationStrategyApply,
 					Actuation:       inventory.ActuationSucceeded,
 					Reconcile:       inventory.ReconcileSucceeded,
-					UID:             "unused",
-					Generation:      1,
+					UID:             testDeployment2.GetUID(),
+					Generation:      testDeployment2.GetGeneration(),
 				},
 				{
 					ObjectReference: inventory.ObjectReferenceFromObjMetadata(testDeployment3ID),
@@ -248,6 +256,7 @@ func TestWaitTask_Timeout(t *testing.T) {
 	testDeployment1ID := testutil.ToIdentifier(t, testDeployment1YAML)
 	testDeployment1 := testutil.Unstructured(t, testDeployment1YAML)
 	testDeployment2ID := testutil.ToIdentifier(t, testDeployment2YAML)
+	testDeployment2 := testutil.Unstructured(t, testDeployment2YAML)
 	testDeployment3ID := testutil.ToIdentifier(t, testDeployment3YAML)
 	testDeployment4ID := testutil.ToIdentifier(t, testDeployment4YAML)
 	ids := object.ObjMetadataSet{
@@ -266,14 +275,22 @@ func TestWaitTask_Timeout(t *testing.T) {
 	taskContext := NewTaskContext(eventChannel, resourceCache)
 	defer close(eventChannel)
 
-	// mark deployment 1 & 2 as applied
-	taskContext.InventoryManager().AddSuccessfulApply(testDeployment1ID, "unused", 1)
-	taskContext.InventoryManager().AddSuccessfulApply(testDeployment2ID, "unused", 1)
+	// Update metadata on successfully applied objects
+	testDeployment1.SetUID("a")
+	testDeployment1.SetGeneration(1)
+	testDeployment2.SetUID("b")
+	testDeployment2.SetGeneration(1)
 
-	// mark deployment 3 as failed
+	// mark deployment 1 & 2 as apply succeeded
+	taskContext.InventoryManager().AddSuccessfulApply(testDeployment1ID,
+		testDeployment1.GetUID(), testDeployment1.GetGeneration())
+	taskContext.InventoryManager().AddSuccessfulApply(testDeployment2ID,
+		testDeployment2.GetUID(), testDeployment2.GetGeneration())
+
+	// mark deployment 3 as apply failed
 	taskContext.InventoryManager().AddFailedApply(testDeployment3ID)
 
-	// mark deployment 4 as skipped
+	// mark deployment 4 as apply skipped
 	taskContext.InventoryManager().AddSkippedApply(testDeployment4ID)
 
 	// run task async, to let the test collect events
@@ -378,16 +395,16 @@ loop:
 					Strategy:        inventory.ActuationStrategyApply,
 					Actuation:       inventory.ActuationSucceeded,
 					Reconcile:       inventory.ReconcileSucceeded,
-					UID:             "unused",
-					Generation:      1,
+					UID:             testDeployment1.GetUID(),
+					Generation:      testDeployment1.GetGeneration(),
 				},
 				{
 					ObjectReference: inventory.ObjectReferenceFromObjMetadata(testDeployment2ID),
 					Strategy:        inventory.ActuationStrategyApply,
 					Actuation:       inventory.ActuationSucceeded,
 					Reconcile:       inventory.ReconcileTimeout,
-					UID:             "unused",
-					Generation:      1,
+					UID:             testDeployment2.GetUID(),
+					Generation:      testDeployment2.GetGeneration(),
 				},
 				{
 					ObjectReference: inventory.ObjectReferenceFromObjMetadata(testDeployment3ID),
@@ -423,8 +440,13 @@ func TestWaitTask_StartAndComplete(t *testing.T) {
 	taskContext := NewTaskContext(eventChannel, resourceCache)
 	defer close(eventChannel)
 
-	// mark the deployment as applied
-	taskContext.InventoryManager().AddSuccessfulApply(testDeploymentID, "unused", 1)
+	// Update metadata on successfully applied objects
+	testDeployment.SetUID("a")
+	testDeployment.SetGeneration(1)
+
+	// mark deployment as apply succeeded
+	taskContext.InventoryManager().AddSuccessfulApply(testDeploymentID,
+		testDeployment.GetUID(), testDeployment.GetGeneration())
 
 	// mark the deployment as Current before starting
 	resourceCache.Put(testDeploymentID, cache.ResourceStatus{
@@ -478,8 +500,8 @@ loop:
 					Strategy:        inventory.ActuationStrategyApply,
 					Actuation:       inventory.ActuationSucceeded,
 					Reconcile:       inventory.ReconcileSucceeded,
-					UID:             "unused",
-					Generation:      1,
+					UID:             testDeployment.GetUID(),
+					Generation:      testDeployment.GetGeneration(),
 				},
 			},
 		},
@@ -489,6 +511,7 @@ loop:
 
 func TestWaitTask_Cancel(t *testing.T) {
 	testDeploymentID := testutil.ToIdentifier(t, testDeployment1YAML)
+	testDeployment := testutil.Unstructured(t, testDeployment1YAML)
 	ids := object.ObjMetadataSet{
 		testDeploymentID,
 	}
@@ -502,8 +525,13 @@ func TestWaitTask_Cancel(t *testing.T) {
 	taskContext := NewTaskContext(eventChannel, resourceCache)
 	defer close(eventChannel)
 
-	// mark the deployment as applied
-	taskContext.InventoryManager().AddSuccessfulApply(testDeploymentID, "unused", 1)
+	// Update metadata on successfully applied objects
+	testDeployment.SetUID("a")
+	testDeployment.SetGeneration(1)
+
+	// mark deployment as apply succeeded
+	taskContext.InventoryManager().AddSuccessfulApply(testDeploymentID,
+		testDeployment.GetUID(), testDeployment.GetGeneration())
 
 	// run task async, to let the test collect events
 	go func() {
@@ -559,8 +587,8 @@ loop:
 					Strategy:        inventory.ActuationStrategyApply,
 					Actuation:       inventory.ActuationSucceeded,
 					Reconcile:       inventory.ReconcilePending,
-					UID:             "unused",
-					Generation:      1,
+					UID:             testDeployment.GetUID(),
+					Generation:      testDeployment.GetGeneration(),
 				},
 			},
 		},
@@ -585,8 +613,13 @@ func TestWaitTask_SingleTaskResult(t *testing.T) {
 	taskContext := NewTaskContext(eventChannel, resourceCache)
 	defer close(eventChannel)
 
-	// mark the deployment as applied
-	taskContext.InventoryManager().AddSuccessfulApply(testDeploymentID, "unused", 1)
+	// Update metadata on successfully applied objects
+	testDeployment.SetUID("a")
+	testDeployment.SetGeneration(1)
+
+	// mark deployment as apply succeeded
+	taskContext.InventoryManager().AddSuccessfulApply(testDeploymentID,
+		testDeployment.GetUID(), testDeployment.GetGeneration())
 
 	// run task async, to let the test collect events
 	go func() {
@@ -662,8 +695,8 @@ loop:
 					Strategy:        inventory.ActuationStrategyApply,
 					Actuation:       inventory.ActuationSucceeded,
 					Reconcile:       inventory.ReconcileSucceeded,
-					UID:             "unused",
-					Generation:      1,
+					UID:             testDeployment.GetUID(),
+					Generation:      testDeployment.GetGeneration(),
 				},
 			},
 		},
@@ -672,11 +705,17 @@ loop:
 }
 
 func TestWaitTask_Failed(t *testing.T) {
-	taskName := "wait-1"
+	taskName := "wait-6"
 	testDeployment1ID := testutil.ToIdentifier(t, testDeployment1YAML)
 	testDeployment1 := testutil.Unstructured(t, testDeployment1YAML)
 	testDeployment2ID := testutil.ToIdentifier(t, testDeployment2YAML)
 	testDeployment2 := testutil.Unstructured(t, testDeployment2YAML)
+
+	// Update metadata on successfully applied objects
+	testDeployment1.SetUID("a")
+	testDeployment1.SetGeneration(1)
+	testDeployment2.SetUID("b")
+	testDeployment2.SetGeneration(1)
 
 	testCases := map[string]struct {
 		configureTaskContextFunc func(taskContext *TaskContext)
@@ -687,8 +726,11 @@ func TestWaitTask_Failed(t *testing.T) {
 	}{
 		"continue on failed if others InProgress": {
 			configureTaskContextFunc: func(taskContext *TaskContext) {
-				taskContext.InventoryManager().AddSuccessfulApply(testDeployment1ID, "unused", 1)
-				taskContext.InventoryManager().AddSuccessfulApply(testDeployment2ID, "unused", 1)
+				// mark deployment as apply succeeded
+				taskContext.InventoryManager().AddSuccessfulApply(testDeployment1ID,
+					testDeployment1.GetUID(), testDeployment1.GetGeneration())
+				taskContext.InventoryManager().AddSuccessfulApply(testDeployment2ID,
+					testDeployment2.GetUID(), testDeployment2.GetGeneration())
 			},
 			eventsFunc: func(resourceCache *cache.ResourceCacheMap, task *WaitTask, taskContext *TaskContext) {
 				resourceCache.Put(testDeployment1ID, cache.ResourceStatus{
@@ -756,16 +798,16 @@ func TestWaitTask_Failed(t *testing.T) {
 							Strategy:        inventory.ActuationStrategyApply,
 							Actuation:       inventory.ActuationSucceeded,
 							Reconcile:       inventory.ReconcileFailed,
-							UID:             "unused",
-							Generation:      1,
+							UID:             testDeployment1.GetUID(),
+							Generation:      testDeployment1.GetGeneration(),
 						},
 						{
 							ObjectReference: inventory.ObjectReferenceFromObjMetadata(testDeployment2ID),
 							Strategy:        inventory.ActuationStrategyApply,
 							Actuation:       inventory.ActuationSucceeded,
 							Reconcile:       inventory.ReconcileSucceeded,
-							UID:             "unused",
-							Generation:      1,
+							UID:             testDeployment2.GetUID(),
+							Generation:      testDeployment2.GetGeneration(),
 						},
 					},
 				},
@@ -773,8 +815,11 @@ func TestWaitTask_Failed(t *testing.T) {
 		},
 		"complete wait task is last resource becomes failed": {
 			configureTaskContextFunc: func(taskContext *TaskContext) {
-				taskContext.InventoryManager().AddSuccessfulApply(testDeployment1ID, "unused", 1)
-				taskContext.InventoryManager().AddSuccessfulApply(testDeployment2ID, "unused", 1)
+				// mark deployment as apply succeeded
+				taskContext.InventoryManager().AddSuccessfulApply(testDeployment1ID,
+					testDeployment1.GetUID(), testDeployment1.GetGeneration())
+				taskContext.InventoryManager().AddSuccessfulApply(testDeployment2ID,
+					testDeployment2.GetUID(), testDeployment2.GetGeneration())
 			},
 			eventsFunc: func(resourceCache *cache.ResourceCacheMap, task *WaitTask, taskContext *TaskContext) {
 				resourceCache.Put(testDeployment2ID, cache.ResourceStatus{
@@ -836,16 +881,16 @@ func TestWaitTask_Failed(t *testing.T) {
 							Strategy:        inventory.ActuationStrategyApply,
 							Actuation:       inventory.ActuationSucceeded,
 							Reconcile:       inventory.ReconcileFailed,
-							UID:             "unused",
-							Generation:      1,
+							UID:             testDeployment1.GetUID(),
+							Generation:      testDeployment1.GetGeneration(),
 						},
 						{
 							ObjectReference: inventory.ObjectReferenceFromObjMetadata(testDeployment2ID),
 							Strategy:        inventory.ActuationStrategyApply,
 							Actuation:       inventory.ActuationSucceeded,
 							Reconcile:       inventory.ReconcileSucceeded,
-							UID:             "unused",
-							Generation:      1,
+							UID:             testDeployment2.GetUID(),
+							Generation:      testDeployment2.GetGeneration(),
 						},
 					},
 				},
@@ -853,8 +898,11 @@ func TestWaitTask_Failed(t *testing.T) {
 		},
 		"failed resource can become current": {
 			configureTaskContextFunc: func(taskContext *TaskContext) {
-				taskContext.InventoryManager().AddSuccessfulApply(testDeployment1ID, "unused", 1)
-				taskContext.InventoryManager().AddSuccessfulApply(testDeployment2ID, "unused", 1)
+				// mark deployment as apply succeeded
+				taskContext.InventoryManager().AddSuccessfulApply(testDeployment1ID,
+					testDeployment1.GetUID(), testDeployment1.GetGeneration())
+				taskContext.InventoryManager().AddSuccessfulApply(testDeployment2ID,
+					testDeployment2.GetUID(), testDeployment2.GetGeneration())
 			},
 			eventsFunc: func(resourceCache *cache.ResourceCacheMap, task *WaitTask, taskContext *TaskContext) {
 				resourceCache.Put(testDeployment1ID, cache.ResourceStatus{
@@ -931,16 +979,16 @@ func TestWaitTask_Failed(t *testing.T) {
 							Strategy:        inventory.ActuationStrategyApply,
 							Actuation:       inventory.ActuationSucceeded,
 							Reconcile:       inventory.ReconcileSucceeded,
-							UID:             "unused",
-							Generation:      1,
+							UID:             testDeployment1.GetUID(),
+							Generation:      testDeployment1.GetGeneration(),
 						},
 						{
 							ObjectReference: inventory.ObjectReferenceFromObjMetadata(testDeployment2ID),
 							Strategy:        inventory.ActuationStrategyApply,
 							Actuation:       inventory.ActuationSucceeded,
 							Reconcile:       inventory.ReconcileSucceeded,
-							UID:             "unused",
-							Generation:      1,
+							UID:             testDeployment2.GetUID(),
+							Generation:      testDeployment2.GetGeneration(),
 						},
 					},
 				},
@@ -948,8 +996,11 @@ func TestWaitTask_Failed(t *testing.T) {
 		},
 		"failed resource can become InProgress": {
 			configureTaskContextFunc: func(taskContext *TaskContext) {
-				taskContext.InventoryManager().AddSuccessfulApply(testDeployment1ID, "unused", 1)
-				taskContext.InventoryManager().AddSuccessfulApply(testDeployment2ID, "unused", 1)
+				// mark deployment as apply succeeded
+				taskContext.InventoryManager().AddSuccessfulApply(testDeployment1ID,
+					testDeployment1.GetUID(), testDeployment1.GetGeneration())
+				taskContext.InventoryManager().AddSuccessfulApply(testDeployment2ID,
+					testDeployment2.GetUID(), testDeployment2.GetGeneration())
 			},
 			eventsFunc: func(resourceCache *cache.ResourceCacheMap, task *WaitTask, taskContext *TaskContext) {
 				resourceCache.Put(testDeployment1ID, cache.ResourceStatus{
@@ -1035,16 +1086,16 @@ func TestWaitTask_Failed(t *testing.T) {
 							Strategy:        inventory.ActuationStrategyApply,
 							Actuation:       inventory.ActuationSucceeded,
 							Reconcile:       inventory.ReconcileTimeout,
-							UID:             "unused",
-							Generation:      1,
+							UID:             testDeployment1.GetUID(),
+							Generation:      testDeployment1.GetGeneration(),
 						},
 						{
 							ObjectReference: inventory.ObjectReferenceFromObjMetadata(testDeployment2ID),
 							Strategy:        inventory.ActuationStrategyApply,
 							Actuation:       inventory.ActuationSucceeded,
 							Reconcile:       inventory.ReconcileSucceeded,
-							UID:             "unused",
-							Generation:      1,
+							UID:             testDeployment2.GetUID(),
+							Generation:      testDeployment2.GetGeneration(),
 						},
 					},
 				},
@@ -1059,6 +1110,256 @@ func TestWaitTask_Failed(t *testing.T) {
 				testDeployment2ID,
 			}
 			task := NewWaitTask(taskName, ids, AllCurrent,
+				tc.waitTimeout, testutil.NewFakeRESTMapper())
+
+			eventChannel := make(chan event.Event)
+			resourceCache := cache.NewResourceCacheMap()
+			taskContext := NewTaskContext(eventChannel, resourceCache)
+			defer close(eventChannel)
+
+			tc.configureTaskContextFunc(taskContext)
+
+			// run task async, to let the test collect events
+			go func() {
+				// start the task
+				task.Start(taskContext)
+
+				tc.eventsFunc(resourceCache, task, taskContext)
+			}()
+
+			// wait for task result
+			timer := time.NewTimer(5 * time.Second)
+			receivedEvents := []event.Event{}
+		loop:
+			for {
+				select {
+				case e := <-taskContext.EventChannel():
+					receivedEvents = append(receivedEvents, e)
+				case res := <-taskContext.TaskChannel():
+					timer.Stop()
+					assert.NoError(t, res.Err)
+					break loop
+				case <-timer.C:
+					t.Fatalf("timed out waiting for TaskResult")
+				}
+			}
+
+			testutil.AssertEqual(t, tc.expectedEvents, receivedEvents,
+				"Actual events (%d) do not match expected events (%d)",
+				len(receivedEvents), len(tc.expectedEvents))
+
+			testutil.AssertEqual(t, tc.expectedInventory, taskContext.InventoryManager().Inventory())
+		})
+	}
+}
+
+func TestWaitTask_UIDChanged(t *testing.T) {
+	taskName := "wait-7"
+	testDeployment1ID := testutil.ToIdentifier(t, testDeployment1YAML)
+	testDeployment1 := testutil.Unstructured(t, testDeployment1YAML)
+	testDeployment2ID := testutil.ToIdentifier(t, testDeployment2YAML)
+	testDeployment2 := testutil.Unstructured(t, testDeployment2YAML)
+
+	// Update metadata on successfully applied objects
+	testDeployment1.SetUID("a")
+	testDeployment1.SetGeneration(1)
+	testDeployment2.SetUID("b")
+	testDeployment2.SetGeneration(1)
+
+	replacedDeployment1 := testDeployment1.DeepCopy()
+	replacedDeployment1.SetUID("replaced")
+
+	testCases := map[string]struct {
+		condition                Condition
+		configureTaskContextFunc func(taskContext *TaskContext)
+		eventsFunc               func(*cache.ResourceCacheMap, *WaitTask, *TaskContext)
+		waitTimeout              time.Duration
+		expectedEvents           []event.Event
+		expectedInventory        *inventory.Inventory
+	}{
+		"UID changed after apply means reconcile failure": {
+			condition: AllCurrent,
+			configureTaskContextFunc: func(taskContext *TaskContext) {
+				// mark deployment as apply succeeded
+				taskContext.InventoryManager().AddSuccessfulApply(testDeployment1ID,
+					testDeployment1.GetUID(), testDeployment1.GetGeneration())
+				taskContext.InventoryManager().AddSuccessfulApply(testDeployment2ID,
+					testDeployment2.GetUID(), testDeployment2.GetGeneration())
+			},
+			eventsFunc: func(resourceCache *cache.ResourceCacheMap, task *WaitTask, taskContext *TaskContext) {
+				// any status update after apply success should trigger failure if the UID changed
+				resourceCache.Put(testDeployment1ID, cache.ResourceStatus{
+					Resource: replacedDeployment1,
+					Status:   status.CurrentStatus,
+				})
+				task.StatusUpdate(taskContext, testDeployment1ID)
+
+				resourceCache.Put(testDeployment2ID, cache.ResourceStatus{
+					Resource: testDeployment2,
+					Status:   status.CurrentStatus,
+				})
+				task.StatusUpdate(taskContext, testDeployment2ID)
+			},
+			waitTimeout: 2 * time.Second,
+			expectedEvents: []event.Event{
+				// deployment1 pending
+				{
+					Type: event.WaitType,
+					WaitEvent: event.WaitEvent{
+						GroupName:  taskName,
+						Identifier: testDeployment1ID,
+						Operation:  event.ReconcilePending,
+					},
+				},
+				// deployment2 pending
+				{
+					Type: event.WaitType,
+					WaitEvent: event.WaitEvent{
+						GroupName:  taskName,
+						Identifier: testDeployment2ID,
+						Operation:  event.ReconcilePending,
+					},
+				},
+				// deployment1 is failed
+				{
+					Type: event.WaitType,
+					WaitEvent: event.WaitEvent{
+						GroupName:  taskName,
+						Identifier: testDeployment1ID,
+						Operation:  event.ReconcileFailed,
+					},
+				},
+				// deployment2 current
+				{
+					Type: event.WaitType,
+					WaitEvent: event.WaitEvent{
+						GroupName:  taskName,
+						Identifier: testDeployment2ID,
+						Operation:  event.Reconciled,
+					},
+				},
+			},
+			expectedInventory: &inventory.Inventory{
+				Status: inventory.InventoryStatus{
+					Objects: []inventory.ObjectStatus{
+						{
+							ObjectReference: inventory.ObjectReferenceFromObjMetadata(testDeployment1ID),
+							Strategy:        inventory.ActuationStrategyApply,
+							Actuation:       inventory.ActuationSucceeded,
+							// UID change causes failure after apply
+							Reconcile: inventory.ReconcileFailed,
+							// Recorded UID should be from the applied object, not the new replacement
+							UID:        testDeployment1.GetUID(),
+							Generation: testDeployment1.GetGeneration(),
+						},
+						{
+							ObjectReference: inventory.ObjectReferenceFromObjMetadata(testDeployment2ID),
+							Strategy:        inventory.ActuationStrategyApply,
+							Actuation:       inventory.ActuationSucceeded,
+							Reconcile:       inventory.ReconcileSucceeded,
+							UID:             testDeployment2.GetUID(),
+							Generation:      testDeployment2.GetGeneration(),
+						},
+					},
+				},
+			},
+		},
+		"UID changed after delete means reconcile success": {
+			condition: AllNotFound,
+			configureTaskContextFunc: func(taskContext *TaskContext) {
+				// mark deployment as apply succeeded
+				taskContext.InventoryManager().AddSuccessfulDelete(testDeployment1ID,
+					testDeployment1.GetUID())
+				taskContext.InventoryManager().AddSuccessfulDelete(testDeployment2ID,
+					testDeployment2.GetUID())
+			},
+			eventsFunc: func(resourceCache *cache.ResourceCacheMap, task *WaitTask, taskContext *TaskContext) {
+				// any status update after delete should trigger success if the UID changed
+				resourceCache.Put(testDeployment1ID, cache.ResourceStatus{
+					Resource: replacedDeployment1,
+					Status:   status.InProgressStatus,
+				})
+				task.StatusUpdate(taskContext, testDeployment1ID)
+
+				resourceCache.Put(testDeployment2ID, cache.ResourceStatus{
+					Resource: testDeployment2,
+					Status:   status.NotFoundStatus,
+				})
+				task.StatusUpdate(taskContext, testDeployment2ID)
+			},
+			waitTimeout: 2 * time.Second,
+			expectedEvents: []event.Event{
+				// deployment1 pending
+				{
+					Type: event.WaitType,
+					WaitEvent: event.WaitEvent{
+						GroupName:  taskName,
+						Identifier: testDeployment1ID,
+						Operation:  event.ReconcilePending,
+					},
+				},
+				// deployment2 pending
+				{
+					Type: event.WaitType,
+					WaitEvent: event.WaitEvent{
+						GroupName:  taskName,
+						Identifier: testDeployment2ID,
+						Operation:  event.ReconcilePending,
+					},
+				},
+				// deployment1 is replaced
+				{
+					Type: event.WaitType,
+					WaitEvent: event.WaitEvent{
+						GroupName:  taskName,
+						Identifier: testDeployment1ID,
+						Operation:  event.Reconciled,
+					},
+				},
+				// deployment2 not found
+				{
+					Type: event.WaitType,
+					WaitEvent: event.WaitEvent{
+						GroupName:  taskName,
+						Identifier: testDeployment2ID,
+						Operation:  event.Reconciled,
+					},
+				},
+			},
+			expectedInventory: &inventory.Inventory{
+				Status: inventory.InventoryStatus{
+					Objects: []inventory.ObjectStatus{
+						{
+							ObjectReference: inventory.ObjectReferenceFromObjMetadata(testDeployment1ID),
+							Strategy:        inventory.ActuationStrategyDelete,
+							Actuation:       inventory.ActuationSucceeded,
+							// UID change causes success after delete
+							Reconcile: inventory.ReconcileSucceeded,
+							// Recorded UID should be from the deleted object, not the new replacement
+							UID: testDeployment1.GetUID(),
+							// Deleted generation is unknown
+						},
+						{
+							ObjectReference: inventory.ObjectReferenceFromObjMetadata(testDeployment2ID),
+							Strategy:        inventory.ActuationStrategyDelete,
+							Actuation:       inventory.ActuationSucceeded,
+							Reconcile:       inventory.ReconcileSucceeded,
+							UID:             testDeployment2.GetUID(),
+							// Deleted generation is unknown
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for tn, tc := range testCases {
+		t.Run(tn, func(t *testing.T) {
+			ids := object.ObjMetadataSet{
+				testDeployment1ID,
+				testDeployment2ID,
+			}
+			task := NewWaitTask(taskName, ids, tc.condition,
 				tc.waitTimeout, testutil.NewFakeRESTMapper())
 
 			eventChannel := make(chan event.Event)
