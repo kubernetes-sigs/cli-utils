@@ -110,15 +110,12 @@ func (cic *ClusterInventoryClient) Merge(localInv InventoryInfo, objs object.Obj
 			return nil, err
 		}
 		klog.V(4).Infof("creating initial inventory object with %d objects", len(objs))
-		var createdObj *unstructured.Unstructured
-		if createdObj, err = cic.createInventoryObj(invInfo, dryRun); err != nil {
+		createdObj, err := cic.createInventoryObj(invInfo, dryRun)
+		if err != nil {
 			return nil, err
 		}
-		// TODO(Liujingfang1): Remove the nil check statement after
-		// fixing the client mock in the unit test.
-		if createdObj != nil {
-			invInfo.SetResourceVersion(createdObj.GetResourceVersion())
-		}
+		// Status update requires the latest ResourceVersion
+		invInfo.SetResourceVersion(createdObj.GetResourceVersion())
 		if err := cic.updateStatus(invInfo, dryRun); err != nil {
 			return nil, err
 		}
@@ -144,20 +141,13 @@ func (cic *ClusterInventoryClient) Merge(localInv InventoryInfo, objs object.Obj
 			return pruneIds, nil
 		}
 		if !objs.Equal(clusterObjs) {
-			clusterInv, err = wrappedInv.GetObject()
+			klog.V(4).Infof("update cluster inventory: %s/%s", clusterInv.GetNamespace(), clusterInv.GetName())
+			appliedObj, err := cic.applyInventoryObj(clusterInv, dryRun)
 			if err != nil {
 				return pruneIds, err
 			}
-			klog.V(4).Infof("update cluster inventory: %s/%s", clusterInv.GetNamespace(), clusterInv.GetName())
-			var appliedObj *unstructured.Unstructured
-			if appliedObj, err = cic.applyInventoryObj(clusterInv, dryRun); err != nil {
-				return pruneIds, err
-			}
-			// TODO(Liujingfang1): Remove the nil check statement after
-			// fixing the client mock in the unit test.
-			if appliedObj != nil {
-				clusterInv.SetResourceVersion(appliedObj.GetResourceVersion())
-			}
+			// Status update requires the latest ResourceVersion
+			clusterInv.SetResourceVersion(appliedObj.GetResourceVersion())
 		}
 		if err := cic.updateStatus(clusterInv, dryRun); err != nil {
 			return pruneIds, err
@@ -190,15 +180,12 @@ func (cic *ClusterInventoryClient) Replace(localInv InventoryInfo, objs object.O
 	if !objs.Equal(clusterObjs) {
 		klog.V(4).Infof("replace cluster inventory: %s/%s", clusterInv.GetNamespace(), clusterInv.GetName())
 		klog.V(4).Infof("replace cluster inventory %d objects", len(objs))
-		var appliedObj *unstructured.Unstructured
-		if appliedObj, err = cic.applyInventoryObj(clusterInv, dryRun); err != nil {
+		appliedObj, err := cic.applyInventoryObj(clusterInv, dryRun)
+		if err != nil {
 			return fmt.Errorf("failed to write updated inventory to cluster: %w", err)
 		}
-		// TODO(Liujingfang1): Remove the nil check statement after
-		// fixing the client mock in the unit test.
-		if appliedObj != nil {
-			clusterInv.SetResourceVersion(appliedObj.GetResourceVersion())
-		}
+		// Status update requires the latest ResourceVersion
+		clusterInv.SetResourceVersion(appliedObj.GetResourceVersion())
 	}
 	if err := cic.updateStatus(clusterInv, dryRun); err != nil {
 		return err

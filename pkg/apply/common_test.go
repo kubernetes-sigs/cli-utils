@@ -295,24 +295,24 @@ func (ir *inventoryReactor) updateFakeDynamicClient(fdc *dynamicfake.FakeDynamic
 	fdc.PrependReactor("create", "configmaps", func(action clienttesting.Action) (bool, runtime.Object, error) {
 		obj := *action.(clienttesting.CreateAction).GetObject().(*unstructured.Unstructured)
 		ir.inventoryObj = &obj
-		return true, nil, nil
+		return true, ir.inventoryObj.DeepCopy(), nil
 	})
 	fdc.PrependReactor("list", "configmaps", func(action clienttesting.Action) (bool, runtime.Object, error) {
 		uList := &unstructured.UnstructuredList{
 			Items: []unstructured.Unstructured{},
 		}
 		if ir.inventoryObj != nil {
-			uList.Items = append(uList.Items, *ir.inventoryObj)
+			uList.Items = append(uList.Items, *ir.inventoryObj.DeepCopy())
 		}
 		return true, uList, nil
 	})
 	fdc.PrependReactor("get", "configmaps", func(action clienttesting.Action) (bool, runtime.Object, error) {
-		return true, ir.inventoryObj, nil
+		return true, ir.inventoryObj.DeepCopy(), nil
 	})
 	fdc.PrependReactor("update", "configmaps", func(action clienttesting.Action) (bool, runtime.Object, error) {
 		obj := *action.(clienttesting.UpdateAction).GetObject().(*unstructured.Unstructured)
 		ir.inventoryObj = &obj
-		return true, nil, nil
+		return true, ir.inventoryObj.DeepCopy(), nil
 	})
 }
 
