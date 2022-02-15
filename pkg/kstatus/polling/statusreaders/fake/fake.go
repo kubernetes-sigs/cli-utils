@@ -13,17 +13,17 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
-type FakeStatusReader struct{}
+type StatusReader struct{}
 
-func (f *FakeStatusReader) Supports(schema.GroupKind) bool {
+func (f *StatusReader) Supports(schema.GroupKind) bool {
 	return true
 }
 
-func (f *FakeStatusReader) ReadStatus(_ context.Context, _ engine.ClusterReader, _ object.ObjMetadata) (*event.ResourceStatus, error) {
+func (f *StatusReader) ReadStatus(_ context.Context, _ engine.ClusterReader, _ object.ObjMetadata) (*event.ResourceStatus, error) {
 	return nil, nil
 }
 
-func (f *FakeStatusReader) ReadStatusForObject(_ context.Context, _ engine.ClusterReader, obj *unstructured.Unstructured) (*event.ResourceStatus, error) {
+func (f *StatusReader) ReadStatusForObject(_ context.Context, _ engine.ClusterReader, obj *unstructured.Unstructured) (*event.ResourceStatus, error) {
 	identifier := object.UnstructuredToObjMetadata(obj)
 	return &event.ResourceStatus{
 		Identifier: identifier,

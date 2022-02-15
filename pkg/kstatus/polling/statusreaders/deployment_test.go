@@ -91,7 +91,7 @@ func TestReadStatus(t *testing.T) {
 			}
 			fakeMapper := fakemapper.NewFakeRESTMapper(deploymentGVK, replicaSetGVK)
 
-			fakeStatusReader := &fake.FakeStatusReader{}
+			fakeStatusReader := &fake.StatusReader{}
 			statusReader := NewDeploymentResourceReader(fakeMapper, fakeStatusReader)
 
 			rs, err := statusReader.ReadStatus(context.Background(), fakeReader, tc.identifier)

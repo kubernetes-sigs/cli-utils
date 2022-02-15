@@ -208,7 +208,7 @@ spec:
 				ListErr: tc.listErr,
 			}
 			fakeMapper := fakemapper.NewFakeRESTMapper(rsGVK)
-			fakeStatusReader := &fakesr.FakeStatusReader{}
+			fakeStatusReader := &fakesr.StatusReader{}
 
 			object := testutil.YamlToUnstructured(t, tc.manifest)
 
