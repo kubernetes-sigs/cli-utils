@@ -201,7 +201,7 @@ func TestNewStatusPollerRunnerCancellationWithMultipleResources(t *testing.T) {
 	engine := PollerEngine{
 		Mapper: fakeMapper,
 		ClusterReaderFactory: ClusterReaderFactoryFunc(func(client.Reader, meta.RESTMapper, object.ObjMetadataSet) (ClusterReader, error) {
-			return &fakecr.FakeClusterReader{
+			return &fakecr.ClusterReader{
 				SyncErr: context.Canceled,
 			}, nil
 		}),

@@ -80,7 +80,7 @@ func TestLookupResource(t *testing.T) {
 
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
-			fakeReader := &fakecr.FakeClusterReader{
+			fakeReader := &fakecr.ClusterReader{
 				GetErr: tc.readerErr,
 			}
 			fakeMapper := fakemapper.NewFakeRESTMapper(deploymentGVK)
@@ -201,7 +201,7 @@ spec:
 
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
-			fakeClusterReader := &fakecr.FakeClusterReader{
+			fakeClusterReader := &fakecr.ClusterReader{
 				ListResources: &unstructured.UnstructuredList{
 					Items: tc.listObjects,
 				},

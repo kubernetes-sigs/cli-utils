@@ -85,7 +85,7 @@ func TestReadStatus(t *testing.T) {
 	for tn := range testCases {
 		tc := testCases[tn]
 		t.Run(tn, func(t *testing.T) {
-			fakeReader := &fakecr.FakeClusterReader{
+			fakeReader := &fakecr.ClusterReader{
 				GetResource: tc.readerResource,
 				GetErr:      tc.readerErr,
 			}
