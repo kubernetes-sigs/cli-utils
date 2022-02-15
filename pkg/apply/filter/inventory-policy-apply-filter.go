@@ -38,6 +38,9 @@ func (ipaf InventoryPolicyApplyFilter) Filter(obj *unstructured.Unstructured) (b
 	if obj == nil {
 		return true, "missing object", nil
 	}
+	if ipaf.InvPolicy == inventory.AdoptAll {
+		return false, "", nil
+	}
 	// Object must be retrieved from the cluster to get the inventory id.
 	clusterObj, err := ipaf.getObject(object.UnstructuredToObjMetadata(obj))
 	if err != nil {
