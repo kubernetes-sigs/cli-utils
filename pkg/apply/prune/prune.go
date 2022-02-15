@@ -13,7 +13,6 @@ package prune
 
 import (
 	"context"
-	"sort"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -27,7 +26,6 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/object"
-	"sigs.k8s.io/cli-utils/pkg/ordering"
 )
 
 // Pruner implements GetPruneObjs to calculate which objects to prune and Prune
@@ -233,7 +231,6 @@ func (p *Pruner) GetPruneObjs(
 		}
 		objs = append(objs, pruneObj)
 	}
-	sort.Sort(sort.Reverse(ordering.SortableUnstructureds(objs)))
 	return objs, nil
 }
 

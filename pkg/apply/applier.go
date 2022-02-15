@@ -6,7 +6,6 @@ package apply
 import (
 	"context"
 	"fmt"
-	"sort"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -28,7 +27,6 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/object/validation"
-	"sigs.k8s.io/cli-utils/pkg/ordering"
 )
 
 const defaultPollInterval = 2 * time.Second
@@ -93,7 +91,6 @@ func (a *Applier) prepareObjects(localInv inventory.InventoryInfo, localObjs obj
 	if err != nil {
 		return nil, nil, err
 	}
-	sort.Sort(ordering.SortableUnstructureds(localObjs))
 	return localObjs, pruneObjs, nil
 }
 
