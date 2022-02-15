@@ -150,14 +150,13 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.InventoryInfo, obje
 			InventoryPolicy:        options.InventoryPolicy,
 		}
 		// Build list of apply validation filters.
-		var applyFilters []filter.ValidationFilter
-		if options.InventoryPolicy != inventory.AdoptAll {
-			applyFilters = append(applyFilters, filter.InventoryPolicyApplyFilter{
+		applyFilters := []filter.ValidationFilter{
+			filter.InventoryPolicyApplyFilter{
 				Client:    a.client,
 				Mapper:    a.mapper,
 				Inv:       invInfo,
 				InvPolicy: options.InventoryPolicy,
-			})
+			},
 		}
 
 		// Build list of prune validation filters.
