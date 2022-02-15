@@ -37,7 +37,7 @@ func ReadAnnotation(obj *unstructured.Unstructured) (ApplyTimeMutation, error) {
 		return mutation, nil
 	}
 	if klog.V(5).Enabled() {
-		klog.Infof("resource (%v) has apply-time-mutation annotation:\n%s", ResourceReferenceFromUnstructured(obj), mutationYaml)
+		klog.Infof("object (%v) has apply-time-mutation annotation:\n%s", ResourceReferenceFromUnstructured(obj), mutationYaml)
 	}
 
 	err := yaml.Unmarshal([]byte(mutationYaml), &mutation)

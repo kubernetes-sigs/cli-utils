@@ -23,9 +23,9 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/object/mutation"
 )
 
-// ApplyTimeMutator mutates a resource by injecting values specified by the
+// ApplyTimeMutator mutates an object by injecting values specified by the
 // apply-time-mutation annotation.
-// The optional ResourceCache will be used to speed up source resource lookups,
+// The optional ResourceCache will be used to speed up source object lookups,
 // if specified.
 // Implements the Mutator interface
 type ApplyTimeMutator struct {
@@ -54,10 +54,11 @@ func (atm *ApplyTimeMutator) Mutate(ctx context.Context, obj *unstructured.Unstr
 
 	subs, err := mutation.ReadAnnotation(obj)
 	if err != nil {
-		return mutated, reason, fmt.Errorf("failed to read annotation in resource (%s): %w", targetRef, err)
+		return mutated, reason, fmt.Errorf("failed to read annotation in object (%s): %w", targetRef, err)
 	}
 
-	klog.V(4).Infof("target resource (%s):\n%s", targetRef, object.YamlStringer{O: obj})
+	klog.V(4).Infof("target object: %s", targetRef)
+	klog.V(7).Infof("target object YAML:\n%s", object.YamlStringer{O: obj})
 
 	// validate no self-references
 	// Early validation to avoid GETs, but won't catch sources with implicit namespace.
@@ -73,7 +74,7 @@ func (atm *ApplyTimeMutator) Mutate(ctx context.Context, obj *unstructured.Unstr
 		// lookup REST mapping
 		sourceMapping, err := atm.getMapping(sourceRef)
 		if err != nil {
-			return mutated, reason, fmt.Errorf("failed to identify source resource mapping (%s): %w", sourceRef, err)
+			return mutated, reason, fmt.Errorf("failed to identify source object mapping (%s): %w", sourceRef, err)
 		}
 
 		// Default source namespace to target namesapce, if namespace-scoped
@@ -87,27 +88,28 @@ func (atm *ApplyTimeMutator) Mutate(ctx context.Context, obj *unstructured.Unstr
 			return mutated, reason, fmt.Errorf("invalid self-reference (%s)", sub.SourceRef)
 		}
 
-		// lookup source resource from cache or cluster
+		// lookup source object from cache or cluster
 		sourceObj, err := atm.getObject(ctx, sourceMapping, sourceRef)
 		if err != nil {
-			return mutated, reason, fmt.Errorf("failed to get source resource (%s): %w", sourceRef, err)
+			return mutated, reason, fmt.Errorf("failed to get source object (%s): %w", sourceRef, err)
 		}
 
-		klog.V(4).Infof("source resource (%s):\n%s", sourceRef, object.YamlStringer{O: sourceObj})
+		klog.V(4).Infof("source object: %s", sourceRef)
+		klog.V(7).Infof("source object YAML:\n%s", object.YamlStringer{O: sourceObj})
 
-		// lookup target field in target resource
+		// lookup target field in target object
 		targetValue, _, err := readFieldValue(obj, sub.TargetPath)
 		if err != nil {
-			return mutated, reason, fmt.Errorf("failed to read field (%s) from target resource (%s): %w", sub.TargetPath, targetRef, err)
+			return mutated, reason, fmt.Errorf("failed to read field (%s) from target object (%s): %w", sub.TargetPath, targetRef, err)
 		}
 
-		// lookup source field in source resource
+		// lookup source field in source object
 		sourceValue, found, err := readFieldValue(sourceObj, sub.SourcePath)
 		if err != nil {
-			return mutated, reason, fmt.Errorf("failed to read field (%s) from source resource (%s): %w", sub.SourcePath, sourceRef, err)
+			return mutated, reason, fmt.Errorf("failed to read field (%s) from source object (%s): %w", sub.SourcePath, sourceRef, err)
 		}
 		if !found {
-			return mutated, reason, fmt.Errorf("source field (%s) not present in source resource (%s)", sub.SourcePath, sourceRef)
+			return mutated, reason, fmt.Errorf("source field (%s) not present in source object (%s)", sub.SourcePath, sourceRef)
 		}
 
 		var newValue interface{}
@@ -134,25 +136,26 @@ func (atm *ApplyTimeMutator) Mutate(ctx context.Context, obj *unstructured.Unstr
 		klog.V(5).Infof("substitution: targetRef=(%s), sourceRef=(%s): sourceValue=(%v), token=(%s), oldTargetValue=(%v), newTargetValue=(%v)",
 			targetRef, sourceRef, sourceValue, sub.Token, targetValue, newValue)
 
-		// update target field in target resource
+		// update target field in target object
 		err = writeFieldValue(obj, sub.TargetPath, newValue)
 		if err != nil {
-			return mutated, reason, fmt.Errorf("failed to set field in target resource (%s): %w", targetRef, err)
+			return mutated, reason, fmt.Errorf("failed to set field in target object (%s): %w", targetRef, err)
 		}
 
 		mutated = true
-		reason = fmt.Sprintf("resource contained annotation: %s", mutation.Annotation)
+		reason = fmt.Sprintf("object contained annotation: %s", mutation.Annotation)
 	}
 
 	if mutated {
-		klog.V(4).Infof("mutated target resource (%s):\n%s", targetRef, object.YamlStringer{O: obj})
+		klog.V(4).Infof("mutated target object: %s", targetRef)
+		klog.V(7).Infof("mutated target object YAML:\n%s", object.YamlStringer{O: obj})
 	}
 
 	return mutated, reason, nil
 }
 
 func (atm *ApplyTimeMutator) getMapping(ref mutation.ResourceReference) (*meta.RESTMapping, error) {
-	// lookup resource using group api version, if specified
+	// lookup object using group api version, if specified
 	sourceGvk := ref.GroupVersionKind()
 	var mapping *meta.RESTMapping
 	var err error
@@ -167,19 +170,19 @@ func (atm *ApplyTimeMutator) getMapping(ref mutation.ResourceReference) (*meta.R
 	return mapping, nil
 }
 
-// getObject returns a cached resource, if cached and cache exists, otherwise
-// the resource is retrieved from the cluster.
+// getObject returns a cached object, if cached and cache exists, otherwise
+// the object is retrieved from the cluster.
 func (atm *ApplyTimeMutator) getObject(ctx context.Context, mapping *meta.RESTMapping, ref mutation.ResourceReference) (*unstructured.Unstructured, error) {
-	// validate source reference
+	// validate source object
 	if ref.Name == "" {
-		return nil, fmt.Errorf("invalid source reference: empty name")
+		return nil, fmt.Errorf("invalid source object: empty name")
 	}
 	if ref.Kind == "" {
-		return nil, fmt.Errorf("invalid source reference: empty kind")
+		return nil, fmt.Errorf("invalid source object: empty kind")
 	}
 	id := ref.ToObjMetadata()
 
-	// get resource from cache
+	// get object from cache
 	if atm.ResourceCache != nil {
 		result := atm.ResourceCache.Get(id)
 		// Use the cached version, if current/reconciled.
@@ -189,25 +192,25 @@ func (atm *ApplyTimeMutator) getObject(ctx context.Context, mapping *meta.RESTMa
 		}
 	}
 
-	// get resource from cluster
+	// get object from cluster
 	namespacedClient := atm.Client.Resource(mapping.Resource).Namespace(ref.Namespace)
 	obj, err := namespacedClient.Get(ctx, ref.Name, metav1.GetOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
 		// Skip NotFound so the cache gets updated.
-		return nil, fmt.Errorf("failed to retrieve resource from cluster: %w", err)
+		return nil, fmt.Errorf("failed to retrieve object from cluster: %w", err)
 	}
 
-	// add resource to cache
+	// add object to cache
 	if atm.ResourceCache != nil {
 		// If it's not cached or not current, update the cache.
-		// This will add external resources to the cache,
+		// This will add external objects to the cache,
 		// but the user won't get status events for them.
 		atm.ResourceCache.Put(id, computeStatus(obj))
 	}
 
 	if err != nil {
 		// NotFound
-		return nil, fmt.Errorf("resource not found: %w", err)
+		return nil, fmt.Errorf("object not found: %w", err)
 	}
 
 	return obj, nil
@@ -219,14 +222,14 @@ func computeStatus(obj *unstructured.Unstructured) cache.ResourceStatus {
 		return cache.ResourceStatus{
 			Resource:      obj,
 			Status:        status.NotFoundStatus,
-			StatusMessage: "Resource not found",
+			StatusMessage: "Object not found",
 		}
 	}
 	result, err := status.Compute(obj)
 	if err != nil {
 		if klog.V(3).Enabled() {
 			ref := mutation.ResourceReferenceFromUnstructured(obj)
-			klog.Info("failed to compute resource status (%s): %d", ref, err)
+			klog.Info("failed to compute object status (%s): %d", ref, err)
 		}
 		return cache.ResourceStatus{
 			Resource: obj,
