@@ -27,7 +27,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var expectedReason = "resource contained annotation: config.kubernetes.io/apply-time-mutation"
+var expectedReason = "object contained annotation: config.kubernetes.io/apply-time-mutation"
 
 var pod1y = `
 apiVersion: v1
@@ -409,7 +409,7 @@ func TestMutate(t *testing.T) {
 			mutated: false,
 			reason:  "",
 			// exact error message isn't very important. Feel free to update if the error text changes.
-			errMsg: `failed to read annotation in resource (v1/namespaces/map-namespace/ConfigMap/map3-name): ` +
+			errMsg: `failed to read annotation in object (v1/namespaces/map-namespace/ConfigMap/map3-name): ` +
 				`invalid "config.kubernetes.io/apply-time-mutation" annotation: ` +
 				`error unmarshaling JSON: ` +
 				`while decoding JSON: ` +
@@ -427,8 +427,8 @@ func TestMutate(t *testing.T) {
 			mutated: false,
 			reason:  "",
 			// exact error message isn't very important. Feel free to update if the error text changes.
-			errMsg: `failed to get source resource (networking.k8s.io/namespaces/ingress-namespace/Ingress/ingress1-name): ` +
-				`resource not found: ` +
+			errMsg: `failed to get source object (networking.k8s.io/namespaces/ingress-namespace/Ingress/ingress1-name): ` +
+				`object not found: ` +
 				`ingresses.networking.k8s.io "ingress1-name" not found`,
 		},
 		"pod env var string from ingress port int": {
