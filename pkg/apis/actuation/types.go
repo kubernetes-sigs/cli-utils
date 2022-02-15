@@ -79,6 +79,7 @@ type ObjectStatus struct {
 	Generation int64 `json:"generation,omitempty"`
 }
 
+//nolint:revive // consistent prefix improves tab-completion for enums
 //go:generate stringer -type=ActuationStrategy -linecomment
 type ActuationStrategy int
 
@@ -87,6 +88,7 @@ const (
 	ActuationStrategyDelete                          // Delete
 )
 
+//nolint:revive // consistent prefix improves tab-completion for enums
 //go:generate stringer -type=ActuationStatus -linecomment
 type ActuationStatus int
 
