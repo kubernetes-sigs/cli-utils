@@ -11,6 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -48,11 +49,13 @@ type InventoryClient interface {
 // InventoryClient interface.
 type ClusterInventoryClient struct {
 	dc                    dynamic.Interface
+	discoveryClient       discovery.CachedDiscoveryInterface
 	mapper                meta.RESTMapper
 	InventoryFactoryFunc  StorageFactoryFunc
 	invToUnstructuredFunc InventoryToUnstructuredFunc
 }
 
+var _ InventoryClient = &ClusterInventoryClient{}
 var _ InventoryClient = &ClusterInventoryClient{}
 
 // NewInventoryClient returns a concrete implementation of the
@@ -68,8 +71,13 @@ func NewInventoryClient(factory cmdutil.Factory,
 	if err != nil {
 		return nil, err
 	}
+	discoveryClinet, err := factory.ToDiscoveryClient()
+	if err != nil {
+		return nil, err
+	}
 	clusterInventoryClient := ClusterInventoryClient{
 		dc:                    dc,
+		discoveryClient:       discoveryClinet,
 		mapper:                mapper,
 		InventoryFactoryFunc:  invFunc,
 		invToUnstructuredFunc: invToUnstructuredFunc,
@@ -102,8 +110,14 @@ func (cic *ClusterInventoryClient) Merge(localInv InventoryInfo, objs object.Obj
 			return nil, err
 		}
 		klog.V(4).Infof("creating initial inventory object with %d objects", len(objs))
-		if err := cic.createInventoryObj(invInfo, dryRun); err != nil {
+		var createdObj *unstructured.Unstructured
+		if createdObj, err = cic.createInventoryObj(invInfo, dryRun); err != nil {
 			return nil, err
+		}
+		// TODO(Liujingfang1): Remove the nil check statement after
+		// fixing the client mock in the unit test.
+		if createdObj != nil {
+			invInfo.SetResourceVersion(createdObj.GetResourceVersion())
 		}
 		if err := cic.updateStatus(invInfo, dryRun); err != nil {
 			return nil, err
@@ -135,8 +149,14 @@ func (cic *ClusterInventoryClient) Merge(localInv InventoryInfo, objs object.Obj
 				return pruneIds, err
 			}
 			klog.V(4).Infof("update cluster inventory: %s/%s", clusterInv.GetNamespace(), clusterInv.GetName())
-			if err := cic.applyInventoryObj(clusterInv, dryRun); err != nil {
+			var appliedObj *unstructured.Unstructured
+			if appliedObj, err = cic.applyInventoryObj(clusterInv, dryRun); err != nil {
 				return pruneIds, err
+			}
+			// TODO(Liujingfang1): Remove the nil check statement after
+			// fixing the client mock in the unit test.
+			if appliedObj != nil {
+				clusterInv.SetResourceVersion(appliedObj.GetResourceVersion())
 			}
 		}
 		if err := cic.updateStatus(clusterInv, dryRun); err != nil {
@@ -170,8 +190,14 @@ func (cic *ClusterInventoryClient) Replace(localInv InventoryInfo, objs object.O
 	if !objs.Equal(clusterObjs) {
 		klog.V(4).Infof("replace cluster inventory: %s/%s", clusterInv.GetNamespace(), clusterInv.GetName())
 		klog.V(4).Infof("replace cluster inventory %d objects", len(objs))
-		if err := cic.applyInventoryObj(clusterInv, dryRun); err != nil {
+		var appliedObj *unstructured.Unstructured
+		if appliedObj, err = cic.applyInventoryObj(clusterInv, dryRun); err != nil {
 			return fmt.Errorf("failed to write updated inventory to cluster: %w", err)
+		}
+		// TODO(Liujingfang1): Remove the nil check statement after
+		// fixing the client mock in the unit test.
+		if appliedObj != nil {
+			clusterInv.SetResourceVersion(appliedObj.GetResourceVersion())
 		}
 	}
 	if err := cic.updateStatus(clusterInv, dryRun); err != nil {
@@ -335,51 +361,49 @@ func (cic *ClusterInventoryClient) GetClusterInventoryObjs(inv InventoryInfo) (o
 }
 
 // applyInventoryObj applies the passed inventory object to the APIServer.
-func (cic *ClusterInventoryClient) applyInventoryObj(obj *unstructured.Unstructured, dryRun common.DryRunStrategy) error {
+func (cic *ClusterInventoryClient) applyInventoryObj(obj *unstructured.Unstructured, dryRun common.DryRunStrategy) (*unstructured.Unstructured, error) {
 	if dryRun.ClientOrServerDryRun() {
 		klog.V(4).Infof("dry-run apply inventory object: not applied")
-		return nil
+		return nil, nil
 	}
 	if obj == nil {
-		return fmt.Errorf("attempting apply a nil inventory object")
+		return nil, fmt.Errorf("attempting apply a nil inventory object")
 	}
 
 	mapping, err := cic.getMapping(obj)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	klog.V(4).Infof("replacing inventory object: %s/%s", obj.GetNamespace(), obj.GetName())
-	_, err = cic.dc.Resource(mapping.Resource).Namespace(obj.GetNamespace()).
+	return cic.dc.Resource(mapping.Resource).Namespace(obj.GetNamespace()).
 		Update(context.TODO(), obj, metav1.UpdateOptions{})
-	return err
 }
 
 // createInventoryObj creates the passed inventory object on the APIServer.
-func (cic *ClusterInventoryClient) createInventoryObj(obj *unstructured.Unstructured, dryRun common.DryRunStrategy) error {
+func (cic *ClusterInventoryClient) createInventoryObj(obj *unstructured.Unstructured, dryRun common.DryRunStrategy) (*unstructured.Unstructured, error) {
 	if dryRun.ClientOrServerDryRun() {
 		klog.V(4).Infof("dry-run create inventory object: not created")
-		return nil
+		return nil, nil
 	}
 	if obj == nil {
-		return fmt.Errorf("attempting create a nil inventory object")
+		return nil, fmt.Errorf("attempting create a nil inventory object")
 	}
 	// Default inventory name gets random suffix. Fixes problem where legacy
 	// inventory templates within same namespace will collide on name.
 	err := fixLegacyInventoryName(obj)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	mapping, err := cic.getMapping(obj)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	klog.V(4).Infof("creating inventory object: %s/%s", obj.GetNamespace(), obj.GetName())
-	_, err = cic.dc.Resource(mapping.Resource).Namespace(obj.GetNamespace()).
+	return cic.dc.Resource(mapping.Resource).Namespace(obj.GetNamespace()).
 		Create(context.TODO(), obj, metav1.CreateOptions{})
-	return err
 }
 
 // deleteInventoryObjByName deletes the passed inventory object from the APIServer, or
@@ -441,33 +465,45 @@ func (cic *ClusterInventoryClient) updateStatus(obj *unstructured.Unstructured, 
 	if !found {
 		return nil
 	}
-
-	klog.V(4).Infof("update inventory status")
 	mapping, err := cic.mapper.RESTMapping(obj.GroupVersionKind().GroupKind())
+	if err != nil {
+		return nil
+	}
+	hasStatus, err := cic.hasSubResource(obj.GetAPIVersion(), mapping.Resource.Resource, "status")
 	if err != nil {
 		return err
 	}
+	if !hasStatus {
+		klog.V(4).Infof("skip updating inventory status")
+		return nil
+	}
+
+	klog.V(4).Infof("update inventory status")
 	resource := cic.dc.Resource(mapping.Resource).Namespace(obj.GetNamespace())
 	meta := metav1.TypeMeta{
 		Kind:       obj.GetKind(),
 		APIVersion: obj.GetAPIVersion(),
 	}
-	liveObj, err := resource.Get(context.TODO(), obj.GetName(), metav1.GetOptions{TypeMeta: meta}, "status")
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			klog.V(4).Infof("skip updating inventory subresource status for %v: %v", meta, err)
-			return nil
-		}
-		return fmt.Errorf("failed to get inventory status from cluster: %w", err)
-	}
-
-	err = unstructured.SetNestedMap(liveObj.UnstructuredContent(), status, "status")
-	if err != nil {
+	if err = unstructured.SetNestedMap(obj.Object, status, "status"); err != nil {
 		return err
 	}
-	_, err = resource.UpdateStatus(context.TODO(), liveObj, metav1.UpdateOptions{TypeMeta: meta})
-	if err != nil {
+	if _, err = resource.UpdateStatus(context.TODO(), obj, metav1.UpdateOptions{TypeMeta: meta}); err != nil {
 		return fmt.Errorf("failed to write updated inventory status to cluster: %w", err)
 	}
 	return nil
+}
+
+// hasSubResource checks if a resource has the given subresource using the discovery client.
+func (cic *ClusterInventoryClient) hasSubResource(groupVersion, resource, subresource string) (bool, error) {
+	resources, err := cic.discoveryClient.ServerResourcesForGroupVersion(groupVersion)
+	if err != nil {
+		return false, err
+	}
+
+	for _, r := range resources.APIResources {
+		if r.Name == fmt.Sprintf("%s/%s", resource, subresource) {
+			return true, nil
+		}
+	}
+	return false, nil
 }

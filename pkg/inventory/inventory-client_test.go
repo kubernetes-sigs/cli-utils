@@ -232,7 +232,7 @@ func TestCreateInventory(t *testing.T) {
 			if inv != nil {
 				inv = storeObjsInInventory(tc.inv, tc.localObjs)
 			}
-			err = invClient.createInventoryObj(inv, common.DryRunNone)
+			_, err = invClient.createInventoryObj(inv, common.DryRunNone)
 			if tc.error != "" {
 				assert.EqualError(t, err, tc.error)
 			} else {
