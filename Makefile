@@ -35,7 +35,13 @@ install-addlicense:
 install-lint:
 	(which $(GOPATH)/bin/golangci-lint || go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.40.1)
 
-generate: install-stringer
+install-deepcopy-gen:
+	(which $(GOPATH)/bin/deepcopy-gen || go install k8s.io/code-generator/cmd/deepcopy-gen@v0.23.3)
+
+generate-deepcopy: install-deepcopy-gen
+	hack/run-in-gopath.sh deepcopy-gen --input-dirs ./pkg/apis/... -O zz_generated.deepcopy --go-header-file ./LICENSE_TEMPLATE_GO
+
+generate: install-stringer generate-deepcopy
 	go generate ./...
 
 license: install-addlicense

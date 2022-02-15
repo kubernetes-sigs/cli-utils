@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"sigs.k8s.io/cli-utils/pkg/apis/actuation"
 	"sigs.k8s.io/cli-utils/pkg/apply/cache"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
@@ -215,36 +216,36 @@ loop:
 		"Actual events (%d) do not match expected events (%d)",
 		len(receivedEvents), len(expectedEvents))
 
-	expectedInventory := inventory.Inventory{
-		Status: inventory.InventoryStatus{
-			Objects: []inventory.ObjectStatus{
+	expectedInventory := actuation.Inventory{
+		Status: actuation.InventoryStatus{
+			Objects: []actuation.ObjectStatus{
 				{
 					ObjectReference: inventory.ObjectReferenceFromObjMetadata(testDeployment1ID),
-					Strategy:        inventory.ActuationStrategyApply,
-					Actuation:       inventory.ActuationSucceeded,
-					Reconcile:       inventory.ReconcileSucceeded,
+					Strategy:        actuation.ActuationStrategyApply,
+					Actuation:       actuation.ActuationSucceeded,
+					Reconcile:       actuation.ReconcileSucceeded,
 					UID:             testDeployment1.GetUID(),
 					Generation:      testDeployment1.GetGeneration(),
 				},
 				{
 					ObjectReference: inventory.ObjectReferenceFromObjMetadata(testDeployment2ID),
-					Strategy:        inventory.ActuationStrategyApply,
-					Actuation:       inventory.ActuationSucceeded,
-					Reconcile:       inventory.ReconcileSucceeded,
+					Strategy:        actuation.ActuationStrategyApply,
+					Actuation:       actuation.ActuationSucceeded,
+					Reconcile:       actuation.ReconcileSucceeded,
 					UID:             testDeployment2.GetUID(),
 					Generation:      testDeployment2.GetGeneration(),
 				},
 				{
 					ObjectReference: inventory.ObjectReferenceFromObjMetadata(testDeployment3ID),
-					Strategy:        inventory.ActuationStrategyApply,
-					Actuation:       inventory.ActuationFailed,
-					Reconcile:       inventory.ReconcileSkipped,
+					Strategy:        actuation.ActuationStrategyApply,
+					Actuation:       actuation.ActuationFailed,
+					Reconcile:       actuation.ReconcileSkipped,
 				},
 				{
 					ObjectReference: inventory.ObjectReferenceFromObjMetadata(testDeployment4ID),
-					Strategy:        inventory.ActuationStrategyApply,
-					Actuation:       inventory.ActuationSkipped,
-					Reconcile:       inventory.ReconcileSkipped,
+					Strategy:        actuation.ActuationStrategyApply,
+					Actuation:       actuation.ActuationSkipped,
+					Reconcile:       actuation.ReconcileSkipped,
 				},
 			},
 		},
@@ -387,36 +388,36 @@ loop:
 		"Actual events (%d) do not match expected events (%d)",
 		len(receivedEvents), len(expectedEvents))
 
-	expectedInventory := inventory.Inventory{
-		Status: inventory.InventoryStatus{
-			Objects: []inventory.ObjectStatus{
+	expectedInventory := actuation.Inventory{
+		Status: actuation.InventoryStatus{
+			Objects: []actuation.ObjectStatus{
 				{
 					ObjectReference: inventory.ObjectReferenceFromObjMetadata(testDeployment1ID),
-					Strategy:        inventory.ActuationStrategyApply,
-					Actuation:       inventory.ActuationSucceeded,
-					Reconcile:       inventory.ReconcileSucceeded,
+					Strategy:        actuation.ActuationStrategyApply,
+					Actuation:       actuation.ActuationSucceeded,
+					Reconcile:       actuation.ReconcileSucceeded,
 					UID:             testDeployment1.GetUID(),
 					Generation:      testDeployment1.GetGeneration(),
 				},
 				{
 					ObjectReference: inventory.ObjectReferenceFromObjMetadata(testDeployment2ID),
-					Strategy:        inventory.ActuationStrategyApply,
-					Actuation:       inventory.ActuationSucceeded,
-					Reconcile:       inventory.ReconcileTimeout,
+					Strategy:        actuation.ActuationStrategyApply,
+					Actuation:       actuation.ActuationSucceeded,
+					Reconcile:       actuation.ReconcileTimeout,
 					UID:             testDeployment2.GetUID(),
 					Generation:      testDeployment2.GetGeneration(),
 				},
 				{
 					ObjectReference: inventory.ObjectReferenceFromObjMetadata(testDeployment3ID),
-					Strategy:        inventory.ActuationStrategyApply,
-					Actuation:       inventory.ActuationFailed,
-					Reconcile:       inventory.ReconcileSkipped,
+					Strategy:        actuation.ActuationStrategyApply,
+					Actuation:       actuation.ActuationFailed,
+					Reconcile:       actuation.ReconcileSkipped,
 				},
 				{
 					ObjectReference: inventory.ObjectReferenceFromObjMetadata(testDeployment4ID),
-					Strategy:        inventory.ActuationStrategyApply,
-					Actuation:       inventory.ActuationSkipped,
-					Reconcile:       inventory.ReconcileSkipped,
+					Strategy:        actuation.ActuationStrategyApply,
+					Actuation:       actuation.ActuationSkipped,
+					Reconcile:       actuation.ReconcileSkipped,
 				},
 			},
 		},
@@ -492,14 +493,14 @@ loop:
 		"Actual events (%d) do not match expected events (%d)",
 		len(receivedEvents), len(expectedEvents))
 
-	expectedInventory := inventory.Inventory{
-		Status: inventory.InventoryStatus{
-			Objects: []inventory.ObjectStatus{
+	expectedInventory := actuation.Inventory{
+		Status: actuation.InventoryStatus{
+			Objects: []actuation.ObjectStatus{
 				{
 					ObjectReference: inventory.ObjectReferenceFromObjMetadata(testDeploymentID),
-					Strategy:        inventory.ActuationStrategyApply,
-					Actuation:       inventory.ActuationSucceeded,
-					Reconcile:       inventory.ReconcileSucceeded,
+					Strategy:        actuation.ActuationStrategyApply,
+					Actuation:       actuation.ActuationSucceeded,
+					Reconcile:       actuation.ReconcileSucceeded,
 					UID:             testDeployment.GetUID(),
 					Generation:      testDeployment.GetGeneration(),
 				},
@@ -579,14 +580,14 @@ loop:
 		"Actual events (%d) do not match expected events (%d)",
 		len(receivedEvents), len(expectedEvents))
 
-	expectedInventory := inventory.Inventory{
-		Status: inventory.InventoryStatus{
-			Objects: []inventory.ObjectStatus{
+	expectedInventory := actuation.Inventory{
+		Status: actuation.InventoryStatus{
+			Objects: []actuation.ObjectStatus{
 				{
 					ObjectReference: inventory.ObjectReferenceFromObjMetadata(testDeploymentID),
-					Strategy:        inventory.ActuationStrategyApply,
-					Actuation:       inventory.ActuationSucceeded,
-					Reconcile:       inventory.ReconcilePending,
+					Strategy:        actuation.ActuationStrategyApply,
+					Actuation:       actuation.ActuationSucceeded,
+					Reconcile:       actuation.ReconcilePending,
 					UID:             testDeployment.GetUID(),
 					Generation:      testDeployment.GetGeneration(),
 				},
@@ -687,14 +688,14 @@ loop:
 	}
 	assert.Equal(t, expectedResults, receivedResults)
 
-	expectedInventory := inventory.Inventory{
-		Status: inventory.InventoryStatus{
-			Objects: []inventory.ObjectStatus{
+	expectedInventory := actuation.Inventory{
+		Status: actuation.InventoryStatus{
+			Objects: []actuation.ObjectStatus{
 				{
 					ObjectReference: inventory.ObjectReferenceFromObjMetadata(testDeploymentID),
-					Strategy:        inventory.ActuationStrategyApply,
-					Actuation:       inventory.ActuationSucceeded,
-					Reconcile:       inventory.ReconcileSucceeded,
+					Strategy:        actuation.ActuationStrategyApply,
+					Actuation:       actuation.ActuationSucceeded,
+					Reconcile:       actuation.ReconcileSucceeded,
 					UID:             testDeployment.GetUID(),
 					Generation:      testDeployment.GetGeneration(),
 				},
@@ -722,7 +723,7 @@ func TestWaitTask_Failed(t *testing.T) {
 		eventsFunc               func(*cache.ResourceCacheMap, *WaitTask, *TaskContext)
 		waitTimeout              time.Duration
 		expectedEvents           []event.Event
-		expectedInventory        *inventory.Inventory
+		expectedInventory        *actuation.Inventory
 	}{
 		"continue on failed if others InProgress": {
 			configureTaskContextFunc: func(taskContext *TaskContext) {
@@ -790,22 +791,22 @@ func TestWaitTask_Failed(t *testing.T) {
 					},
 				},
 			},
-			expectedInventory: &inventory.Inventory{
-				Status: inventory.InventoryStatus{
-					Objects: []inventory.ObjectStatus{
+			expectedInventory: &actuation.Inventory{
+				Status: actuation.InventoryStatus{
+					Objects: []actuation.ObjectStatus{
 						{
 							ObjectReference: inventory.ObjectReferenceFromObjMetadata(testDeployment1ID),
-							Strategy:        inventory.ActuationStrategyApply,
-							Actuation:       inventory.ActuationSucceeded,
-							Reconcile:       inventory.ReconcileFailed,
+							Strategy:        actuation.ActuationStrategyApply,
+							Actuation:       actuation.ActuationSucceeded,
+							Reconcile:       actuation.ReconcileFailed,
 							UID:             testDeployment1.GetUID(),
 							Generation:      testDeployment1.GetGeneration(),
 						},
 						{
 							ObjectReference: inventory.ObjectReferenceFromObjMetadata(testDeployment2ID),
-							Strategy:        inventory.ActuationStrategyApply,
-							Actuation:       inventory.ActuationSucceeded,
-							Reconcile:       inventory.ReconcileSucceeded,
+							Strategy:        actuation.ActuationStrategyApply,
+							Actuation:       actuation.ActuationSucceeded,
+							Reconcile:       actuation.ReconcileSucceeded,
 							UID:             testDeployment2.GetUID(),
 							Generation:      testDeployment2.GetGeneration(),
 						},
@@ -873,22 +874,22 @@ func TestWaitTask_Failed(t *testing.T) {
 					},
 				},
 			},
-			expectedInventory: &inventory.Inventory{
-				Status: inventory.InventoryStatus{
-					Objects: []inventory.ObjectStatus{
+			expectedInventory: &actuation.Inventory{
+				Status: actuation.InventoryStatus{
+					Objects: []actuation.ObjectStatus{
 						{
 							ObjectReference: inventory.ObjectReferenceFromObjMetadata(testDeployment1ID),
-							Strategy:        inventory.ActuationStrategyApply,
-							Actuation:       inventory.ActuationSucceeded,
-							Reconcile:       inventory.ReconcileFailed,
+							Strategy:        actuation.ActuationStrategyApply,
+							Actuation:       actuation.ActuationSucceeded,
+							Reconcile:       actuation.ReconcileFailed,
 							UID:             testDeployment1.GetUID(),
 							Generation:      testDeployment1.GetGeneration(),
 						},
 						{
 							ObjectReference: inventory.ObjectReferenceFromObjMetadata(testDeployment2ID),
-							Strategy:        inventory.ActuationStrategyApply,
-							Actuation:       inventory.ActuationSucceeded,
-							Reconcile:       inventory.ReconcileSucceeded,
+							Strategy:        actuation.ActuationStrategyApply,
+							Actuation:       actuation.ActuationSucceeded,
+							Reconcile:       actuation.ReconcileSucceeded,
 							UID:             testDeployment2.GetUID(),
 							Generation:      testDeployment2.GetGeneration(),
 						},
@@ -971,22 +972,22 @@ func TestWaitTask_Failed(t *testing.T) {
 					},
 				},
 			},
-			expectedInventory: &inventory.Inventory{
-				Status: inventory.InventoryStatus{
-					Objects: []inventory.ObjectStatus{
+			expectedInventory: &actuation.Inventory{
+				Status: actuation.InventoryStatus{
+					Objects: []actuation.ObjectStatus{
 						{
 							ObjectReference: inventory.ObjectReferenceFromObjMetadata(testDeployment1ID),
-							Strategy:        inventory.ActuationStrategyApply,
-							Actuation:       inventory.ActuationSucceeded,
-							Reconcile:       inventory.ReconcileSucceeded,
+							Strategy:        actuation.ActuationStrategyApply,
+							Actuation:       actuation.ActuationSucceeded,
+							Reconcile:       actuation.ReconcileSucceeded,
 							UID:             testDeployment1.GetUID(),
 							Generation:      testDeployment1.GetGeneration(),
 						},
 						{
 							ObjectReference: inventory.ObjectReferenceFromObjMetadata(testDeployment2ID),
-							Strategy:        inventory.ActuationStrategyApply,
-							Actuation:       inventory.ActuationSucceeded,
-							Reconcile:       inventory.ReconcileSucceeded,
+							Strategy:        actuation.ActuationStrategyApply,
+							Actuation:       actuation.ActuationSucceeded,
+							Reconcile:       actuation.ReconcileSucceeded,
 							UID:             testDeployment2.GetUID(),
 							Generation:      testDeployment2.GetGeneration(),
 						},
@@ -1078,22 +1079,22 @@ func TestWaitTask_Failed(t *testing.T) {
 					},
 				},
 			},
-			expectedInventory: &inventory.Inventory{
-				Status: inventory.InventoryStatus{
-					Objects: []inventory.ObjectStatus{
+			expectedInventory: &actuation.Inventory{
+				Status: actuation.InventoryStatus{
+					Objects: []actuation.ObjectStatus{
 						{
 							ObjectReference: inventory.ObjectReferenceFromObjMetadata(testDeployment1ID),
-							Strategy:        inventory.ActuationStrategyApply,
-							Actuation:       inventory.ActuationSucceeded,
-							Reconcile:       inventory.ReconcileTimeout,
+							Strategy:        actuation.ActuationStrategyApply,
+							Actuation:       actuation.ActuationSucceeded,
+							Reconcile:       actuation.ReconcileTimeout,
 							UID:             testDeployment1.GetUID(),
 							Generation:      testDeployment1.GetGeneration(),
 						},
 						{
 							ObjectReference: inventory.ObjectReferenceFromObjMetadata(testDeployment2ID),
-							Strategy:        inventory.ActuationStrategyApply,
-							Actuation:       inventory.ActuationSucceeded,
-							Reconcile:       inventory.ReconcileSucceeded,
+							Strategy:        actuation.ActuationStrategyApply,
+							Actuation:       actuation.ActuationSucceeded,
+							Reconcile:       actuation.ReconcileSucceeded,
 							UID:             testDeployment2.GetUID(),
 							Generation:      testDeployment2.GetGeneration(),
 						},
@@ -1175,7 +1176,7 @@ func TestWaitTask_UIDChanged(t *testing.T) {
 		eventsFunc               func(*cache.ResourceCacheMap, *WaitTask, *TaskContext)
 		waitTimeout              time.Duration
 		expectedEvents           []event.Event
-		expectedInventory        *inventory.Inventory
+		expectedInventory        *actuation.Inventory
 	}{
 		"UID changed after apply means reconcile failure": {
 			condition: AllCurrent,
@@ -1239,24 +1240,24 @@ func TestWaitTask_UIDChanged(t *testing.T) {
 					},
 				},
 			},
-			expectedInventory: &inventory.Inventory{
-				Status: inventory.InventoryStatus{
-					Objects: []inventory.ObjectStatus{
+			expectedInventory: &actuation.Inventory{
+				Status: actuation.InventoryStatus{
+					Objects: []actuation.ObjectStatus{
 						{
 							ObjectReference: inventory.ObjectReferenceFromObjMetadata(testDeployment1ID),
-							Strategy:        inventory.ActuationStrategyApply,
-							Actuation:       inventory.ActuationSucceeded,
+							Strategy:        actuation.ActuationStrategyApply,
+							Actuation:       actuation.ActuationSucceeded,
 							// UID change causes failure after apply
-							Reconcile: inventory.ReconcileFailed,
+							Reconcile: actuation.ReconcileFailed,
 							// Recorded UID should be from the applied object, not the new replacement
 							UID:        testDeployment1.GetUID(),
 							Generation: testDeployment1.GetGeneration(),
 						},
 						{
 							ObjectReference: inventory.ObjectReferenceFromObjMetadata(testDeployment2ID),
-							Strategy:        inventory.ActuationStrategyApply,
-							Actuation:       inventory.ActuationSucceeded,
-							Reconcile:       inventory.ReconcileSucceeded,
+							Strategy:        actuation.ActuationStrategyApply,
+							Actuation:       actuation.ActuationSucceeded,
+							Reconcile:       actuation.ReconcileSucceeded,
 							UID:             testDeployment2.GetUID(),
 							Generation:      testDeployment2.GetGeneration(),
 						},
@@ -1326,24 +1327,24 @@ func TestWaitTask_UIDChanged(t *testing.T) {
 					},
 				},
 			},
-			expectedInventory: &inventory.Inventory{
-				Status: inventory.InventoryStatus{
-					Objects: []inventory.ObjectStatus{
+			expectedInventory: &actuation.Inventory{
+				Status: actuation.InventoryStatus{
+					Objects: []actuation.ObjectStatus{
 						{
 							ObjectReference: inventory.ObjectReferenceFromObjMetadata(testDeployment1ID),
-							Strategy:        inventory.ActuationStrategyDelete,
-							Actuation:       inventory.ActuationSucceeded,
+							Strategy:        actuation.ActuationStrategyDelete,
+							Actuation:       actuation.ActuationSucceeded,
 							// UID change causes success after delete
-							Reconcile: inventory.ReconcileSucceeded,
+							Reconcile: actuation.ReconcileSucceeded,
 							// Recorded UID should be from the deleted object, not the new replacement
 							UID: testDeployment1.GetUID(),
 							// Deleted generation is unknown
 						},
 						{
 							ObjectReference: inventory.ObjectReferenceFromObjMetadata(testDeployment2ID),
-							Strategy:        inventory.ActuationStrategyDelete,
-							Actuation:       inventory.ActuationSucceeded,
-							Reconcile:       inventory.ReconcileSucceeded,
+							Strategy:        actuation.ActuationStrategyDelete,
+							Actuation:       actuation.ActuationSucceeded,
+							Reconcile:       actuation.ReconcileSucceeded,
 							UID:             testDeployment2.GetUID(),
 							// Deleted generation is unknown
 						},
