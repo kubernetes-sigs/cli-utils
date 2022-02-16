@@ -68,14 +68,14 @@ func TestBaseRunner(t *testing.T) {
 			statusEventsDelay: 5 * time.Second,
 			statusEvents: []pollevent.Event{
 				{
-					EventType: pollevent.ResourceUpdateEvent,
+					Type: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
 						Identifier: cmID,
 						Status:     status.CurrentStatus,
 					},
 				},
 				{
-					EventType: pollevent.ResourceUpdateEvent,
+					Type: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
 						Identifier: depID,
 						Status:     status.CurrentStatus,
@@ -129,7 +129,7 @@ func TestBaseRunner(t *testing.T) {
 			statusEventsDelay: time.Second,
 			statusEvents: []pollevent.Event{
 				{
-					EventType: pollevent.ResourceUpdateEvent,
+					Type: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
 						Identifier: cmID,
 						Status:     status.CurrentStatus,
@@ -176,14 +176,14 @@ func TestBaseRunner(t *testing.T) {
 			statusEventsDelay: time.Second,
 			statusEvents: []pollevent.Event{
 				{
-					EventType: pollevent.ResourceUpdateEvent,
+					Type: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
 						Identifier: cmID,
 						Status:     status.CurrentStatus,
 					},
 				},
 				{
-					EventType: pollevent.ResourceUpdateEvent,
+					Type: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
 						Identifier: depID,
 						Status:     status.InProgressStatus,
@@ -427,8 +427,8 @@ func TestBaseRunnerCancellation(t *testing.T) {
 			statusEventsDelay: 2 * time.Second,
 			statusEvents: []pollevent.Event{
 				{
-					EventType: pollevent.ErrorEvent,
-					Error:     testError,
+					Type:  pollevent.ErrorEvent,
+					Error: testError,
 				},
 			},
 			contextTimeout: 30 * time.Second,

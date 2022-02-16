@@ -11,7 +11,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-type FakeClusterReader struct {
+type ClusterReader struct {
 	NoopClusterReader
 
 	GetResource *unstructured.Unstructured
@@ -23,21 +23,21 @@ type FakeClusterReader struct {
 	SyncErr error
 }
 
-func (f *FakeClusterReader) Get(_ context.Context, _ client.ObjectKey, u *unstructured.Unstructured) error {
+func (f *ClusterReader) Get(_ context.Context, _ client.ObjectKey, u *unstructured.Unstructured) error {
 	if f.GetResource != nil {
 		u.Object = f.GetResource.Object
 	}
 	return f.GetErr
 }
 
-func (f *FakeClusterReader) ListNamespaceScoped(_ context.Context, list *unstructured.UnstructuredList, _ string, _ labels.Selector) error {
+func (f *ClusterReader) ListNamespaceScoped(_ context.Context, list *unstructured.UnstructuredList, _ string, _ labels.Selector) error {
 	if f.ListResources != nil {
 		list.Items = f.ListResources.Items
 	}
 	return f.ListErr
 }
 
-func (f *FakeClusterReader) Sync(_ context.Context) error {
+func (f *ClusterReader) Sync(_ context.Context) error {
 	return f.SyncErr
 }
 

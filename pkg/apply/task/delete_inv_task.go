@@ -19,8 +19,8 @@ import (
 // resources have been deleted.
 type DeleteInvTask struct {
 	TaskName  string
-	InvClient inventory.InventoryClient
-	InvInfo   inventory.InventoryInfo
+	InvClient inventory.Client
+	InvInfo   inventory.Info
 	DryRun    common.DryRunStrategy
 }
 

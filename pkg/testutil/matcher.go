@@ -57,7 +57,7 @@ func indent(in string, indentation uint) string {
 // any error with the same type as the supplied error.
 //
 // Use with testutil.Equal to handle error comparisons.
-func EqualErrorType(err error) equalErrorType {
+func EqualErrorType(err error) error {
 	return equalErrorType{
 		err: err,
 	}
@@ -86,7 +86,7 @@ func (e equalErrorType) Unwrap() error {
 // any error with the same Error() as the supplied string value.
 //
 // Use with testutil.Equal to handle error comparisons.
-func EqualErrorString(err string) equalErrorString {
+func EqualErrorString(err string) error {
 	return equalErrorString{
 		err: err,
 	}

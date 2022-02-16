@@ -23,7 +23,7 @@ func continueOnErrorTest(ctx context.Context, c client.Client, invConfig Invento
 	By("apply an invalid CRD")
 	applier := invConfig.ApplierFactoryFunc()
 
-	inv := invConfig.InvWrapperFunc(invConfig.InventoryFactoryFunc(inventoryName, namespaceName, "test"))
+	inv := invConfig.InvWrapperFunc(invConfig.FactoryFunc(inventoryName, namespaceName, "test"))
 
 	invalidCrdObj := manifestToUnstructured(invalidCrd)
 	pod1Obj := withNamespace(manifestToUnstructured(pod1), namespaceName)

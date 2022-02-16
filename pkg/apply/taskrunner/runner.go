@@ -17,19 +17,19 @@ import (
 )
 
 // NewTaskStatusRunner returns a new TaskStatusRunner.
-func NewTaskStatusRunner(identifiers object.ObjMetadataSet, statusPoller poller.Poller) *taskStatusRunner {
-	return &taskStatusRunner{
-		identifiers:  identifiers,
-		statusPoller: statusPoller,
+func NewTaskStatusRunner(identifiers object.ObjMetadataSet, statusPoller poller.Poller) *TaskStatusRunner {
+	return &TaskStatusRunner{
+		Identifiers:  identifiers,
+		StatusPoller: statusPoller,
 	}
 }
 
-// taskStatusRunner is a taskRunner that executes a set of
+// TaskStatusRunner is a taskRunner that executes a set of
 // tasks while at the same time uses the statusPoller to
 // keep track of the status of the resources.
-type taskStatusRunner struct {
-	identifiers  object.ObjMetadataSet
-	statusPoller poller.Poller
+type TaskStatusRunner struct {
+	Identifiers  object.ObjMetadataSet
+	StatusPoller poller.Poller
 }
 
 // Options defines properties that is passed along to
@@ -49,7 +49,7 @@ type Options struct {
 //   validation of wait conditions.
 // - eventChannel is written to with events based on status updates, if
 //   emitStatusEvents is true.
-func (tsr *taskStatusRunner) Run(
+func (tsr *TaskStatusRunner) Run(
 	ctx context.Context,
 	taskContext *TaskContext,
 	taskQueue chan Task,
@@ -59,7 +59,7 @@ func (tsr *taskStatusRunner) Run(
 	// If taskStatusRunner.Run is cancelled, baseRunner.run will exit early,
 	// causing the poller to be cancelled.
 	statusCtx, cancelFunc := context.WithCancel(context.Background())
-	statusChannel := tsr.statusPoller.Poll(statusCtx, tsr.identifiers, polling.PollOptions{
+	statusChannel := tsr.StatusPoller.Poll(statusCtx, tsr.Identifiers, polling.PollOptions{
 		PollInterval: opts.PollInterval,
 	})
 
@@ -113,7 +113,7 @@ func (tsr *taskStatusRunner) Run(
 			// An error event on the statusChannel means the StatusPoller
 			// has encountered a problem so it can't continue. This means
 			// the statusChannel will be closed soon.
-			if statusEvent.EventType == pollevent.ErrorEvent {
+			if statusEvent.Type == pollevent.ErrorEvent {
 				abort = true
 				abortReason = fmt.Errorf("polling for status failed: %v",
 					statusEvent.Error)

@@ -13,22 +13,22 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
-type fakeLoader struct {
-	factory   util.Factory
-	InvClient *inventory.FakeInventoryClient
+type FakeLoader struct {
+	Factory   util.Factory
+	InvClient *inventory.FakeClient
 }
 
-var _ ManifestLoader = &fakeLoader{}
+var _ ManifestLoader = &FakeLoader{}
 
-func NewFakeLoader(f util.Factory, objs object.ObjMetadataSet) *fakeLoader {
-	return &fakeLoader{
-		factory:   f,
-		InvClient: inventory.NewFakeInventoryClient(objs),
+func NewFakeLoader(f util.Factory, objs object.ObjMetadataSet) *FakeLoader {
+	return &FakeLoader{
+		Factory:   f,
+		InvClient: inventory.NewFakeClient(objs),
 	}
 }
 
-func (f *fakeLoader) ManifestReader(reader io.Reader, _ string) (ManifestReader, error) {
-	mapper, err := f.factory.ToRESTMapper()
+func (f *FakeLoader) ManifestReader(reader io.Reader, _ string) (ManifestReader, error) {
+	mapper, err := f.Factory.ToRESTMapper()
 	if err != nil {
 		return nil, err
 	}
@@ -44,7 +44,7 @@ func (f *fakeLoader) ManifestReader(reader io.Reader, _ string) (ManifestReader,
 	}, nil
 }
 
-func (f *fakeLoader) InventoryInfo(objs []*unstructured.Unstructured) (inventory.InventoryInfo, []*unstructured.Unstructured, error) {
+func (f *FakeLoader) InventoryInfo(objs []*unstructured.Unstructured) (inventory.Info, []*unstructured.Unstructured, error) {
 	inv, objs, err := inventory.SplitUnstructureds(objs)
 	return inventory.WrapInventoryInfoObj(inv), objs, err
 }

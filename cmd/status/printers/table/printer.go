@@ -18,22 +18,22 @@ const (
 	updateInterval = 1 * time.Second
 )
 
-// tablePrinter is an implementation of the Printer interface that outputs
+// Printer is an implementation of the Printer interface that outputs
 // status information about resources in a table format with in-place updates.
-type tablePrinter struct {
-	ioStreams genericclioptions.IOStreams
+type Printer struct {
+	IOStreams genericclioptions.IOStreams
 }
 
-// NewTablePrinter returns a new instance of the tablePrinter.
-func NewTablePrinter(ioStreams genericclioptions.IOStreams) *tablePrinter {
-	return &tablePrinter{
-		ioStreams: ioStreams,
+// NewPrinter returns a new instance of the tablePrinter.
+func NewPrinter(ioStreams genericclioptions.IOStreams) *Printer {
+	return &Printer{
+		IOStreams: ioStreams,
 	}
 }
 
 // Print take an event channel and outputs the status events on the channel
 // until the channel is closed .
-func (t *tablePrinter) Print(ch <-chan event.Event, identifiers object.ObjMetadataSet,
+func (t *Printer) Print(ch <-chan event.Event, identifiers object.ObjMetadataSet,
 	cancelFunc collector.ObserverFunc) error {
 	coll := collector.NewResourceStatusCollector(identifiers)
 	stop := make(chan struct{})
@@ -76,11 +76,11 @@ var columns = []table.ColumnDefinition{
 
 // Print prints the table of resources with their statuses until the
 // provided stop channel is closed.
-func (t *tablePrinter) runPrintLoop(coll *CollectorAdapter, stop <-chan struct{}) <-chan struct{} {
+func (t *Printer) runPrintLoop(coll *CollectorAdapter, stop <-chan struct{}) <-chan struct{} {
 	finished := make(chan struct{})
 
 	baseTablePrinter := table.BaseTablePrinter{
-		IOStreams: t.ioStreams,
+		IOStreams: t.IOStreams,
 		Columns:   columns,
 	}
 

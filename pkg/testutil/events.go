@@ -89,7 +89,7 @@ func VerifyEvents(expEvents []ExpEvent, events []event.Event) error {
 		e := events[i]
 		ee := expEvents[expEventIndex]
 		if isMatch(ee, e) {
-			expEventIndex += 1
+			expEventIndex++
 			if expEventIndex >= len(expEvents) {
 				return nil
 			}

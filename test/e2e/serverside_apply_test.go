@@ -21,7 +21,7 @@ func serversideApplyTest(ctx context.Context, c client.Client, invConfig Invento
 	By("Apply a Deployment and an APIService by server-side apply")
 	applier := invConfig.ApplierFactoryFunc()
 
-	inv := invConfig.InvWrapperFunc(invConfig.InventoryFactoryFunc(inventoryName, namespaceName, "test"))
+	inv := invConfig.InvWrapperFunc(invConfig.FactoryFunc(inventoryName, namespaceName, "test"))
 	firstResources := []*unstructured.Unstructured{
 		withNamespace(manifestToUnstructured(deployment1), namespaceName),
 		manifestToUnstructured(apiservice1),

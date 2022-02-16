@@ -122,7 +122,7 @@ metadata:
 
 // Returns a inventory object with the inventory set from
 // the passed "children".
-func createInventoryInfo(children ...*unstructured.Unstructured) inventory.InventoryInfo {
+func createInventoryInfo(children ...*unstructured.Unstructured) inventory.Info {
 	inventoryObjCopy := inventoryObj.DeepCopy()
 	wrappedInv := inventory.WrapInventoryObj(inventoryObjCopy)
 	objs := object.UnstructuredSetToObjMetadataSet(children)
@@ -455,7 +455,7 @@ func TestPrune(t *testing.T) {
 			}
 			pruneIds := object.UnstructuredSetToObjMetadataSet(tc.pruneObjs)
 			po := Pruner{
-				InvClient: inventory.NewFakeInventoryClient(pruneIds),
+				InvClient: inventory.NewFakeClient(pruneIds),
 				Client:    fake.NewSimpleDynamicClient(scheme.Scheme, objs...),
 				Mapper: testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme,
 					scheme.Scheme.PrioritizedVersionsAllGroups()...),
@@ -535,7 +535,7 @@ func TestPruneDeletionPrevention(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			pruneID := object.UnstructuredToObjMetadata(tc.pruneObj)
 			po := Pruner{
-				InvClient: inventory.NewFakeInventoryClient(object.ObjMetadataSet{pruneID}),
+				InvClient: inventory.NewFakeClient(object.ObjMetadataSet{pruneID}),
 				Client:    fake.NewSimpleDynamicClient(scheme.Scheme, tc.pruneObj),
 				Mapper: testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme,
 					scheme.Scheme.PrioritizedVersionsAllGroups()...),
@@ -629,7 +629,7 @@ func TestPruneWithErrors(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			pruneIds := object.UnstructuredSetToObjMetadataSet(tc.pruneObjs)
 			po := Pruner{
-				InvClient: inventory.NewFakeInventoryClient(pruneIds),
+				InvClient: inventory.NewFakeClient(pruneIds),
 				// Set up the fake dynamic client to recognize all objects, and the RESTMapper.
 				Client: &fakeDynamicClient{
 					resourceInterface: &failureNamespaceClient{},
@@ -720,7 +720,7 @@ func TestGetPruneObjs(t *testing.T) {
 				objs = append(objs, obj)
 			}
 			po := Pruner{
-				InvClient: inventory.NewFakeInventoryClient(object.UnstructuredSetToObjMetadataSet(tc.prevInventory)),
+				InvClient: inventory.NewFakeClient(object.UnstructuredSetToObjMetadataSet(tc.prevInventory)),
 				Client:    fake.NewSimpleDynamicClient(scheme.Scheme, objs...),
 				Mapper: testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme,
 					scheme.Scheme.PrioritizedVersionsAllGroups()...),
@@ -834,7 +834,7 @@ func TestPrune_PropagationPolicy(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			captureClient := &optionsCaptureNamespaceClient{}
 			po := Pruner{
-				InvClient: inventory.NewFakeInventoryClient(object.ObjMetadataSet{}),
+				InvClient: inventory.NewFakeClient(object.ObjMetadataSet{}),
 				Client: &fakeDynamicClient{
 					resourceInterface: captureClient,
 				},

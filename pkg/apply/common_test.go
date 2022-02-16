@@ -65,7 +65,7 @@ func (i inventoryInfo) toUnstructured() *unstructured.Unstructured {
 	}
 }
 
-func (i inventoryInfo) toWrapped() inventory.InventoryInfo {
+func (i inventoryInfo) toWrapped() inventory.Info {
 	return inventory.WrapInventoryInfoObj(i.toUnstructured())
 }
 
@@ -120,10 +120,10 @@ func newTestDestroyer(
 func newTestInventory(
 	t *testing.T,
 	tf *cmdtesting.TestFactory,
-) inventory.InventoryClient {
-	// Use an InventoryClient with a fakeInfoHelper to allow generating Info
+) inventory.Client {
+	// Use an Client with a fakeInfoHelper to allow generating Info
 	// objects that use the FakeRESTClient as the UnstructuredClient.
-	invClient, err := inventory.ClusterInventoryClientFactory{}.NewInventoryClient(tf)
+	invClient, err := inventory.ClusterClientFactory{}.NewClient(tf)
 	require.NoError(t, err)
 	return invClient
 }

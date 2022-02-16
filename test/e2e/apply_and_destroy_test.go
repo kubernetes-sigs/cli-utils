@@ -192,7 +192,7 @@ func applyAndDestroyTest(ctx context.Context, c client.Client, invConfig Invento
 	By("Destroy resources")
 	destroyer := invConfig.DestroyerFactoryFunc()
 
-	options := apply.DestroyerOptions{InventoryPolicy: inventory.AdoptIfNoInventory}
+	options := apply.DestroyerOptions{InventoryPolicy: inventory.PolicyAdoptIfNoInventory}
 	destroyerEvents := runCollect(destroyer.Run(ctx, inventoryInfo, options))
 
 	expEvents = []testutil.ExpEvent{
@@ -291,13 +291,13 @@ func applyAndDestroyTest(ctx context.Context, c client.Client, invConfig Invento
 	assertUnstructuredDoesNotExist(ctx, c, deployment1Obj)
 }
 
-func createInventoryInfo(invConfig InventoryConfig, inventoryName, namespaceName, inventoryID string) inventory.InventoryInfo {
-	switch invConfig.InventoryStrategy {
+func createInventoryInfo(invConfig InventoryConfig, inventoryName, namespaceName, inventoryID string) inventory.Info {
+	switch invConfig.Strategy {
 	case inventory.NameStrategy:
-		return invConfig.InvWrapperFunc(invConfig.InventoryFactoryFunc(inventoryName, namespaceName, randomString("inventory-")))
+		return invConfig.InvWrapperFunc(invConfig.FactoryFunc(inventoryName, namespaceName, randomString("inventory-")))
 	case inventory.LabelStrategy:
-		return invConfig.InvWrapperFunc(invConfig.InventoryFactoryFunc(randomString("inventory-"), namespaceName, inventoryID))
+		return invConfig.InvWrapperFunc(invConfig.FactoryFunc(randomString("inventory-"), namespaceName, inventoryID))
 	default:
-		panic(fmt.Errorf("unknown inventory strategy %q", invConfig.InventoryStrategy))
+		panic(fmt.Errorf("unknown inventory strategy %q", invConfig.Strategy))
 	}
 }

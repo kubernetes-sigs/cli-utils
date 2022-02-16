@@ -32,7 +32,7 @@ import (
 // the ApplyOptions were responsible for printing progress. This is now
 // handled by a separate printer with the KubectlPrinterAdapter bridging
 // between the two.
-func NewDestroyer(factory cmdutil.Factory, invClient inventory.InventoryClient) (*Destroyer, error) {
+func NewDestroyer(factory cmdutil.Factory, invClient inventory.Client) (*Destroyer, error) {
 	pruner, err := prune.NewPruner(factory, invClient)
 	if err != nil {
 		return nil, fmt.Errorf("error setting up PruneOptions: %w", err)
@@ -55,12 +55,12 @@ type Destroyer struct {
 	pruner       *prune.Pruner
 	StatusPoller poller.Poller
 	factory      cmdutil.Factory
-	invClient    inventory.InventoryClient
+	invClient    inventory.Client
 }
 
 type DestroyerOptions struct {
 	// InventoryPolicy defines the inventory policy of apply.
-	InventoryPolicy inventory.InventoryPolicy
+	InventoryPolicy inventory.Policy
 
 	// DryRunStrategy defines whether changes should actually be performed,
 	// or if it is just talk and no action.
@@ -99,7 +99,7 @@ func setDestroyerDefaults(o *DestroyerOptions) {
 // Run performs the destroy step. Passes the inventory object. This
 // happens asynchronously on progress and any errors are reported
 // back on the event channel.
-func (d *Destroyer) Run(ctx context.Context, inv inventory.InventoryInfo, options DestroyerOptions) <-chan event.Event {
+func (d *Destroyer) Run(ctx context.Context, inv inventory.Info, options DestroyerOptions) <-chan event.Event {
 	eventChannel := make(chan event.Event)
 	setDestroyerDefaults(&options)
 	go func() {
@@ -139,7 +139,7 @@ func (d *Destroyer) Run(ctx context.Context, inv inventory.InventoryInfo, option
 			Pruner:        d.pruner,
 			DynamicClient: dynamicClient,
 			OpenAPIGetter: d.factory.OpenAPIGetter(),
-			InfoHelper:    info.NewInfoHelper(mapper, d.factory.UnstructuredClientForMapping),
+			InfoHelper:    info.NewHelper(mapper, d.factory.UnstructuredClientForMapping),
 			Mapper:        mapper,
 			InvClient:     d.invClient,
 			Destroy:       true,

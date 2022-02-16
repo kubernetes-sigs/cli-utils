@@ -25,7 +25,7 @@ import (
 type ApplierBuilder struct {
 	// factory is only used to retrieve things that have not been provided explicitly.
 	factory                      util.Factory
-	invClient                    inventory.InventoryClient
+	invClient                    inventory.Client
 	client                       dynamic.Interface
 	discoClient                  discovery.CachedDiscoveryInterface
 	mapper                       meta.RESTMapper
@@ -57,7 +57,7 @@ func (b *ApplierBuilder) Build() (*Applier, error) {
 		client:        bx.client,
 		openAPIGetter: bx.discoClient,
 		mapper:        bx.mapper,
-		infoHelper:    info.NewInfoHelper(bx.mapper, bx.unstructuredClientForMapping),
+		infoHelper:    info.NewHelper(bx.mapper, bx.unstructuredClientForMapping),
 	}, nil
 }
 
@@ -124,7 +124,7 @@ func (b *ApplierBuilder) WithFactory(factory util.Factory) *ApplierBuilder {
 	return b
 }
 
-func (b *ApplierBuilder) WithInventoryClient(invClient inventory.InventoryClient) *ApplierBuilder {
+func (b *ApplierBuilder) WithInventoryClient(invClient inventory.Client) *ApplierBuilder {
 	b.invClient = invClient
 	return b
 }

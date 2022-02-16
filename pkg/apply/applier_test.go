@@ -122,7 +122,7 @@ func TestApplier(t *testing.T) {
 			clusterObjs: object.UnstructuredSet{},
 			options: ApplierOptions{
 				NoPrune:         true,
-				InventoryPolicy: inventory.InventoryPolicyMustMatch,
+				InventoryPolicy: inventory.PolicyMustMatch,
 			},
 			expectedEvents: []testutil.ExpEvent{
 				{
@@ -229,12 +229,12 @@ func TestApplier(t *testing.T) {
 			clusterObjs: object.UnstructuredSet{},
 			options: ApplierOptions{
 				ReconcileTimeout: time.Minute,
-				InventoryPolicy:  inventory.InventoryPolicyMustMatch,
+				InventoryPolicy:  inventory.PolicyMustMatch,
 				EmitStatusEvents: true,
 			},
 			statusEvents: []pollevent.Event{
 				{
-					EventType: pollevent.ResourceUpdateEvent,
+					Type: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
 						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
 						Status:     status.InProgressStatus,
@@ -242,7 +242,7 @@ func TestApplier(t *testing.T) {
 					},
 				},
 				{
-					EventType: pollevent.ResourceUpdateEvent,
+					Type: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
 						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
 						Status:     status.CurrentStatus,
@@ -250,7 +250,7 @@ func TestApplier(t *testing.T) {
 					},
 				},
 				{
-					EventType: pollevent.ResourceUpdateEvent,
+					Type: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
 						Identifier: testutil.ToIdentifier(t, resources["secret"]),
 						Status:     status.CurrentStatus,
@@ -425,12 +425,12 @@ func TestApplier(t *testing.T) {
 			},
 			options: ApplierOptions{
 				ReconcileTimeout: time.Minute,
-				InventoryPolicy:  inventory.AdoptIfNoInventory,
+				InventoryPolicy:  inventory.PolicyAdoptIfNoInventory,
 				EmitStatusEvents: true,
 			},
 			statusEvents: []pollevent.Event{
 				{
-					EventType: pollevent.ResourceUpdateEvent,
+					Type: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
 						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
 						Status:     status.CurrentStatus,
@@ -438,7 +438,7 @@ func TestApplier(t *testing.T) {
 					},
 				},
 				{
-					EventType: pollevent.ResourceUpdateEvent,
+					Type: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
 						Identifier: testutil.ToIdentifier(t, resources["secret"]),
 						Status:     status.CurrentStatus,
@@ -606,33 +606,33 @@ func TestApplier(t *testing.T) {
 				testutil.Unstructured(t, resources["secret"], testutil.AddOwningInv(t, "test")),
 			},
 			options: ApplierOptions{
-				InventoryPolicy:  inventory.InventoryPolicyMustMatch,
+				InventoryPolicy:  inventory.PolicyMustMatch,
 				EmitStatusEvents: true,
 			},
 			statusEvents: []pollevent.Event{
 				{
-					EventType: pollevent.ResourceUpdateEvent,
+					Type: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
 						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
 						Status:     status.InProgressStatus,
 					},
 				},
 				{
-					EventType: pollevent.ResourceUpdateEvent,
+					Type: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
 						Identifier: testutil.ToIdentifier(t, resources["secret"]),
 						Status:     status.InProgressStatus,
 					},
 				},
 				{
-					EventType: pollevent.ResourceUpdateEvent,
+					Type: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
 						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
 						Status:     status.NotFoundStatus,
 					},
 				},
 				{
-					EventType: pollevent.ResourceUpdateEvent,
+					Type: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
 						Identifier: testutil.ToIdentifier(t, resources["secret"]),
 						Status:     status.NotFoundStatus,
@@ -806,19 +806,19 @@ func TestApplier(t *testing.T) {
 			},
 			options: ApplierOptions{
 				ReconcileTimeout: time.Minute,
-				InventoryPolicy:  inventory.InventoryPolicyMustMatch,
+				InventoryPolicy:  inventory.PolicyMustMatch,
 				EmitStatusEvents: true,
 			},
 			statusEvents: []pollevent.Event{
 				{
-					EventType: pollevent.ResourceUpdateEvent,
+					Type: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
 						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
 						Status:     status.InProgressStatus,
 					},
 				},
 				{
-					EventType: pollevent.ResourceUpdateEvent,
+					Type: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
 						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
 						Status:     status.CurrentStatus,
@@ -945,7 +945,7 @@ func TestApplier(t *testing.T) {
 				testutil.Unstructured(t, resources["deployment"], testutil.AddOwningInv(t, "unmatched")),
 			},
 			options: ApplierOptions{
-				InventoryPolicy:  inventory.InventoryPolicyMustMatch,
+				InventoryPolicy:  inventory.PolicyMustMatch,
 				EmitStatusEvents: true,
 			},
 			expectedEvents: []testutil.ExpEvent{
@@ -1052,19 +1052,19 @@ func TestApplier(t *testing.T) {
 				testutil.Unstructured(t, resources["deployment"], testutil.AddOwningInv(t, "test")),
 			},
 			options: ApplierOptions{
-				InventoryPolicy:  inventory.InventoryPolicyMustMatch,
+				InventoryPolicy:  inventory.PolicyMustMatch,
 				EmitStatusEvents: true,
 			},
 			statusEvents: []pollevent.Event{
 				{
-					EventType: pollevent.ResourceUpdateEvent,
+					Type: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
 						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
 						Status:     status.InProgressStatus,
 					},
 				},
 				{
-					EventType: pollevent.ResourceUpdateEvent,
+					Type: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
 						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
 						Status:     status.NotFoundStatus,
@@ -1201,13 +1201,13 @@ func TestApplier(t *testing.T) {
 			clusterObjs: object.UnstructuredSet{},
 			options: ApplierOptions{
 				ReconcileTimeout: time.Minute,
-				InventoryPolicy:  inventory.AdoptIfNoInventory,
+				InventoryPolicy:  inventory.PolicyAdoptIfNoInventory,
 				EmitStatusEvents: true,
 				ValidationPolicy: validation.SkipInvalid,
 			},
 			statusEvents: []pollevent.Event{
 				{
-					EventType: pollevent.ResourceUpdateEvent,
+					Type: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
 						Identifier: testutil.ToIdentifier(t, resources["secret"]),
 						Status:     status.CurrentStatus,
@@ -1382,7 +1382,7 @@ func TestApplier(t *testing.T) {
 			clusterObjs: object.UnstructuredSet{},
 			options: ApplierOptions{
 				ReconcileTimeout: time.Minute,
-				InventoryPolicy:  inventory.AdoptIfNoInventory,
+				InventoryPolicy:  inventory.PolicyAdoptIfNoInventory,
 				EmitStatusEvents: true,
 				ValidationPolicy: validation.ExitEarly,
 			},
@@ -1562,13 +1562,13 @@ func TestApplierCancel(t *testing.T) {
 				// EmitStatusEvents required to test event output
 				EmitStatusEvents: true,
 				NoPrune:          true,
-				InventoryPolicy:  inventory.InventoryPolicyMustMatch,
+				InventoryPolicy:  inventory.PolicyMustMatch,
 				// ReconcileTimeout required to enable WaitTasks
 				ReconcileTimeout: 1 * time.Minute,
 			},
 			statusEvents: []pollevent.Event{
 				{
-					EventType: pollevent.ResourceUpdateEvent,
+					Type: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
 						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
 						Status:     status.InProgressStatus,
@@ -1576,7 +1576,7 @@ func TestApplierCancel(t *testing.T) {
 					},
 				},
 				{
-					EventType: pollevent.ResourceUpdateEvent,
+					Type: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
 						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
 						Status:     status.InProgressStatus,
@@ -1720,13 +1720,13 @@ func TestApplierCancel(t *testing.T) {
 				// EmitStatusEvents required to test event output
 				EmitStatusEvents: true,
 				NoPrune:          true,
-				InventoryPolicy:  inventory.InventoryPolicyMustMatch,
+				InventoryPolicy:  inventory.PolicyMustMatch,
 				// ReconcileTimeout required to enable WaitTasks
 				ReconcileTimeout: 1 * time.Minute,
 			},
 			statusEvents: []pollevent.Event{
 				{
-					EventType: pollevent.ResourceUpdateEvent,
+					Type: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
 						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
 						Status:     status.InProgressStatus,
@@ -1734,7 +1734,7 @@ func TestApplierCancel(t *testing.T) {
 					},
 				},
 				{
-					EventType: pollevent.ResourceUpdateEvent,
+					Type: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
 						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
 						Status:     status.CurrentStatus,

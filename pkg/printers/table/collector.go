@@ -20,8 +20,8 @@ import (
 
 const InvalidStatus status.Status = "Invalid"
 
-func newResourceStateCollector(resourceGroups []event.ActionGroup) *ResourceStateCollector {
-	resourceInfos := make(map[object.ObjMetadata]*ResourceInfo)
+func newResourceStateCollector(resourceGroups []event.ActionGroup) *resourceStateCollector {
+	resourceInfos := make(map[object.ObjMetadata]*resourceInfo)
 	for _, group := range resourceGroups {
 		action := group.Action
 		// Keep the action that describes the operation for the resource
@@ -30,7 +30,7 @@ func newResourceStateCollector(resourceGroups []event.ActionGroup) *ResourceStat
 			continue
 		}
 		for _, identifier := range group.Identifiers {
-			resourceInfos[identifier] = &ResourceInfo{
+			resourceInfos[identifier] = &resourceInfo{
 				identifier: identifier,
 				resourceStatus: &pe.ResourceStatus{
 					Identifier: identifier,
@@ -40,31 +40,31 @@ func newResourceStateCollector(resourceGroups []event.ActionGroup) *ResourceStat
 			}
 		}
 	}
-	return &ResourceStateCollector{
+	return &resourceStateCollector{
 		resourceInfos: resourceInfos,
 	}
 }
 
-// ResourceStateCollector consumes the events from the applier
+// resourceStateCollector consumes the events from the applier
 // eventChannel and keeps track of the latest state for all resources.
 // It also provides functionality for fetching the latest seen
 // state and return it in format that can be used by the
 // BaseTablePrinter.
-type ResourceStateCollector struct {
+type resourceStateCollector struct {
 	mux sync.RWMutex
 
 	// resourceInfos contains a mapping from the unique
 	// resource identifier to a ResourceInfo object that captures
 	// the latest state for the given resource.
-	resourceInfos map[object.ObjMetadata]*ResourceInfo
+	resourceInfos map[object.ObjMetadata]*resourceInfo
 
 	err error
 }
 
-// ResourceInfo captures the latest seen state of a single resource.
+// resourceInfo captures the latest seen state of a single resource.
 // This is used for top-level resources that have a ResourceAction
 // associated with them.
-type ResourceInfo struct {
+type resourceInfo struct {
 	// identifier contains the information that identifies a
 	// single resource.
 	identifier object.ObjMetadata
@@ -100,55 +100,55 @@ type ResourceInfo struct {
 }
 
 // Identifier returns the identifier for the given resource.
-func (r *ResourceInfo) Identifier() object.ObjMetadata {
+func (r *resourceInfo) Identifier() object.ObjMetadata {
 	return r.identifier
 }
 
 // ResourceStatus returns the latest seen status for the
 // resource.
-func (r *ResourceInfo) ResourceStatus() *pe.ResourceStatus {
+func (r *resourceInfo) ResourceStatus() *pe.ResourceStatus {
 	return r.resourceStatus
 }
 
 // SubResources returns a slice of Resource which contains
 // any resources created and managed by this resource.
-func (r *ResourceInfo) SubResources() []table.Resource {
+func (r *resourceInfo) SubResources() []table.Resource {
 	var resources []table.Resource
 	for _, res := range r.resourceStatus.GeneratedResources {
-		resources = append(resources, &SubResourceInfo{
+		resources = append(resources, &subResourceInfo{
 			resourceStatus: res,
 		})
 	}
 	return resources
 }
 
-// SubResourceInfo captures the latest seen state of a
+// subResourceInfo captures the latest seen state of a
 // single subResource, i.e. resources that are created and
 // managed by one of the top-level resources we either apply
 // or prune.
-type SubResourceInfo struct {
+type subResourceInfo struct {
 	// resourceStatus contains the latest status information
 	// about the subResource.
 	resourceStatus *pe.ResourceStatus
 }
 
 // Identifier returns the identifier for the given subResource.
-func (r *SubResourceInfo) Identifier() object.ObjMetadata {
+func (r *subResourceInfo) Identifier() object.ObjMetadata {
 	return r.resourceStatus.Identifier
 }
 
 // ResourceStatus returns the latest seen status for the
 // subResource.
-func (r *SubResourceInfo) ResourceStatus() *pe.ResourceStatus {
+func (r *subResourceInfo) ResourceStatus() *pe.ResourceStatus {
 	return r.resourceStatus
 }
 
 // SubResources returns a slice of Resource which contains
 // any resources created and managed by this resource.
-func (r *SubResourceInfo) SubResources() []table.Resource {
+func (r *subResourceInfo) SubResources() []table.Resource {
 	var resources []table.Resource
 	for _, res := range r.resourceStatus.GeneratedResources {
-		resources = append(resources, &SubResourceInfo{
+		resources = append(resources, &subResourceInfo{
 			resourceStatus: res,
 		})
 	}
@@ -162,7 +162,7 @@ func (r *SubResourceInfo) SubResources() []table.Resource {
 // The function returns a channel. When this channel is closed, the
 // goroutine has processed all events in the eventChannel and
 // exited.
-func (r *ResourceStateCollector) Listen(eventChannel <-chan event.Event) <-chan listenerResult {
+func (r *resourceStateCollector) Listen(eventChannel <-chan event.Event) <-chan listenerResult {
 	completed := make(chan listenerResult)
 	go func() {
 		defer close(completed)
@@ -181,7 +181,7 @@ type listenerResult struct {
 }
 
 // processEvent processes an event and updates the state.
-func (r *ResourceStateCollector) processEvent(ev event.Event) error {
+func (r *resourceStateCollector) processEvent(ev event.Event) error {
 	r.mux.Lock()
 	defer r.mux.Unlock()
 	switch ev.Type {
@@ -203,7 +203,7 @@ func (r *ResourceStateCollector) processEvent(ev event.Event) error {
 
 // processValidationEvent handles events pertaining to a validation error
 // for a resource.
-func (r *ResourceStateCollector) processValidationEvent(e event.ValidationEvent) error {
+func (r *resourceStateCollector) processValidationEvent(e event.ValidationEvent) error {
 	klog.V(7).Infoln("processing validation event")
 	// unwrap validation errors
 	err := e.Error
@@ -231,7 +231,7 @@ func (r *ResourceStateCollector) processValidationEvent(e event.ValidationEvent)
 
 // processStatusEvent handles events pertaining to a status
 // update for a resource.
-func (r *ResourceStateCollector) processStatusEvent(e event.StatusEvent) {
+func (r *resourceStateCollector) processStatusEvent(e event.StatusEvent) {
 	klog.V(7).Infoln("processing status event")
 	previous, found := r.resourceInfos[e.Identifier]
 	if !found {
@@ -242,7 +242,7 @@ func (r *ResourceStateCollector) processStatusEvent(e event.StatusEvent) {
 }
 
 // processApplyEvent handles events relating to apply operations
-func (r *ResourceStateCollector) processApplyEvent(e event.ApplyEvent) {
+func (r *resourceStateCollector) processApplyEvent(e event.ApplyEvent) {
 	identifier := e.Identifier
 	klog.V(7).Infof("processing apply event for %s", identifier)
 	previous, found := r.resourceInfos[identifier]
@@ -257,7 +257,7 @@ func (r *ResourceStateCollector) processApplyEvent(e event.ApplyEvent) {
 }
 
 // processPruneEvent handles event related to prune operations.
-func (r *ResourceStateCollector) processPruneEvent(e event.PruneEvent) {
+func (r *resourceStateCollector) processPruneEvent(e event.PruneEvent) {
 	identifier := e.Identifier
 	klog.V(7).Infof("processing prune event for %s", identifier)
 	previous, found := r.resourceInfos[identifier]
@@ -272,7 +272,7 @@ func (r *ResourceStateCollector) processPruneEvent(e event.PruneEvent) {
 }
 
 // processPruneEvent handles event related to prune operations.
-func (r *ResourceStateCollector) processWaitEvent(e event.WaitEvent) {
+func (r *resourceStateCollector) processWaitEvent(e event.WaitEvent) {
 	identifier := e.Identifier
 	klog.V(7).Infof("processing wait event for %s", identifier)
 	previous, found := r.resourceInfos[identifier]
@@ -306,13 +306,13 @@ func (r *ResourceState) Error() error {
 
 // LatestState returns a ResourceState object that contains
 // a copy of the latest state for all resources.
-func (r *ResourceStateCollector) LatestState() *ResourceState {
+func (r *resourceStateCollector) LatestState() *ResourceState {
 	r.mux.RLock()
 	defer r.mux.RUnlock()
 
 	var resourceInfos ResourceInfos
 	for _, ri := range r.resourceInfos {
-		resourceInfos = append(resourceInfos, &ResourceInfo{
+		resourceInfos = append(resourceInfos, &resourceInfo{
 			identifier:     ri.identifier,
 			resourceStatus: ri.resourceStatus,
 			ResourceAction: ri.ResourceAction,
@@ -332,7 +332,7 @@ func (r *ResourceStateCollector) LatestState() *ResourceState {
 
 // Stats returns a summary of the results from the actuation operation
 // as a stats.Stats object.
-func (r *ResourceStateCollector) Stats() stats.Stats {
+func (r *resourceStateCollector) Stats() stats.Stats {
 	var s stats.Stats
 	for _, res := range r.resourceInfos {
 		switch res.ResourceAction {
@@ -357,7 +357,7 @@ func (r *ResourceStateCollector) Stats() stats.Stats {
 	return s
 }
 
-type ResourceInfos []*ResourceInfo
+type ResourceInfos []*resourceInfo
 
 func (g ResourceInfos) Len() int {
 	return len(g)

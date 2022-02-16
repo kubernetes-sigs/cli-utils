@@ -62,7 +62,7 @@ func TestDestroyerCancel(t *testing.T) {
 			},
 			statusEvents: []pollevent.Event{
 				{
-					EventType: pollevent.ResourceUpdateEvent,
+					Type: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
 						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
 						Status:     status.InProgressStatus,
@@ -70,7 +70,7 @@ func TestDestroyerCancel(t *testing.T) {
 					},
 				},
 				{
-					EventType: pollevent.ResourceUpdateEvent,
+					Type: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
 						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
 						Status:     status.InProgressStatus,
@@ -184,7 +184,7 @@ func TestDestroyerCancel(t *testing.T) {
 			},
 			statusEvents: []pollevent.Event{
 				{
-					EventType: pollevent.ResourceUpdateEvent,
+					Type: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
 						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
 						Status:     status.InProgressStatus,
@@ -192,7 +192,7 @@ func TestDestroyerCancel(t *testing.T) {
 					},
 				},
 				{
-					EventType: pollevent.ResourceUpdateEvent,
+					Type: pollevent.ResourceUpdateEvent,
 					Resource: &pollevent.ResourceStatus{
 						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
 						Status:     status.NotFoundStatus,

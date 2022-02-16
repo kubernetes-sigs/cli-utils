@@ -23,7 +23,7 @@ func exitEarlyTest(ctx context.Context, c client.Client, invConfig InventoryConf
 	By("exit early on invalid object")
 	applier := invConfig.ApplierFactoryFunc()
 
-	inv := invConfig.InvWrapperFunc(invConfig.InventoryFactoryFunc(inventoryName, namespaceName, "test"))
+	inv := invConfig.InvWrapperFunc(invConfig.FactoryFunc(inventoryName, namespaceName, "test"))
 
 	fields := struct{ Namespace string }{Namespace: namespaceName}
 	// valid pod

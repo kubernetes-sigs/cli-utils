@@ -85,13 +85,13 @@ func TestReadStatus(t *testing.T) {
 	for tn := range testCases {
 		tc := testCases[tn]
 		t.Run(tn, func(t *testing.T) {
-			fakeReader := &fakecr.FakeClusterReader{
+			fakeReader := &fakecr.ClusterReader{
 				GetResource: tc.readerResource,
 				GetErr:      tc.readerErr,
 			}
 			fakeMapper := fakemapper.NewFakeRESTMapper(deploymentGVK, replicaSetGVK)
 
-			fakeStatusReader := &fake.FakeStatusReader{}
+			fakeStatusReader := &fake.StatusReader{}
 			statusReader := NewDeploymentResourceReader(fakeMapper, fakeStatusReader)
 
 			rs, err := statusReader.ReadStatus(context.Background(), fakeReader, tc.identifier)

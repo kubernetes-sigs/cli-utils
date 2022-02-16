@@ -33,7 +33,7 @@ install-addlicense:
 	(which $(GOPATH)/bin/addlicense || go install github.com/google/addlicense@v1.0.0)
 
 install-lint:
-	(which $(GOPATH)/bin/golangci-lint || go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.40.1)
+	(which $(GOPATH)/bin/golangci-lint || go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.44.0)
 
 install-deepcopy-gen:
 	(which $(GOPATH)/bin/deepcopy-gen || go install k8s.io/code-generator/cmd/deepcopy-gen@v0.23.3)

@@ -24,8 +24,8 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/manifestreader"
 )
 
-func GetStatusRunner(factory cmdutil.Factory, invFactory inventory.InventoryClientFactory, loader manifestreader.ManifestLoader) *StatusRunner {
-	r := &StatusRunner{
+func GetRunner(factory cmdutil.Factory, invFactory inventory.ClientFactory, loader manifestreader.ManifestLoader) *Runner {
+	r := &Runner{
 		factory:           factory,
 		invFactory:        invFactory,
 		loader:            loader,
@@ -47,16 +47,16 @@ func GetStatusRunner(factory cmdutil.Factory, invFactory inventory.InventoryClie
 	return r
 }
 
-func StatusCommand(f cmdutil.Factory, invFactory inventory.InventoryClientFactory, loader manifestreader.ManifestLoader) *cobra.Command {
-	return GetStatusRunner(f, invFactory, loader).Command
+func Command(f cmdutil.Factory, invFactory inventory.ClientFactory, loader manifestreader.ManifestLoader) *cobra.Command {
+	return GetRunner(f, invFactory, loader).Command
 }
 
-// StatusRunner captures the parameters for the command and contains
+// Runner captures the parameters for the command and contains
 // the run function.
-type StatusRunner struct {
+type Runner struct {
 	Command    *cobra.Command
 	factory    cmdutil.Factory
-	invFactory inventory.InventoryClientFactory
+	invFactory inventory.ClientFactory
 	loader     manifestreader.ManifestLoader
 
 	period    time.Duration
@@ -70,7 +70,7 @@ type StatusRunner struct {
 // runE implements the logic of the command and will delegate to the
 // poller to compute status for each of the resources. One of the printer
 // implementations takes care of printing the output.
-func (r *StatusRunner) runE(cmd *cobra.Command, args []string) error {
+func (r *Runner) runE(cmd *cobra.Command, args []string) error {
 	_, err := common.DemandOneDirectory(args)
 	if err != nil {
 		return err
@@ -91,7 +91,7 @@ func (r *StatusRunner) runE(cmd *cobra.Command, args []string) error {
 	}
 	inv := inventory.WrapInventoryInfoObj(invObj)
 
-	invClient, err := r.invFactory.NewInventoryClient(r.factory)
+	invClient, err := r.invFactory.NewClient(r.factory)
 	if err != nil {
 		return err
 	}

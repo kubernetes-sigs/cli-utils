@@ -296,7 +296,7 @@ func pruneRetrieveErrorTest(ctx context.Context, c client.Client, invConfig Inve
 	By("Destroy resources")
 	destroyer := invConfig.DestroyerFactoryFunc()
 
-	options := apply.DestroyerOptions{InventoryPolicy: inventory.AdoptIfNoInventory}
+	options := apply.DestroyerOptions{InventoryPolicy: inventory.PolicyAdoptIfNoInventory}
 	destroyerEvents := runCollect(destroyer.Run(ctx, inv, options))
 
 	expEvents3 := []testutil.ExpEvent{

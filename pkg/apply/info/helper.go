@@ -10,8 +10,8 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
-// InfoHelper provides functions for interacting with Info objects.
-type InfoHelper interface {
+// Helper provides functions for interacting with Info objects.
+type Helper interface {
 	// UpdateInfo sets the mapping and client for the provided Info
 	// object. This must be called at a time when all needed resource
 	// types are available in the RESTMapper.
@@ -20,19 +20,19 @@ type InfoHelper interface {
 	BuildInfo(obj *unstructured.Unstructured) (*resource.Info, error)
 }
 
-func NewInfoHelper(mapper meta.RESTMapper, unstructuredClientForMapping func(*meta.RESTMapping) (resource.RESTClient, error)) *infoHelper {
-	return &infoHelper{
+func NewHelper(mapper meta.RESTMapper, unstructuredClientForMapping func(*meta.RESTMapping) (resource.RESTClient, error)) Helper {
+	return &helper{
 		mapper:                       mapper,
 		unstructuredClientForMapping: unstructuredClientForMapping,
 	}
 }
 
-type infoHelper struct {
+type helper struct {
 	mapper                       meta.RESTMapper
 	unstructuredClientForMapping func(*meta.RESTMapping) (resource.RESTClient, error)
 }
 
-func (ih *infoHelper) UpdateInfo(info *resource.Info) error {
+func (ih *helper) UpdateInfo(info *resource.Info) error {
 	gvk := info.Object.GetObjectKind().GroupVersionKind()
 	mapping, err := ih.mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
 	if err != nil {
@@ -48,7 +48,7 @@ func (ih *infoHelper) UpdateInfo(info *resource.Info) error {
 	return nil
 }
 
-func (ih *infoHelper) BuildInfo(obj *unstructured.Unstructured) (*resource.Info, error) {
+func (ih *helper) BuildInfo(obj *unstructured.Unstructured) (*resource.Info, error) {
 	info, err := object.UnstructuredToInfo(obj)
 	if err != nil {
 		return nil, err

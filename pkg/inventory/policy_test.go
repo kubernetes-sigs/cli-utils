@@ -25,7 +25,7 @@ func (i *fakeInventoryInfo) ID() string {
 	return i.id
 }
 
-func (i *fakeInventoryInfo) Strategy() InventoryStrategy {
+func (i *fakeInventoryInfo) Strategy() Strategy {
 	return NameStrategy
 }
 
@@ -52,8 +52,8 @@ func TestInventoryIDMatch(t *testing.T) {
 	testcases := []struct {
 		name     string
 		obj      *unstructured.Unstructured
-		inv      InventoryInfo
-		expected inventoryIDMatchStatus
+		inv      Info
+		expected IDMatchStatus
 	}{
 		{
 			name:     "empty",
@@ -75,7 +75,7 @@ func TestInventoryIDMatch(t *testing.T) {
 		},
 	}
 	for _, tc := range testcases {
-		actual := InventoryIDMatch(tc.inv, tc.obj)
+		actual := IDMatch(tc.inv, tc.obj)
 		if actual != tc.expected {
 			t.Errorf("expected %v, but got %v", tc.expected, actual)
 		}
@@ -86,8 +86,8 @@ func TestCanApply(t *testing.T) {
 	testcases := []struct {
 		name     string
 		obj      *unstructured.Unstructured
-		inv      InventoryInfo
-		policy   InventoryPolicy
+		inv      Info
+		policy   Policy
 		canApply bool
 	}{
 		{
@@ -100,63 +100,63 @@ func TestCanApply(t *testing.T) {
 			name:     "empty with AdoptIfNoInventory",
 			obj:      testObjectWithAnnotation("", ""),
 			inv:      &fakeInventoryInfo{id: "random-id"},
-			policy:   AdoptIfNoInventory,
+			policy:   PolicyAdoptIfNoInventory,
 			canApply: true,
 		},
 		{
 			name:     "empty with AdoptAll",
 			obj:      testObjectWithAnnotation("", ""),
 			inv:      &fakeInventoryInfo{id: "random-id"},
-			policy:   AdoptAll,
+			policy:   PolicyAdoptAll,
 			canApply: true,
 		},
 		{
 			name:     "empty with InventoryPolicyMustMatch",
 			obj:      testObjectWithAnnotation("", ""),
 			inv:      &fakeInventoryInfo{id: "random-id"},
-			policy:   InventoryPolicyMustMatch,
+			policy:   PolicyMustMatch,
 			canApply: false,
 		},
 		{
 			name:     "matched with InventoryPolicyMustMatch",
 			obj:      testObjectWithAnnotation(OwningInventoryKey, "matched"),
 			inv:      &fakeInventoryInfo{id: "matched"},
-			policy:   InventoryPolicyMustMatch,
+			policy:   PolicyMustMatch,
 			canApply: true,
 		},
 		{
 			name:     "matched with AdoptIfNoInventory",
 			obj:      testObjectWithAnnotation(OwningInventoryKey, "matched"),
 			inv:      &fakeInventoryInfo{id: "matched"},
-			policy:   AdoptIfNoInventory,
+			policy:   PolicyAdoptIfNoInventory,
 			canApply: true,
 		},
 		{
 			name:     "matched with AloptAll",
 			obj:      testObjectWithAnnotation(OwningInventoryKey, "matched"),
 			inv:      &fakeInventoryInfo{id: "matched"},
-			policy:   AdoptAll,
+			policy:   PolicyAdoptAll,
 			canApply: true,
 		},
 		{
 			name:     "unmatched with InventoryPolicyMustMatch",
 			obj:      testObjectWithAnnotation(OwningInventoryKey, "unmatched"),
 			inv:      &fakeInventoryInfo{id: "random-id"},
-			policy:   InventoryPolicyMustMatch,
+			policy:   PolicyMustMatch,
 			canApply: false,
 		},
 		{
 			name:     "unmatched with AdoptIfNoInventory",
 			obj:      testObjectWithAnnotation(OwningInventoryKey, "unmatched"),
 			inv:      &fakeInventoryInfo{id: "random-id"},
-			policy:   AdoptIfNoInventory,
+			policy:   PolicyAdoptIfNoInventory,
 			canApply: false,
 		},
 		{
 			name:     "unmatched with AdoptAll",
 			obj:      testObjectWithAnnotation(OwningInventoryKey, "unmatched"),
 			inv:      &fakeInventoryInfo{id: "random-id"},
-			policy:   AdoptAll,
+			policy:   PolicyAdoptAll,
 			canApply: true,
 		},
 	}
@@ -172,8 +172,8 @@ func TestCanPrune(t *testing.T) {
 	testcases := []struct {
 		name     string
 		obj      *unstructured.Unstructured
-		inv      InventoryInfo
-		policy   InventoryPolicy
+		inv      Info
+		policy   Policy
 		canPrune bool
 	}{
 		{
@@ -186,63 +186,63 @@ func TestCanPrune(t *testing.T) {
 			name:     "empty with AdoptIfNoInventory",
 			obj:      testObjectWithAnnotation("", ""),
 			inv:      &fakeInventoryInfo{id: "random-id"},
-			policy:   AdoptIfNoInventory,
+			policy:   PolicyAdoptIfNoInventory,
 			canPrune: true,
 		},
 		{
 			name:     "empty with AdoptAll",
 			obj:      testObjectWithAnnotation("", ""),
 			inv:      &fakeInventoryInfo{id: "random-id"},
-			policy:   AdoptAll,
+			policy:   PolicyAdoptAll,
 			canPrune: true,
 		},
 		{
 			name:     "empty with InventoryPolicyMustMatch",
 			obj:      testObjectWithAnnotation("", ""),
 			inv:      &fakeInventoryInfo{id: "random-id"},
-			policy:   InventoryPolicyMustMatch,
+			policy:   PolicyMustMatch,
 			canPrune: false,
 		},
 		{
 			name:     "matched with InventoryPolicyMustMatch",
 			obj:      testObjectWithAnnotation(OwningInventoryKey, "matched"),
 			inv:      &fakeInventoryInfo{id: "matched"},
-			policy:   InventoryPolicyMustMatch,
+			policy:   PolicyMustMatch,
 			canPrune: true,
 		},
 		{
 			name:     "matched with AdoptIfNoInventory",
 			obj:      testObjectWithAnnotation(OwningInventoryKey, "matched"),
 			inv:      &fakeInventoryInfo{id: "matched"},
-			policy:   AdoptIfNoInventory,
+			policy:   PolicyAdoptIfNoInventory,
 			canPrune: true,
 		},
 		{
 			name:     "matched with AloptAll",
 			obj:      testObjectWithAnnotation(OwningInventoryKey, "matched"),
 			inv:      &fakeInventoryInfo{id: "matched"},
-			policy:   AdoptAll,
+			policy:   PolicyAdoptAll,
 			canPrune: true,
 		},
 		{
 			name:     "unmatched with InventoryPolicyMustMatch",
 			obj:      testObjectWithAnnotation(OwningInventoryKey, "unmatched"),
 			inv:      &fakeInventoryInfo{id: "random-id"},
-			policy:   InventoryPolicyMustMatch,
+			policy:   PolicyMustMatch,
 			canPrune: false,
 		},
 		{
 			name:     "unmatched with AdoptIfNoInventory",
 			obj:      testObjectWithAnnotation(OwningInventoryKey, "unmatched"),
 			inv:      &fakeInventoryInfo{id: "random-id"},
-			policy:   AdoptIfNoInventory,
+			policy:   PolicyAdoptIfNoInventory,
 			canPrune: false,
 		},
 		{
 			name:     "unmatched with AdoptAll",
 			obj:      testObjectWithAnnotation(OwningInventoryKey, "unmatched"),
 			inv:      &fakeInventoryInfo{id: "random-id"},
-			policy:   AdoptAll,
+			policy:   PolicyAdoptAll,
 			canPrune: true,
 		},
 	}

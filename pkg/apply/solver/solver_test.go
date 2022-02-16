@@ -421,7 +421,7 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 			}
 
 			applyIds := object.UnstructuredSetToObjMetadataSet(tc.applyObjs)
-			fakeInvClient := inventory.NewFakeInventoryClient(applyIds)
+			fakeInvClient := inventory.NewFakeClient(applyIds)
 			vCollector := &validation.Collector{}
 			tqb := TaskQueueBuilder{
 				Pruner:    pruner,
@@ -786,7 +786,7 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 			}
 
 			pruneIds := object.UnstructuredSetToObjMetadataSet(tc.pruneObjs)
-			fakeInvClient := inventory.NewFakeInventoryClient(pruneIds)
+			fakeInvClient := inventory.NewFakeClient(pruneIds)
 			vCollector := &validation.Collector{}
 			tqb := TaskQueueBuilder{
 				Pruner:    pruner,

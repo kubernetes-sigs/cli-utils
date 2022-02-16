@@ -26,49 +26,49 @@ func TestInventoryPolicyFilter(t *testing.T) {
 	tests := map[string]struct {
 		inventoryID    string
 		objInventoryID string
-		policy         inventory.InventoryPolicy
+		policy         inventory.Policy
 		filtered       bool
 	}{
 		"inventory and object ids match, not filtered": {
 			inventoryID:    "foo",
 			objInventoryID: "foo",
-			policy:         inventory.InventoryPolicyMustMatch,
+			policy:         inventory.PolicyMustMatch,
 			filtered:       false,
 		},
 		"inventory and object ids match and adopt, not filtered": {
 			inventoryID:    "foo",
 			objInventoryID: "foo",
-			policy:         inventory.AdoptIfNoInventory,
+			policy:         inventory.PolicyAdoptIfNoInventory,
 			filtered:       false,
 		},
 		"inventory and object ids do no match and policy must match, filtered": {
 			inventoryID:    "foo",
 			objInventoryID: "bar",
-			policy:         inventory.InventoryPolicyMustMatch,
+			policy:         inventory.PolicyMustMatch,
 			filtered:       true,
 		},
 		"inventory and object ids do no match and adopt if no inventory, filtered": {
 			inventoryID:    "foo",
 			objInventoryID: "bar",
-			policy:         inventory.AdoptIfNoInventory,
+			policy:         inventory.PolicyAdoptIfNoInventory,
 			filtered:       true,
 		},
 		"inventory and object ids do no match and adopt all, not filtered": {
 			inventoryID:    "foo",
 			objInventoryID: "bar",
-			policy:         inventory.AdoptAll,
+			policy:         inventory.PolicyAdoptAll,
 			filtered:       false,
 		},
 		"object id empty and adopt all, not filtered": {
 			inventoryID:    "foo",
 			objInventoryID: "",
-			policy:         inventory.AdoptAll,
+			policy:         inventory.PolicyAdoptAll,
 			filtered:       false,
 		},
 		"object id empty and policy must match, filtered": {
 			inventoryID:    "foo",
 			objInventoryID: "",
-			policy:         inventory.InventoryPolicyMustMatch,
+			policy:         inventory.PolicyMustMatch,
 			filtered:       true,
 		},
 	}

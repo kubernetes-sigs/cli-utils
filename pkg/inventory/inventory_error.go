@@ -39,10 +39,36 @@ func (g MultipleInventoryObjError) Error() string {
 	return multipleInventoryErrorStr
 }
 
+//nolint:revive // redundant name in exported error ok
 type InventoryNamespaceInSet struct {
 	Namespace string
 }
 
 func (g InventoryNamespaceInSet) Error() string {
 	return inventoryNamespaceInSet
+}
+
+//nolint:revive // redundant name in exported error ok
+type InventoryOverlapError struct {
+	err error
+}
+
+func (e *InventoryOverlapError) Error() string {
+	return e.err.Error()
+}
+
+func NewInventoryOverlapError(err error) *InventoryOverlapError {
+	return &InventoryOverlapError{err: err}
+}
+
+type NeedAdoptionError struct {
+	err error
+}
+
+func (e *NeedAdoptionError) Error() string {
+	return e.err.Error()
+}
+
+func NewNeedAdoptionError(err error) *NeedAdoptionError {
+	return &NeedAdoptionError{err: err}
 }

@@ -22,8 +22,8 @@ import (
 type InventoryPolicyApplyFilter struct {
 	Client    dynamic.Interface
 	Mapper    meta.RESTMapper
-	Inv       inventory.InventoryInfo
-	InvPolicy inventory.InventoryPolicy
+	Inv       inventory.Info
+	InvPolicy inventory.Policy
 }
 
 // Name returns a filter identifier for logging.
@@ -38,7 +38,7 @@ func (ipaf InventoryPolicyApplyFilter) Filter(obj *unstructured.Unstructured) (b
 	if obj == nil {
 		return true, "missing object", nil
 	}
-	if ipaf.InvPolicy == inventory.AdoptAll {
+	if ipaf.InvPolicy == inventory.PolicyAdoptAll {
 		return false, "", nil
 	}
 	// Object must be retrieved from the cluster to get the inventory id.
@@ -54,7 +54,7 @@ func (ipaf InventoryPolicyApplyFilter) Filter(obj *unstructured.Unstructured) (b
 	// if an object should be applied.
 	canApply, err := inventory.CanApply(ipaf.Inv, clusterObj, ipaf.InvPolicy)
 	if !canApply {
-		invMatch := inventory.InventoryIDMatch(ipaf.Inv, clusterObj)
+		invMatch := inventory.IDMatch(ipaf.Inv, clusterObj)
 		reason := fmt.Sprintf("inventory policy prevented apply (inventoryIDMatchStatus: %q, inventoryPolicy: %q)",
 			invMatch, ipaf.InvPolicy)
 		return true, reason, err

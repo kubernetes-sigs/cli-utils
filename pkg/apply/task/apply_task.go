@@ -49,7 +49,7 @@ type ApplyTask struct {
 
 	DynamicClient     dynamic.Interface
 	OpenAPIGetter     discovery.OpenAPISchemaInterface
-	InfoHelper        info.InfoHelper
+	InfoHelper        info.Helper
 	Mapper            meta.RESTMapper
 	Objects           object.UnstructuredSet
 	Filters           []filter.ValidationFilter

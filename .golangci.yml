@@ -15,13 +15,13 @@ linters:
     - dogsled
     - dupl
     - errcheck
+    - exportloopref
     - gochecknoinits
     - goconst
     - gocritic
     - gocyclo
     - gofmt
     - goimports
-    - golint
     - gosec
     - gosimple
     - govet
@@ -30,10 +30,10 @@ linters:
     - lll
     - misspell
     - nakedret
-    - scopelint
     - staticcheck
     - structcheck
     - stylecheck
+    - revive
     - typecheck
     - unconvert
     - unparam
@@ -49,8 +49,6 @@ linters-settings:
     line-length: 170
   gocyclo:
     min-complexity: 30
-  golint:
-    min-confidence: 0.85
 
 issues:
   # List of regexps of issue texts to exclude, empty list by default.

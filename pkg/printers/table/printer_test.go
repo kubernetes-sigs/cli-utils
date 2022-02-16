@@ -26,17 +26,17 @@ func TestActionColumnDef(t *testing.T) {
 		expectedOutput string
 	}{
 		"unexpected implementation of Resource interface": {
-			resource:       &SubResourceInfo{},
+			resource:       &subResourceInfo{},
 			columnWidth:    15,
 			expectedOutput: "",
 		},
 		"neither applied nor pruned": {
-			resource:       &ResourceInfo{},
+			resource:       &resourceInfo{},
 			columnWidth:    15,
 			expectedOutput: "",
 		},
 		"applied": {
-			resource: &ResourceInfo{
+			resource: &resourceInfo{
 				ResourceAction: event.ApplyAction,
 				ApplyOpResult:  createdOpResult,
 			},
@@ -44,7 +44,7 @@ func TestActionColumnDef(t *testing.T) {
 			expectedOutput: "Created",
 		},
 		"pruned": {
-			resource: &ResourceInfo{
+			resource: &resourceInfo{
 				ResourceAction: event.PruneAction,
 				PruneOpResult:  prunedOpResult,
 			},
@@ -52,7 +52,7 @@ func TestActionColumnDef(t *testing.T) {
 			expectedOutput: "Pruned",
 		},
 		"trimmed output": {
-			resource: &ResourceInfo{
+			resource: &resourceInfo{
 				ResourceAction: event.ApplyAction,
 				ApplyOpResult:  createdOpResult,
 			},

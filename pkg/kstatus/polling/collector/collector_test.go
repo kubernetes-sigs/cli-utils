@@ -49,8 +49,8 @@ func TestCollectorWithFatalError(t *testing.T) {
 
 	exampleErr := fmt.Errorf("this is a test error")
 	eventCh <- event.Event{
-		EventType: event.ErrorEvent,
-		Error:     exampleErr,
+		Type:  event.ErrorEvent,
+		Error: exampleErr,
 	}
 
 	var err error
@@ -101,7 +101,7 @@ func TestCollectorEventProcessing(t *testing.T) {
 			},
 			events: []event.Event{
 				{
-					EventType: event.ResourceUpdateEvent,
+					Type: event.ResourceUpdateEvent,
 					Resource: &event.ResourceStatus{
 						Identifier: resourceIdentifiers["deployment"],
 					},
@@ -115,25 +115,25 @@ func TestCollectorEventProcessing(t *testing.T) {
 			},
 			events: []event.Event{
 				{
-					EventType: event.ResourceUpdateEvent,
+					Type: event.ResourceUpdateEvent,
 					Resource: &event.ResourceStatus{
 						Identifier: resourceIdentifiers["deployment"],
 					},
 				},
 				{
-					EventType: event.ResourceUpdateEvent,
+					Type: event.ResourceUpdateEvent,
 					Resource: &event.ResourceStatus{
 						Identifier: resourceIdentifiers["statefulSet"],
 					},
 				},
 				{
-					EventType: event.ResourceUpdateEvent,
+					Type: event.ResourceUpdateEvent,
 					Resource: &event.ResourceStatus{
 						Identifier: resourceIdentifiers["deployment"],
 					},
 				},
 				{
-					EventType: event.ResourceUpdateEvent,
+					Type: event.ResourceUpdateEvent,
 					Resource: &event.ResourceStatus{
 						Identifier: resourceIdentifiers["statefulSet"],
 					},
@@ -169,7 +169,7 @@ func TestCollectorEventProcessing(t *testing.T) {
 			var expectedObservation *Observation
 			if latestEvent != nil {
 				expectedObservation = &Observation{
-					LastEventType: latestEvent.EventType,
+					LastEventType: latestEvent.Type,
 				}
 			} else {
 				expectedObservation = &Observation{}

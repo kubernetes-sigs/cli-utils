@@ -56,16 +56,16 @@ func main() {
 	initCmd := initcmd.NewCmdInit(f, ioStreams)
 	updateHelp(names, initCmd)
 	loader := manifestreader.NewManifestLoader(f)
-	invFactory := inventory.ClusterInventoryClientFactory{}
-	applyCmd := apply.ApplyCommand(f, invFactory, loader, ioStreams)
+	invFactory := inventory.ClusterClientFactory{}
+	applyCmd := apply.Command(f, invFactory, loader, ioStreams)
 	updateHelp(names, applyCmd)
-	previewCmd := preview.PreviewCommand(f, invFactory, loader, ioStreams)
+	previewCmd := preview.Command(f, invFactory, loader, ioStreams)
 	updateHelp(names, previewCmd)
-	diffCmd := diff.NewCmdDiff(f, ioStreams)
+	diffCmd := diff.NewCommand(f, ioStreams)
 	updateHelp(names, diffCmd)
-	destroyCmd := destroy.DestroyCommand(f, invFactory, loader, ioStreams)
+	destroyCmd := destroy.Command(f, invFactory, loader, ioStreams)
 	updateHelp(names, destroyCmd)
-	statusCmd := status.StatusCommand(f, invFactory, loader)
+	statusCmd := status.Command(f, invFactory, loader)
 	updateHelp(names, statusCmd)
 
 	cmd.AddCommand(initCmd, applyCmd, diffCmd, destroyCmd, previewCmd, statusCmd)

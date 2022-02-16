@@ -107,7 +107,7 @@ func TestInvAddTask(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			client := inventory.NewFakeInventoryClient(tc.initialObjs)
+			client := inventory.NewFakeClient(tc.initialObjs)
 			eventChannel := make(chan event.Event)
 			resourceCache := cache.NewResourceCacheMap()
 			context := taskrunner.NewTaskContext(eventChannel, resourceCache)
@@ -142,7 +142,7 @@ func TestInventoryNamespaceInSet(t *testing.T) {
 	inventoryNamespace := createNamespace(namespace)
 
 	tests := map[string]struct {
-		inv       inventory.InventoryInfo
+		inv       inventory.Info
 		objects   []*unstructured.Unstructured
 		namespace *unstructured.Unstructured
 	}{

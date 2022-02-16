@@ -28,7 +28,7 @@ func skipInvalidTest(ctx context.Context, c client.Client, invConfig InventoryCo
 	By("apply valid objects and skip invalid objects")
 	applier := invConfig.ApplierFactoryFunc()
 
-	inv := invConfig.InvWrapperFunc(invConfig.InventoryFactoryFunc(inventoryName, namespaceName, "test"))
+	inv := invConfig.InvWrapperFunc(invConfig.FactoryFunc(inventoryName, namespaceName, "test"))
 
 	fields := struct{ Namespace string }{Namespace: namespaceName}
 	// valid pod
@@ -345,7 +345,7 @@ func skipInvalidTest(ctx context.Context, c client.Client, invConfig InventoryCo
 	By("destroy valid objects and skip invalid objects")
 	destroyer := invConfig.DestroyerFactoryFunc()
 	destroyerEvents := runCollect(destroyer.Run(ctx, inv, apply.DestroyerOptions{
-		InventoryPolicy:  inventory.AdoptIfNoInventory,
+		InventoryPolicy:  inventory.PolicyAdoptIfNoInventory,
 		ValidationPolicy: validation.SkipInvalid,
 	}))
 

@@ -9,15 +9,15 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
-// EventType is the type that describes the type of an Event that is passed back to the caller
+// Type is the type that describes the type of an Event that is passed back to the caller
 // as resources in the cluster are being polled.
 //
-//go:generate stringer -type=EventType
-type EventType int
+//go:generate stringer -type=Type
+type Type int
 
 const (
 	// ResourceUpdateEvent describes events related to a change in the status of one of the polled resources.
-	ResourceUpdateEvent EventType = iota
+	ResourceUpdateEvent Type = iota
 	// ErrorEvent signals that the engine has encountered an error that it can not recover from. The engine
 	// is shutting down and the event channel will be closed after this event.
 	ErrorEvent
@@ -26,8 +26,8 @@ const (
 // Event defines that type that is passed back through the event channel to notify the caller of changes
 // as resources are being polled.
 type Event struct {
-	// EventType defines the type of event.
-	EventType EventType
+	// Type defines the type of event.
+	Type Type
 
 	// Resource is only available for ResourceUpdateEvents. It includes information about the resource,
 	// including the resource status, any errors and the resource itself (as an unstructured).
