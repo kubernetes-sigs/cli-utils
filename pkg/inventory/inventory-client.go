@@ -16,6 +16,7 @@ import (
 	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util"
+	"sigs.k8s.io/cli-utils/pkg/apis/actuation"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
@@ -34,7 +35,7 @@ type Client interface {
 	Merge(inv Info, objs object.ObjMetadataSet, dryRun common.DryRunStrategy) (object.ObjMetadataSet, error)
 	// Replace replaces the set of objects stored in the inventory
 	// object with the passed set of objects, or an error if one occurs.
-	Replace(inv Info, objs object.ObjMetadataSet, dryRun common.DryRunStrategy) error
+	Replace(inv Info, objs object.ObjMetadataSet, status []actuation.ObjectStatus, dryRun common.DryRunStrategy) error
 	// DeleteInventoryObj deletes the passed inventory object from the APIServer.
 	DeleteInventoryObj(inv Info, dryRun common.DryRunStrategy) error
 	// ApplyInventoryNamespace applies the Namespace that the inventory object should be in.
@@ -100,8 +101,9 @@ func (cic *ClusterClient) Merge(localInv Info, objs object.ObjMetadataSet, dryRu
 	}
 	if clusterInv == nil {
 		// Wrap inventory object and store the inventory in it.
+		status := getObjStatus(nil, objs)
 		inv := cic.InventoryFactoryFunc(invObj)
-		if err := inv.Store(objs); err != nil {
+		if err := inv.Store(objs, status); err != nil {
 			return nil, err
 		}
 		invInfo, err := inv.GetObject()
@@ -126,10 +128,11 @@ func (cic *ClusterClient) Merge(localInv Info, objs object.ObjMetadataSet, dryRu
 		}
 		pruneIds = clusterObjs.Diff(objs)
 		unionObjs := clusterObjs.Union(objs)
+		status := getObjStatus(pruneIds, unionObjs)
 		klog.V(4).Infof("num objects to prune: %d", len(pruneIds))
 		klog.V(4).Infof("num merged objects to store in inventory: %d", len(unionObjs))
 		wrappedInv := cic.InventoryFactoryFunc(clusterInv)
-		if err = wrappedInv.Store(unionObjs); err != nil {
+		if err = wrappedInv.Store(unionObjs, status); err != nil {
 			return pruneIds, err
 		}
 		clusterInv, err = wrappedInv.GetObject()
@@ -158,7 +161,8 @@ func (cic *ClusterClient) Merge(localInv Info, objs object.ObjMetadataSet, dryRu
 
 // Replace stores the passed objects in the cluster inventory object, or
 // an error if one occurred.
-func (cic *ClusterClient) Replace(localInv Info, objs object.ObjMetadataSet, dryRun common.DryRunStrategy) error {
+func (cic *ClusterClient) Replace(localInv Info, objs object.ObjMetadataSet, status []actuation.ObjectStatus,
+	dryRun common.DryRunStrategy) error {
 	// Skip entire function for dry-run.
 	if dryRun.ClientOrServerDryRun() {
 		klog.V(4).Infoln("dry-run replace inventory object: not applied")
@@ -172,7 +176,7 @@ func (cic *ClusterClient) Replace(localInv Info, objs object.ObjMetadataSet, dry
 	if err != nil {
 		return fmt.Errorf("failed to read inventory from cluster: %w", err)
 	}
-	clusterInv, err = cic.replaceInventory(clusterInv, objs)
+	clusterInv, err = cic.replaceInventory(clusterInv, objs, status)
 	if err != nil {
 		return err
 	}
@@ -193,9 +197,10 @@ func (cic *ClusterClient) Replace(localInv Info, objs object.ObjMetadataSet, dry
 }
 
 // replaceInventory stores the passed objects into the passed inventory object.
-func (cic *ClusterClient) replaceInventory(inv *unstructured.Unstructured, objs object.ObjMetadataSet) (*unstructured.Unstructured, error) {
+func (cic *ClusterClient) replaceInventory(inv *unstructured.Unstructured, objs object.ObjMetadataSet,
+	status []actuation.ObjectStatus) (*unstructured.Unstructured, error) {
 	wrappedInv := cic.InventoryFactoryFunc(inv)
-	if err := wrappedInv.Store(objs); err != nil {
+	if err := wrappedInv.Store(objs, status); err != nil {
 		return nil, err
 	}
 	clusterInv, err := wrappedInv.GetObject()
@@ -492,4 +497,29 @@ func (cic *ClusterClient) hasSubResource(groupVersion, resource, subresource str
 		}
 	}
 	return false, nil
+}
+
+// getObjStatus returns the list of object status
+// at the beginning of an apply process.
+func getObjStatus(pruneIds, unionIds []object.ObjMetadata) []actuation.ObjectStatus {
+	status := []actuation.ObjectStatus{}
+	for _, obj := range unionIds {
+		status = append(status,
+			actuation.ObjectStatus{
+				ObjectReference: ObjectReferenceFromObjMetadata(obj),
+				Strategy:        actuation.ActuationStrategyApply,
+				Actuation:       actuation.ActuationPending,
+				Reconcile:       actuation.ReconcilePending,
+			})
+	}
+	for _, obj := range pruneIds {
+		status = append(status,
+			actuation.ObjectStatus{
+				ObjectReference: ObjectReferenceFromObjMetadata(obj),
+				Strategy:        actuation.ActuationStrategyDelete,
+				Actuation:       actuation.ActuationPending,
+				Reconcile:       actuation.ReconcilePending,
+			})
+	}
+	return status
 }

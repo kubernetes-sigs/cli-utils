@@ -9,6 +9,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubectl/pkg/cmd/util"
+	"sigs.k8s.io/cli-utils/pkg/apis/actuation"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/object"
@@ -156,7 +157,7 @@ func (i InventoryCustomType) Load() (object.ObjMetadataSet, error) {
 	return inv, nil
 }
 
-func (i InventoryCustomType) Store(objs object.ObjMetadataSet) error {
+func (i InventoryCustomType) Store(objs object.ObjMetadataSet, _ []actuation.ObjectStatus) error {
 	var inv []interface{}
 	for _, obj := range objs {
 		inv = append(inv, map[string]interface{}{

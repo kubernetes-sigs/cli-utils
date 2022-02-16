@@ -114,8 +114,11 @@ func (i *InvSetTask) Start(taskContext *taskrunner.TaskContext) {
 		klog.V(4).Infof("keep in inventory %d invalid objects", len(invalidObjects))
 		invObjs = invObjs.Union(invalidObjects)
 
+		klog.V(4).Infof("get the apply status for %d objects", len(invObjs))
+		objStatus := taskContext.InventoryManager().Inventory().Status.Objects
+
 		klog.V(4).Infof("set inventory %d total objects", len(invObjs))
-		err := i.InvClient.Replace(i.InvInfo, invObjs, i.DryRun)
+		err := i.InvClient.Replace(i.InvInfo, invObjs, objStatus, i.DryRun)
 
 		klog.V(2).Infof("inventory set task completing (name: %q)", i.Name())
 		taskContext.TaskChannel() <- taskrunner.TaskResult{Err: err}

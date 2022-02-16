@@ -9,9 +9,11 @@
 package inventory
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"sigs.k8s.io/cli-utils/pkg/apis/actuation"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
@@ -42,8 +44,9 @@ func InvInfoToConfigMap(inv Info) *unstructured.Unstructured {
 // the Inventory interface. This wrapper loads and stores the
 // object metadata (inventory) to and from the wrapped ConfigMap.
 type ConfigMap struct {
-	inv      *unstructured.Unstructured
-	objMetas object.ObjMetadataSet
+	inv       *unstructured.Unstructured
+	objMetas  object.ObjMetadataSet
+	objStatus []actuation.ObjectStatus
 }
 
 var _ Info = &ConfigMap{}
@@ -94,8 +97,9 @@ func (icm *ConfigMap) Load() (object.ObjMetadataSet, error) {
 // Store is an Inventory interface function implemented to store
 // the object metadata in the wrapped ConfigMap. Actual storing
 // happens in "GetObject".
-func (icm *ConfigMap) Store(objMetas object.ObjMetadataSet) error {
+func (icm *ConfigMap) Store(objMetas object.ObjMetadataSet, status []actuation.ObjectStatus) error {
 	icm.objMetas = objMetas
+	icm.objStatus = status
 	return nil
 }
 
@@ -103,11 +107,14 @@ func (icm *ConfigMap) Store(objMetas object.ObjMetadataSet) error {
 // or an error if one occurs.
 func (icm *ConfigMap) GetObject() (*unstructured.Unstructured, error) {
 	// Create the objMap of all the resources, and compute the hash.
-	objMap := buildObjMap(icm.objMetas)
+	objMap, err := buildObjMap(icm.objMetas, icm.objStatus)
+	if err != nil {
+		return nil, err
+	}
 	// Create the inventory object by copying the template.
 	invCopy := icm.inv.DeepCopy()
 	// Adds the inventory map to the ConfigMap "data" section.
-	err := unstructured.SetNestedStringMap(invCopy.UnstructuredContent(),
+	err = unstructured.SetNestedStringMap(invCopy.UnstructuredContent(),
 		objMap, "data")
 	if err != nil {
 		return nil, err
@@ -115,10 +122,33 @@ func (icm *ConfigMap) GetObject() (*unstructured.Unstructured, error) {
 	return invCopy, nil
 }
 
-func buildObjMap(objMetas object.ObjMetadataSet) map[string]string {
+func buildObjMap(objMetas object.ObjMetadataSet, objStatus []actuation.ObjectStatus) (map[string]string, error) {
 	objMap := map[string]string{}
-	for _, objMetadata := range objMetas {
-		objMap[objMetadata.String()] = ""
+	objStatusMap := map[object.ObjMetadata]actuation.ObjectStatus{}
+	for _, status := range objStatus {
+		objStatusMap[ObjMetadataFromObjectReference(status.ObjectReference)] = status
 	}
-	return objMap
+	for _, objMetadata := range objMetas {
+		if status, found := objStatusMap[objMetadata]; found {
+			objMap[objMetadata.String()] = stringFrom(status)
+		} else {
+			// This should never happen since the objStatus have captured all the
+			// object status
+			return nil, fmt.Errorf("object status not found for %s", objMetadata)
+		}
+	}
+	return objMap, nil
+}
+
+func stringFrom(status actuation.ObjectStatus) string {
+	tmp := map[string]string{
+		"strategy":  status.Strategy.String(),
+		"actuation": status.Actuation.String(),
+		"reconcile": status.Reconcile.String(),
+	}
+	data, err := json.Marshal(tmp)
+	if err != nil || string(data) == "{}" {
+		return ""
+	}
+	return string(data)
 }
