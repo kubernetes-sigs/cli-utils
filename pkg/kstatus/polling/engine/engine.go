@@ -61,7 +61,6 @@ func (s *PollerEngine) Poll(ctx context.Context, identifiers object.ObjMetadataS
 		}
 
 		runner := &statusPollerRunner{
-			ctx:                      ctx,
 			clusterReader:            clusterReader,
 			statusReaders:            s.StatusReaders,
 			defaultStatusReader:      s.DefaultStatusReader,
@@ -70,7 +69,7 @@ func (s *PollerEngine) Poll(ctx context.Context, identifiers object.ObjMetadataS
 			eventChannel:             eventChannel,
 			pollingInterval:          options.PollInterval,
 		}
-		runner.Run()
+		runner.Run(ctx)
 	}()
 
 	return eventChannel
@@ -123,10 +122,6 @@ type Options struct {
 // with LIST calls before each polling loop, or the normal ClusterReader that just forwards each call
 // to the client.Reader from controller-runtime.
 type statusPollerRunner struct {
-	// ctx is the context for the runner. It will be used by the caller of Poll to cancel
-	// polling resources.
-	ctx context.Context
-
 	// clusterReader is the interface for fetching and listing resources from the cluster. It can be implemented
 	// to make call directly to the cluster or use caching to reduce the number of calls to the cluster.
 	clusterReader ClusterReader
@@ -159,14 +154,14 @@ type statusPollerRunner struct {
 }
 
 // Run starts the polling loop of the statusReaders.
-func (r *statusPollerRunner) Run() {
+func (r *statusPollerRunner) Run(ctx context.Context) {
 	// Sets up ticker that will trigger the regular polling loop at a regular interval.
 	ticker := time.NewTicker(r.pollingInterval)
 	defer func() {
 		ticker.Stop()
 	}()
 
-	err := r.syncAndPoll()
+	err := r.syncAndPoll(ctx)
 	if err != nil {
 		r.handleSyncAndPollErr(err)
 		return
@@ -174,11 +169,11 @@ func (r *statusPollerRunner) Run() {
 
 	for {
 		select {
-		case <-r.ctx.Done():
+		case <-ctx.Done():
 			return
 		case <-ticker.C:
 			// First sync and then compute status for all resources.
-			err := r.syncAndPoll()
+			err := r.syncAndPoll(ctx)
 			if err != nil {
 				r.handleSyncAndPollErr(err)
 				return
@@ -202,34 +197,34 @@ func (r *statusPollerRunner) handleSyncAndPollErr(err error) {
 	}
 }
 
-func (r *statusPollerRunner) syncAndPoll() error {
+func (r *statusPollerRunner) syncAndPoll(ctx context.Context) error {
 	// First trigger a sync of the ClusterReader. This may or may not actually
 	// result in calls to the cluster, depending on the implementation.
 	// If this call fails, there is no clean way to recover, so we just return an ErrorEvent
 	// and shut down.
-	err := r.clusterReader.Sync(r.ctx)
+	err := r.clusterReader.Sync(ctx)
 	if err != nil {
 		return err
 	}
 	// Poll all resources and compute status. If the polling of resources has completed (based
 	// on information from the StatusAggregator and the value of pollUntilCancelled), we send
 	// a CompletedEvent and return.
-	return r.pollStatusForAllResources()
+	return r.pollStatusForAllResources(ctx)
 }
 
 // pollStatusForAllResources iterates over all the resources in the set and delegates
 // to the appropriate engine to compute the status.
-func (r *statusPollerRunner) pollStatusForAllResources() error {
+func (r *statusPollerRunner) pollStatusForAllResources(ctx context.Context) error {
 	for _, id := range r.identifiers {
 		// Check if the context has been cancelled on every iteration.
 		select {
-		case <-r.ctx.Done():
-			return r.ctx.Err()
+		case <-ctx.Done():
+			return ctx.Err()
 		default:
 		}
 		gk := id.GroupKind
 		statusReader := r.statusReaderForGroupKind(gk)
-		resourceStatus, err := statusReader.ReadStatus(r.ctx, r.clusterReader, id)
+		resourceStatus, err := statusReader.ReadStatus(ctx, r.clusterReader, id)
 		if err != nil {
 			return err
 		}
