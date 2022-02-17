@@ -127,25 +127,6 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.Info, objects objec
 
 		// Fetch the queue (channel) of tasks that should be executed.
 		klog.V(4).Infoln("applier building task queue...")
-		taskBuilder := &solver.TaskQueueBuilder{
-			Pruner:        a.pruner,
-			DynamicClient: a.client,
-			OpenAPIGetter: a.openAPIGetter,
-			InfoHelper:    a.infoHelper,
-			Mapper:        a.mapper,
-			InvClient:     a.invClient,
-			Destroy:       false,
-			Collector:     vCollector,
-		}
-		opts := solver.Options{
-			ServerSideOptions:      options.ServerSideOptions,
-			ReconcileTimeout:       options.ReconcileTimeout,
-			Prune:                  !options.NoPrune,
-			DryRunStrategy:         options.DryRunStrategy,
-			PrunePropagationPolicy: options.PrunePropagationPolicy,
-			PruneTimeout:           options.PruneTimeout,
-			InventoryPolicy:        options.InventoryPolicy,
-		}
 		// Build list of apply validation filters.
 		applyFilters := []filter.ValidationFilter{
 			filter.InventoryPolicyApplyFilter{
@@ -155,7 +136,6 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.Info, objects objec
 				InvPolicy: options.InventoryPolicy,
 			},
 		}
-
 		// Build list of prune validation filters.
 		pruneFilters := []filter.ValidationFilter{
 			filter.PreventRemoveFilter{},
@@ -176,14 +156,35 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.Info, objects objec
 				ResourceCache: resourceCache,
 			},
 		}
+		taskBuilder := &solver.TaskQueueBuilder{
+			Pruner:        a.pruner,
+			DynamicClient: a.client,
+			OpenAPIGetter: a.openAPIGetter,
+			InfoHelper:    a.infoHelper,
+			Mapper:        a.mapper,
+			InvClient:     a.invClient,
+			Collector:     vCollector,
+			ApplyFilters:  applyFilters,
+			ApplyMutators: applyMutators,
+			PruneFilters:  pruneFilters,
+		}
+		opts := solver.Options{
+			ServerSideOptions:      options.ServerSideOptions,
+			ReconcileTimeout:       options.ReconcileTimeout,
+			Destroy:                false,
+			Prune:                  !options.NoPrune,
+			DryRunStrategy:         options.DryRunStrategy,
+			PrunePropagationPolicy: options.PrunePropagationPolicy,
+			PruneTimeout:           options.PruneTimeout,
+			InventoryPolicy:        options.InventoryPolicy,
+		}
 
 		// Build the ordered set of tasks to execute.
 		taskQueue := taskBuilder.
-			AppendInvAddTask(invInfo, applyObjs, options.DryRunStrategy).
-			AppendApplyWaitTasks(applyObjs, applyFilters, applyMutators, opts).
-			AppendPruneWaitTasks(pruneObjs, pruneFilters, opts).
-			AppendInvSetTask(invInfo, options.DryRunStrategy).
-			Build()
+			WithApplyObjects(applyObjs).
+			WithPruneObjects(pruneObjs).
+			WithInventory(invInfo).
+			Build(opts)
 
 		klog.V(4).Infof("validation errors: %d", len(vCollector.Errors))
 		klog.V(4).Infof("invalid objects: %d", len(vCollector.InvalidIds))

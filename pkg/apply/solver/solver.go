@@ -46,18 +46,19 @@ type TaskQueueBuilder struct {
 	InvClient     inventory.Client
 	// Collector is used to collect validation errors and invalid objects.
 	// Invalid objects will be filtered and not be injected into tasks.
-	Collector *validation.Collector
-	// True if we are destroying, which deletes the inventory object
-	// as well (possibly) the inventory namespace.
-	Destroy bool
+	Collector     *validation.Collector
+	ApplyFilters  []filter.ValidationFilter
+	ApplyMutators []mutator.Interface
+	PruneFilters  []filter.ValidationFilter
+
 	// The accumulated tasks and counter variables to name tasks.
-	invAddCounter    int
-	invSetCounter    int
-	deleteInvCounter int
-	applyCounter     int
-	waitCounter      int
-	pruneCounter     int
-	tasks            []taskrunner.Task
+	applyCounter int
+	pruneCounter int
+	waitCounter  int
+
+	invInfo   inventory.Info
+	applyObjs object.UnstructuredSet
+	pruneObjs object.UnstructuredSet
 }
 
 type TaskQueue struct {
@@ -86,8 +87,12 @@ func (tq *TaskQueue) ToActionGroups() []event.ActionGroup {
 }
 
 type Options struct {
-	ServerSideOptions      common.ServerSideOptions
-	ReconcileTimeout       time.Duration
+	ServerSideOptions common.ServerSideOptions
+	ReconcileTimeout  time.Duration
+	// True if we are destroying, which deletes the inventory object
+	// as well (possibly) the inventory namespace.
+	Destroy bool
+	// True if we're deleting prune objects
 	Prune                  bool
 	DryRunStrategy         common.DryRunStrategy
 	PrunePropagationPolicy metav1.DeletionPropagation
@@ -95,65 +100,124 @@ type Options struct {
 	InventoryPolicy        inventory.Policy
 }
 
+// WithInventory sets the inventory info and returns the builder for chaining.
+func (t *TaskQueueBuilder) WithInventory(inv inventory.Info) *TaskQueueBuilder {
+	t.invInfo = inv
+	return t
+}
+
+// WithApplyObjects sets the apply objects and returns the builder for chaining.
+func (t *TaskQueueBuilder) WithApplyObjects(applyObjs object.UnstructuredSet) *TaskQueueBuilder {
+	t.applyObjs = applyObjs
+	return t
+}
+
+// WithPruneObjects sets the prune objects and returns the builder for chaining.
+func (t *TaskQueueBuilder) WithPruneObjects(pruneObjs object.UnstructuredSet) *TaskQueueBuilder {
+	t.pruneObjs = pruneObjs
+	return t
+}
+
 // Build returns the queue of tasks that have been created
-func (t *TaskQueueBuilder) Build() *TaskQueue {
-	return &TaskQueue{tasks: t.tasks}
-}
+func (t *TaskQueueBuilder) Build(o Options) *TaskQueue {
+	var tasks []taskrunner.Task
 
-// AppendInvAddTask appends an inventory add task to the task queue.
-// Returns a pointer to the Builder to chain function calls.
-func (t *TaskQueueBuilder) AppendInvAddTask(inv inventory.Info, applyObjs object.UnstructuredSet,
-	dryRun common.DryRunStrategy) *TaskQueueBuilder {
-	applyObjs = t.Collector.FilterInvalidObjects(applyObjs)
-	klog.V(2).Infoln("adding inventory add task (%d objects)", len(applyObjs))
-	t.tasks = append(t.tasks, &task.InvAddTask{
-		TaskName:  fmt.Sprintf("inventory-add-%d", t.invAddCounter),
-		InvClient: t.InvClient,
-		InvInfo:   inv,
-		Objects:   applyObjs,
-		DryRun:    dryRun,
-	})
-	t.invAddCounter++
-	return t
-}
+	// reset counters
+	t.applyCounter = 0
+	t.pruneCounter = 0
+	t.waitCounter = 0
 
-// AppendInvSetTask appends an inventory set task to the task queue.
-// Returns a pointer to the Builder to chain function calls.
-func (t *TaskQueueBuilder) AppendInvSetTask(inv inventory.Info, dryRun common.DryRunStrategy) *TaskQueueBuilder {
-	klog.V(2).Infoln("adding inventory set task")
-	prevInvIds, _ := t.InvClient.GetClusterObjs(inv)
-	t.tasks = append(t.tasks, &task.InvSetTask{
-		TaskName:      fmt.Sprintf("inventory-set-%d", t.invSetCounter),
-		InvClient:     t.InvClient,
-		InvInfo:       inv,
-		PrevInventory: prevInvIds,
-		DryRun:        dryRun,
-	})
-	t.invSetCounter++
-	return t
-}
+	applyObjs := t.Collector.FilterInvalidObjects(t.applyObjs)
+	pruneObjs := t.Collector.FilterInvalidObjects(t.pruneObjs)
 
-// AppendDeleteInvTask appends to the task queue a task to delete the inventory object.
-// Returns a pointer to the Builder to chain function calls.
-func (t *TaskQueueBuilder) AppendDeleteInvTask(inv inventory.Info, dryRun common.DryRunStrategy) *TaskQueueBuilder {
-	klog.V(2).Infoln("adding delete inventory task")
-	t.tasks = append(t.tasks, &task.DeleteInvTask{
-		TaskName:  fmt.Sprintf("delete-inventory-%d", t.deleteInvCounter),
-		InvClient: t.InvClient,
-		InvInfo:   inv,
-		DryRun:    dryRun,
-	})
-	t.deleteInvCounter++
-	return t
+	if len(applyObjs) > 0 {
+		klog.V(2).Infoln("adding inventory add task (%d objects)", len(applyObjs))
+		tasks = append(tasks, &task.InvAddTask{
+			TaskName:  "inventory-add-0",
+			InvClient: t.InvClient,
+			InvInfo:   t.invInfo,
+			Objects:   applyObjs,
+			DryRun:    o.DryRunStrategy,
+		})
+
+		// Create a dependency graph, sort, and flatten into phases.
+		applySets, err := graph.SortObjs(applyObjs)
+		if err != nil {
+			t.Collector.Collect(err)
+		}
+
+		for _, applySet := range applySets {
+			// filter again, because sorting may have added more invalid objects.
+			applySet = t.Collector.FilterInvalidObjects(applySet)
+			if len(applySet) == 0 {
+				continue
+			}
+			tasks = append(tasks,
+				t.newApplyTask(applySet, t.ApplyFilters, t.ApplyMutators, o))
+			// dry-run skips wait tasks
+			if !o.DryRunStrategy.ClientOrServerDryRun() {
+				applyIds := object.UnstructuredSetToObjMetadataSet(applySet)
+				tasks = append(tasks,
+					t.newWaitTask(applyIds, taskrunner.AllCurrent, o.ReconcileTimeout))
+			}
+		}
+	}
+
+	if o.Prune && len(pruneObjs) > 0 {
+		// Create a dependency graph, sort (in reverse), and flatten into phases.
+		pruneSets, err := graph.ReverseSortObjs(pruneObjs)
+		if err != nil {
+			t.Collector.Collect(err)
+		}
+
+		for _, pruneSet := range pruneSets {
+			// filter again, because sorting may have added more invalid objects.
+			pruneSet = t.Collector.FilterInvalidObjects(pruneSet)
+			if len(pruneSet) == 0 {
+				continue
+			}
+			tasks = append(tasks,
+				t.newPruneTask(pruneSet, t.PruneFilters, o))
+			// dry-run skips wait tasks
+			if !o.DryRunStrategy.ClientOrServerDryRun() {
+				pruneIds := object.UnstructuredSetToObjMetadataSet(pruneSet)
+				tasks = append(tasks,
+					t.newWaitTask(pruneIds, taskrunner.AllNotFound, o.PruneTimeout))
+			}
+		}
+	}
+
+	// TODO: add InvSetTask when Destroy=true to retain undeleted objects
+	if !o.Destroy {
+		klog.V(2).Infoln("adding inventory set task")
+		prevInvIds, _ := t.InvClient.GetClusterObjs(t.invInfo)
+		tasks = append(tasks, &task.InvSetTask{
+			TaskName:      "inventory-set-0",
+			InvClient:     t.InvClient,
+			InvInfo:       t.invInfo,
+			PrevInventory: prevInvIds,
+			DryRun:        o.DryRunStrategy,
+		})
+	} else {
+		klog.V(2).Infoln("adding delete inventory task")
+		tasks = append(tasks, &task.DeleteInvTask{
+			TaskName:  "delete-inventory-0",
+			InvClient: t.InvClient,
+			InvInfo:   t.invInfo,
+			DryRun:    o.DryRunStrategy,
+		})
+	}
+
+	return &TaskQueue{tasks: tasks}
 }
 
 // AppendApplyTask appends a task to the task queue to apply the passed objects
 // to the cluster. Returns a pointer to the Builder to chain function calls.
-func (t *TaskQueueBuilder) AppendApplyTask(applyObjs object.UnstructuredSet,
-	applyFilters []filter.ValidationFilter, applyMutators []mutator.Interface, o Options) *TaskQueueBuilder {
+func (t *TaskQueueBuilder) newApplyTask(applyObjs object.UnstructuredSet,
+	applyFilters []filter.ValidationFilter, applyMutators []mutator.Interface, o Options) taskrunner.Task {
 	applyObjs = t.Collector.FilterInvalidObjects(applyObjs)
 	klog.V(2).Infof("adding apply task (%d objects)", len(applyObjs))
-	t.tasks = append(t.tasks, &task.ApplyTask{
+	task := &task.ApplyTask{
 		TaskName:          fmt.Sprintf("apply-%d", t.applyCounter),
 		Objects:           applyObjs,
 		Filters:           applyFilters,
@@ -164,99 +228,43 @@ func (t *TaskQueueBuilder) AppendApplyTask(applyObjs object.UnstructuredSet,
 		OpenAPIGetter:     t.OpenAPIGetter,
 		InfoHelper:        t.InfoHelper,
 		Mapper:            t.Mapper,
-	})
+	}
 	t.applyCounter++
-	return t
+	return task
 }
 
 // AppendWaitTask appends a task to wait on the passed objects to the task queue.
 // Returns a pointer to the Builder to chain function calls.
-func (t *TaskQueueBuilder) AppendWaitTask(waitIds object.ObjMetadataSet, condition taskrunner.Condition,
-	waitTimeout time.Duration) *TaskQueueBuilder {
+func (t *TaskQueueBuilder) newWaitTask(waitIds object.ObjMetadataSet, condition taskrunner.Condition,
+	waitTimeout time.Duration) taskrunner.Task {
 	waitIds = t.Collector.FilterInvalidIds(waitIds)
 	klog.V(2).Infoln("adding wait task")
-	t.tasks = append(t.tasks, taskrunner.NewWaitTask(
+	task := taskrunner.NewWaitTask(
 		fmt.Sprintf("wait-%d", t.waitCounter),
 		waitIds,
 		condition,
 		waitTimeout,
-		t.Mapper),
+		t.Mapper,
 	)
 	t.waitCounter++
-	return t
+	return task
 }
 
 // AppendPruneTask appends a task to delete objects from the cluster to the task queue.
 // Returns a pointer to the Builder to chain function calls.
-func (t *TaskQueueBuilder) AppendPruneTask(pruneObjs object.UnstructuredSet,
-	pruneFilters []filter.ValidationFilter, o Options) *TaskQueueBuilder {
+func (t *TaskQueueBuilder) newPruneTask(pruneObjs object.UnstructuredSet,
+	pruneFilters []filter.ValidationFilter, o Options) taskrunner.Task {
 	pruneObjs = t.Collector.FilterInvalidObjects(pruneObjs)
 	klog.V(2).Infof("adding prune task (%d objects)", len(pruneObjs))
-	t.tasks = append(t.tasks,
-		&task.PruneTask{
-			TaskName:          fmt.Sprintf("prune-%d", t.pruneCounter),
-			Objects:           pruneObjs,
-			Filters:           pruneFilters,
-			Pruner:            t.Pruner,
-			PropagationPolicy: o.PrunePropagationPolicy,
-			DryRunStrategy:    o.DryRunStrategy,
-			Destroy:           t.Destroy,
-		},
-	)
+	task := &task.PruneTask{
+		TaskName:          fmt.Sprintf("prune-%d", t.pruneCounter),
+		Objects:           pruneObjs,
+		Filters:           pruneFilters,
+		Pruner:            t.Pruner,
+		PropagationPolicy: o.PrunePropagationPolicy,
+		DryRunStrategy:    o.DryRunStrategy,
+		Destroy:           o.Destroy,
+	}
 	t.pruneCounter++
-	return t
-}
-
-// AppendApplyWaitTasks adds apply and wait tasks to the task queue,
-// depending on build variables (like dry-run) and resource types
-// (like CRD's). Returns a pointer to the Builder to chain function calls.
-func (t *TaskQueueBuilder) AppendApplyWaitTasks(applyObjs object.UnstructuredSet,
-	applyFilters []filter.ValidationFilter, applyMutators []mutator.Interface, o Options) *TaskQueueBuilder {
-	// Use the "depends-on" annotation to create a graph, ands sort the
-	// objects to apply into sets using a topological sort.
-	applySets, err := graph.SortObjs(applyObjs)
-	if err != nil {
-		t.Collector.Collect(err)
-	}
-	for _, applySet := range applySets {
-		applySet = t.Collector.FilterInvalidObjects(applySet)
-		if len(applySet) == 0 {
-			continue
-		}
-		t.AppendApplyTask(applySet, applyFilters, applyMutators, o)
-		// dry-run skips wait tasks
-		if !o.DryRunStrategy.ClientOrServerDryRun() {
-			applyIds := object.UnstructuredSetToObjMetadataSet(applySet)
-			t.AppendWaitTask(applyIds, taskrunner.AllCurrent, o.ReconcileTimeout)
-		}
-	}
-	return t
-}
-
-// AppendPruneWaitTasks adds prune and wait tasks to the task queue
-// based on build variables (like dry-run). Returns a pointer to the
-// Builder to chain function calls.
-func (t *TaskQueueBuilder) AppendPruneWaitTasks(pruneObjs object.UnstructuredSet,
-	pruneFilters []filter.ValidationFilter, o Options) *TaskQueueBuilder {
-	if o.Prune {
-		// Use the "depends-on" annotation to create a graph, ands sort the
-		// objects to prune into sets using a (reverse) topological sort.
-		pruneSets, err := graph.ReverseSortObjs(pruneObjs)
-		if err != nil {
-			t.Collector.Collect(err)
-		}
-		for _, pruneSet := range pruneSets {
-			pruneSet = t.Collector.FilterInvalidObjects(pruneSet)
-			if len(pruneSet) == 0 {
-				continue
-			}
-			t.AppendPruneTask(pruneSet, pruneFilters, o)
-			// dry-run skips wait tasks
-			if !o.DryRunStrategy.ClientOrServerDryRun() {
-				pruneIds := object.UnstructuredSetToObjMetadataSet(pruneSet)
-				t.AppendWaitTask(pruneIds, taskrunner.AllNotFound, o.PruneTimeout)
-			}
-		}
-	}
-	return t
+	return task
 }
