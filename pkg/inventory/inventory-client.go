@@ -439,6 +439,9 @@ func (cic *ClusterClient) ApplyInventoryNamespace(obj *unstructured.Unstructured
 	}
 
 	_, err = cic.dc.Resource(mapping.Resource).Create(context.TODO(), invNamespace, metav1.CreateOptions{})
+	if apierrors.IsAlreadyExists(err) {
+		return nil
+	}
 	return err
 }
 
