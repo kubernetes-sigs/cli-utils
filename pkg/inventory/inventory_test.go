@@ -124,6 +124,16 @@ var pod3Info = &resource.Info{
 	Object: pod3,
 }
 
+var inventoryNamespace = &unstructured.Unstructured{
+	Object: map[string]interface{}{
+		"apiVersion": "v1",
+		"kind":       "Namespace",
+		"metadata": map[string]interface{}{
+			"name": testNamespace,
+		},
+	},
+}
+
 func TestFindInventoryObj(t *testing.T) {
 	tests := map[string]struct {
 		infos  []*unstructured.Unstructured
