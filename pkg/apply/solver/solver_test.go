@@ -11,8 +11,6 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"sigs.k8s.io/cli-utils/pkg/apply/filter"
-	"sigs.k8s.io/cli-utils/pkg/apply/mutator"
 	"sigs.k8s.io/cli-utils/pkg/apply/prune"
 	"sigs.k8s.io/cli-utils/pkg/apply/task"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
@@ -105,12 +103,34 @@ metadata:
 	}
 )
 
-func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
+func newInvObject(name, namespace, inventoryID string) *unstructured.Unstructured {
+	return &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "v1",
+			"kind":       "ConfigMap",
+			"metadata": map[string]interface{}{
+				"name":      name,
+				"namespace": namespace,
+				"labels": map[string]interface{}{
+					common.InventoryLabel: inventoryID,
+				},
+			},
+			"data": map[string]string{},
+		},
+	}
+}
+
+func TestTaskQueueBuilder_ApplyBuild(t *testing.T) {
 	// Use a custom Asserter to customize the comparison options
 	asserter := testutil.NewAsserter(
 		cmpopts.EquateErrors(),
 		waitTaskComparer(),
+		fakeClientComparer(),
+		inventoryInfoComparer(),
 	)
+
+	invInfo := inventory.WrapInventoryInfoObj(newInvObject(
+		"abc-123", "default", "test"))
 
 	testCases := map[string]struct {
 		applyObjs     []*unstructured.Unstructured
@@ -118,15 +138,30 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 		expectedTasks []taskrunner.Task
 		expectedError error
 	}{
-		"no resources, no tasks": {
-			applyObjs:     []*unstructured.Unstructured{},
-			expectedTasks: nil,
+		"no resources, no apply or wait tasks": {
+			applyObjs: []*unstructured.Unstructured{},
+			expectedTasks: []taskrunner.Task{
+				&task.InvSetTask{
+					TaskName:      "inventory-set-0",
+					InvClient:     &inventory.FakeClient{},
+					InvInfo:       invInfo,
+					PrevInventory: object.ObjMetadataSet{},
+				},
+			},
 		},
 		"single resource, one apply task, one wait task": {
 			applyObjs: []*unstructured.Unstructured{
 				testutil.Unstructured(t, resources["deployment"]),
 			},
 			expectedTasks: []taskrunner.Task{
+				&task.InvAddTask{
+					TaskName:  "inventory-add-0",
+					InvClient: &inventory.FakeClient{},
+					InvInfo:   invInfo,
+					Objects: object.UnstructuredSet{
+						testutil.Unstructured(t, resources["deployment"]),
+					},
+				},
 				&task.ApplyTask{
 					TaskName: "apply-0",
 					Objects: []*unstructured.Unstructured{
@@ -140,6 +175,14 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 					},
 					Condition: taskrunner.AllCurrent,
 				},
+				&task.InvSetTask{
+					TaskName:  "inventory-set-0",
+					InvClient: &inventory.FakeClient{},
+					InvInfo:   invInfo,
+					PrevInventory: object.ObjMetadataSet{
+						testutil.ToIdentifier(t, resources["deployment"]),
+					},
+				},
 			},
 		},
 		"multiple resource with no timeout": {
@@ -148,6 +191,15 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 				testutil.Unstructured(t, resources["secret"]),
 			},
 			expectedTasks: []taskrunner.Task{
+				&task.InvAddTask{
+					TaskName:  "inventory-add-0",
+					InvClient: &inventory.FakeClient{},
+					InvInfo:   invInfo,
+					Objects: object.UnstructuredSet{
+						testutil.Unstructured(t, resources["deployment"]),
+						testutil.Unstructured(t, resources["secret"]),
+					},
+				},
 				&task.ApplyTask{
 					TaskName: "apply-0",
 					Objects: []*unstructured.Unstructured{
@@ -164,6 +216,15 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 					},
 					Condition: taskrunner.AllCurrent,
 				},
+				&task.InvSetTask{
+					TaskName:  "inventory-set-0",
+					InvClient: &inventory.FakeClient{},
+					InvInfo:   invInfo,
+					PrevInventory: object.ObjMetadataSet{
+						testutil.ToIdentifier(t, resources["deployment"]),
+						testutil.ToIdentifier(t, resources["secret"]),
+					},
+				},
 			},
 		},
 		"multiple resources with reconcile timeout": {
@@ -175,6 +236,15 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 				ReconcileTimeout: 1 * time.Minute,
 			},
 			expectedTasks: []taskrunner.Task{
+				&task.InvAddTask{
+					TaskName:  "inventory-add-0",
+					InvClient: &inventory.FakeClient{},
+					InvInfo:   invInfo,
+					Objects: object.UnstructuredSet{
+						testutil.Unstructured(t, resources["secret"]),
+						testutil.Unstructured(t, resources["deployment"]),
+					},
+				},
 				&task.ApplyTask{
 					TaskName: "apply-0",
 					Objects: []*unstructured.Unstructured{
@@ -192,6 +262,15 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 					Condition: taskrunner.AllCurrent,
 					Timeout:   1 * time.Minute,
 				},
+				&task.InvSetTask{
+					TaskName:  "inventory-set-0",
+					InvClient: &inventory.FakeClient{},
+					InvInfo:   invInfo,
+					PrevInventory: object.ObjMetadataSet{
+						testutil.ToIdentifier(t, resources["secret"]),
+						testutil.ToIdentifier(t, resources["deployment"]),
+					},
+				},
 			},
 		},
 		"multiple resources with reconcile timeout and dryrun": {
@@ -205,6 +284,16 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 			},
 			// No wait task, since it is dry run
 			expectedTasks: []taskrunner.Task{
+				&task.InvAddTask{
+					TaskName:  "inventory-add-0",
+					InvClient: &inventory.FakeClient{},
+					InvInfo:   invInfo,
+					Objects: object.UnstructuredSet{
+						testutil.Unstructured(t, resources["deployment"]),
+						testutil.Unstructured(t, resources["secret"]),
+					},
+					DryRun: common.DryRunClient,
+				},
 				&task.ApplyTask{
 					TaskName: "apply-0",
 					Objects: []*unstructured.Unstructured{
@@ -212,6 +301,16 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 						testutil.Unstructured(t, resources["secret"]),
 					},
 					DryRunStrategy: common.DryRunClient,
+				},
+				&task.InvSetTask{
+					TaskName:  "inventory-set-0",
+					InvClient: &inventory.FakeClient{},
+					InvInfo:   invInfo,
+					PrevInventory: object.ObjMetadataSet{
+						testutil.ToIdentifier(t, resources["deployment"]),
+						testutil.ToIdentifier(t, resources["secret"]),
+					},
+					DryRun: common.DryRunClient,
 				},
 			},
 		},
@@ -226,6 +325,16 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 			},
 			// No wait task, since it is dry run
 			expectedTasks: []taskrunner.Task{
+				&task.InvAddTask{
+					TaskName:  "inventory-add-0",
+					InvClient: &inventory.FakeClient{},
+					InvInfo:   invInfo,
+					Objects: object.UnstructuredSet{
+						testutil.Unstructured(t, resources["pod"]),
+						testutil.Unstructured(t, resources["default-pod"]),
+					},
+					DryRun: common.DryRunServer,
+				},
 				&task.ApplyTask{
 					TaskName: "apply-0",
 					Objects: []*unstructured.Unstructured{
@@ -233,6 +342,16 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 						testutil.Unstructured(t, resources["default-pod"]),
 					},
 					DryRunStrategy: common.DryRunServer,
+				},
+				&task.InvSetTask{
+					TaskName:  "inventory-set-0",
+					InvClient: &inventory.FakeClient{},
+					InvInfo:   invInfo,
+					PrevInventory: object.ObjMetadataSet{
+						testutil.ToIdentifier(t, resources["pod"]),
+						testutil.ToIdentifier(t, resources["default-pod"]),
+					},
+					DryRun: common.DryRunServer,
 				},
 			},
 		},
@@ -243,6 +362,16 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 				testutil.Unstructured(t, resources["crontab2"]),
 			},
 			expectedTasks: []taskrunner.Task{
+				&task.InvAddTask{
+					TaskName:  "inventory-add-0",
+					InvClient: &inventory.FakeClient{},
+					InvInfo:   invInfo,
+					Objects: object.UnstructuredSet{
+						testutil.Unstructured(t, resources["crontab1"]),
+						testutil.Unstructured(t, resources["crd"]),
+						testutil.Unstructured(t, resources["crontab2"]),
+					},
+				},
 				&task.ApplyTask{
 					TaskName: "apply-0",
 					Objects: []*unstructured.Unstructured{
@@ -273,6 +402,16 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 					},
 					Condition: taskrunner.AllCurrent,
 				},
+				&task.InvSetTask{
+					TaskName:  "inventory-set-0",
+					InvClient: &inventory.FakeClient{},
+					InvInfo:   invInfo,
+					PrevInventory: object.ObjMetadataSet{
+						testutil.ToIdentifier(t, resources["crontab1"]),
+						testutil.ToIdentifier(t, resources["crd"]),
+						testutil.ToIdentifier(t, resources["crontab2"]),
+					},
+				},
 			},
 		},
 		"no wait with CRDs if it is a dryrun": {
@@ -286,6 +425,17 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 				DryRunStrategy:   common.DryRunClient,
 			},
 			expectedTasks: []taskrunner.Task{
+				&task.InvAddTask{
+					TaskName:  "inventory-add-0",
+					InvClient: &inventory.FakeClient{},
+					InvInfo:   invInfo,
+					Objects: object.UnstructuredSet{
+						testutil.Unstructured(t, resources["crontab1"]),
+						testutil.Unstructured(t, resources["crd"]),
+						testutil.Unstructured(t, resources["crontab2"]),
+					},
+					DryRun: common.DryRunClient,
+				},
 				&task.ApplyTask{
 					TaskName: "apply-0",
 					Objects: []*unstructured.Unstructured{
@@ -301,6 +451,17 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 					},
 					DryRunStrategy: common.DryRunClient,
 				},
+				&task.InvSetTask{
+					TaskName:  "inventory-set-0",
+					InvClient: &inventory.FakeClient{},
+					InvInfo:   invInfo,
+					PrevInventory: object.ObjMetadataSet{
+						testutil.ToIdentifier(t, resources["crontab1"]),
+						testutil.ToIdentifier(t, resources["crd"]),
+						testutil.ToIdentifier(t, resources["crontab2"]),
+					},
+					DryRun: common.DryRunClient,
+				},
 			},
 		},
 		"resources in namespace creates multiple apply tasks": {
@@ -310,6 +471,16 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 				testutil.Unstructured(t, resources["secret"]),
 			},
 			expectedTasks: []taskrunner.Task{
+				&task.InvAddTask{
+					TaskName:  "inventory-add-0",
+					InvClient: &inventory.FakeClient{},
+					InvInfo:   invInfo,
+					Objects: object.UnstructuredSet{
+						testutil.Unstructured(t, resources["namespace"]),
+						testutil.Unstructured(t, resources["pod"]),
+						testutil.Unstructured(t, resources["secret"]),
+					},
+				},
 				&task.ApplyTask{
 					TaskName: "apply-0",
 					Objects: []*unstructured.Unstructured{
@@ -340,6 +511,16 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 					},
 					Condition: taskrunner.AllCurrent,
 				},
+				&task.InvSetTask{
+					TaskName:  "inventory-set-0",
+					InvClient: &inventory.FakeClient{},
+					InvInfo:   invInfo,
+					PrevInventory: object.ObjMetadataSet{
+						testutil.ToIdentifier(t, resources["namespace"]),
+						testutil.ToIdentifier(t, resources["pod"]),
+						testutil.ToIdentifier(t, resources["secret"]),
+					},
+				},
 			},
 		},
 		"deployment depends on secret creates multiple tasks": {
@@ -349,6 +530,16 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 				testutil.Unstructured(t, resources["secret"]),
 			},
 			expectedTasks: []taskrunner.Task{
+				&task.InvAddTask{
+					TaskName:  "inventory-add-0",
+					InvClient: &inventory.FakeClient{},
+					InvInfo:   invInfo,
+					Objects: object.UnstructuredSet{
+						testutil.Unstructured(t, resources["deployment"],
+							testutil.AddDependsOn(t, testutil.ToIdentifier(t, resources["secret"]))),
+						testutil.Unstructured(t, resources["secret"]),
+					},
+				},
 				&task.ApplyTask{
 					TaskName: "apply-0",
 					Objects: []*unstructured.Unstructured{
@@ -377,6 +568,15 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 						testutil.ToIdentifier(t, resources["deployment"]),
 					},
 					Condition: taskrunner.AllCurrent,
+				},
+				&task.InvSetTask{
+					TaskName:  "inventory-set-0",
+					InvClient: &inventory.FakeClient{},
+					InvInfo:   invInfo,
+					PrevInventory: object.ObjMetadataSet{
+						testutil.ToIdentifier(t, resources["deployment"]),
+						testutil.ToIdentifier(t, resources["secret"]),
+					},
 				},
 			},
 		},
@@ -429,14 +629,9 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 				InvClient: fakeInvClient,
 				Collector: vCollector,
 			}
-			var filters []filter.ValidationFilter
-			var mutators []mutator.Interface
-			tq := tqb.AppendApplyWaitTasks(
-				tc.applyObjs,
-				filters,
-				mutators,
-				tc.options,
-			).Build()
+			tq := tqb.WithInventory(invInfo).
+				WithApplyObjects(tc.applyObjs).
+				Build(tc.options)
 			err := vCollector.ToError()
 			if tc.expectedError != nil {
 				assert.EqualError(t, err, tc.expectedError.Error())
@@ -448,12 +643,17 @@ func TestTaskQueueBuilder_AppendApplyWaitTasks(t *testing.T) {
 	}
 }
 
-func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
+func TestTaskQueueBuilder_PruneBuild(t *testing.T) {
 	// Use a custom Asserter to customize the comparison options
 	asserter := testutil.NewAsserter(
 		cmpopts.EquateErrors(),
 		waitTaskComparer(),
+		fakeClientComparer(),
+		inventoryInfoComparer(),
 	)
+
+	invInfo := inventory.WrapInventoryInfoObj(newInvObject(
+		"abc-123", "default", "test"))
 
 	testCases := map[string]struct {
 		pruneObjs     []*unstructured.Unstructured
@@ -461,10 +661,17 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 		expectedTasks []taskrunner.Task
 		expectedError error
 	}{
-		"no resources, no tasks": {
-			pruneObjs:     []*unstructured.Unstructured{},
-			options:       Options{Prune: true},
-			expectedTasks: nil,
+		"no resources, no apply or prune tasks": {
+			pruneObjs: []*unstructured.Unstructured{},
+			options:   Options{Prune: true},
+			expectedTasks: []taskrunner.Task{
+				&task.InvSetTask{
+					TaskName:      "inventory-set-0",
+					InvClient:     &inventory.FakeClient{},
+					InvInfo:       invInfo,
+					PrevInventory: object.ObjMetadataSet{},
+				},
+			},
 		},
 		"single resource, one prune task, one wait task": {
 			pruneObjs: []*unstructured.Unstructured{
@@ -484,6 +691,14 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 						testutil.ToIdentifier(t, resources["default-pod"]),
 					},
 					Condition: taskrunner.AllNotFound,
+				},
+				&task.InvSetTask{
+					TaskName:  "inventory-set-0",
+					InvClient: &inventory.FakeClient{},
+					InvInfo:   invInfo,
+					PrevInventory: object.ObjMetadataSet{
+						testutil.ToIdentifier(t, resources["default-pod"]),
+					},
 				},
 			},
 		},
@@ -508,6 +723,15 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 						testutil.ToIdentifier(t, resources["pod"]),
 					},
 					Condition: taskrunner.AllNotFound,
+				},
+				&task.InvSetTask{
+					TaskName:  "inventory-set-0",
+					InvClient: &inventory.FakeClient{},
+					InvInfo:   invInfo,
+					PrevInventory: object.ObjMetadataSet{
+						testutil.ToIdentifier(t, resources["default-pod"]),
+						testutil.ToIdentifier(t, resources["pod"]),
+					},
 				},
 			},
 		},
@@ -547,6 +771,15 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 					},
 					Condition: taskrunner.AllNotFound,
 				},
+				&task.InvSetTask{
+					TaskName:  "inventory-set-0",
+					InvClient: &inventory.FakeClient{},
+					InvInfo:   invInfo,
+					PrevInventory: object.ObjMetadataSet{
+						testutil.ToIdentifier(t, resources["pod"]),
+						testutil.ToIdentifier(t, resources["secret"]),
+					},
+				},
 			},
 		},
 		"single resource with prune timeout has wait task": {
@@ -572,6 +805,14 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 					Condition: taskrunner.AllNotFound,
 					Timeout:   3 * time.Minute,
 				},
+				&task.InvSetTask{
+					TaskName:  "inventory-set-0",
+					InvClient: &inventory.FakeClient{},
+					InvInfo:   invInfo,
+					PrevInventory: object.ObjMetadataSet{
+						testutil.ToIdentifier(t, resources["pod"]),
+					},
+				},
 			},
 		},
 		"multiple resources with prune timeout and server-dryrun": {
@@ -593,6 +834,16 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 						testutil.Unstructured(t, resources["default-pod"]),
 					},
 					DryRunStrategy: common.DryRunServer,
+				},
+				&task.InvSetTask{
+					TaskName:  "inventory-set-0",
+					InvClient: &inventory.FakeClient{},
+					InvInfo:   invInfo,
+					PrevInventory: object.ObjMetadataSet{
+						testutil.ToIdentifier(t, resources["pod"]),
+						testutil.ToIdentifier(t, resources["default-pod"]),
+					},
+					DryRun: common.DryRunServer,
 				},
 			},
 		},
@@ -633,6 +884,16 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 					},
 					Condition: taskrunner.AllNotFound,
 				},
+				&task.InvSetTask{
+					TaskName:  "inventory-set-0",
+					InvClient: &inventory.FakeClient{},
+					InvInfo:   invInfo,
+					PrevInventory: object.ObjMetadataSet{
+						testutil.ToIdentifier(t, resources["crontab1"]),
+						testutil.ToIdentifier(t, resources["crd"]),
+						testutil.ToIdentifier(t, resources["crontab2"]),
+					},
+				},
 			},
 		},
 		"no wait with CRDs if it is a dryrun": {
@@ -661,6 +922,17 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 						testutil.Unstructured(t, resources["crd"]),
 					},
 					DryRunStrategy: common.DryRunClient,
+				},
+				&task.InvSetTask{
+					TaskName:  "inventory-set-0",
+					InvClient: &inventory.FakeClient{},
+					InvInfo:   invInfo,
+					PrevInventory: object.ObjMetadataSet{
+						testutil.ToIdentifier(t, resources["crontab1"]),
+						testutil.ToIdentifier(t, resources["crd"]),
+						testutil.ToIdentifier(t, resources["crontab2"]),
+					},
+					DryRun: common.DryRunClient,
 				},
 			},
 		},
@@ -699,6 +971,16 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 						testutil.ToIdentifier(t, resources["namespace"]),
 					},
 					Condition: taskrunner.AllNotFound,
+				},
+				&task.InvSetTask{
+					TaskName:  "inventory-set-0",
+					InvClient: &inventory.FakeClient{},
+					InvInfo:   invInfo,
+					PrevInventory: object.ObjMetadataSet{
+						testutil.ToIdentifier(t, resources["namespace"]),
+						testutil.ToIdentifier(t, resources["pod"]),
+						testutil.ToIdentifier(t, resources["secret"]),
+					},
 				},
 			},
 		},
@@ -752,6 +1034,14 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 					taskrunner.AllCurrent, 1*time.Second,
 					testutil.NewFakeRESTMapper(),
 				),
+				&task.InvSetTask{
+					TaskName:  "inventory-set-0",
+					InvClient: &inventory.FakeClient{},
+					InvInfo:   invInfo,
+					PrevInventory: object.ObjMetadataSet{
+						testutil.ToIdentifier(t, resources["pod"]),
+					},
+				},
 			},
 			expectedError: validation.NewError(
 				graph.CyclicDependencyError{
@@ -794,8 +1084,9 @@ func TestTaskQueueBuilder_AppendPruneWaitTasks(t *testing.T) {
 				InvClient: fakeInvClient,
 				Collector: vCollector,
 			}
-			var emptyPruneFilters []filter.ValidationFilter
-			tq := tqb.AppendPruneWaitTasks(tc.pruneObjs, emptyPruneFilters, tc.options).Build()
+			tq := tqb.WithInventory(invInfo).
+				WithPruneObjects(tc.pruneObjs).
+				Build(tc.options)
 			err := vCollector.ToError()
 			if tc.expectedError != nil {
 				assert.EqualError(t, err, tc.expectedError.Error())
@@ -821,5 +1112,28 @@ func waitTaskComparer() cmp.Option {
 			x.Condition == y.Condition &&
 			x.Timeout == y.Timeout &&
 			cmp.Equal(x.Mapper, y.Mapper)
+	})
+}
+
+// fakeClientComparer allows comparion of inventory.FakeClient, ignoring objs.
+func fakeClientComparer() cmp.Option {
+	return cmp.Comparer(func(x, y *inventory.FakeClient) bool {
+		if x == nil {
+			return y == nil
+		}
+		if y == nil {
+			return false
+		}
+		return true
+	})
+}
+
+// inventoryInfoComparer allows comparion of inventory.Info, ignoring impl.
+func inventoryInfoComparer() cmp.Option {
+	return cmp.Comparer(func(x, y inventory.Info) bool {
+		return x.ID() == y.ID() &&
+			x.Name() == y.Name() &&
+			x.Namespace() == y.Namespace() &&
+			x.Strategy() == y.Strategy()
 	})
 }

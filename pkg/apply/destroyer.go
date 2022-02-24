@@ -99,7 +99,7 @@ func setDestroyerDefaults(o *DestroyerOptions) {
 // Run performs the destroy step. Passes the inventory object. This
 // happens asynchronously on progress and any errors are reported
 // back on the event channel.
-func (d *Destroyer) Run(ctx context.Context, inv inventory.Info, options DestroyerOptions) <-chan event.Event {
+func (d *Destroyer) Run(ctx context.Context, invInfo inventory.Info, options DestroyerOptions) <-chan event.Event {
 	eventChannel := make(chan event.Event)
 	setDestroyerDefaults(&options)
 	go func() {
@@ -107,7 +107,7 @@ func (d *Destroyer) Run(ctx context.Context, inv inventory.Info, options Destroy
 		// Retrieve the objects to be deleted from the cluster. Second parameter is empty
 		// because no local objects returns all inventory objects for deletion.
 		emptyLocalObjs := object.UnstructuredSet{}
-		deleteObjs, err := d.pruner.GetPruneObjs(inv, emptyLocalObjs, prune.Options{
+		deleteObjs, err := d.pruner.GetPruneObjs(invInfo, emptyLocalObjs, prune.Options{
 			DryRunStrategy: options.DryRunStrategy,
 		})
 		if err != nil {
@@ -135,6 +135,13 @@ func (d *Destroyer) Run(ctx context.Context, inv inventory.Info, options Destroy
 			handleError(eventChannel, err)
 			return
 		}
+		deleteFilters := []filter.ValidationFilter{
+			filter.PreventRemoveFilter{},
+			filter.InventoryPolicyFilter{
+				Inv:       invInfo,
+				InvPolicy: options.InventoryPolicy,
+			},
+		}
 		taskBuilder := &solver.TaskQueueBuilder{
 			Pruner:        d.pruner,
 			DynamicClient: dynamicClient,
@@ -142,28 +149,23 @@ func (d *Destroyer) Run(ctx context.Context, inv inventory.Info, options Destroy
 			InfoHelper:    info.NewHelper(mapper, d.factory.UnstructuredClientForMapping),
 			Mapper:        mapper,
 			InvClient:     d.invClient,
-			Destroy:       true,
 			Collector:     vCollector,
+			PruneFilters:  deleteFilters,
 		}
 		opts := solver.Options{
+			Destroy:                true,
 			Prune:                  true,
-			PruneTimeout:           options.DeleteTimeout,
 			DryRunStrategy:         options.DryRunStrategy,
 			PrunePropagationPolicy: options.DeletePropagationPolicy,
-		}
-		deleteFilters := []filter.ValidationFilter{
-			filter.PreventRemoveFilter{},
-			filter.InventoryPolicyFilter{
-				Inv:       inv,
-				InvPolicy: options.InventoryPolicy,
-			},
+			PruneTimeout:           options.DeleteTimeout,
+			InventoryPolicy:        options.InventoryPolicy,
 		}
 
 		// Build the ordered set of tasks to execute.
 		taskQueue := taskBuilder.
-			AppendPruneWaitTasks(deleteObjs, deleteFilters, opts).
-			AppendDeleteInvTask(inv, options.DryRunStrategy).
-			Build()
+			WithPruneObjects(deleteObjs).
+			WithInventory(invInfo).
+			Build(opts)
 
 		klog.V(4).Infof("validation errors: %d", len(vCollector.Errors))
 		klog.V(4).Infof("invalid objects: %d", len(vCollector.InvalidIds))
