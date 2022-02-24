@@ -503,6 +503,21 @@ status:
    numberReady: 4
    observedGeneration: 1
 `
+var dsDifferentGeneration = `
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+   name: test
+   namespace: qual
+   generation: 2
+status:
+   desiredNumberScheduled: 4
+   currentNumberScheduled: 4
+   updatedNumberScheduled: 4
+   numberAvailable: 4
+   numberReady: 4
+   observedGeneration: 1
+`
 
 var dsLessReady = `
 apiVersion: apps/v1
@@ -543,7 +558,7 @@ func TestDaemonsetStatus(t *testing.T) {
 			expectedConditions: []Condition{{
 				Type:   ConditionReconciling,
 				Status: corev1.ConditionTrue,
-				Reason: "NoDesiredNumber",
+				Reason: "NoObservedGeneration",
 			}},
 			absentConditionTypes: []ConditionType{
 				ConditionStalled,
@@ -577,6 +592,18 @@ func TestDaemonsetStatus(t *testing.T) {
 				Type:   ConditionReconciling,
 				Status: corev1.ConditionTrue,
 				Reason: "LessReady",
+			}},
+			absentConditionTypes: []ConditionType{
+				ConditionStalled,
+			},
+		},
+		"dsDifferentGeneration": {
+			spec:           dsDifferentGeneration,
+			expectedStatus: InProgressStatus,
+			expectedConditions: []Condition{{
+				Type:   ConditionReconciling,
+				Status: corev1.ConditionTrue,
+				Reason: "LatestGenerationNotObserved",
 			}},
 			absentConditionTypes: []ConditionType{
 				ConditionStalled,
