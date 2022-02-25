@@ -192,3 +192,10 @@ spec:
     - name: tcp
       containerPort: 80
 `
+
+var namespaceTemplate = `
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{.Namespace}}
+`

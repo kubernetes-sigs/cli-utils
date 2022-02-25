@@ -7,7 +7,10 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/cli-utils/pkg/multierror"
@@ -374,6 +377,495 @@ func TestReverseSortObjs(t *testing.T) {
 	}
 }
 
+func TestDependencyGraph(t *testing.T) {
+	// Use a custom Asserter to customize the graph options
+	asserter := testutil.NewAsserter(
+		cmpopts.EquateErrors(),
+		graphComparer(),
+	)
+
+	testCases := map[string]struct {
+		objs          object.UnstructuredSet
+		graph         *Graph
+		expectedError error
+	}{
+		"no objects": {
+			objs:  object.UnstructuredSet{},
+			graph: New(),
+		},
+		"one object no dependencies": {
+			objs: object.UnstructuredSet{
+				testutil.Unstructured(t, resources["deployment"]),
+			},
+			graph: &Graph{
+				edges: map[object.ObjMetadata]object.ObjMetadataSet{
+					testutil.ToIdentifier(t, resources["deployment"]): {},
+				},
+				reverseEdges: map[object.ObjMetadata]object.ObjMetadataSet{
+					testutil.ToIdentifier(t, resources["deployment"]): {},
+				},
+			},
+		},
+		"two unrelated objects": {
+			objs: object.UnstructuredSet{
+				testutil.Unstructured(t, resources["deployment"]),
+				testutil.Unstructured(t, resources["secret"]),
+			},
+			graph: &Graph{
+				edges: map[object.ObjMetadata]object.ObjMetadataSet{
+					testutil.ToIdentifier(t, resources["deployment"]): {},
+					testutil.ToIdentifier(t, resources["secret"]):     {},
+				},
+				reverseEdges: map[object.ObjMetadata]object.ObjMetadataSet{
+					testutil.ToIdentifier(t, resources["deployment"]): {},
+					testutil.ToIdentifier(t, resources["secret"]):     {},
+				},
+			},
+		},
+		"two objects one dependency": {
+			objs: object.UnstructuredSet{
+				testutil.Unstructured(t, resources["deployment"],
+					testutil.AddDependsOn(t, testutil.ToIdentifier(t, resources["secret"]))),
+				testutil.Unstructured(t, resources["secret"]),
+			},
+			graph: &Graph{
+				edges: map[object.ObjMetadata]object.ObjMetadataSet{
+					testutil.ToIdentifier(t, resources["deployment"]): {
+						testutil.ToIdentifier(t, resources["secret"]),
+					},
+					testutil.ToIdentifier(t, resources["secret"]): {},
+				},
+				reverseEdges: map[object.ObjMetadata]object.ObjMetadataSet{
+					testutil.ToIdentifier(t, resources["deployment"]): {},
+					testutil.ToIdentifier(t, resources["secret"]): {
+						testutil.ToIdentifier(t, resources["deployment"]),
+					},
+				},
+			},
+		},
+		"three objects two dependencies": {
+			objs: object.UnstructuredSet{
+				testutil.Unstructured(t, resources["deployment"],
+					testutil.AddDependsOn(t, testutil.ToIdentifier(t, resources["secret"]))),
+				testutil.Unstructured(t, resources["secret"],
+					testutil.AddDependsOn(t, testutil.ToIdentifier(t, resources["pod"]))),
+				testutil.Unstructured(t, resources["pod"]),
+			},
+			graph: &Graph{
+				edges: map[object.ObjMetadata]object.ObjMetadataSet{
+					testutil.ToIdentifier(t, resources["deployment"]): {
+						testutil.ToIdentifier(t, resources["secret"]),
+					},
+					testutil.ToIdentifier(t, resources["secret"]): {
+						testutil.ToIdentifier(t, resources["pod"]),
+					},
+					testutil.ToIdentifier(t, resources["pod"]): {},
+				},
+				reverseEdges: map[object.ObjMetadata]object.ObjMetadataSet{
+					testutil.ToIdentifier(t, resources["pod"]): {
+						testutil.ToIdentifier(t, resources["secret"]),
+					},
+					testutil.ToIdentifier(t, resources["secret"]): {
+						testutil.ToIdentifier(t, resources["deployment"]),
+					},
+					testutil.ToIdentifier(t, resources["deployment"]): {},
+				},
+			},
+		},
+		"three objects two dependencies on the same object": {
+			objs: object.UnstructuredSet{
+				testutil.Unstructured(t, resources["deployment"],
+					testutil.AddDependsOn(t, testutil.ToIdentifier(t, resources["secret"]))),
+				testutil.Unstructured(t, resources["pod"],
+					testutil.AddDependsOn(t, testutil.ToIdentifier(t, resources["secret"]))),
+				testutil.Unstructured(t, resources["secret"]),
+			},
+			graph: &Graph{
+				edges: map[object.ObjMetadata]object.ObjMetadataSet{
+					testutil.ToIdentifier(t, resources["deployment"]): {
+						testutil.ToIdentifier(t, resources["secret"]),
+					},
+					testutil.ToIdentifier(t, resources["pod"]): {
+						testutil.ToIdentifier(t, resources["secret"]),
+					},
+					testutil.ToIdentifier(t, resources["secret"]): {},
+				},
+				reverseEdges: map[object.ObjMetadata]object.ObjMetadataSet{
+					testutil.ToIdentifier(t, resources["secret"]): {
+						testutil.ToIdentifier(t, resources["deployment"]),
+						testutil.ToIdentifier(t, resources["pod"]),
+					},
+					testutil.ToIdentifier(t, resources["pod"]):        {},
+					testutil.ToIdentifier(t, resources["deployment"]): {},
+				},
+			},
+		},
+		"two objects and their namespace": {
+			objs: object.UnstructuredSet{
+				testutil.Unstructured(t, resources["deployment"]),
+				testutil.Unstructured(t, resources["namespace"]),
+				testutil.Unstructured(t, resources["secret"]),
+			},
+			graph: &Graph{
+				edges: map[object.ObjMetadata]object.ObjMetadataSet{
+					testutil.ToIdentifier(t, resources["deployment"]): {
+						testutil.ToIdentifier(t, resources["namespace"]),
+					},
+					testutil.ToIdentifier(t, resources["secret"]): {
+						testutil.ToIdentifier(t, resources["namespace"]),
+					},
+					testutil.ToIdentifier(t, resources["namespace"]): {},
+				},
+				reverseEdges: map[object.ObjMetadata]object.ObjMetadataSet{
+					testutil.ToIdentifier(t, resources["namespace"]): {
+						testutil.ToIdentifier(t, resources["secret"]),
+						testutil.ToIdentifier(t, resources["deployment"]),
+					},
+					testutil.ToIdentifier(t, resources["secret"]):     {},
+					testutil.ToIdentifier(t, resources["deployment"]): {},
+				},
+			},
+		},
+		"two custom resources and their CRD": {
+			objs: object.UnstructuredSet{
+				testutil.Unstructured(t, resources["crontab1"]),
+				testutil.Unstructured(t, resources["crontab2"]),
+				testutil.Unstructured(t, resources["crd"]),
+			},
+			graph: &Graph{
+				edges: map[object.ObjMetadata]object.ObjMetadataSet{
+					testutil.ToIdentifier(t, resources["crontab1"]): {
+						testutil.ToIdentifier(t, resources["crd"]),
+					},
+					testutil.ToIdentifier(t, resources["crontab2"]): {
+						testutil.ToIdentifier(t, resources["crd"]),
+					},
+					testutil.ToIdentifier(t, resources["crd"]): {},
+				},
+				reverseEdges: map[object.ObjMetadata]object.ObjMetadataSet{
+					testutil.ToIdentifier(t, resources["crd"]): {
+						testutil.ToIdentifier(t, resources["crontab1"]),
+						testutil.ToIdentifier(t, resources["crontab2"]),
+					},
+					testutil.ToIdentifier(t, resources["crontab1"]): {},
+					testutil.ToIdentifier(t, resources["crontab2"]): {},
+				},
+			},
+		},
+		"two custom resources with their CRD and namespace": {
+			objs: object.UnstructuredSet{
+				testutil.Unstructured(t, resources["crontab1"]),
+				testutil.Unstructured(t, resources["crontab2"]),
+				testutil.Unstructured(t, resources["namespace"]),
+				testutil.Unstructured(t, resources["crd"]),
+			},
+			graph: &Graph{
+				edges: map[object.ObjMetadata]object.ObjMetadataSet{
+					testutil.ToIdentifier(t, resources["crontab1"]): {
+						testutil.ToIdentifier(t, resources["crd"]),
+						testutil.ToIdentifier(t, resources["namespace"]),
+					},
+					testutil.ToIdentifier(t, resources["crontab2"]): {
+						testutil.ToIdentifier(t, resources["crd"]),
+						testutil.ToIdentifier(t, resources["namespace"]),
+					},
+					testutil.ToIdentifier(t, resources["crd"]):       {},
+					testutil.ToIdentifier(t, resources["namespace"]): {},
+				},
+				reverseEdges: map[object.ObjMetadata]object.ObjMetadataSet{
+					testutil.ToIdentifier(t, resources["crd"]): {
+						testutil.ToIdentifier(t, resources["crontab1"]),
+						testutil.ToIdentifier(t, resources["crontab2"]),
+					},
+					testutil.ToIdentifier(t, resources["namespace"]): {
+						testutil.ToIdentifier(t, resources["crontab1"]),
+						testutil.ToIdentifier(t, resources["crontab2"]),
+					},
+					testutil.ToIdentifier(t, resources["crontab1"]): {},
+					testutil.ToIdentifier(t, resources["crontab2"]): {},
+				},
+			},
+		},
+		"two object cyclic dependency": {
+			objs: object.UnstructuredSet{
+				testutil.Unstructured(t, resources["deployment"],
+					testutil.AddDependsOn(t, testutil.ToIdentifier(t, resources["secret"]))),
+				testutil.Unstructured(t, resources["secret"],
+					testutil.AddDependsOn(t, testutil.ToIdentifier(t, resources["deployment"]))),
+			},
+			graph: &Graph{
+				edges: map[object.ObjMetadata]object.ObjMetadataSet{
+					testutil.ToIdentifier(t, resources["deployment"]): {
+						testutil.ToIdentifier(t, resources["secret"]),
+					},
+					testutil.ToIdentifier(t, resources["secret"]): {
+						testutil.ToIdentifier(t, resources["deployment"]),
+					},
+				},
+				reverseEdges: map[object.ObjMetadata]object.ObjMetadataSet{
+					testutil.ToIdentifier(t, resources["secret"]): {
+						testutil.ToIdentifier(t, resources["deployment"]),
+					},
+					testutil.ToIdentifier(t, resources["deployment"]): {
+						testutil.ToIdentifier(t, resources["secret"]),
+					},
+				},
+			},
+		},
+		"three object cyclic dependency": {
+			objs: object.UnstructuredSet{
+				testutil.Unstructured(t, resources["deployment"],
+					testutil.AddDependsOn(t, testutil.ToIdentifier(t, resources["secret"]))),
+				testutil.Unstructured(t, resources["secret"],
+					testutil.AddDependsOn(t, testutil.ToIdentifier(t, resources["pod"]))),
+				testutil.Unstructured(t, resources["pod"],
+					testutil.AddDependsOn(t, testutil.ToIdentifier(t, resources["deployment"]))),
+			},
+			graph: &Graph{
+				edges: map[object.ObjMetadata]object.ObjMetadataSet{
+					testutil.ToIdentifier(t, resources["deployment"]): {
+						testutil.ToIdentifier(t, resources["secret"]),
+					},
+					testutil.ToIdentifier(t, resources["secret"]): {
+						testutil.ToIdentifier(t, resources["pod"]),
+					},
+					testutil.ToIdentifier(t, resources["pod"]): {
+						testutil.ToIdentifier(t, resources["deployment"]),
+					},
+				},
+				reverseEdges: map[object.ObjMetadata]object.ObjMetadataSet{
+					testutil.ToIdentifier(t, resources["deployment"]): {
+						testutil.ToIdentifier(t, resources["pod"]),
+					},
+					testutil.ToIdentifier(t, resources["pod"]): {
+						testutil.ToIdentifier(t, resources["secret"]),
+					},
+					testutil.ToIdentifier(t, resources["secret"]): {
+						testutil.ToIdentifier(t, resources["deployment"]),
+					},
+				},
+			},
+		},
+	}
+
+	for tn, tc := range testCases {
+		t.Run(tn, func(t *testing.T) {
+			g, err := DependencyGraph(tc.objs)
+			if tc.expectedError != nil {
+				require.EqualError(t, err, tc.expectedError.Error())
+				return
+			}
+			assert.NoError(t, err)
+			asserter.Equal(t, tc.graph, g)
+		})
+	}
+}
+
+func TestHydrateSetList(t *testing.T) {
+	testCases := map[string]struct {
+		idSetList []object.ObjMetadataSet
+		objs      object.UnstructuredSet
+		expected  []object.UnstructuredSet
+	}{
+		"no object sets": {
+			idSetList: []object.ObjMetadataSet{},
+			expected:  nil,
+		},
+		"one object set": {
+			idSetList: []object.ObjMetadataSet{
+				{
+					testutil.ToIdentifier(t, resources["deployment"]),
+				},
+			},
+			objs: object.UnstructuredSet{
+				testutil.Unstructured(t, resources["deployment"]),
+			},
+			expected: []object.UnstructuredSet{
+				{
+					testutil.Unstructured(t, resources["deployment"]),
+				},
+			},
+		},
+		"two out of three": {
+			idSetList: []object.ObjMetadataSet{
+				{
+					testutil.ToIdentifier(t, resources["deployment"]),
+				},
+				{
+					testutil.ToIdentifier(t, resources["secret"]),
+				},
+				{
+					testutil.ToIdentifier(t, resources["pod"]),
+				},
+			},
+			objs: object.UnstructuredSet{
+				testutil.Unstructured(t, resources["deployment"]),
+				testutil.Unstructured(t, resources["pod"]),
+			},
+			expected: []object.UnstructuredSet{
+				{
+					testutil.Unstructured(t, resources["deployment"]),
+				},
+				{
+					testutil.Unstructured(t, resources["pod"]),
+				},
+			},
+		},
+		"two uneven sets": {
+			idSetList: []object.ObjMetadataSet{
+				{
+					testutil.ToIdentifier(t, resources["secret"]),
+					testutil.ToIdentifier(t, resources["deployment"]),
+				},
+				{
+					testutil.ToIdentifier(t, resources["namespace"]),
+				},
+			},
+			objs: object.UnstructuredSet{
+				testutil.Unstructured(t, resources["namespace"]),
+				testutil.Unstructured(t, resources["deployment"]),
+				testutil.Unstructured(t, resources["secret"]),
+				testutil.Unstructured(t, resources["pod"]),
+			},
+			expected: []object.UnstructuredSet{
+				{
+					testutil.Unstructured(t, resources["secret"]),
+					testutil.Unstructured(t, resources["deployment"]),
+				},
+				{
+					testutil.Unstructured(t, resources["namespace"]),
+				},
+			},
+		},
+		"one of two sets": {
+			idSetList: []object.ObjMetadataSet{
+				{
+					testutil.ToIdentifier(t, resources["namespace"]),
+					testutil.ToIdentifier(t, resources["crd"]),
+				},
+				{
+					testutil.ToIdentifier(t, resources["crontab1"]),
+					testutil.ToIdentifier(t, resources["crontab2"]),
+				},
+			},
+			objs: object.UnstructuredSet{
+				testutil.Unstructured(t, resources["namespace"]),
+				testutil.Unstructured(t, resources["crd"]),
+			},
+			expected: []object.UnstructuredSet{
+				{
+					testutil.Unstructured(t, resources["namespace"]),
+					testutil.Unstructured(t, resources["crd"]),
+				},
+			},
+		},
+	}
+
+	for tn, tc := range testCases {
+		t.Run(tn, func(t *testing.T) {
+			objSetList := HydrateSetList(tc.idSetList, tc.objs)
+			assert.Equal(t, tc.expected, objSetList)
+		})
+	}
+}
+
+func TestReverseSetList(t *testing.T) {
+	testCases := map[string]struct {
+		setList  []object.UnstructuredSet
+		expected []object.UnstructuredSet
+	}{
+		"no object sets": {
+			setList:  []object.UnstructuredSet{},
+			expected: []object.UnstructuredSet{},
+		},
+		"one object set": {
+			setList: []object.UnstructuredSet{
+				{
+					testutil.Unstructured(t, resources["deployment"]),
+				},
+			},
+			expected: []object.UnstructuredSet{
+				{
+					testutil.Unstructured(t, resources["deployment"]),
+				},
+			},
+		},
+		"three object sets": {
+			setList: []object.UnstructuredSet{
+				{
+					testutil.Unstructured(t, resources["deployment"]),
+				},
+				{
+					testutil.Unstructured(t, resources["secret"]),
+				},
+				{
+					testutil.Unstructured(t, resources["pod"]),
+				},
+			},
+			expected: []object.UnstructuredSet{
+				{
+					testutil.Unstructured(t, resources["pod"]),
+				},
+				{
+					testutil.Unstructured(t, resources["secret"]),
+				},
+				{
+					testutil.Unstructured(t, resources["deployment"]),
+				},
+			},
+		},
+		"two uneven sets": {
+			setList: []object.UnstructuredSet{
+				{
+					testutil.Unstructured(t, resources["secret"]),
+					testutil.Unstructured(t, resources["deployment"]),
+				},
+				{
+					testutil.Unstructured(t, resources["namespace"]),
+				},
+			},
+			expected: []object.UnstructuredSet{
+				{
+					testutil.Unstructured(t, resources["namespace"]),
+				},
+				{
+					testutil.Unstructured(t, resources["deployment"]),
+					testutil.Unstructured(t, resources["secret"]),
+				},
+			},
+		},
+		"two even sets": {
+			setList: []object.UnstructuredSet{
+				{
+					testutil.Unstructured(t, resources["crontab1"]),
+					testutil.Unstructured(t, resources["crontab2"]),
+				},
+				{
+					testutil.Unstructured(t, resources["crd"]),
+					testutil.Unstructured(t, resources["namespace"]),
+				},
+			},
+			expected: []object.UnstructuredSet{
+				{
+					testutil.Unstructured(t, resources["namespace"]),
+					testutil.Unstructured(t, resources["crd"]),
+				},
+				{
+					testutil.Unstructured(t, resources["crontab2"]),
+					testutil.Unstructured(t, resources["crontab1"]),
+				},
+			},
+		},
+	}
+
+	for tn, tc := range testCases {
+		t.Run(tn, func(t *testing.T) {
+			ReverseSetList(tc.setList)
+			assert.Equal(t, tc.expected, tc.setList)
+		})
+	}
+}
+
 func TestApplyTimeMutationEdges(t *testing.T) {
 	testCases := map[string]struct {
 		objs          []*unstructured.Unstructured
@@ -646,7 +1138,7 @@ func TestApplyTimeMutationEdges(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 			}
-			actual := g.GetEdges()
+			actual := edgeMapToList(g.edges)
 			verifyEdges(t, tc.expected, actual)
 		})
 	}
@@ -939,7 +1431,7 @@ func TestAddDependsOnEdges(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 			}
-			actual := g.GetEdges()
+			actual := edgeMapToList(g.edges)
 			verifyEdges(t, tc.expected, actual)
 		})
 	}
@@ -1016,7 +1508,7 @@ func TestAddNamespaceEdges(t *testing.T) {
 			g := New()
 			ids := object.UnstructuredSetToObjMetadataSet(tc.objs)
 			addNamespaceEdges(g, tc.objs, ids)
-			actual := g.GetEdges()
+			actual := edgeMapToList(g.edges)
 			verifyEdges(t, tc.expected, actual)
 		})
 	}
@@ -1068,7 +1560,7 @@ func TestAddCRDEdges(t *testing.T) {
 			g := New()
 			ids := object.UnstructuredSetToObjMetadataSet(tc.objs)
 			addCRDEdges(g, tc.objs, ids)
-			actual := g.GetEdges()
+			actual := edgeMapToList(g.edges)
 			verifyEdges(t, tc.expected, actual)
 		})
 	}
@@ -1135,4 +1627,18 @@ func containsEdge(edges []Edge, edge Edge) bool {
 		}
 	}
 	return false
+}
+
+// waitTaskComparer allows comparion of WaitTasks, ignoring private fields.
+func graphComparer() cmp.Option {
+	return cmp.Comparer(func(x, y *Graph) bool {
+		if x == nil {
+			return y == nil
+		}
+		if y == nil {
+			return false
+		}
+		return cmp.Equal(x.edges, y.edges) &&
+			cmp.Equal(x.reverseEdges, y.reverseEdges)
+	})
 }
