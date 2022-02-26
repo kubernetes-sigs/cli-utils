@@ -9,14 +9,6 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
-// ObjMetadataEqualObjectReference compares an ObjMetadata with a ObjectReference
-func ObjMetadataEqualObjectReference(id object.ObjMetadata, ref actuation.ObjectReference) bool {
-	return id.GroupKind.Group == ref.Group &&
-		id.GroupKind.Kind == ref.Kind &&
-		id.Namespace == ref.Namespace &&
-		id.Name == ref.Name
-}
-
 // ObjectReferenceFromObjMetadata converts an ObjMetadata to a ObjectReference
 func ObjectReferenceFromObjMetadata(id object.ObjMetadata) actuation.ObjectReference {
 	return actuation.ObjectReference{

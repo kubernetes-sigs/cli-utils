@@ -32,8 +32,9 @@ func (tc *Manager) Inventory() *actuation.Inventory {
 // ObjectStatus retrieves the status of an object with the specified ID.
 // The returned status is a pointer and can be updated in-place for efficiency.
 func (tc *Manager) ObjectStatus(id object.ObjMetadata) (*actuation.ObjectStatus, bool) {
+	ref := ObjectReferenceFromObjMetadata(id)
 	for i, objStatus := range tc.inventory.Status.Objects {
-		if ObjMetadataEqualObjectReference(id, objStatus.ObjectReference) {
+		if objStatus.ObjectReference == ref {
 			return &(tc.inventory.Status.Objects[i]), true
 		}
 	}
@@ -65,14 +66,14 @@ func (tc *Manager) ObjectsWithReconcileStatus(status actuation.ReconcileStatus) 
 }
 
 // SetObjectStatus updates or adds an ObjectStatus record to the inventory.
-func (tc *Manager) SetObjectStatus(id object.ObjMetadata, objStatus actuation.ObjectStatus) {
-	for i, objStatus := range tc.inventory.Status.Objects {
-		if ObjMetadataEqualObjectReference(id, objStatus.ObjectReference) {
-			tc.inventory.Status.Objects[i] = objStatus
+func (tc *Manager) SetObjectStatus(newObjStatus actuation.ObjectStatus) {
+	for i, oldObjStatus := range tc.inventory.Status.Objects {
+		if oldObjStatus.ObjectReference == newObjStatus.ObjectReference {
+			tc.inventory.Status.Objects[i] = newObjStatus
 			return
 		}
 	}
-	tc.inventory.Status.Objects = append(tc.inventory.Status.Objects, objStatus)
+	tc.inventory.Status.Objects = append(tc.inventory.Status.Objects, newObjStatus)
 }
 
 // IsSuccessfulApply returns true if the object apply was successful
@@ -89,7 +90,7 @@ func (tc *Manager) IsSuccessfulApply(id object.ObjMetadata) bool {
 // resource identified by the provided id. Currently, we keep information
 // about the generation of the resource after the apply operation completed.
 func (tc *Manager) AddSuccessfulApply(id object.ObjMetadata, uid types.UID, gen int64) {
-	tc.SetObjectStatus(id, actuation.ObjectStatus{
+	tc.SetObjectStatus(actuation.ObjectStatus{
 		ObjectReference: ObjectReferenceFromObjMetadata(id),
 		Strategy:        actuation.ActuationStrategyApply,
 		Actuation:       actuation.ActuationSucceeded,
@@ -155,7 +156,7 @@ func (tc *Manager) IsSuccessfulDelete(id object.ObjMetadata) bool {
 // object was scheduled to be deleted asynchronously, which might cause further
 // updates by finalizers. The UID will change if the object is re-created.
 func (tc *Manager) AddSuccessfulDelete(id object.ObjMetadata, uid types.UID) {
-	tc.SetObjectStatus(id, actuation.ObjectStatus{
+	tc.SetObjectStatus(actuation.ObjectStatus{
 		ObjectReference: ObjectReferenceFromObjMetadata(id),
 		Strategy:        actuation.ActuationStrategyDelete,
 		Actuation:       actuation.ActuationSucceeded,
@@ -183,7 +184,7 @@ func (tc *Manager) IsFailedApply(id object.ObjMetadata) bool {
 
 // AddFailedApply registers that the object failed to apply
 func (tc *Manager) AddFailedApply(id object.ObjMetadata) {
-	tc.SetObjectStatus(id, actuation.ObjectStatus{
+	tc.SetObjectStatus(actuation.ObjectStatus{
 		ObjectReference: ObjectReferenceFromObjMetadata(id),
 		Strategy:        actuation.ActuationStrategyApply,
 		Actuation:       actuation.ActuationFailed,
@@ -208,7 +209,7 @@ func (tc *Manager) IsFailedDelete(id object.ObjMetadata) bool {
 
 // AddFailedDelete registers that the object failed to delete
 func (tc *Manager) AddFailedDelete(id object.ObjMetadata) {
-	tc.SetObjectStatus(id, actuation.ObjectStatus{
+	tc.SetObjectStatus(actuation.ObjectStatus{
 		ObjectReference: ObjectReferenceFromObjMetadata(id),
 		Strategy:        actuation.ActuationStrategyDelete,
 		Actuation:       actuation.ActuationFailed,
@@ -234,7 +235,7 @@ func (tc *Manager) IsSkippedApply(id object.ObjMetadata) bool {
 
 // AddSkippedApply registers that the object apply was skipped
 func (tc *Manager) AddSkippedApply(id object.ObjMetadata) {
-	tc.SetObjectStatus(id, actuation.ObjectStatus{
+	tc.SetObjectStatus(actuation.ObjectStatus{
 		ObjectReference: ObjectReferenceFromObjMetadata(id),
 		Strategy:        actuation.ActuationStrategyApply,
 		Actuation:       actuation.ActuationSkipped,
@@ -259,7 +260,7 @@ func (tc *Manager) IsSkippedDelete(id object.ObjMetadata) bool {
 
 // AddSkippedDelete registers that the object delete was skipped
 func (tc *Manager) AddSkippedDelete(id object.ObjMetadata) {
-	tc.SetObjectStatus(id, actuation.ObjectStatus{
+	tc.SetObjectStatus(actuation.ObjectStatus{
 		ObjectReference: ObjectReferenceFromObjMetadata(id),
 		Strategy:        actuation.ActuationStrategyDelete,
 		Actuation:       actuation.ActuationSkipped,
