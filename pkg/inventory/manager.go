@@ -393,3 +393,55 @@ func (tc *Manager) SetPendingReconcile(id object.ObjMetadata) error {
 func (tc *Manager) PendingReconciles() object.ObjMetadataSet {
 	return tc.ObjectsWithReconcileStatus(actuation.ReconcilePending)
 }
+
+// IsPendingApply returns true if the object pending apply
+func (tc *Manager) IsPendingApply(id object.ObjMetadata) bool {
+	objStatus, found := tc.ObjectStatus(id)
+	if !found {
+		return false
+	}
+	return objStatus.Strategy == actuation.ActuationStrategyApply &&
+		objStatus.Actuation == actuation.ActuationPending
+}
+
+// AddPendingApply registers that the object is pending apply
+func (tc *Manager) AddPendingApply(id object.ObjMetadata) {
+	tc.SetObjectStatus(actuation.ObjectStatus{
+		ObjectReference: ObjectReferenceFromObjMetadata(id),
+		Strategy:        actuation.ActuationStrategyApply,
+		Actuation:       actuation.ActuationPending,
+		Reconcile:       actuation.ReconcilePending,
+	})
+}
+
+// PendingApplies returns all the objects that are pending apply
+func (tc *Manager) PendingApplies() object.ObjMetadataSet {
+	return tc.ObjectsWithActuationStatus(actuation.ActuationStrategyApply,
+		actuation.ActuationPending)
+}
+
+// IsPendingDelete returns true if the object pending delete
+func (tc *Manager) IsPendingDelete(id object.ObjMetadata) bool {
+	objStatus, found := tc.ObjectStatus(id)
+	if !found {
+		return false
+	}
+	return objStatus.Strategy == actuation.ActuationStrategyDelete &&
+		objStatus.Actuation == actuation.ActuationPending
+}
+
+// AddPendingDelete registers that the object is pending delete
+func (tc *Manager) AddPendingDelete(id object.ObjMetadata) {
+	tc.SetObjectStatus(actuation.ObjectStatus{
+		ObjectReference: ObjectReferenceFromObjMetadata(id),
+		Strategy:        actuation.ActuationStrategyDelete,
+		Actuation:       actuation.ActuationPending,
+		Reconcile:       actuation.ReconcilePending,
+	})
+}
+
+// PendingDeletes returns all the objects that are pending delete
+func (tc *Manager) PendingDeletes() object.ObjMetadataSet {
+	return tc.ObjectsWithActuationStatus(actuation.ActuationStrategyDelete,
+		actuation.ActuationPending)
+}

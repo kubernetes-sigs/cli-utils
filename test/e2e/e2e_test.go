@@ -187,6 +187,14 @@ var _ = Describe("Applier", func() {
 					mutationTest(ctx, c, invConfig, inventoryName, namespace.GetName())
 				})
 
+				It("DependencyFilter", func() {
+					dependencyFilterTest(ctx, c, invConfig, inventoryName, namespace.GetName())
+				})
+
+				It("LocalNamespacesFilter", func() {
+					namespaceFilterTest(ctx, c, invConfig, inventoryName, namespace.GetName())
+				})
+
 				It("Prune retrieval error correctly handled", func() {
 					pruneRetrieveErrorTest(ctx, c, invConfig, inventoryName, namespace.GetName())
 				})

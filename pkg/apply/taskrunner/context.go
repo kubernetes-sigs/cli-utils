@@ -9,6 +9,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/object"
+	"sigs.k8s.io/cli-utils/pkg/object/graph"
 )
 
 // NewTaskContext returns a new TaskContext
@@ -20,6 +21,7 @@ func NewTaskContext(eventChannel chan event.Event, resourceCache cache.ResourceC
 		inventoryManager: inventory.NewManager(),
 		abandonedObjects: make(map[object.ObjMetadata]struct{}),
 		invalidObjects:   make(map[object.ObjMetadata]struct{}),
+		graph:            graph.New(),
 	}
 }
 
@@ -32,6 +34,7 @@ type TaskContext struct {
 	inventoryManager *inventory.Manager
 	abandonedObjects map[object.ObjMetadata]struct{}
 	invalidObjects   map[object.ObjMetadata]struct{}
+	graph            *graph.Graph
 }
 
 func (tc *TaskContext) TaskChannel() chan TaskResult {
@@ -48,6 +51,14 @@ func (tc *TaskContext) ResourceCache() cache.ResourceCache {
 
 func (tc *TaskContext) InventoryManager() *inventory.Manager {
 	return tc.inventoryManager
+}
+
+func (tc *TaskContext) Graph() *graph.Graph {
+	return tc.graph
+}
+
+func (tc *TaskContext) SetGraph(g *graph.Graph) {
+	tc.graph = g
 }
 
 // SendEvent sends an event on the event channel

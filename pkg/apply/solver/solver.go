@@ -119,7 +119,7 @@ func (t *TaskQueueBuilder) WithPruneObjects(pruneObjs object.UnstructuredSet) *T
 }
 
 // Build returns the queue of tasks that have been created
-func (t *TaskQueueBuilder) Build(o Options) *TaskQueue {
+func (t *TaskQueueBuilder) Build(taskContext *taskrunner.TaskContext, o Options) *TaskQueue {
 	var tasks []taskrunner.Task
 
 	// reset counters
@@ -127,11 +127,40 @@ func (t *TaskQueueBuilder) Build(o Options) *TaskQueue {
 	t.pruneCounter = 0
 	t.waitCounter = 0
 
+	// Filter objects that failed earlier validation
 	applyObjs := t.Collector.FilterInvalidObjects(t.applyObjs)
 	pruneObjs := t.Collector.FilterInvalidObjects(t.pruneObjs)
 
+	// Merge applyObjs & pruneObjs and graph them together.
+	// This detects implicit and explicit dependencies.
+	// Invalid dependency annotations will be treated as validation errors.
+	allObjs := make(object.UnstructuredSet, 0, len(applyObjs)+len(pruneObjs))
+	allObjs = append(allObjs, applyObjs...)
+	allObjs = append(allObjs, pruneObjs...)
+	g, err := graph.DependencyGraph(allObjs)
+	if err != nil {
+		t.Collector.Collect(err)
+	}
+	// Store graph for use by DependencyFilter
+	taskContext.SetGraph(g)
+	// Sort objects into phases (apply order).
+	// Cycles will be treated as validation errors.
+	idSetList, err := g.Sort()
+	if err != nil {
+		t.Collector.Collect(err)
+	}
+
+	// Filter objects with cycles or invalid dependency annotations
+	applyObjs = t.Collector.FilterInvalidObjects(applyObjs)
+	pruneObjs = t.Collector.FilterInvalidObjects(pruneObjs)
+
 	if len(applyObjs) > 0 {
-		klog.V(2).Infoln("adding inventory add task (%d objects)", len(applyObjs))
+		// Register actuation plan in the inventory
+		for _, id := range object.UnstructuredSetToObjMetadataSet(applyObjs) {
+			taskContext.InventoryManager().AddPendingApply(id)
+		}
+
+		klog.V(2).Infof("adding inventory add task (%d objects)", len(applyObjs))
 		tasks = append(tasks, &task.InvAddTask{
 			TaskName:  "inventory-add-0",
 			InvClient: t.InvClient,
@@ -140,18 +169,10 @@ func (t *TaskQueueBuilder) Build(o Options) *TaskQueue {
 			DryRun:    o.DryRunStrategy,
 		})
 
-		// Create a dependency graph, sort, and flatten into phases.
-		applySets, err := graph.SortObjs(applyObjs)
-		if err != nil {
-			t.Collector.Collect(err)
-		}
+		// Filter idSetList down to just apply objects
+		applySets := graph.HydrateSetList(idSetList, applyObjs)
 
 		for _, applySet := range applySets {
-			// filter again, because sorting may have added more invalid objects.
-			applySet = t.Collector.FilterInvalidObjects(applySet)
-			if len(applySet) == 0 {
-				continue
-			}
 			tasks = append(tasks,
 				t.newApplyTask(applySet, t.ApplyFilters, t.ApplyMutators, o))
 			// dry-run skips wait tasks
@@ -164,18 +185,18 @@ func (t *TaskQueueBuilder) Build(o Options) *TaskQueue {
 	}
 
 	if o.Prune && len(pruneObjs) > 0 {
-		// Create a dependency graph, sort (in reverse), and flatten into phases.
-		pruneSets, err := graph.ReverseSortObjs(pruneObjs)
-		if err != nil {
-			t.Collector.Collect(err)
+		// Register actuation plan in the inventory
+		for _, id := range object.UnstructuredSetToObjMetadataSet(pruneObjs) {
+			taskContext.InventoryManager().AddPendingDelete(id)
 		}
 
+		// Filter idSetList down to just prune objects
+		pruneSets := graph.HydrateSetList(idSetList, pruneObjs)
+
+		// Reverse apply order to get prune order
+		graph.ReverseSetList(pruneSets)
+
 		for _, pruneSet := range pruneSets {
-			// filter again, because sorting may have added more invalid objects.
-			pruneSet = t.Collector.FilterInvalidObjects(pruneSet)
-			if len(pruneSet) == 0 {
-				continue
-			}
 			tasks = append(tasks,
 				t.newPruneTask(pruneSet, t.PruneFilters, o))
 			// dry-run skips wait tasks

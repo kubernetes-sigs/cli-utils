@@ -19,25 +19,19 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/ordering"
 )
 
-// SortObjs returns a slice of the sets of objects to apply (in order).
-// Each of the objects in an apply set is applied together. The order of
-// the returned applied sets is a topological ordering of the sets to apply.
-// Returns an single empty apply set if there are no objects to apply.
-func SortObjs(objs object.UnstructuredSet) ([]object.UnstructuredSet, error) {
-	var objSets []object.UnstructuredSet
+// DependencyGraph returns a new graph, populated with the supplied objects as
+// vetices and edges built from their dependencies.
+func DependencyGraph(objs object.UnstructuredSet) (*Graph, error) {
+	g := New()
 	if len(objs) == 0 {
-		return objSets, nil
+		return g, nil
 	}
 	var errors []error
+
 	// Convert to IDs (same length & order as objs)
+	// This is simply an optimiation to avoid repeating obj -> id conversion.
 	ids := object.UnstructuredSetToObjMetadataSet(objs)
-	// Create the graph, and build a map of object metadata to the object (Unstructured).
-	g := New()
-	objToUnstructured := map[object.ObjMetadata]*unstructured.Unstructured{}
-	for i, obj := range objs {
-		id := ids[i]
-		objToUnstructured[id] = obj
-	}
+
 	// Add objects as graph vertices
 	addVertices(g, ids)
 	// Add dependencies as graph edges
@@ -49,14 +43,29 @@ func SortObjs(objs object.UnstructuredSet) ([]object.UnstructuredSet, error) {
 	if err := addApplyTimeMutationEdges(g, objs, ids); err != nil {
 		errors = append(errors, err)
 	}
-	// Run topological sort on the graph.
-	sortedObjSets, err := g.Sort()
-	if err != nil {
-		errors = append(errors, err)
+	if len(errors) > 0 {
+		return g, multierror.Wrap(errors...)
 	}
+	return g, nil
+}
+
+// HydrateSetList takes a list of sets of ids and a set of objects and returns
+// a list of set of objects. The output set list will be the same order as the
+// input set list, but with IDs converted into Objects. Any IDs that do not
+// match objects in the provided object set will be skipped (filtered) in the
+// output.
+func HydrateSetList(idSetList []object.ObjMetadataSet, objs object.UnstructuredSet) []object.UnstructuredSet {
+	var objSetList []object.UnstructuredSet
+
+	// Build a map of id -> obj.
+	objToUnstructured := map[object.ObjMetadata]*unstructured.Unstructured{}
+	for _, obj := range objs {
+		objToUnstructured[object.UnstructuredToObjMetadata(obj)] = obj
+	}
+
 	// Map the object metadata back to the sorted sets of unstructured objects.
 	// Ignore any edges that aren't part of the input set (don't wait for them).
-	for _, objSet := range sortedObjSets {
+	for _, objSet := range idSetList {
 		currentSet := object.UnstructuredSet{}
 		for _, id := range objSet {
 			var found bool
@@ -65,14 +74,43 @@ func SortObjs(objs object.UnstructuredSet) ([]object.UnstructuredSet, error) {
 				currentSet = append(currentSet, obj)
 			}
 		}
-		// Sort each set in apply order
-		sort.Sort(ordering.SortableUnstructureds(currentSet))
-		objSets = append(objSets, currentSet)
+		if len(currentSet) > 0 {
+			// Sort each set in apply order
+			sort.Sort(ordering.SortableUnstructureds(currentSet))
+			objSetList = append(objSetList, currentSet)
+		}
 	}
+
+	return objSetList
+}
+
+// SortObjs returns a slice of the sets of objects to apply (in order).
+// Each of the objects in an apply set is applied together. The order of
+// the returned applied sets is a topological ordering of the sets to apply.
+// Returns an single empty apply set if there are no objects to apply.
+func SortObjs(objs object.UnstructuredSet) ([]object.UnstructuredSet, error) {
+	var errors []error
+	if len(objs) == 0 {
+		return nil, nil
+	}
+
+	g, err := DependencyGraph(objs)
+	if err != nil {
+		// collect and continue
+		errors = multierror.Unwrap(err)
+	}
+
+	idSetList, err := g.Sort()
+	if err != nil {
+		errors = append(errors, err)
+	}
+
+	objSetList := HydrateSetList(idSetList, objs)
+
 	if len(errors) > 0 {
-		return objSets, multierror.Wrap(errors...)
+		return objSetList, multierror.Wrap(errors...)
 	}
-	return objSets, nil
+	return objSetList, nil
 }
 
 // ReverseSortObjs is the same as SortObjs but using reverse ordering.
@@ -82,17 +120,22 @@ func ReverseSortObjs(objs object.UnstructuredSet) ([]object.UnstructuredSet, err
 	if err != nil {
 		return s, err
 	}
+	ReverseSetList(s)
+	return s, nil
+}
+
+// ReverseSetList deep reverses of a list of object lists
+func ReverseSetList(setList []object.UnstructuredSet) {
 	// Reverse the ordering of the object sets using swaps.
-	for i, j := 0, len(s)-1; i < j; i, j = i+1, j-1 {
-		s[i], s[j] = s[j], s[i]
+	for i, j := 0, len(setList)-1; i < j; i, j = i+1, j-1 {
+		setList[i], setList[j] = setList[j], setList[i]
 	}
 	// Reverse the ordering of the objects in each set using swaps.
-	for _, c := range s {
-		for i, j := 0, len(c)-1; i < j; i, j = i+1, j-1 {
-			c[i], c[j] = c[j], c[i]
+	for _, set := range setList {
+		for i, j := 0, len(set)-1; i < j; i, j = i+1, j-1 {
+			set[i], set[j] = set[j], set[i]
 		}
 	}
-	return s, nil
 }
 
 // addVertices adds all the IDs in the set as graph vertices.

@@ -11,6 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"sigs.k8s.io/cli-utils/pkg/apis/actuation"
 	"sigs.k8s.io/cli-utils/pkg/apply/cache"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/filter"
@@ -129,6 +130,10 @@ func (d *Destroyer) Run(ctx context.Context, invInfo inventory.Info, options Des
 		}
 		validator.Validate(deleteObjs)
 
+		// Build a TaskContext for passing info between tasks
+		resourceCache := cache.NewResourceCacheMap()
+		taskContext := taskrunner.NewTaskContext(eventChannel, resourceCache)
+
 		klog.V(4).Infoln("destroyer building task queue...")
 		dynamicClient, err := d.factory.DynamicClient()
 		if err != nil {
@@ -140,6 +145,10 @@ func (d *Destroyer) Run(ctx context.Context, invInfo inventory.Info, options Des
 			filter.InventoryPolicyFilter{
 				Inv:       invInfo,
 				InvPolicy: options.InventoryPolicy,
+			},
+			filter.DependencyFilter{
+				TaskContext: taskContext,
+				Strategy:    actuation.ActuationStrategyDelete,
 			},
 		}
 		taskBuilder := &solver.TaskQueueBuilder{
@@ -165,7 +174,7 @@ func (d *Destroyer) Run(ctx context.Context, invInfo inventory.Info, options Des
 		taskQueue := taskBuilder.
 			WithPruneObjects(deleteObjs).
 			WithInventory(invInfo).
-			Build(opts)
+			Build(taskContext, opts)
 
 		klog.V(4).Infof("validation errors: %d", len(vCollector.Errors))
 		klog.V(4).Infof("invalid objects: %d", len(vCollector.InvalidIds))
@@ -186,10 +195,6 @@ func (d *Destroyer) Run(ctx context.Context, invInfo inventory.Info, options Des
 			handleError(eventChannel, fmt.Errorf("invalid ValidationPolicy: %q", options.ValidationPolicy))
 			return
 		}
-
-		// Build a TaskContext for passing info between tasks
-		resourceCache := cache.NewResourceCacheMap()
-		taskContext := taskrunner.NewTaskContext(eventChannel, resourceCache)
 
 		// Register invalid objects to be retained in the inventory, if present.
 		for _, id := range vCollector.InvalidIds {

@@ -14,6 +14,7 @@ import (
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/klog/v2"
+	"sigs.k8s.io/cli-utils/pkg/apis/actuation"
 	"sigs.k8s.io/cli-utils/pkg/apply/cache"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/filter"
@@ -125,6 +126,10 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.Info, objects objec
 		}
 		klog.V(4).Infof("calculated %d apply objs; %d prune objs", len(applyObjs), len(pruneObjs))
 
+		// Build a TaskContext for passing info between tasks
+		resourceCache := cache.NewResourceCacheMap()
+		taskContext := taskrunner.NewTaskContext(eventChannel, resourceCache)
+
 		// Fetch the queue (channel) of tasks that should be executed.
 		klog.V(4).Infoln("applier building task queue...")
 		// Build list of apply validation filters.
@@ -134,6 +139,10 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.Info, objects objec
 				Mapper:    a.mapper,
 				Inv:       invInfo,
 				InvPolicy: options.InventoryPolicy,
+			},
+			filter.DependencyFilter{
+				TaskContext: taskContext,
+				Strategy:    actuation.ActuationStrategyApply,
 			},
 		}
 		// Build list of prune validation filters.
@@ -146,9 +155,12 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.Info, objects objec
 			filter.LocalNamespacesFilter{
 				LocalNamespaces: localNamespaces(invInfo, object.UnstructuredSetToObjMetadataSet(objects)),
 			},
+			filter.DependencyFilter{
+				TaskContext: taskContext,
+				Strategy:    actuation.ActuationStrategyDelete,
+			},
 		}
 		// Build list of apply mutators.
-		resourceCache := cache.NewResourceCacheMap()
 		applyMutators := []mutator.Interface{
 			&mutator.ApplyTimeMutator{
 				Client:        a.client,
@@ -184,7 +196,7 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.Info, objects objec
 			WithApplyObjects(applyObjs).
 			WithPruneObjects(pruneObjs).
 			WithInventory(invInfo).
-			Build(opts)
+			Build(taskContext, opts)
 
 		klog.V(4).Infof("validation errors: %d", len(vCollector.Errors))
 		klog.V(4).Infof("invalid objects: %d", len(vCollector.InvalidIds))
@@ -205,9 +217,6 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.Info, objects objec
 			handleError(eventChannel, fmt.Errorf("invalid ValidationPolicy: %q", options.ValidationPolicy))
 			return
 		}
-
-		// Build a TaskContext for passing info between tasks
-		taskContext := taskrunner.NewTaskContext(eventChannel, resourceCache)
 
 		// Register invalid objects to be retained in the inventory, if present.
 		for _, id := range vCollector.InvalidIds {

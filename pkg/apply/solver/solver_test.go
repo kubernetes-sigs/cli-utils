@@ -11,6 +11,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"sigs.k8s.io/cli-utils/pkg/apis/actuation"
 	"sigs.k8s.io/cli-utils/pkg/apply/prune"
 	"sigs.k8s.io/cli-utils/pkg/apply/task"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
@@ -133,10 +134,11 @@ func TestTaskQueueBuilder_ApplyBuild(t *testing.T) {
 		"abc-123", "default", "test"))
 
 	testCases := map[string]struct {
-		applyObjs     []*unstructured.Unstructured
-		options       Options
-		expectedTasks []taskrunner.Task
-		expectedError error
+		applyObjs      []*unstructured.Unstructured
+		options        Options
+		expectedTasks  []taskrunner.Task
+		expectedError  error
+		expectedStatus []actuation.ObjectStatus
 	}{
 		"no resources, no apply or wait tasks": {
 			applyObjs: []*unstructured.Unstructured{},
@@ -184,6 +186,16 @@ func TestTaskQueueBuilder_ApplyBuild(t *testing.T) {
 					},
 				},
 			},
+			expectedStatus: []actuation.ObjectStatus{
+				{
+					ObjectReference: inventory.ObjectReferenceFromObjMetadata(
+						testutil.ToIdentifier(t, resources["deployment"]),
+					),
+					Strategy:  actuation.ActuationStrategyApply,
+					Actuation: actuation.ActuationPending,
+					Reconcile: actuation.ReconcilePending,
+				},
+			},
 		},
 		"multiple resource with no timeout": {
 			applyObjs: []*unstructured.Unstructured{
@@ -224,6 +236,24 @@ func TestTaskQueueBuilder_ApplyBuild(t *testing.T) {
 						testutil.ToIdentifier(t, resources["deployment"]),
 						testutil.ToIdentifier(t, resources["secret"]),
 					},
+				},
+			},
+			expectedStatus: []actuation.ObjectStatus{
+				{
+					ObjectReference: inventory.ObjectReferenceFromObjMetadata(
+						testutil.ToIdentifier(t, resources["deployment"]),
+					),
+					Strategy:  actuation.ActuationStrategyApply,
+					Actuation: actuation.ActuationPending,
+					Reconcile: actuation.ReconcilePending,
+				},
+				{
+					ObjectReference: inventory.ObjectReferenceFromObjMetadata(
+						testutil.ToIdentifier(t, resources["secret"]),
+					),
+					Strategy:  actuation.ActuationStrategyApply,
+					Actuation: actuation.ActuationPending,
+					Reconcile: actuation.ReconcilePending,
 				},
 			},
 		},
@@ -272,6 +302,24 @@ func TestTaskQueueBuilder_ApplyBuild(t *testing.T) {
 					},
 				},
 			},
+			expectedStatus: []actuation.ObjectStatus{
+				{
+					ObjectReference: inventory.ObjectReferenceFromObjMetadata(
+						testutil.ToIdentifier(t, resources["deployment"]),
+					),
+					Strategy:  actuation.ActuationStrategyApply,
+					Actuation: actuation.ActuationPending,
+					Reconcile: actuation.ReconcilePending,
+				},
+				{
+					ObjectReference: inventory.ObjectReferenceFromObjMetadata(
+						testutil.ToIdentifier(t, resources["secret"]),
+					),
+					Strategy:  actuation.ActuationStrategyApply,
+					Actuation: actuation.ActuationPending,
+					Reconcile: actuation.ReconcilePending,
+				},
+			},
 		},
 		"multiple resources with reconcile timeout and dryrun": {
 			applyObjs: []*unstructured.Unstructured{
@@ -313,6 +361,24 @@ func TestTaskQueueBuilder_ApplyBuild(t *testing.T) {
 					DryRun: common.DryRunClient,
 				},
 			},
+			expectedStatus: []actuation.ObjectStatus{
+				{
+					ObjectReference: inventory.ObjectReferenceFromObjMetadata(
+						testutil.ToIdentifier(t, resources["deployment"]),
+					),
+					Strategy:  actuation.ActuationStrategyApply,
+					Actuation: actuation.ActuationPending,
+					Reconcile: actuation.ReconcilePending,
+				},
+				{
+					ObjectReference: inventory.ObjectReferenceFromObjMetadata(
+						testutil.ToIdentifier(t, resources["secret"]),
+					),
+					Strategy:  actuation.ActuationStrategyApply,
+					Actuation: actuation.ActuationPending,
+					Reconcile: actuation.ReconcilePending,
+				},
+			},
 		},
 		"multiple resources with reconcile timeout and server-dryrun": {
 			applyObjs: []*unstructured.Unstructured{
@@ -352,6 +418,24 @@ func TestTaskQueueBuilder_ApplyBuild(t *testing.T) {
 						testutil.ToIdentifier(t, resources["default-pod"]),
 					},
 					DryRun: common.DryRunServer,
+				},
+			},
+			expectedStatus: []actuation.ObjectStatus{
+				{
+					ObjectReference: inventory.ObjectReferenceFromObjMetadata(
+						testutil.ToIdentifier(t, resources["pod"]),
+					),
+					Strategy:  actuation.ActuationStrategyApply,
+					Actuation: actuation.ActuationPending,
+					Reconcile: actuation.ReconcilePending,
+				},
+				{
+					ObjectReference: inventory.ObjectReferenceFromObjMetadata(
+						testutil.ToIdentifier(t, resources["default-pod"]),
+					),
+					Strategy:  actuation.ActuationStrategyApply,
+					Actuation: actuation.ActuationPending,
+					Reconcile: actuation.ReconcilePending,
 				},
 			},
 		},
@@ -413,6 +497,32 @@ func TestTaskQueueBuilder_ApplyBuild(t *testing.T) {
 					},
 				},
 			},
+			expectedStatus: []actuation.ObjectStatus{
+				{
+					ObjectReference: inventory.ObjectReferenceFromObjMetadata(
+						testutil.ToIdentifier(t, resources["crontab1"]),
+					),
+					Strategy:  actuation.ActuationStrategyApply,
+					Actuation: actuation.ActuationPending,
+					Reconcile: actuation.ReconcilePending,
+				},
+				{
+					ObjectReference: inventory.ObjectReferenceFromObjMetadata(
+						testutil.ToIdentifier(t, resources["crd"]),
+					),
+					Strategy:  actuation.ActuationStrategyApply,
+					Actuation: actuation.ActuationPending,
+					Reconcile: actuation.ReconcilePending,
+				},
+				{
+					ObjectReference: inventory.ObjectReferenceFromObjMetadata(
+						testutil.ToIdentifier(t, resources["crontab2"]),
+					),
+					Strategy:  actuation.ActuationStrategyApply,
+					Actuation: actuation.ActuationPending,
+					Reconcile: actuation.ReconcilePending,
+				},
+			},
 		},
 		"no wait with CRDs if it is a dryrun": {
 			applyObjs: []*unstructured.Unstructured{
@@ -461,6 +571,32 @@ func TestTaskQueueBuilder_ApplyBuild(t *testing.T) {
 						testutil.ToIdentifier(t, resources["crontab2"]),
 					},
 					DryRun: common.DryRunClient,
+				},
+			},
+			expectedStatus: []actuation.ObjectStatus{
+				{
+					ObjectReference: inventory.ObjectReferenceFromObjMetadata(
+						testutil.ToIdentifier(t, resources["crontab1"]),
+					),
+					Strategy:  actuation.ActuationStrategyApply,
+					Actuation: actuation.ActuationPending,
+					Reconcile: actuation.ReconcilePending,
+				},
+				{
+					ObjectReference: inventory.ObjectReferenceFromObjMetadata(
+						testutil.ToIdentifier(t, resources["crd"]),
+					),
+					Strategy:  actuation.ActuationStrategyApply,
+					Actuation: actuation.ActuationPending,
+					Reconcile: actuation.ReconcilePending,
+				},
+				{
+					ObjectReference: inventory.ObjectReferenceFromObjMetadata(
+						testutil.ToIdentifier(t, resources["crontab2"]),
+					),
+					Strategy:  actuation.ActuationStrategyApply,
+					Actuation: actuation.ActuationPending,
+					Reconcile: actuation.ReconcilePending,
 				},
 			},
 		},
@@ -520,6 +656,32 @@ func TestTaskQueueBuilder_ApplyBuild(t *testing.T) {
 						testutil.ToIdentifier(t, resources["pod"]),
 						testutil.ToIdentifier(t, resources["secret"]),
 					},
+				},
+			},
+			expectedStatus: []actuation.ObjectStatus{
+				{
+					ObjectReference: inventory.ObjectReferenceFromObjMetadata(
+						testutil.ToIdentifier(t, resources["namespace"]),
+					),
+					Strategy:  actuation.ActuationStrategyApply,
+					Actuation: actuation.ActuationPending,
+					Reconcile: actuation.ReconcilePending,
+				},
+				{
+					ObjectReference: inventory.ObjectReferenceFromObjMetadata(
+						testutil.ToIdentifier(t, resources["pod"]),
+					),
+					Strategy:  actuation.ActuationStrategyApply,
+					Actuation: actuation.ActuationPending,
+					Reconcile: actuation.ReconcilePending,
+				},
+				{
+					ObjectReference: inventory.ObjectReferenceFromObjMetadata(
+						testutil.ToIdentifier(t, resources["secret"]),
+					),
+					Strategy:  actuation.ActuationStrategyApply,
+					Actuation: actuation.ActuationPending,
+					Reconcile: actuation.ReconcilePending,
 				},
 			},
 		},
@@ -579,6 +741,24 @@ func TestTaskQueueBuilder_ApplyBuild(t *testing.T) {
 					},
 				},
 			},
+			expectedStatus: []actuation.ObjectStatus{
+				{
+					ObjectReference: inventory.ObjectReferenceFromObjMetadata(
+						testutil.ToIdentifier(t, resources["deployment"]),
+					),
+					Strategy:  actuation.ActuationStrategyApply,
+					Actuation: actuation.ActuationPending,
+					Reconcile: actuation.ReconcilePending,
+				},
+				{
+					ObjectReference: inventory.ObjectReferenceFromObjMetadata(
+						testutil.ToIdentifier(t, resources["secret"]),
+					),
+					Strategy:  actuation.ActuationStrategyApply,
+					Actuation: actuation.ActuationPending,
+					Reconcile: actuation.ReconcilePending,
+				},
+			},
 		},
 		"cyclic dependency returns error": {
 			applyObjs: []*unstructured.Unstructured{
@@ -629,9 +809,10 @@ func TestTaskQueueBuilder_ApplyBuild(t *testing.T) {
 				InvClient: fakeInvClient,
 				Collector: vCollector,
 			}
+			taskContext := taskrunner.NewTaskContext(nil, nil)
 			tq := tqb.WithInventory(invInfo).
 				WithApplyObjects(tc.applyObjs).
-				Build(tc.options)
+				Build(taskContext, tc.options)
 			err := vCollector.ToError()
 			if tc.expectedError != nil {
 				assert.EqualError(t, err, tc.expectedError.Error())
@@ -639,6 +820,9 @@ func TestTaskQueueBuilder_ApplyBuild(t *testing.T) {
 			}
 			assert.NoError(t, err)
 			asserter.Equal(t, tc.expectedTasks, tq.tasks)
+
+			actualStatus := taskContext.InventoryManager().Inventory().Status.Objects
+			testutil.AssertEqual(t, tc.expectedStatus, actualStatus)
 		})
 	}
 }
@@ -656,10 +840,11 @@ func TestTaskQueueBuilder_PruneBuild(t *testing.T) {
 		"abc-123", "default", "test"))
 
 	testCases := map[string]struct {
-		pruneObjs     []*unstructured.Unstructured
-		options       Options
-		expectedTasks []taskrunner.Task
-		expectedError error
+		pruneObjs      []*unstructured.Unstructured
+		options        Options
+		expectedTasks  []taskrunner.Task
+		expectedError  error
+		expectedStatus []actuation.ObjectStatus
 	}{
 		"no resources, no apply or prune tasks": {
 			pruneObjs: []*unstructured.Unstructured{},
@@ -701,6 +886,16 @@ func TestTaskQueueBuilder_PruneBuild(t *testing.T) {
 					},
 				},
 			},
+			expectedStatus: []actuation.ObjectStatus{
+				{
+					ObjectReference: inventory.ObjectReferenceFromObjMetadata(
+						testutil.ToIdentifier(t, resources["default-pod"]),
+					),
+					Strategy:  actuation.ActuationStrategyDelete,
+					Actuation: actuation.ActuationPending,
+					Reconcile: actuation.ReconcilePending,
+				},
+			},
 		},
 		"multiple resources, one prune task, one wait task": {
 			pruneObjs: []*unstructured.Unstructured{
@@ -732,6 +927,24 @@ func TestTaskQueueBuilder_PruneBuild(t *testing.T) {
 						testutil.ToIdentifier(t, resources["default-pod"]),
 						testutil.ToIdentifier(t, resources["pod"]),
 					},
+				},
+			},
+			expectedStatus: []actuation.ObjectStatus{
+				{
+					ObjectReference: inventory.ObjectReferenceFromObjMetadata(
+						testutil.ToIdentifier(t, resources["default-pod"]),
+					),
+					Strategy:  actuation.ActuationStrategyDelete,
+					Actuation: actuation.ActuationPending,
+					Reconcile: actuation.ReconcilePending,
+				},
+				{
+					ObjectReference: inventory.ObjectReferenceFromObjMetadata(
+						testutil.ToIdentifier(t, resources["pod"]),
+					),
+					Strategy:  actuation.ActuationStrategyDelete,
+					Actuation: actuation.ActuationPending,
+					Reconcile: actuation.ReconcilePending,
 				},
 			},
 		},
@@ -781,6 +994,24 @@ func TestTaskQueueBuilder_PruneBuild(t *testing.T) {
 					},
 				},
 			},
+			expectedStatus: []actuation.ObjectStatus{
+				{
+					ObjectReference: inventory.ObjectReferenceFromObjMetadata(
+						testutil.ToIdentifier(t, resources["pod"]),
+					),
+					Strategy:  actuation.ActuationStrategyDelete,
+					Actuation: actuation.ActuationPending,
+					Reconcile: actuation.ReconcilePending,
+				},
+				{
+					ObjectReference: inventory.ObjectReferenceFromObjMetadata(
+						testutil.ToIdentifier(t, resources["secret"]),
+					),
+					Strategy:  actuation.ActuationStrategyDelete,
+					Actuation: actuation.ActuationPending,
+					Reconcile: actuation.ReconcilePending,
+				},
+			},
 		},
 		"single resource with prune timeout has wait task": {
 			pruneObjs: []*unstructured.Unstructured{
@@ -814,6 +1045,16 @@ func TestTaskQueueBuilder_PruneBuild(t *testing.T) {
 					},
 				},
 			},
+			expectedStatus: []actuation.ObjectStatus{
+				{
+					ObjectReference: inventory.ObjectReferenceFromObjMetadata(
+						testutil.ToIdentifier(t, resources["pod"]),
+					),
+					Strategy:  actuation.ActuationStrategyDelete,
+					Actuation: actuation.ActuationPending,
+					Reconcile: actuation.ReconcilePending,
+				},
+			},
 		},
 		"multiple resources with prune timeout and server-dryrun": {
 			pruneObjs: []*unstructured.Unstructured{
@@ -844,6 +1085,24 @@ func TestTaskQueueBuilder_PruneBuild(t *testing.T) {
 						testutil.ToIdentifier(t, resources["default-pod"]),
 					},
 					DryRun: common.DryRunServer,
+				},
+			},
+			expectedStatus: []actuation.ObjectStatus{
+				{
+					ObjectReference: inventory.ObjectReferenceFromObjMetadata(
+						testutil.ToIdentifier(t, resources["pod"]),
+					),
+					Strategy:  actuation.ActuationStrategyDelete,
+					Actuation: actuation.ActuationPending,
+					Reconcile: actuation.ReconcilePending,
+				},
+				{
+					ObjectReference: inventory.ObjectReferenceFromObjMetadata(
+						testutil.ToIdentifier(t, resources["default-pod"]),
+					),
+					Strategy:  actuation.ActuationStrategyDelete,
+					Actuation: actuation.ActuationPending,
+					Reconcile: actuation.ReconcilePending,
 				},
 			},
 		},
@@ -895,6 +1154,32 @@ func TestTaskQueueBuilder_PruneBuild(t *testing.T) {
 					},
 				},
 			},
+			expectedStatus: []actuation.ObjectStatus{
+				{
+					ObjectReference: inventory.ObjectReferenceFromObjMetadata(
+						testutil.ToIdentifier(t, resources["crontab1"]),
+					),
+					Strategy:  actuation.ActuationStrategyDelete,
+					Actuation: actuation.ActuationPending,
+					Reconcile: actuation.ReconcilePending,
+				},
+				{
+					ObjectReference: inventory.ObjectReferenceFromObjMetadata(
+						testutil.ToIdentifier(t, resources["crd"]),
+					),
+					Strategy:  actuation.ActuationStrategyDelete,
+					Actuation: actuation.ActuationPending,
+					Reconcile: actuation.ReconcilePending,
+				},
+				{
+					ObjectReference: inventory.ObjectReferenceFromObjMetadata(
+						testutil.ToIdentifier(t, resources["crontab2"]),
+					),
+					Strategy:  actuation.ActuationStrategyDelete,
+					Actuation: actuation.ActuationPending,
+					Reconcile: actuation.ReconcilePending,
+				},
+			},
 		},
 		"no wait with CRDs if it is a dryrun": {
 			pruneObjs: []*unstructured.Unstructured{
@@ -933,6 +1218,32 @@ func TestTaskQueueBuilder_PruneBuild(t *testing.T) {
 						testutil.ToIdentifier(t, resources["crontab2"]),
 					},
 					DryRun: common.DryRunClient,
+				},
+			},
+			expectedStatus: []actuation.ObjectStatus{
+				{
+					ObjectReference: inventory.ObjectReferenceFromObjMetadata(
+						testutil.ToIdentifier(t, resources["crontab1"]),
+					),
+					Strategy:  actuation.ActuationStrategyDelete,
+					Actuation: actuation.ActuationPending,
+					Reconcile: actuation.ReconcilePending,
+				},
+				{
+					ObjectReference: inventory.ObjectReferenceFromObjMetadata(
+						testutil.ToIdentifier(t, resources["crd"]),
+					),
+					Strategy:  actuation.ActuationStrategyDelete,
+					Actuation: actuation.ActuationPending,
+					Reconcile: actuation.ReconcilePending,
+				},
+				{
+					ObjectReference: inventory.ObjectReferenceFromObjMetadata(
+						testutil.ToIdentifier(t, resources["crontab2"]),
+					),
+					Strategy:  actuation.ActuationStrategyDelete,
+					Actuation: actuation.ActuationPending,
+					Reconcile: actuation.ReconcilePending,
 				},
 			},
 		},
@@ -981,6 +1292,32 @@ func TestTaskQueueBuilder_PruneBuild(t *testing.T) {
 						testutil.ToIdentifier(t, resources["pod"]),
 						testutil.ToIdentifier(t, resources["secret"]),
 					},
+				},
+			},
+			expectedStatus: []actuation.ObjectStatus{
+				{
+					ObjectReference: inventory.ObjectReferenceFromObjMetadata(
+						testutil.ToIdentifier(t, resources["namespace"]),
+					),
+					Strategy:  actuation.ActuationStrategyDelete,
+					Actuation: actuation.ActuationPending,
+					Reconcile: actuation.ReconcilePending,
+				},
+				{
+					ObjectReference: inventory.ObjectReferenceFromObjMetadata(
+						testutil.ToIdentifier(t, resources["pod"]),
+					),
+					Strategy:  actuation.ActuationStrategyDelete,
+					Actuation: actuation.ActuationPending,
+					Reconcile: actuation.ReconcilePending,
+				},
+				{
+					ObjectReference: inventory.ObjectReferenceFromObjMetadata(
+						testutil.ToIdentifier(t, resources["secret"]),
+					),
+					Strategy:  actuation.ActuationStrategyDelete,
+					Actuation: actuation.ActuationPending,
+					Reconcile: actuation.ReconcilePending,
 				},
 			},
 		},
@@ -1084,9 +1421,10 @@ func TestTaskQueueBuilder_PruneBuild(t *testing.T) {
 				InvClient: fakeInvClient,
 				Collector: vCollector,
 			}
+			taskContext := taskrunner.NewTaskContext(nil, nil)
 			tq := tqb.WithInventory(invInfo).
 				WithPruneObjects(tc.pruneObjs).
-				Build(tc.options)
+				Build(taskContext, tc.options)
 			err := vCollector.ToError()
 			if tc.expectedError != nil {
 				assert.EqualError(t, err, tc.expectedError.Error())
@@ -1094,6 +1432,365 @@ func TestTaskQueueBuilder_PruneBuild(t *testing.T) {
 			}
 			assert.NoError(t, err)
 			asserter.Equal(t, tc.expectedTasks, tq.tasks)
+
+			actualStatus := taskContext.InventoryManager().Inventory().Status.Objects
+			testutil.AssertEqual(t, tc.expectedStatus, actualStatus)
+		})
+	}
+}
+
+func TestTaskQueueBuilder_ApplyPruneBuild(t *testing.T) {
+	// Use a custom Asserter to customize the comparison options
+	asserter := testutil.NewAsserter(
+		cmpopts.EquateErrors(),
+		waitTaskComparer(),
+		fakeClientComparer(),
+		inventoryInfoComparer(),
+	)
+
+	invInfo := inventory.WrapInventoryInfoObj(newInvObject(
+		"abc-123", "default", "test"))
+
+	testCases := map[string]struct {
+		inventoryIDs   object.ObjMetadataSet
+		applyObjs      object.UnstructuredSet
+		pruneObjs      object.UnstructuredSet
+		options        Options
+		expectedTasks  []taskrunner.Task
+		expectedError  error
+		expectedStatus []actuation.ObjectStatus
+	}{
+		"two resources, one apply, one prune": {
+			inventoryIDs: object.ObjMetadataSet{
+				testutil.ToIdentifier(t, resources["secret"]),
+			},
+			applyObjs: object.UnstructuredSet{
+				testutil.Unstructured(t, resources["deployment"]),
+			},
+			pruneObjs: object.UnstructuredSet{
+				testutil.Unstructured(t, resources["secret"]),
+			},
+			options: Options{Prune: true},
+			expectedTasks: []taskrunner.Task{
+				&task.InvAddTask{
+					TaskName:  "inventory-add-0",
+					InvClient: &inventory.FakeClient{},
+					InvInfo:   invInfo,
+					Objects: object.UnstructuredSet{
+						testutil.Unstructured(t, resources["deployment"]),
+					},
+				},
+				&task.ApplyTask{
+					TaskName: "apply-0",
+					Objects: []*unstructured.Unstructured{
+						testutil.Unstructured(t, resources["deployment"]),
+					},
+				},
+				&taskrunner.WaitTask{
+					TaskName: "wait-0",
+					Ids: object.ObjMetadataSet{
+						testutil.ToIdentifier(t, resources["deployment"]),
+					},
+					Condition: taskrunner.AllCurrent,
+				},
+				&task.PruneTask{
+					TaskName: "prune-0",
+					Objects: []*unstructured.Unstructured{
+						testutil.Unstructured(t, resources["secret"]),
+					},
+				},
+				&taskrunner.WaitTask{
+					TaskName: "wait-1",
+					Ids: object.ObjMetadataSet{
+						testutil.ToIdentifier(t, resources["secret"]),
+					},
+					Condition: taskrunner.AllNotFound,
+				},
+				&task.InvSetTask{
+					TaskName:  "inventory-set-0",
+					InvClient: &inventory.FakeClient{},
+					InvInfo:   invInfo,
+					PrevInventory: object.ObjMetadataSet{
+						testutil.ToIdentifier(t, resources["secret"]),
+					},
+				},
+			},
+			expectedStatus: []actuation.ObjectStatus{
+				{
+					ObjectReference: inventory.ObjectReferenceFromObjMetadata(
+						testutil.ToIdentifier(t, resources["deployment"]),
+					),
+					Strategy:  actuation.ActuationStrategyApply,
+					Actuation: actuation.ActuationPending,
+					Reconcile: actuation.ReconcilePending,
+				},
+				{
+					ObjectReference: inventory.ObjectReferenceFromObjMetadata(
+						testutil.ToIdentifier(t, resources["secret"]),
+					),
+					Strategy:  actuation.ActuationStrategyDelete,
+					Actuation: actuation.ActuationPending,
+					Reconcile: actuation.ReconcilePending,
+				},
+			},
+		},
+		"prune disabled": {
+			inventoryIDs: object.ObjMetadataSet{
+				testutil.ToIdentifier(t, resources["secret"]),
+			},
+			applyObjs: object.UnstructuredSet{
+				testutil.Unstructured(t, resources["deployment"]),
+			},
+			pruneObjs: object.UnstructuredSet{
+				testutil.Unstructured(t, resources["secret"]),
+			},
+			options: Options{Prune: false},
+			expectedTasks: []taskrunner.Task{
+				&task.InvAddTask{
+					TaskName:  "inventory-add-0",
+					InvClient: &inventory.FakeClient{},
+					InvInfo:   invInfo,
+					Objects: object.UnstructuredSet{
+						testutil.Unstructured(t, resources["deployment"]),
+					},
+				},
+				&task.ApplyTask{
+					TaskName: "apply-0",
+					Objects: []*unstructured.Unstructured{
+						testutil.Unstructured(t, resources["deployment"]),
+					},
+				},
+				&taskrunner.WaitTask{
+					TaskName: "wait-0",
+					Ids: object.ObjMetadataSet{
+						testutil.ToIdentifier(t, resources["deployment"]),
+					},
+					Condition: taskrunner.AllCurrent,
+				},
+				&task.InvSetTask{
+					TaskName:  "inventory-set-0",
+					InvClient: &inventory.FakeClient{},
+					InvInfo:   invInfo,
+					PrevInventory: object.ObjMetadataSet{
+						testutil.ToIdentifier(t, resources["secret"]),
+					},
+				},
+			},
+			expectedStatus: []actuation.ObjectStatus{
+				{
+					ObjectReference: inventory.ObjectReferenceFromObjMetadata(
+						testutil.ToIdentifier(t, resources["deployment"]),
+					),
+					Strategy:  actuation.ActuationStrategyApply,
+					Actuation: actuation.ActuationPending,
+					Reconcile: actuation.ReconcilePending,
+				},
+			},
+		},
+		// This use case returns in a task plan that would cause a dependency
+		// to be deleted. This is remediated by the DependencyFilter at
+		// apply-time, by skipping both the apply and prune.
+		// This test does not verify the DependencyFilter tho, just that the
+		// dependency was discovered between apply & prune objects.
+		"dependency: apply -> prune": {
+			inventoryIDs: object.ObjMetadataSet{
+				testutil.ToIdentifier(t, resources["secret"]),
+			},
+			applyObjs: object.UnstructuredSet{
+				testutil.Unstructured(t, resources["deployment"],
+					testutil.AddDependsOn(t, testutil.ToIdentifier(t, resources["secret"]))),
+			},
+			pruneObjs: object.UnstructuredSet{
+				testutil.Unstructured(t, resources["secret"]),
+			},
+			options: Options{Prune: true},
+			expectedTasks: []taskrunner.Task{
+				&task.InvAddTask{
+					TaskName:  "inventory-add-0",
+					InvClient: &inventory.FakeClient{},
+					InvInfo:   invInfo,
+					Objects: object.UnstructuredSet{
+						testutil.Unstructured(t, resources["deployment"],
+							testutil.AddDependsOn(t, testutil.ToIdentifier(t, resources["secret"]))),
+					},
+				},
+				&task.ApplyTask{
+					TaskName: "apply-0",
+					Objects: []*unstructured.Unstructured{
+						testutil.Unstructured(t, resources["deployment"],
+							testutil.AddDependsOn(t, testutil.ToIdentifier(t, resources["secret"]))),
+					},
+				},
+				&taskrunner.WaitTask{
+					TaskName: "wait-0",
+					Ids: object.ObjMetadataSet{
+						testutil.ToIdentifier(t, resources["deployment"]),
+					},
+					Condition: taskrunner.AllCurrent,
+				},
+				&task.PruneTask{
+					TaskName: "prune-0",
+					Objects: []*unstructured.Unstructured{
+						testutil.Unstructured(t, resources["secret"]),
+					},
+				},
+				&taskrunner.WaitTask{
+					TaskName: "wait-1",
+					Ids: object.ObjMetadataSet{
+						testutil.ToIdentifier(t, resources["secret"]),
+					},
+					Condition: taskrunner.AllNotFound,
+				},
+				&task.InvSetTask{
+					TaskName:  "inventory-set-0",
+					InvClient: &inventory.FakeClient{},
+					InvInfo:   invInfo,
+					PrevInventory: object.ObjMetadataSet{
+						testutil.ToIdentifier(t, resources["secret"]),
+					},
+				},
+			},
+			expectedStatus: []actuation.ObjectStatus{
+				{
+					ObjectReference: inventory.ObjectReferenceFromObjMetadata(
+						testutil.ToIdentifier(t, resources["deployment"]),
+					),
+					Strategy:  actuation.ActuationStrategyApply,
+					Actuation: actuation.ActuationPending,
+					Reconcile: actuation.ReconcilePending,
+				},
+				{
+					ObjectReference: inventory.ObjectReferenceFromObjMetadata(
+						testutil.ToIdentifier(t, resources["secret"]),
+					),
+					Strategy:  actuation.ActuationStrategyDelete,
+					Actuation: actuation.ActuationPending,
+					Reconcile: actuation.ReconcilePending,
+				},
+			},
+		},
+		// This use case returns in a task plan that would cause a dependency
+		// to be applied. This is fine.
+		// This test just verifies that the  dependency was discovered between
+		// prune & apply objects.
+		"dependency: prune -> apply": {
+			inventoryIDs: object.ObjMetadataSet{
+				testutil.ToIdentifier(t, resources["secret"]),
+			},
+			applyObjs: object.UnstructuredSet{
+				testutil.Unstructured(t, resources["deployment"]),
+			},
+			pruneObjs: object.UnstructuredSet{
+				testutil.Unstructured(t, resources["secret"],
+					testutil.AddDependsOn(t, testutil.ToIdentifier(t, resources["deployment"]))),
+			},
+			options: Options{Prune: true},
+			expectedTasks: []taskrunner.Task{
+				&task.InvAddTask{
+					TaskName:  "inventory-add-0",
+					InvClient: &inventory.FakeClient{},
+					InvInfo:   invInfo,
+					Objects: object.UnstructuredSet{
+						testutil.Unstructured(t, resources["deployment"]),
+					},
+				},
+				&task.ApplyTask{
+					TaskName: "apply-0",
+					Objects: []*unstructured.Unstructured{
+						testutil.Unstructured(t, resources["deployment"]),
+					},
+				},
+				&taskrunner.WaitTask{
+					TaskName: "wait-0",
+					Ids: object.ObjMetadataSet{
+						testutil.ToIdentifier(t, resources["deployment"]),
+					},
+					Condition: taskrunner.AllCurrent,
+				},
+				&task.PruneTask{
+					TaskName: "prune-0",
+					Objects: []*unstructured.Unstructured{
+						testutil.Unstructured(t, resources["secret"],
+							testutil.AddDependsOn(t, testutil.ToIdentifier(t, resources["deployment"]))),
+					},
+				},
+				&taskrunner.WaitTask{
+					TaskName: "wait-1",
+					Ids: object.ObjMetadataSet{
+						testutil.ToIdentifier(t, resources["secret"]),
+					},
+					Condition: taskrunner.AllNotFound,
+				},
+				&task.InvSetTask{
+					TaskName:  "inventory-set-0",
+					InvClient: &inventory.FakeClient{},
+					InvInfo:   invInfo,
+					PrevInventory: object.ObjMetadataSet{
+						testutil.ToIdentifier(t, resources["secret"]),
+					},
+				},
+			},
+			expectedStatus: []actuation.ObjectStatus{
+				{
+					ObjectReference: inventory.ObjectReferenceFromObjMetadata(
+						testutil.ToIdentifier(t, resources["deployment"]),
+					),
+					Strategy:  actuation.ActuationStrategyApply,
+					Actuation: actuation.ActuationPending,
+					Reconcile: actuation.ReconcilePending,
+				},
+				{
+					ObjectReference: inventory.ObjectReferenceFromObjMetadata(
+						testutil.ToIdentifier(t, resources["secret"]),
+					),
+					Strategy:  actuation.ActuationStrategyDelete,
+					Actuation: actuation.ActuationPending,
+					Reconcile: actuation.ReconcilePending,
+				},
+			},
+		},
+	}
+
+	for tn, tc := range testCases {
+		t.Run(tn, func(t *testing.T) {
+			mapper := testutil.NewFakeRESTMapper()
+			// inject mapper & pruner for equality comparison
+			for _, t := range tc.expectedTasks {
+				switch typedTask := t.(type) {
+				case *task.ApplyTask:
+					typedTask.Mapper = mapper
+				case *task.PruneTask:
+					typedTask.Pruner = &prune.Pruner{}
+				case *taskrunner.WaitTask:
+					typedTask.Mapper = mapper
+				}
+			}
+
+			fakeInvClient := inventory.NewFakeClient(tc.inventoryIDs)
+			vCollector := &validation.Collector{}
+			tqb := TaskQueueBuilder{
+				Pruner:    pruner,
+				Mapper:    mapper,
+				InvClient: fakeInvClient,
+				Collector: vCollector,
+			}
+			taskContext := taskrunner.NewTaskContext(nil, nil)
+			tq := tqb.WithInventory(invInfo).
+				WithApplyObjects(tc.applyObjs).
+				WithPruneObjects(tc.pruneObjs).
+				Build(taskContext, tc.options)
+
+			err := vCollector.ToError()
+			if tc.expectedError != nil {
+				assert.EqualError(t, err, tc.expectedError.Error())
+				return
+			}
+			assert.NoError(t, err)
+
+			asserter.Equal(t, tc.expectedTasks, tq.tasks)
+
+			actualStatus := taskContext.InventoryManager().Inventory().Status.Objects
+			testutil.AssertEqual(t, tc.expectedStatus, actualStatus)
 		})
 	}
 }

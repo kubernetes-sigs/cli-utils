@@ -138,6 +138,119 @@ func TestObjectGraphSort(t *testing.T) {
 			}
 			assert.NoError(t, err)
 			testutil.AssertEqual(t, tc.expected, actual)
+
+			// verify sort is repeatable & non-destructive
+			actual, err = g.Sort()
+			assert.NoError(t, err)
+			testutil.AssertEqual(t, tc.expected, actual)
+		})
+	}
+}
+
+func TestGraphDependencies(t *testing.T) {
+	testCases := map[string]struct {
+		vertices object.ObjMetadataSet
+		edges    []Edge
+		from     object.ObjMetadata
+		expected object.ObjMetadataSet
+	}{
+		"no dependencies": {
+			vertices: object.ObjMetadataSet{o1, o2, o3},
+			edges: []Edge{
+				{From: o1, To: o2},
+				{From: o1, To: o3},
+				{From: o2, To: o3},
+			},
+			from:     o3,
+			expected: object.ObjMetadataSet{},
+		},
+		"one dependency": {
+			vertices: object.ObjMetadataSet{o1, o2, o3},
+			edges: []Edge{
+				{From: o1, To: o2},
+				{From: o1, To: o3},
+				{From: o2, To: o3},
+			},
+			from:     o2,
+			expected: object.ObjMetadataSet{o3},
+		},
+		"two dependencies": {
+			vertices: object.ObjMetadataSet{o1, o2, o3},
+			edges: []Edge{
+				{From: o1, To: o2},
+				{From: o1, To: o3},
+				{From: o2, To: o3},
+			},
+			from:     o1,
+			expected: object.ObjMetadataSet{o2, o3},
+		},
+	}
+
+	for tn, tc := range testCases {
+		t.Run(tn, func(t *testing.T) {
+			g := New()
+			for _, vertex := range tc.vertices {
+				g.AddVertex(vertex)
+			}
+			for _, edge := range tc.edges {
+				g.AddEdge(edge.From, edge.To)
+			}
+
+			testutil.AssertEqual(t, tc.expected, g.Dependencies(tc.from))
+		})
+	}
+}
+
+func TestGraphDependents(t *testing.T) {
+	testCases := map[string]struct {
+		vertices object.ObjMetadataSet
+		edges    []Edge
+		to       object.ObjMetadata
+		expected object.ObjMetadataSet
+	}{
+		"no dependents": {
+			vertices: object.ObjMetadataSet{o1, o2, o3},
+			edges: []Edge{
+				{From: o1, To: o2},
+				{From: o1, To: o3},
+				{From: o2, To: o3},
+			},
+			to:       o1,
+			expected: object.ObjMetadataSet{},
+		},
+		"one dependent": {
+			vertices: object.ObjMetadataSet{o1, o2, o3},
+			edges: []Edge{
+				{From: o1, To: o2},
+				{From: o1, To: o3},
+				{From: o2, To: o3},
+			},
+			to:       o2,
+			expected: object.ObjMetadataSet{o1},
+		},
+		"two dependents": {
+			vertices: object.ObjMetadataSet{o1, o2, o3},
+			edges: []Edge{
+				{From: o1, To: o2},
+				{From: o1, To: o3},
+				{From: o2, To: o3},
+			},
+			to:       o3,
+			expected: object.ObjMetadataSet{o1, o2},
+		},
+	}
+
+	for tn, tc := range testCases {
+		t.Run(tn, func(t *testing.T) {
+			g := New()
+			for _, vertex := range tc.vertices {
+				g.AddVertex(vertex)
+			}
+			for _, edge := range tc.edges {
+				g.AddEdge(edge.From, edge.To)
+			}
+
+			testutil.AssertEqual(t, tc.expected, g.Dependents(tc.to))
 		})
 	}
 }
