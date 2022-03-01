@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/cli-utils/pkg/apis/actuation"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
+	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
@@ -24,8 +25,9 @@ const (
 // DependencyFilter implements ValidationFilter interface to determine if an
 // object can be applied or deleted based on the status of it's dependencies.
 type DependencyFilter struct {
-	TaskContext *taskrunner.TaskContext
-	Strategy    actuation.ActuationStrategy
+	TaskContext       *taskrunner.TaskContext
+	ActuationStrategy actuation.ActuationStrategy
+	DryRunStrategy    common.DryRunStrategy
 }
 
 const DependencyFilterName = "DependencyFilter"
@@ -40,7 +42,7 @@ func (dnrf DependencyFilter) Name() string {
 func (dnrf DependencyFilter) Filter(obj *unstructured.Unstructured) (bool, string, error) {
 	id := object.UnstructuredToObjMetadata(obj)
 
-	switch dnrf.Strategy {
+	switch dnrf.ActuationStrategy {
 	case actuation.ActuationStrategyApply:
 		// For apply, check dependencies (outgoing)
 		for _, depID := range dnrf.TaskContext.Graph().Dependencies(id) {
@@ -64,7 +66,7 @@ func (dnrf DependencyFilter) Filter(obj *unstructured.Unstructured) (bool, strin
 			}
 		}
 	default:
-		panic(fmt.Sprintf("invalid filter strategy: %q", dnrf.Strategy))
+		panic(fmt.Sprintf("invalid filter strategy: %q", dnrf.ActuationStrategy))
 	}
 	return false, "", nil
 }
@@ -91,9 +93,9 @@ func (dnrf DependencyFilter) filterByRelationStatus(id object.ObjMetadata, relat
 
 	// Dependencies must have the same actuation strategy.
 	// If there is a mismatch, skip both.
-	if status.Strategy != dnrf.Strategy {
+	if status.Strategy != dnrf.ActuationStrategy {
 		return true, fmt.Sprintf("%s skipped because %s is scheduled for %s: %q",
-			strings.ToLower(dnrf.Strategy.String()),
+			strings.ToLower(dnrf.ActuationStrategy.String()),
 			strings.ToLower(relationship.String()),
 			strings.ToLower(status.Strategy.String()),
 			id), nil
@@ -103,7 +105,7 @@ func (dnrf DependencyFilter) filterByRelationStatus(id object.ObjMetadata, relat
 	case actuation.ActuationPending:
 		// If actuation is still pending, dependency sorting is probably broken.
 		return false, "", fmt.Errorf("premature %s: %s %s actuation %s: %q",
-			strings.ToLower(dnrf.Strategy.String()),
+			strings.ToLower(dnrf.ActuationStrategy.String()),
 			strings.ToLower(relationship.String()),
 			strings.ToLower(status.Strategy.String()),
 			strings.ToLower(status.Actuation.String()),
@@ -112,7 +114,7 @@ func (dnrf DependencyFilter) filterByRelationStatus(id object.ObjMetadata, relat
 		// Skip!
 		return true, fmt.Sprintf("%s %s actuation %s: %q",
 			strings.ToLower(relationship.String()),
-			strings.ToLower(dnrf.Strategy.String()),
+			strings.ToLower(dnrf.ActuationStrategy.String()),
 			strings.ToLower(status.Actuation.String()),
 			id), nil
 	case actuation.ActuationSucceeded:
@@ -124,11 +126,17 @@ func (dnrf DependencyFilter) filterByRelationStatus(id object.ObjMetadata, relat
 			id)
 	}
 
+	// DryRun skips WaitTasks, so reconcile status can be ignored
+	if dnrf.DryRunStrategy.ClientOrServerDryRun() {
+		// Don't skip!
+		return false, "", nil
+	}
+
 	switch status.Reconcile {
 	case actuation.ReconcilePending:
 		// If reconcile is still pending, dependency sorting is probably broken.
 		return false, "", fmt.Errorf("premature %s: %s %s reconcile %s: %q",
-			strings.ToLower(dnrf.Strategy.String()),
+			strings.ToLower(dnrf.ActuationStrategy.String()),
 			strings.ToLower(relationship.String()),
 			strings.ToLower(status.Strategy.String()),
 			strings.ToLower(status.Reconcile.String()),
@@ -137,7 +145,7 @@ func (dnrf DependencyFilter) filterByRelationStatus(id object.ObjMetadata, relat
 		// Skip!
 		return true, fmt.Sprintf("%s %s reconcile %s: %q",
 			strings.ToLower(relationship.String()),
-			strings.ToLower(dnrf.Strategy.String()),
+			strings.ToLower(dnrf.ActuationStrategy.String()),
 			strings.ToLower(status.Reconcile.String()),
 			id), nil
 	case actuation.ReconcileSucceeded:

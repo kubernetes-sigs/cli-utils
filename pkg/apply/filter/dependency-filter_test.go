@@ -12,6 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/cli-utils/pkg/apis/actuation"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
+	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
@@ -43,15 +44,16 @@ var idB = object.ObjMetadata{
 
 func TestDependencyFilter(t *testing.T) {
 	tests := map[string]struct {
-		strategy         actuation.ActuationStrategy
-		contextSetup     func(*taskrunner.TaskContext)
-		id               object.ObjMetadata
-		expectedFiltered bool
-		expectedReason   string
-		expectedError    error
+		dryRunStrategy    common.DryRunStrategy
+		actuationStrategy actuation.ActuationStrategy
+		contextSetup      func(*taskrunner.TaskContext)
+		id                object.ObjMetadata
+		expectedFiltered  bool
+		expectedReason    string
+		expectedError     error
 	}{
 		"apply A (no deps)": {
-			strategy: actuation.ActuationStrategyApply,
+			actuationStrategy: actuation.ActuationStrategyApply,
 			contextSetup: func(taskContext *taskrunner.TaskContext) {
 				taskContext.Graph().AddVertex(idA)
 				taskContext.InventoryManager().AddPendingApply(idA)
@@ -62,7 +64,7 @@ func TestDependencyFilter(t *testing.T) {
 			expectedError:    nil,
 		},
 		"apply A (A -> B) when B is invalid": {
-			strategy: actuation.ActuationStrategyApply,
+			actuationStrategy: actuation.ActuationStrategyApply,
 			contextSetup: func(taskContext *taskrunner.TaskContext) {
 				taskContext.Graph().AddVertex(idA)
 				taskContext.Graph().AddVertex(idInvalid)
@@ -76,7 +78,7 @@ func TestDependencyFilter(t *testing.T) {
 			expectedError:    nil,
 		},
 		"apply A (A -> B) before B is applied": {
-			strategy: actuation.ActuationStrategyApply,
+			actuationStrategy: actuation.ActuationStrategyApply,
 			contextSetup: func(taskContext *taskrunner.TaskContext) {
 				taskContext.Graph().AddVertex(idA)
 				taskContext.Graph().AddVertex(idB)
@@ -88,7 +90,7 @@ func TestDependencyFilter(t *testing.T) {
 			expectedError: fmt.Errorf("premature apply: dependency apply actuation pending: %q", idB),
 		},
 		"apply A (A -> B) before B is reconciled": {
-			strategy: actuation.ActuationStrategyApply,
+			actuationStrategy: actuation.ActuationStrategyApply,
 			contextSetup: func(taskContext *taskrunner.TaskContext) {
 				taskContext.Graph().AddVertex(idA)
 				taskContext.Graph().AddVertex(idB)
@@ -105,7 +107,7 @@ func TestDependencyFilter(t *testing.T) {
 			expectedError: fmt.Errorf("premature apply: dependency apply reconcile pending: %q", idB),
 		},
 		"apply A (A -> B) after B is reconciled": {
-			strategy: actuation.ActuationStrategyApply,
+			actuationStrategy: actuation.ActuationStrategyApply,
 			contextSetup: func(taskContext *taskrunner.TaskContext) {
 				taskContext.Graph().AddVertex(idA)
 				taskContext.Graph().AddVertex(idB)
@@ -124,7 +126,7 @@ func TestDependencyFilter(t *testing.T) {
 			expectedError:    nil,
 		},
 		"apply A (A -> B) after B apply failed": {
-			strategy: actuation.ActuationStrategyApply,
+			actuationStrategy: actuation.ActuationStrategyApply,
 			contextSetup: func(taskContext *taskrunner.TaskContext) {
 				taskContext.Graph().AddVertex(idA)
 				taskContext.Graph().AddVertex(idB)
@@ -143,7 +145,7 @@ func TestDependencyFilter(t *testing.T) {
 			expectedError:    nil,
 		},
 		"apply A (A -> B) after B apply skipped": {
-			strategy: actuation.ActuationStrategyApply,
+			actuationStrategy: actuation.ActuationStrategyApply,
 			contextSetup: func(taskContext *taskrunner.TaskContext) {
 				taskContext.Graph().AddVertex(idA)
 				taskContext.Graph().AddVertex(idB)
@@ -162,7 +164,7 @@ func TestDependencyFilter(t *testing.T) {
 			expectedError:    nil,
 		},
 		"apply A (A -> B) after B reconcile failed": {
-			strategy: actuation.ActuationStrategyApply,
+			actuationStrategy: actuation.ActuationStrategyApply,
 			contextSetup: func(taskContext *taskrunner.TaskContext) {
 				taskContext.Graph().AddVertex(idA)
 				taskContext.Graph().AddVertex(idB)
@@ -181,7 +183,7 @@ func TestDependencyFilter(t *testing.T) {
 			expectedError:    nil,
 		},
 		"apply A (A -> B) after B reconcile timeout": {
-			strategy: actuation.ActuationStrategyApply,
+			actuationStrategy: actuation.ActuationStrategyApply,
 			contextSetup: func(taskContext *taskrunner.TaskContext) {
 				taskContext.Graph().AddVertex(idA)
 				taskContext.Graph().AddVertex(idB)
@@ -201,7 +203,7 @@ func TestDependencyFilter(t *testing.T) {
 		},
 		// artificial use case: reconcile should only be skipped if apply failed or was skipped
 		"apply A (A -> B) after B reconcile skipped": {
-			strategy: actuation.ActuationStrategyApply,
+			actuationStrategy: actuation.ActuationStrategyApply,
 			contextSetup: func(taskContext *taskrunner.TaskContext) {
 				taskContext.Graph().AddVertex(idA)
 				taskContext.Graph().AddVertex(idB)
@@ -220,7 +222,7 @@ func TestDependencyFilter(t *testing.T) {
 			expectedError:    nil,
 		},
 		"apply A (A -> B) when B delete pending": {
-			strategy: actuation.ActuationStrategyApply,
+			actuationStrategy: actuation.ActuationStrategyApply,
 			contextSetup: func(taskContext *taskrunner.TaskContext) {
 				taskContext.Graph().AddVertex(idA)
 				taskContext.Graph().AddVertex(idB)
@@ -234,7 +236,7 @@ func TestDependencyFilter(t *testing.T) {
 			expectedError:    nil,
 		},
 		"delete B (no deps)": {
-			strategy: actuation.ActuationStrategyDelete,
+			actuationStrategy: actuation.ActuationStrategyDelete,
 			contextSetup: func(taskContext *taskrunner.TaskContext) {
 				taskContext.Graph().AddVertex(idB)
 				taskContext.InventoryManager().AddPendingDelete(idB)
@@ -245,7 +247,7 @@ func TestDependencyFilter(t *testing.T) {
 			expectedError:    nil,
 		},
 		"delete B (A -> B) when A is invalid": {
-			strategy: actuation.ActuationStrategyDelete,
+			actuationStrategy: actuation.ActuationStrategyDelete,
 			contextSetup: func(taskContext *taskrunner.TaskContext) {
 				taskContext.Graph().AddVertex(idInvalid)
 				taskContext.Graph().AddVertex(idB)
@@ -259,7 +261,7 @@ func TestDependencyFilter(t *testing.T) {
 			expectedError:    nil,
 		},
 		"delete B (A -> B) before A is deleted": {
-			strategy: actuation.ActuationStrategyDelete,
+			actuationStrategy: actuation.ActuationStrategyDelete,
 			contextSetup: func(taskContext *taskrunner.TaskContext) {
 				taskContext.Graph().AddVertex(idA)
 				taskContext.Graph().AddVertex(idB)
@@ -271,7 +273,7 @@ func TestDependencyFilter(t *testing.T) {
 			expectedError: fmt.Errorf("premature delete: dependent delete actuation pending: %q", idA),
 		},
 		"delete B (A -> B) before A is reconciled": {
-			strategy: actuation.ActuationStrategyDelete,
+			actuationStrategy: actuation.ActuationStrategyDelete,
 			contextSetup: func(taskContext *taskrunner.TaskContext) {
 				taskContext.Graph().AddVertex(idA)
 				taskContext.Graph().AddVertex(idB)
@@ -288,7 +290,7 @@ func TestDependencyFilter(t *testing.T) {
 			expectedError: fmt.Errorf("premature delete: dependent delete reconcile pending: %q", idA),
 		},
 		"delete B (A -> B) after A is reconciled": {
-			strategy: actuation.ActuationStrategyDelete,
+			actuationStrategy: actuation.ActuationStrategyDelete,
 			contextSetup: func(taskContext *taskrunner.TaskContext) {
 				taskContext.Graph().AddVertex(idA)
 				taskContext.Graph().AddVertex(idB)
@@ -307,7 +309,7 @@ func TestDependencyFilter(t *testing.T) {
 			expectedError:    nil,
 		},
 		"delete B (A -> B) after A delete failed": {
-			strategy: actuation.ActuationStrategyDelete,
+			actuationStrategy: actuation.ActuationStrategyDelete,
 			contextSetup: func(taskContext *taskrunner.TaskContext) {
 				taskContext.Graph().AddVertex(idA)
 				taskContext.Graph().AddVertex(idB)
@@ -326,7 +328,7 @@ func TestDependencyFilter(t *testing.T) {
 			expectedError:    nil,
 		},
 		"delete B (A -> B) after A delete skipped": {
-			strategy: actuation.ActuationStrategyDelete,
+			actuationStrategy: actuation.ActuationStrategyDelete,
 			contextSetup: func(taskContext *taskrunner.TaskContext) {
 				taskContext.Graph().AddVertex(idA)
 				taskContext.Graph().AddVertex(idB)
@@ -346,7 +348,7 @@ func TestDependencyFilter(t *testing.T) {
 		},
 		// artificial use case: delete reconcile can't fail, only timeout
 		"delete B (A -> B) after A reconcile failed": {
-			strategy: actuation.ActuationStrategyDelete,
+			actuationStrategy: actuation.ActuationStrategyDelete,
 			contextSetup: func(taskContext *taskrunner.TaskContext) {
 				taskContext.Graph().AddVertex(idA)
 				taskContext.Graph().AddVertex(idB)
@@ -365,7 +367,7 @@ func TestDependencyFilter(t *testing.T) {
 			expectedError:    nil,
 		},
 		"delete B (A -> B) after A reconcile timeout": {
-			strategy: actuation.ActuationStrategyDelete,
+			actuationStrategy: actuation.ActuationStrategyDelete,
 			contextSetup: func(taskContext *taskrunner.TaskContext) {
 				taskContext.Graph().AddVertex(idA)
 				taskContext.Graph().AddVertex(idB)
@@ -385,7 +387,7 @@ func TestDependencyFilter(t *testing.T) {
 		},
 		// artificial use case: reconcile should only be skipped if delete failed or was skipped
 		"delete B (A -> B) after A reconcile skipped": {
-			strategy: actuation.ActuationStrategyDelete,
+			actuationStrategy: actuation.ActuationStrategyDelete,
 			contextSetup: func(taskContext *taskrunner.TaskContext) {
 				taskContext.Graph().AddVertex(idA)
 				taskContext.Graph().AddVertex(idB)
@@ -404,7 +406,7 @@ func TestDependencyFilter(t *testing.T) {
 			expectedError:    nil,
 		},
 		"delete B (A -> B) when A apply succeeded": {
-			strategy: actuation.ActuationStrategyDelete,
+			actuationStrategy: actuation.ActuationStrategyDelete,
 			contextSetup: func(taskContext *taskrunner.TaskContext) {
 				taskContext.Graph().AddVertex(idA)
 				taskContext.Graph().AddVertex(idB)
@@ -422,6 +424,46 @@ func TestDependencyFilter(t *testing.T) {
 			expectedReason:   fmt.Sprintf("delete skipped because dependent is scheduled for apply: %q", idA),
 			expectedError:    nil,
 		},
+		"DryRun: apply A (A -> B) when B apply reconcile pending": {
+			dryRunStrategy:    common.DryRunClient,
+			actuationStrategy: actuation.ActuationStrategyApply,
+			contextSetup: func(taskContext *taskrunner.TaskContext) {
+				taskContext.Graph().AddVertex(idA)
+				taskContext.Graph().AddVertex(idB)
+				taskContext.Graph().AddEdge(idA, idB)
+				taskContext.InventoryManager().AddPendingApply(idA)
+				taskContext.InventoryManager().SetObjectStatus(actuation.ObjectStatus{
+					ObjectReference: inventory.ObjectReferenceFromObjMetadata(idB),
+					Strategy:        actuation.ActuationStrategyApply,
+					Actuation:       actuation.ActuationSucceeded,
+					Reconcile:       actuation.ReconcilePending,
+				})
+			},
+			id:               idA,
+			expectedFiltered: false,
+			expectedReason:   "",
+			expectedError:    nil,
+		},
+		"DryRun: delete B (A -> B) when A delete reconcile pending": {
+			dryRunStrategy:    common.DryRunClient,
+			actuationStrategy: actuation.ActuationStrategyDelete,
+			contextSetup: func(taskContext *taskrunner.TaskContext) {
+				taskContext.Graph().AddVertex(idA)
+				taskContext.Graph().AddVertex(idB)
+				taskContext.Graph().AddEdge(idA, idB)
+				taskContext.InventoryManager().AddPendingDelete(idB)
+				taskContext.InventoryManager().SetObjectStatus(actuation.ObjectStatus{
+					ObjectReference: inventory.ObjectReferenceFromObjMetadata(idA),
+					Strategy:        actuation.ActuationStrategyDelete,
+					Actuation:       actuation.ActuationSucceeded,
+					Reconcile:       actuation.ReconcilePending,
+				})
+			},
+			id:               idB,
+			expectedFiltered: false,
+			expectedReason:   "",
+			expectedError:    nil,
+		},
 	}
 
 	for name, tc := range tests {
@@ -430,8 +472,9 @@ func TestDependencyFilter(t *testing.T) {
 			tc.contextSetup(taskContext)
 
 			filter := DependencyFilter{
-				TaskContext: taskContext,
-				Strategy:    tc.strategy,
+				TaskContext:       taskContext,
+				ActuationStrategy: tc.actuationStrategy,
+				DryRunStrategy:    tc.dryRunStrategy,
 			}
 			obj := defaultObj.DeepCopy()
 			obj.SetGroupVersionKind(tc.id.GroupKind.WithVersion("v1"))
