@@ -171,6 +171,10 @@ var _ = Describe("Applier", func() {
 					dryRunTest(ctx, c, invConfig, inventoryName, namespace.GetName())
 				})
 
+				It("EmptySet", func() {
+					emptySetTest(ctx, c, invConfig, inventoryName, namespace.GetName())
+				})
+
 				It("Deletion Prevention", func() {
 					deletionPreventionTest(ctx, c, invConfig, inventoryName, namespace.GetName())
 				})

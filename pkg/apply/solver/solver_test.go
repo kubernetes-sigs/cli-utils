@@ -143,6 +143,12 @@ func TestTaskQueueBuilder_ApplyBuild(t *testing.T) {
 		"no resources, no apply or wait tasks": {
 			applyObjs: []*unstructured.Unstructured{},
 			expectedTasks: []taskrunner.Task{
+				&task.InvAddTask{
+					TaskName:  "inventory-add-0",
+					InvClient: &inventory.FakeClient{},
+					InvInfo:   invInfo,
+					Objects:   object.UnstructuredSet{},
+				},
 				&task.InvSetTask{
 					TaskName:      "inventory-set-0",
 					InvClient:     &inventory.FakeClient{},
@@ -850,6 +856,12 @@ func TestTaskQueueBuilder_PruneBuild(t *testing.T) {
 			pruneObjs: []*unstructured.Unstructured{},
 			options:   Options{Prune: true},
 			expectedTasks: []taskrunner.Task{
+				&task.InvAddTask{
+					TaskName:  "inventory-add-0",
+					InvClient: &inventory.FakeClient{},
+					InvInfo:   invInfo,
+					Objects:   object.UnstructuredSet{},
+				},
 				&task.InvSetTask{
 					TaskName:      "inventory-set-0",
 					InvClient:     &inventory.FakeClient{},
@@ -864,6 +876,12 @@ func TestTaskQueueBuilder_PruneBuild(t *testing.T) {
 			},
 			options: Options{Prune: true},
 			expectedTasks: []taskrunner.Task{
+				&task.InvAddTask{
+					TaskName:  "inventory-add-0",
+					InvClient: &inventory.FakeClient{},
+					InvInfo:   invInfo,
+					Objects:   object.UnstructuredSet{},
+				},
 				&task.PruneTask{
 					TaskName: "prune-0",
 					Objects: []*unstructured.Unstructured{
@@ -904,6 +922,12 @@ func TestTaskQueueBuilder_PruneBuild(t *testing.T) {
 			},
 			options: Options{Prune: true},
 			expectedTasks: []taskrunner.Task{
+				&task.InvAddTask{
+					TaskName:  "inventory-add-0",
+					InvClient: &inventory.FakeClient{},
+					InvInfo:   invInfo,
+					Objects:   object.UnstructuredSet{},
+				},
 				&task.PruneTask{
 					TaskName: "prune-0",
 					Objects: []*unstructured.Unstructured{
@@ -957,6 +981,12 @@ func TestTaskQueueBuilder_PruneBuild(t *testing.T) {
 			options: Options{Prune: true},
 			// Opposite ordering when pruning/deleting
 			expectedTasks: []taskrunner.Task{
+				&task.InvAddTask{
+					TaskName:  "inventory-add-0",
+					InvClient: &inventory.FakeClient{},
+					InvInfo:   invInfo,
+					Objects:   object.UnstructuredSet{},
+				},
 				&task.PruneTask{
 					TaskName: "prune-0",
 					Objects: []*unstructured.Unstructured{
@@ -1022,6 +1052,12 @@ func TestTaskQueueBuilder_PruneBuild(t *testing.T) {
 				PruneTimeout: 3 * time.Minute,
 			},
 			expectedTasks: []taskrunner.Task{
+				&task.InvAddTask{
+					TaskName:  "inventory-add-0",
+					InvClient: &inventory.FakeClient{},
+					InvInfo:   invInfo,
+					Objects:   object.UnstructuredSet{},
+				},
 				&task.PruneTask{
 					TaskName: "prune-0",
 					Objects: []*unstructured.Unstructured{
@@ -1068,6 +1104,13 @@ func TestTaskQueueBuilder_PruneBuild(t *testing.T) {
 			},
 			// No wait task, since it is dry run
 			expectedTasks: []taskrunner.Task{
+				&task.InvAddTask{
+					TaskName:  "inventory-add-0",
+					InvClient: &inventory.FakeClient{},
+					InvInfo:   invInfo,
+					Objects:   object.UnstructuredSet{},
+					DryRun:    common.DryRunServer,
+				},
 				&task.PruneTask{
 					TaskName: "prune-0",
 					Objects: []*unstructured.Unstructured{
@@ -1115,6 +1158,12 @@ func TestTaskQueueBuilder_PruneBuild(t *testing.T) {
 			options: Options{Prune: true},
 			// Opposite ordering when pruning/deleting.
 			expectedTasks: []taskrunner.Task{
+				&task.InvAddTask{
+					TaskName:  "inventory-add-0",
+					InvClient: &inventory.FakeClient{},
+					InvInfo:   invInfo,
+					Objects:   object.UnstructuredSet{},
+				},
 				&task.PruneTask{
 					TaskName: "prune-0",
 					Objects: []*unstructured.Unstructured{
@@ -1193,6 +1242,13 @@ func TestTaskQueueBuilder_PruneBuild(t *testing.T) {
 				Prune:            true,
 			},
 			expectedTasks: []taskrunner.Task{
+				&task.InvAddTask{
+					TaskName:  "inventory-add-0",
+					InvClient: &inventory.FakeClient{},
+					InvInfo:   invInfo,
+					Objects:   object.UnstructuredSet{},
+					DryRun:    common.DryRunClient,
+				},
 				&task.PruneTask{
 					TaskName: "prune-0",
 					Objects: []*unstructured.Unstructured{
@@ -1255,6 +1311,12 @@ func TestTaskQueueBuilder_PruneBuild(t *testing.T) {
 			},
 			options: Options{Prune: true},
 			expectedTasks: []taskrunner.Task{
+				&task.InvAddTask{
+					TaskName:  "inventory-add-0",
+					InvClient: &inventory.FakeClient{},
+					InvInfo:   invInfo,
+					Objects:   object.UnstructuredSet{},
+				},
 				&task.PruneTask{
 					TaskName: "prune-0",
 					Objects: []*unstructured.Unstructured{
@@ -1357,6 +1419,12 @@ func TestTaskQueueBuilder_PruneBuild(t *testing.T) {
 			},
 			options: Options{Prune: true},
 			expectedTasks: []taskrunner.Task{
+				&task.InvAddTask{
+					TaskName:  "inventory-add-0",
+					InvClient: &inventory.FakeClient{},
+					InvInfo:   invInfo,
+					Objects:   object.UnstructuredSet{},
+				},
 				&task.PruneTask{
 					TaskName: "prune-0",
 					Objects: []*unstructured.Unstructured{
