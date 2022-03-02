@@ -641,6 +641,22 @@ func TestApplier(t *testing.T) {
 			},
 			expectedStatusEvents: []testutil.ExpEvent{
 				{
+					EventType: event.ActionGroupType,
+					ActionGroupEvent: &testutil.ExpActionGroupEvent{
+						GroupName: "inventory-add-0",
+						Action:    event.InventoryAction,
+						Type:      event.Started,
+					},
+				},
+				{
+					EventType: event.ActionGroupType,
+					ActionGroupEvent: &testutil.ExpActionGroupEvent{
+						GroupName: "inventory-add-0",
+						Action:    event.InventoryAction,
+						Type:      event.Finished,
+					},
+				},
+				{
 					EventType: event.StatusType,
 					StatusEvent: &testutil.ExpStatusEvent{
 						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
@@ -940,6 +956,22 @@ func TestApplier(t *testing.T) {
 				{
 					EventType: event.ActionGroupType,
 					ActionGroupEvent: &testutil.ExpActionGroupEvent{
+						GroupName: "inventory-add-0",
+						Action:    event.InventoryAction,
+						Type:      event.Started,
+					},
+				},
+				{
+					EventType: event.ActionGroupType,
+					ActionGroupEvent: &testutil.ExpActionGroupEvent{
+						GroupName: "inventory-add-0",
+						Action:    event.InventoryAction,
+						Type:      event.Finished,
+					},
+				},
+				{
+					EventType: event.ActionGroupType,
+					ActionGroupEvent: &testutil.ExpActionGroupEvent{
 						GroupName: "prune-0",
 						Action:    event.PruneAction,
 						Type:      event.Started,
@@ -1059,6 +1091,22 @@ func TestApplier(t *testing.T) {
 				{
 					EventType: event.InitType,
 					InitEvent: &testutil.ExpInitEvent{},
+				},
+				{
+					EventType: event.ActionGroupType,
+					ActionGroupEvent: &testutil.ExpActionGroupEvent{
+						GroupName: "inventory-add-0",
+						Action:    event.InventoryAction,
+						Type:      event.Started,
+					},
+				},
+				{
+					EventType: event.ActionGroupType,
+					ActionGroupEvent: &testutil.ExpActionGroupEvent{
+						GroupName: "inventory-add-0",
+						Action:    event.InventoryAction,
+						Type:      event.Finished,
+					},
 				},
 				{
 					EventType: event.ActionGroupType,

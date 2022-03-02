@@ -154,12 +154,8 @@ func (t *TaskQueueBuilder) Build(taskContext *taskrunner.TaskContext, o Options)
 	applyObjs = t.Collector.FilterInvalidObjects(applyObjs)
 	pruneObjs = t.Collector.FilterInvalidObjects(pruneObjs)
 
-	if len(applyObjs) > 0 {
-		// Register actuation plan in the inventory
-		for _, id := range object.UnstructuredSetToObjMetadataSet(applyObjs) {
-			taskContext.InventoryManager().AddPendingApply(id)
-		}
-
+	if !o.Destroy {
+		// InvAddTask creates the inventory and adds any objects being applied
 		klog.V(2).Infof("adding inventory add task (%d objects)", len(applyObjs))
 		tasks = append(tasks, &task.InvAddTask{
 			TaskName:  "inventory-add-0",
@@ -168,6 +164,13 @@ func (t *TaskQueueBuilder) Build(taskContext *taskrunner.TaskContext, o Options)
 			Objects:   applyObjs,
 			DryRun:    o.DryRunStrategy,
 		})
+	}
+
+	if len(applyObjs) > 0 {
+		// Register actuation plan in the inventory
+		for _, id := range object.UnstructuredSetToObjMetadataSet(applyObjs) {
+			taskContext.InventoryManager().AddPendingApply(id)
+		}
 
 		// Filter idSetList down to just apply objects
 		applySets := graph.HydrateSetList(idSetList, applyObjs)
