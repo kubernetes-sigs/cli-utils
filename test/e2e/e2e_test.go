@@ -36,6 +36,7 @@ type applierFactoryFunc func() *apply.Applier
 type destroyerFactoryFunc func() *apply.Destroyer
 type invSizeVerifyFunc func(ctx context.Context, c client.Client, name, namespace, id string, count int)
 type invCountVerifyFunc func(ctx context.Context, c client.Client, namespace string, count int)
+type invNotExistsFunc func(ctx context.Context, c client.Client, name, namespace, id string)
 
 type InventoryConfig struct {
 	Strategy             inventory.Strategy
@@ -45,6 +46,7 @@ type InventoryConfig struct {
 	DestroyerFactoryFunc destroyerFactoryFunc
 	InvSizeVerifyFunc    invSizeVerifyFunc
 	InvCountVerifyFunc   invCountVerifyFunc
+	InvNotExistsFunc     invNotExistsFunc
 }
 
 const (
@@ -61,6 +63,7 @@ var inventoryConfigs = map[string]InventoryConfig{
 		DestroyerFactoryFunc: newDefaultInvDestroyer,
 		InvSizeVerifyFunc:    defaultInvSizeVerifyFunc,
 		InvCountVerifyFunc:   defaultInvCountVerifyFunc,
+		InvNotExistsFunc:     defaultInvNotExistsFunc,
 	},
 	CustomTypeInvConfig: {
 		Strategy:             inventory.NameStrategy,
@@ -70,6 +73,7 @@ var inventoryConfigs = map[string]InventoryConfig{
 		DestroyerFactoryFunc: newCustomInvDestroyer,
 		InvSizeVerifyFunc:    customInvSizeVerifyFunc,
 		InvCountVerifyFunc:   customInvCountVerifyFunc,
+		InvNotExistsFunc:     customInvNotExistsFunc,
 	},
 }
 
@@ -161,6 +165,10 @@ var _ = Describe("Applier", func() {
 
 				It("Apply and destroy", func() {
 					applyAndDestroyTest(ctx, c, invConfig, inventoryName, namespace.GetName())
+				})
+
+				It("DryRun", func() {
+					dryRunTest(ctx, c, invConfig, inventoryName, namespace.GetName())
 				})
 
 				It("Deletion Prevention", func() {
@@ -340,6 +348,15 @@ func newDefaultInvDestroyer() *apply.Destroyer {
 	return newDestroyerFromInvFactory(inventory.ClusterClientFactory{})
 }
 
+func defaultInvNotExistsFunc(ctx context.Context, c client.Client, name, namespace, id string) {
+	var cmList v1.ConfigMapList
+	err := c.List(ctx, &cmList,
+		client.MatchingLabels(map[string]string{common.InventoryLabel: id}),
+		client.InNamespace(namespace))
+	Expect(err).ToNot(HaveOccurred())
+	Expect(cmList.Items).To(HaveLen(0), "expected inventory list to be empty")
+}
+
 func defaultInvSizeVerifyFunc(ctx context.Context, c client.Client, name, namespace, id string, count int) {
 	var cmList v1.ConfigMapList
 	err := c.List(ctx, &cmList,
@@ -374,6 +391,14 @@ func newFactory() util.Factory {
 	kubeConfigFlags := genericclioptions.NewConfigFlags(true).WithDeprecatedPasswordFlag()
 	matchVersionKubeConfigFlags := util.NewMatchVersionFlags(kubeConfigFlags)
 	return util.NewFactory(matchVersionKubeConfigFlags)
+}
+
+func customInvNotExistsFunc(ctx context.Context, c client.Client, name, namespace, id string) {
+	var u unstructured.Unstructured
+	u.SetGroupVersionKind(customprovider.InventoryGVK)
+	u.SetName(name)
+	u.SetNamespace(namespace)
+	assertUnstructuredDoesNotExist(ctx, c, &u)
 }
 
 func customInvSizeVerifyFunc(ctx context.Context, c client.Client, name, namespace, _ string, count int) {

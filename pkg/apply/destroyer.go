@@ -147,8 +147,9 @@ func (d *Destroyer) Run(ctx context.Context, invInfo inventory.Info, options Des
 				InvPolicy: options.InventoryPolicy,
 			},
 			filter.DependencyFilter{
-				TaskContext: taskContext,
-				Strategy:    actuation.ActuationStrategyDelete,
+				TaskContext:       taskContext,
+				ActuationStrategy: actuation.ActuationStrategyDelete,
+				DryRunStrategy:    options.DryRunStrategy,
 			},
 		}
 		taskBuilder := &solver.TaskQueueBuilder{

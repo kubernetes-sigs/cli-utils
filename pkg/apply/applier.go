@@ -141,8 +141,9 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.Info, objects objec
 				InvPolicy: options.InventoryPolicy,
 			},
 			filter.DependencyFilter{
-				TaskContext: taskContext,
-				Strategy:    actuation.ActuationStrategyApply,
+				TaskContext:       taskContext,
+				ActuationStrategy: actuation.ActuationStrategyApply,
+				DryRunStrategy:    options.DryRunStrategy,
 			},
 		}
 		// Build list of prune validation filters.
@@ -156,8 +157,9 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.Info, objects objec
 				LocalNamespaces: localNamespaces(invInfo, object.UnstructuredSetToObjMetadataSet(objects)),
 			},
 			filter.DependencyFilter{
-				TaskContext: taskContext,
-				Strategy:    actuation.ActuationStrategyDelete,
+				TaskContext:       taskContext,
+				ActuationStrategy: actuation.ActuationStrategyDelete,
+				DryRunStrategy:    options.DryRunStrategy,
 			},
 		}
 		// Build list of apply mutators.
