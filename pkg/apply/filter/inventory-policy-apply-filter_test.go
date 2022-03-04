@@ -10,8 +10,10 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/kubectl/pkg/scheme"
+	"sigs.k8s.io/cli-utils/pkg/apis/actuation"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
+	"sigs.k8s.io/cli-utils/pkg/testutil"
 )
 
 var invObjTemplate = &unstructured.Unstructured{
@@ -30,57 +32,57 @@ func TestInventoryPolicyApplyFilter(t *testing.T) {
 		inventoryID    string
 		objInventoryID string
 		policy         inventory.Policy
-		filtered       bool
-		isError        bool
+		expectedError  error
 	}{
 		"inventory and object ids match, not filtered": {
 			inventoryID:    "foo",
 			objInventoryID: "foo",
 			policy:         inventory.PolicyMustMatch,
-			filtered:       false,
-			isError:        false,
 		},
 		"inventory and object ids match and adopt, not filtered": {
 			inventoryID:    "foo",
 			objInventoryID: "foo",
 			policy:         inventory.PolicyAdoptIfNoInventory,
-			filtered:       false,
-			isError:        false,
 		},
 		"inventory and object ids do no match and policy must match, filtered and error": {
 			inventoryID:    "foo",
 			objInventoryID: "bar",
 			policy:         inventory.PolicyMustMatch,
-			filtered:       true,
-			isError:        true,
+			expectedError: &inventory.PolicyPreventedActuationError{
+				Strategy: actuation.ActuationStrategyApply,
+				Policy:   inventory.PolicyMustMatch,
+				Status:   inventory.NoMatch,
+			},
 		},
 		"inventory and object ids do no match and adopt if no inventory, filtered and error": {
 			inventoryID:    "foo",
 			objInventoryID: "bar",
 			policy:         inventory.PolicyAdoptIfNoInventory,
-			filtered:       true,
-			isError:        true,
+			expectedError: &inventory.PolicyPreventedActuationError{
+				Strategy: actuation.ActuationStrategyApply,
+				Policy:   inventory.PolicyAdoptIfNoInventory,
+				Status:   inventory.NoMatch,
+			},
 		},
 		"inventory and object ids do no match and adopt all, not filtered": {
 			inventoryID:    "foo",
 			objInventoryID: "bar",
 			policy:         inventory.PolicyAdoptAll,
-			filtered:       false,
-			isError:        false,
 		},
 		"object id empty and adopt all, not filtered": {
 			inventoryID:    "foo",
 			objInventoryID: "",
 			policy:         inventory.PolicyAdoptAll,
-			filtered:       false,
-			isError:        false,
 		},
 		"object id empty and policy must match, filtered and error": {
 			inventoryID:    "foo",
 			objInventoryID: "",
 			policy:         inventory.PolicyMustMatch,
-			filtered:       true,
-			isError:        true,
+			expectedError: &inventory.PolicyPreventedActuationError{
+				Strategy: actuation.ActuationStrategyApply,
+				Policy:   inventory.PolicyMustMatch,
+				Status:   inventory.NoMatch,
+			},
 		},
 	}
 
@@ -103,19 +105,8 @@ func TestInventoryPolicyApplyFilter(t *testing.T) {
 				Inv:       inventory.WrapInventoryInfoObj(invObj),
 				InvPolicy: tc.policy,
 			}
-			actual, reason, err := filter.Filter(obj)
-			if tc.isError != (err != nil) {
-				t.Fatalf("Expected InventoryPolicyFilter error (%v), got (%v)", tc.isError, (err != nil))
-			}
-			if tc.filtered != actual {
-				t.Errorf("InventoryPolicyFilter expected filter (%t), got (%t)", tc.filtered, actual)
-			}
-			if tc.filtered && len(reason) == 0 {
-				t.Errorf("InventoryPolicyFilter filtered; expected but missing Reason")
-			}
-			if !tc.filtered && len(reason) > 0 {
-				t.Errorf("InventoryPolicyFilter not filtered; received unexpected Reason: %s", reason)
-			}
+			err := filter.Filter(obj)
+			testutil.AssertEqual(t, tc.expectedError, err)
 		})
 	}
 }

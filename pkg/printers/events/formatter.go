@@ -62,12 +62,17 @@ func (ef *formatter) FormatApplyEvent(ae event.ApplyEvent) error {
 	gk := ae.Identifier.GroupKind
 	name := ae.Identifier.Name
 	if ae.Error != nil {
-		ef.print("%s apply failed: %s", resourceIDToString(gk, name),
-			ae.Error.Error())
-	} else {
-		ef.print("%s %s", resourceIDToString(gk, name),
-			strings.ToLower(ae.Operation.String()))
+		if ae.Operation == event.Unchanged {
+			ef.print("%s apply skipped: %s", resourceIDToString(gk, name),
+				ae.Error.Error())
+		} else {
+			ef.print("%s apply failed: %s", resourceIDToString(gk, name),
+				ae.Error.Error())
+		}
+		return nil
 	}
+	ef.print("%s %s", resourceIDToString(gk, name),
+		strings.ToLower(ae.Operation.String()))
 	return nil
 }
 
@@ -79,17 +84,23 @@ func (ef *formatter) FormatStatusEvent(se event.StatusEvent) error {
 
 func (ef *formatter) FormatPruneEvent(pe event.PruneEvent) error {
 	gk := pe.Identifier.GroupKind
+	name := pe.Identifier.Name
 	if pe.Error != nil {
-		ef.print("%s prune failed: %s", resourceIDToString(gk, pe.Identifier.Name),
-			pe.Error.Error())
+		if pe.Operation == event.PruneSkipped {
+			ef.print("%s prune skipped: %s", resourceIDToString(gk, name),
+				pe.Error.Error())
+		} else {
+			ef.print("%s prune failed: %s", resourceIDToString(gk, name),
+				pe.Error.Error())
+		}
 		return nil
 	}
 
 	switch pe.Operation {
 	case event.Pruned:
-		ef.print("%s pruned", resourceIDToString(gk, pe.Identifier.Name))
+		ef.print("%s pruned", resourceIDToString(gk, name))
 	case event.PruneSkipped:
-		ef.print("%s prune skipped", resourceIDToString(gk, pe.Identifier.Name))
+		ef.print("%s prune skipped", resourceIDToString(gk, name))
 	}
 	return nil
 }
@@ -99,8 +110,13 @@ func (ef *formatter) FormatDeleteEvent(de event.DeleteEvent) error {
 	name := de.Identifier.Name
 
 	if de.Error != nil {
-		ef.print("%s deletion failed: %s", resourceIDToString(gk, name),
-			de.Error.Error())
+		if de.Operation == event.DeleteSkipped {
+			ef.print("%s delete skipped: %s", resourceIDToString(gk, name),
+				de.Error.Error())
+		} else {
+			ef.print("%s delete failed: %s", resourceIDToString(gk, name),
+				de.Error.Error())
+		}
 		return nil
 	}
 

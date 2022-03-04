@@ -14,7 +14,7 @@ import (
 // events for pruning or deleting.
 type EventFactory interface {
 	CreateSuccessEvent(obj *unstructured.Unstructured) event.Event
-	CreateSkippedEvent(obj *unstructured.Unstructured, reason string) event.Event
+	CreateSkippedEvent(obj *unstructured.Unstructured, err error) event.Event
 	CreateFailedEvent(id object.ObjMetadata, err error) event.Event
 }
 
@@ -50,7 +50,7 @@ func (pef PruneEventFactory) CreateSuccessEvent(obj *unstructured.Unstructured) 
 	}
 }
 
-func (pef PruneEventFactory) CreateSkippedEvent(obj *unstructured.Unstructured, reason string) event.Event {
+func (pef PruneEventFactory) CreateSkippedEvent(obj *unstructured.Unstructured, err error) event.Event {
 	return event.Event{
 		Type: event.PruneType,
 		PruneEvent: event.PruneEvent{
@@ -58,7 +58,7 @@ func (pef PruneEventFactory) CreateSkippedEvent(obj *unstructured.Unstructured, 
 			Operation:  event.PruneSkipped,
 			Object:     obj,
 			Identifier: object.UnstructuredToObjMetadata(obj),
-			Reason:     reason,
+			Error:      err,
 		},
 	}
 }
@@ -92,7 +92,7 @@ func (def DeleteEventFactory) CreateSuccessEvent(obj *unstructured.Unstructured)
 	}
 }
 
-func (def DeleteEventFactory) CreateSkippedEvent(obj *unstructured.Unstructured, reason string) event.Event {
+func (def DeleteEventFactory) CreateSkippedEvent(obj *unstructured.Unstructured, err error) event.Event {
 	return event.Event{
 		Type: event.DeleteType,
 		DeleteEvent: event.DeleteEvent{
@@ -100,7 +100,7 @@ func (def DeleteEventFactory) CreateSkippedEvent(obj *unstructured.Unstructured,
 			Operation:  event.DeleteSkipped,
 			Object:     obj,
 			Identifier: object.UnstructuredToObjMetadata(obj),
-			Reason:     reason,
+			Error:      err,
 		},
 	}
 }

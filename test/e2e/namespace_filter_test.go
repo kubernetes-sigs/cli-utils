@@ -10,8 +10,10 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"sigs.k8s.io/cli-utils/pkg/apis/actuation"
 	"sigs.k8s.io/cli-utils/pkg/apply"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
+	"sigs.k8s.io/cli-utils/pkg/apply/filter"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/testutil"
 	"sigs.k8s.io/cli-utils/test/e2e/e2eutil"
@@ -281,7 +283,13 @@ func namespaceFilterTest(ctx context.Context, c client.Client, invConfig invconf
 				GroupName:  "apply-0",
 				Operation:  event.Unchanged,
 				Identifier: object.UnstructuredToObjMetadata(podBObj),
-				Error:      nil,
+				Error: testutil.EqualError(&filter.DependencyActuationMismatchError{
+					Object:           object.UnstructuredToObjMetadata(podBObj),
+					Strategy:         actuation.ActuationStrategyApply,
+					Relationship:     filter.RelationshipDependency,
+					Relation:         object.UnstructuredToObjMetadata(namespace1Obj),
+					RelationStrategy: actuation.ActuationStrategyDelete,
+				}),
 			},
 		},
 		{
@@ -336,7 +344,9 @@ func namespaceFilterTest(ctx context.Context, c client.Client, invConfig invconf
 				GroupName:  "prune-0",
 				Operation:  event.PruneSkipped,
 				Identifier: object.UnstructuredToObjMetadata(namespace1Obj),
-				Error:      nil,
+				Error: testutil.EqualError(&filter.NamespaceInUseError{
+					Namespace: namespace1Name,
+				}),
 			},
 		},
 		{

@@ -261,15 +261,13 @@ type PruneEvent struct {
 	Identifier object.ObjMetadata
 	Operation  PruneEventOperation
 	Object     *unstructured.Unstructured
-	// If prune is skipped, this reason string explains why
-	Reason string
-	Error  error
+	Error      error
 }
 
 // String returns a string suitable for logging
 func (pe PruneEvent) String() string {
-	return fmt.Sprintf("PruneEvent{ GroupName: %q, Operation: %q, Identifier: %q, Reason: %q, Error: %q }",
-		pe.GroupName, pe.Operation, pe.Identifier, pe.Reason, pe.Error)
+	return fmt.Sprintf("PruneEvent{ GroupName: %q, Operation: %q, Identifier: %q, Error: %q }",
+		pe.GroupName, pe.Operation, pe.Identifier, pe.Error)
 }
 
 //go:generate stringer -type=DeleteEventOperation
@@ -286,15 +284,13 @@ type DeleteEvent struct {
 	Identifier object.ObjMetadata
 	Operation  DeleteEventOperation
 	Object     *unstructured.Unstructured
-	// If delete is skipped, this reason string explains why
-	Reason string
-	Error  error
+	Error      error
 }
 
 // String returns a string suitable for logging
 func (de DeleteEvent) String() string {
-	return fmt.Sprintf("DeleteEvent{ GroupName: %q, Operation: %q, Identifier: %q, Reason: %q, Error: %q }",
-		de.GroupName, de.Operation, de.Identifier, de.Reason, de.Error)
+	return fmt.Sprintf("DeleteEvent{ GroupName: %q, Operation: %q, Identifier: %q, Error: %q }",
+		de.GroupName, de.Operation, de.Identifier, de.Error)
 }
 
 type ValidationEvent struct {

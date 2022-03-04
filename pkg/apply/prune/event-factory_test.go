@@ -4,6 +4,7 @@
 package prune
 
 import (
+	"fmt"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -15,17 +16,20 @@ func TestEventFactory(t *testing.T) {
 	tests := map[string]struct {
 		destroy      bool
 		obj          *unstructured.Unstructured
-		err          error
+		skippedErr   error
+		failedErr    error
 		expectedType event.Type
 	}{
 		"prune events": {
 			destroy:      false,
 			obj:          pod,
+			skippedErr:   fmt.Errorf("fake reason"),
 			expectedType: event.PruneType,
 		},
 		"delete events": {
 			destroy:      true,
 			obj:          pdb,
+			skippedErr:   fmt.Errorf("fake reason"),
 			expectedType: event.DeleteType,
 		},
 	}
@@ -63,7 +67,7 @@ func TestEventFactory(t *testing.T) {
 				t.Errorf("success event expected nil error, got (%s)", err)
 			}
 			// Validate the "skipped" event"
-			actualEvent = eventFactory.CreateSkippedEvent(tc.obj, "fake reason")
+			actualEvent = eventFactory.CreateSkippedEvent(tc.obj, tc.skippedErr)
 			if tc.expectedType != actualEvent.Type {
 				t.Errorf("skipped event expected type (%s), got (%s)",
 					tc.expectedType, actualEvent.Type)
@@ -86,11 +90,11 @@ func TestEventFactory(t *testing.T) {
 			if tc.obj != actualObj {
 				t.Errorf("expected event object (%v), got (%v)", tc.obj, actualObj)
 			}
-			if err != nil {
-				t.Errorf("skipped event expected nil error, got (%s)", err)
+			if tc.skippedErr != err {
+				t.Errorf("skipped event expected error (%s), got (%s)", tc.skippedErr, err)
 			}
 			// Validate the "failed" event"
-			actualEvent = eventFactory.CreateFailedEvent(id, tc.err)
+			actualEvent = eventFactory.CreateFailedEvent(id, tc.failedErr)
 			if tc.expectedType != actualEvent.Type {
 				t.Errorf("failed event expected type (%s), got (%s)",
 					tc.expectedType, actualEvent.Type)
@@ -104,8 +108,8 @@ func TestEventFactory(t *testing.T) {
 			} else {
 				err = actualEvent.DeleteEvent.Error
 			}
-			if tc.err != err {
-				t.Errorf("failed event expected error (%s), got (%s)", tc.err, err)
+			if tc.failedErr != err {
+				t.Errorf("failed event expected error (%s), got (%s)", tc.failedErr, err)
 			}
 		})
 	}

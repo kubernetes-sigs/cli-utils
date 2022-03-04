@@ -5,12 +5,12 @@ package e2e
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"sigs.k8s.io/cli-utils/pkg/apis/actuation"
 	"sigs.k8s.io/cli-utils/pkg/apply"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
@@ -91,10 +91,13 @@ func inventoryPolicyMustMatchTest(ctx context.Context, c client.Client, invConfi
 			EventType: event.ApplyType,
 			ApplyEvent: &testutil.ExpApplyEvent{
 				GroupName:  "apply-0",
+				Operation:  event.Unchanged,
 				Identifier: object.UnstructuredToObjMetadata(deployment1Obj),
-				Error: testutil.EqualErrorType(
-					inventory.NewInventoryOverlapError(errors.New("test")),
-				),
+				Error: &inventory.PolicyPreventedActuationError{
+					Strategy: actuation.ActuationStrategyApply,
+					Policy:   inventory.PolicyMustMatch,
+					Status:   inventory.NoMatch,
+				},
 			},
 		},
 		{

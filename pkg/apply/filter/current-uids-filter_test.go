@@ -8,38 +8,36 @@ import (
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"sigs.k8s.io/cli-utils/pkg/testutil"
 )
 
 func TestCurrentUIDFilter(t *testing.T) {
 	tests := map[string]struct {
-		filterUIDs sets.String
-		objUID     string
-		filtered   bool
+		filterUIDs    sets.String
+		objUID        string
+		expectedError error
 	}{
 		"Empty filter UIDs, object is not filtered": {
 			filterUIDs: sets.NewString(),
 			objUID:     "bar",
-			filtered:   false,
 		},
 		"Empty object UID, object is not filtered": {
 			filterUIDs: sets.NewString("foo"),
 			objUID:     "",
-			filtered:   false,
 		},
 		"Object UID not in filter UID set, object is not filtered": {
 			filterUIDs: sets.NewString("foo", "baz"),
 			objUID:     "bar",
-			filtered:   false,
 		},
 		"Object UID is in filter UID set, object is filtered": {
-			filterUIDs: sets.NewString("foo"),
-			objUID:     "foo",
-			filtered:   true,
+			filterUIDs:    sets.NewString("foo"),
+			objUID:        "foo",
+			expectedError: &ApplyPreventedDeletionError{UID: "foo"},
 		},
 		"Object UID is among several filter UIDs, object is filtered": {
-			filterUIDs: sets.NewString("foo", "bar", "baz"),
-			objUID:     "foo",
-			filtered:   true,
+			filterUIDs:    sets.NewString("foo", "bar", "baz"),
+			objUID:        "foo",
+			expectedError: &ApplyPreventedDeletionError{UID: "foo"},
 		},
 	}
 
@@ -50,19 +48,8 @@ func TestCurrentUIDFilter(t *testing.T) {
 			}
 			obj := defaultObj.DeepCopy()
 			obj.SetUID(types.UID(tc.objUID))
-			actual, reason, err := filter.Filter(obj)
-			if err != nil {
-				t.Fatalf("CurrentUIDFilter unexpected error (%s)", err)
-			}
-			if tc.filtered != actual {
-				t.Errorf("CurrentUIDFilter expected filter (%t), got (%t)", tc.filtered, actual)
-			}
-			if tc.filtered && len(reason) == 0 {
-				t.Errorf("CurrentUIDFilter filtered; expected but missing Reason")
-			}
-			if !tc.filtered && len(reason) > 0 {
-				t.Errorf("CurrentUIDFilter not filtered; received unexpected Reason: %s", reason)
-			}
+			err := filter.Filter(obj)
+			testutil.AssertEqual(t, tc.expectedError, err)
 		})
 	}
 }

@@ -133,6 +133,9 @@ Apply the three resources to the cluster.
 <!-- @runApply @testE2EAgainstLatestRelease -->
 ```
 kapply apply $BASE --reconcile-timeout=1m | tee $OUTPUT/status
+
+expectedOutputLine "3 resource(s) applied. 3 created, 0 unchanged, 0 configured, 0 failed"
+expectedOutputLine "3 resource(s) reconciled, 0 skipped, 0 failed to reconcile, 0 timed out"
 ```
 
 Use the preview command to show what will happen if we run destroy. This should
@@ -143,10 +146,9 @@ command.
 kapply preview --destroy $BASE | tee $OUTPUT/status
 
 expectedOutputLine "configmap/firstmap deleted"
-
-expectedOutputLine "configmap/secondmap delete skipped"
-
-expectedOutputLine "configmap/thirdmap delete skipped"
+expectedOutputLine 'configmap/secondmap delete skipped: annotation prevents deletion ("cli-utils.sigs.k8s.io/on-remove": "keep")'
+expectedOutputLine 'configmap/thirdmap delete skipped: annotation prevents deletion ("client.lifecycle.config.k8s.io/deletion": "detach")'
+expectedOutputLine "1 resource(s) deleted, 2 skipped"
 ```
 
 We run the destroy command and see that the resource without the annotations (firstmap)
@@ -157,12 +159,15 @@ cluster.
 kapply destroy $BASE | tee $OUTPUT/status
 
 expectedOutputLine "configmap/firstmap deleted"
-
-expectedOutputLine "configmap/secondmap delete skipped"
-
-expectedOutputLine "configmap/thirdmap delete skipped"
-
+expectedOutputLine 'configmap/secondmap delete skipped: annotation prevents deletion ("cli-utils.sigs.k8s.io/on-remove": "keep")'
+expectedOutputLine 'configmap/thirdmap delete skipped: annotation prevents deletion ("client.lifecycle.config.k8s.io/deletion": "detach")'
 expectedOutputLine "1 resource(s) deleted, 2 skipped"
+
+expectedOutputLine "configmap/firstmap reconciled"
+expectedOutputLine "configmap/secondmap reconcile skipped"
+expectedOutputLine "configmap/thirdmap reconcile skipped"
+expectedOutputLine "1 resource(s) reconciled, 2 skipped, 0 failed to reconcile, 0 timed out"
+
 expectedNotFound "resource(s) pruned"
 
 kubectl get cm --no-headers | awk '{print $1}' | tee $OUTPUT/status
@@ -194,7 +199,6 @@ will instead be skipped due to the lifecycle directive.
 kapply preview $BASE | tee $OUTPUT/status
 
 expectedOutputLine "configmap/secondmap prune skipped"
-
 expectedOutputLine "configmap/thirdmap prune skipped"
 ```
 
@@ -204,7 +208,6 @@ Run apply and verify that secondmap and thirdmap are still in the cluster.
 kapply apply $BASE | tee $OUTPUT/status
 
 expectedOutputLine "configmap/secondmap prune skipped"
-
 expectedOutputLine "configmap/thirdmap prune skipped"
 
 kubectl get cm --no-headers | awk '{print $1}' | tee $OUTPUT/status
