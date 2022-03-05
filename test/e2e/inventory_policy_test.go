@@ -357,7 +357,7 @@ func inventoryPolicyAdoptIfNoInventoryTest(ctx context.Context, c client.Client,
 	Expect(value).To(Equal(invName))
 
 	invConfig.InvCountVerifyFunc(ctx, c, namespaceName, 1)
-	invConfig.InvSizeVerifyFunc(ctx, c, invName, namespaceName, invName, 1)
+	invConfig.InvSizeVerifyFunc(ctx, c, invName, namespaceName, invName, 1, 1)
 }
 
 func inventoryPolicyAdoptAllTest(ctx context.Context, c client.Client, invConfig InventoryConfig, namespaceName string) {

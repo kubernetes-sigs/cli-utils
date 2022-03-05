@@ -54,6 +54,7 @@ type ClusterClient struct {
 	mapper                meta.RESTMapper
 	InventoryFactoryFunc  StorageFactoryFunc
 	invToUnstructuredFunc ToUnstructuredFunc
+	statusPolicy          StatusPolicy
 }
 
 var _ Client = &ClusterClient{}
@@ -62,7 +63,9 @@ var _ Client = &ClusterClient{}
 // Client interface or an error.
 func NewClient(factory cmdutil.Factory,
 	invFunc StorageFactoryFunc,
-	invToUnstructuredFunc ToUnstructuredFunc) (*ClusterClient, error) {
+	invToUnstructuredFunc ToUnstructuredFunc,
+	statusPolicy StatusPolicy,
+) (*ClusterClient, error) {
 	dc, err := factory.DynamicClient()
 	if err != nil {
 		return nil, err
@@ -81,6 +84,7 @@ func NewClient(factory cmdutil.Factory,
 		mapper:                mapper,
 		InventoryFactoryFunc:  invFunc,
 		invToUnstructuredFunc: invToUnstructuredFunc,
+		statusPolicy:          statusPolicy,
 	}
 	return &clusterClient, nil
 }
@@ -451,6 +455,10 @@ func (cic *ClusterClient) getMapping(obj *unstructured.Unstructured) (*meta.REST
 }
 
 func (cic *ClusterClient) updateStatus(obj *unstructured.Unstructured, dryRun common.DryRunStrategy) error {
+	if cic.statusPolicy != StatusPolicyAll {
+		klog.V(4).Infof("inventory status update skipped (StatusPolicy: %s)", cic.statusPolicy)
+		return nil
+	}
 	if dryRun.ClientOrServerDryRun() {
 		klog.V(4).Infof("dry-run update inventory status: not updated")
 		return nil

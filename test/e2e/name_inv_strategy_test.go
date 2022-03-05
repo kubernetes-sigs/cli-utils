@@ -32,7 +32,7 @@ func applyWithExistingInvTest(ctx context.Context, c client.Client, invConfig In
 	}))
 
 	By("Verify inventory")
-	invConfig.InvSizeVerifyFunc(ctx, c, inventoryName, namespaceName, orgInventoryID, 1)
+	invConfig.InvSizeVerifyFunc(ctx, c, inventoryName, namespaceName, orgInventoryID, 1, 1)
 
 	By("Apply second set of resources, using same inventory name but different ID")
 	secondInventoryID := fmt.Sprintf("%s-%s-2", inventoryName, namespaceName)

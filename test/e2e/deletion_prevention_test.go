@@ -47,7 +47,7 @@ func deletionPreventionTest(ctx context.Context, c client.Client, invConfig Inve
 	Expect(obj.GetAnnotations()[inventory.OwningInventoryKey]).To(Equal(inventoryInfo.ID()))
 
 	By("Verify the inventory size is 3")
-	invConfig.InvSizeVerifyFunc(ctx, c, inventoryName, namespaceName, inventoryID, 3)
+	invConfig.InvSizeVerifyFunc(ctx, c, inventoryName, namespaceName, inventoryID, 3, 3)
 
 	By("Dry-run apply resources")
 	resources = []*unstructured.Unstructured{
@@ -72,7 +72,7 @@ func deletionPreventionTest(ctx context.Context, c client.Client, invConfig Inve
 	Expect(obj.GetAnnotations()[inventory.OwningInventoryKey]).To(Equal(inventoryInfo.ID()))
 
 	By("Verify the inventory size is still 3")
-	invConfig.InvSizeVerifyFunc(ctx, c, inventoryName, namespaceName, inventoryID, 3)
+	invConfig.InvSizeVerifyFunc(ctx, c, inventoryName, namespaceName, inventoryID, 3, 3)
 
 	By("Apply resources")
 	resources = []*unstructured.Unstructured{
@@ -96,5 +96,5 @@ func deletionPreventionTest(ctx context.Context, c client.Client, invConfig Inve
 	Expect(obj.GetAnnotations()[inventory.OwningInventoryKey]).To(Equal(""))
 
 	By("Verify the inventory size is 1")
-	invConfig.InvSizeVerifyFunc(ctx, c, inventoryName, namespaceName, inventoryID, 1)
+	invConfig.InvSizeVerifyFunc(ctx, c, inventoryName, namespaceName, inventoryID, 1, 3)
 }

@@ -77,7 +77,7 @@ func emptySetTest(ctx context.Context, c client.Client, invConfig InventoryConfi
 	Expect(testutil.EventsToExpEvents(applierEvents)).To(testutil.Equal(expEvents))
 
 	By("Verify inventory created")
-	invConfig.InvSizeVerifyFunc(ctx, c, inventoryName, namespaceName, inventoryID, 0)
+	invConfig.InvSizeVerifyFunc(ctx, c, inventoryName, namespaceName, inventoryID, 0, 0)
 
 	By("Destroy zero resources")
 	destroyer := invConfig.DestroyerFactoryFunc()

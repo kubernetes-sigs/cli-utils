@@ -44,7 +44,7 @@ spec:
             type: object
           spec:
             properties:
-              inventory:
+              objects:
                 items:
                   properties:
                     group:
@@ -63,10 +63,41 @@ spec:
                   type: object
                 type: array
             type: object
+          status:
+            properties:
+              objects:
+                items:
+                  properties:
+                    group:
+                      type: string
+                    kind:
+                      type: string
+                    name:
+                      type: string
+                    namespace:
+                      type: string
+                    strategy:
+                      type: string
+                    actuation:
+                      type: string
+                    reconcile:
+                      type: string
+                  required:
+                  - group
+                  - kind
+                  - name
+                  - namespace
+                  - strategy
+                  - actuation
+                  - reconcile
+                  type: object
+                type: array
+            type: object
         type: object
     served: true
     storage: true
-    subresources: {}
+    subresources:
+      status: {}
 `))
 
 var InventoryGVK = schema.GroupVersionKind{
@@ -81,7 +112,8 @@ type CustomClientFactory struct {
 }
 
 func (CustomClientFactory) NewClient(factory util.Factory) (inventory.Client, error) {
-	return inventory.NewClient(factory, WrapInventoryObj, invToUnstructuredFunc)
+	return inventory.NewClient(factory,
+		WrapInventoryObj, invToUnstructuredFunc, inventory.StatusPolicyAll)
 }
 
 func invToUnstructuredFunc(inv inventory.Info) *unstructured.Unstructured {
@@ -131,7 +163,7 @@ func (i InventoryCustomType) ID() string {
 
 func (i InventoryCustomType) Load() (object.ObjMetadataSet, error) {
 	var inv object.ObjMetadataSet
-	s, found, err := unstructured.NestedSlice(i.inv.Object, "spec", "inventory")
+	s, found, err := unstructured.NestedSlice(i.inv.Object, "spec", "objects")
 	if err != nil {
 		return inv, err
 	}
@@ -157,20 +189,44 @@ func (i InventoryCustomType) Load() (object.ObjMetadataSet, error) {
 	return inv, nil
 }
 
-func (i InventoryCustomType) Store(objs object.ObjMetadataSet, _ []actuation.ObjectStatus) error {
-	var inv []interface{}
+func (i InventoryCustomType) Store(objs object.ObjMetadataSet, status []actuation.ObjectStatus) error {
+	var specObjs []interface{}
 	for _, obj := range objs {
-		inv = append(inv, map[string]interface{}{
+		specObjs = append(specObjs, map[string]interface{}{
 			"group":     obj.GroupKind.Group,
 			"kind":      obj.GroupKind.Kind,
 			"namespace": obj.Namespace,
 			"name":      obj.Name,
 		})
 	}
-	if len(inv) > 0 {
-		return unstructured.SetNestedSlice(i.inv.Object, inv, "spec", "inventory")
+	var statusObjs []interface{}
+	for _, objStatus := range status {
+		statusObjs = append(statusObjs, map[string]interface{}{
+			"group":     objStatus.Group,
+			"kind":      objStatus.Kind,
+			"namespace": objStatus.Namespace,
+			"name":      objStatus.Name,
+			"strategy":  objStatus.Strategy.String(),
+			"actuation": objStatus.Actuation.String(),
+			"reconcile": objStatus.Reconcile.String(),
+		})
 	}
-	unstructured.RemoveNestedField(i.inv.Object, "spec")
+	if len(specObjs) > 0 {
+		err := unstructured.SetNestedSlice(i.inv.Object, specObjs, "spec", "objects")
+		if err != nil {
+			return err
+		}
+	} else {
+		unstructured.RemoveNestedField(i.inv.Object, "spec")
+	}
+	if len(statusObjs) > 0 {
+		err := unstructured.SetNestedSlice(i.inv.Object, statusObjs, "status", "objects")
+		if err != nil {
+			return err
+		}
+	} else {
+		unstructured.RemoveNestedField(i.inv.Object, "status")
+	}
 	return nil
 }
 
