@@ -34,7 +34,7 @@ type inventoryFactoryFunc func(name, namespace, id string) *unstructured.Unstruc
 type invWrapperFunc func(*unstructured.Unstructured) inventory.Info
 type applierFactoryFunc func() *apply.Applier
 type destroyerFactoryFunc func() *apply.Destroyer
-type invSizeVerifyFunc func(ctx context.Context, c client.Client, name, namespace, id string, count int)
+type invSizeVerifyFunc func(ctx context.Context, c client.Client, name, namespace, id string, specCount, statusCount int)
 type invCountVerifyFunc func(ctx context.Context, c client.Client, namespace string, count int)
 type invNotExistsFunc func(ctx context.Context, c client.Client, name, namespace, id string)
 
@@ -361,19 +361,20 @@ func defaultInvNotExistsFunc(ctx context.Context, c client.Client, name, namespa
 	Expect(cmList.Items).To(HaveLen(0), "expected inventory list to be empty")
 }
 
-func defaultInvSizeVerifyFunc(ctx context.Context, c client.Client, name, namespace, id string, count int) {
+func defaultInvSizeVerifyFunc(ctx context.Context, c client.Client, name, namespace, id string, specCount, _ int) {
 	var cmList v1.ConfigMapList
 	err := c.List(ctx, &cmList,
 		client.MatchingLabels(map[string]string{common.InventoryLabel: id}),
 		client.InNamespace(namespace))
-	Expect(err).ToNot(HaveOccurred())
+	Expect(err).WithOffset(1).ToNot(HaveOccurred(), "listing ConfigMap inventory from cluster")
 
-	Expect(len(cmList.Items)).To(Equal(1))
-	cm := cmList.Items[0]
-	Expect(err).ToNot(HaveOccurred())
+	Expect(len(cmList.Items)).WithOffset(1).To(Equal(1), "number of inventory objects by label")
 
-	data := cm.Data
-	Expect(len(data)).To(Equal(count))
+	data := cmList.Items[0].Data
+	Expect(len(data)).WithOffset(1).To(Equal(specCount), "inventory spec.data length")
+
+	// Don't validate status size.
+	// ConfigMap provider uses inventory.StatusPolicyNone.
 }
 
 func defaultInvCountVerifyFunc(ctx context.Context, c client.Client, namespace string, count int) {
@@ -405,24 +406,30 @@ func customInvNotExistsFunc(ctx context.Context, c client.Client, name, namespac
 	assertUnstructuredDoesNotExist(ctx, c, &u)
 }
 
-func customInvSizeVerifyFunc(ctx context.Context, c client.Client, name, namespace, _ string, count int) {
+func customInvSizeVerifyFunc(ctx context.Context, c client.Client, name, namespace, _ string, specCount, statusCount int) {
 	var u unstructured.Unstructured
 	u.SetGroupVersionKind(customprovider.InventoryGVK)
 	err := c.Get(ctx, types.NamespacedName{
 		Name:      name,
 		Namespace: namespace,
 	}, &u)
-	Expect(err).ToNot(HaveOccurred())
+	Expect(err).WithOffset(1).ToNot(HaveOccurred(), "getting custom inventory from cluster")
 
-	s, found, err := unstructured.NestedSlice(u.Object, "spec", "inventory")
-	Expect(err).ToNot(HaveOccurred())
-
-	if !found {
-		Expect(count).To(Equal(0))
-		return
+	s, found, err := unstructured.NestedSlice(u.Object, "spec", "objects")
+	Expect(err).WithOffset(1).ToNot(HaveOccurred(), "reading inventory spec.objects")
+	if found {
+		Expect(len(s)).WithOffset(1).To(Equal(specCount), "inventory status.objects length")
+	} else {
+		Expect(specCount).WithOffset(1).To(Equal(0), "inventory spec.objects not found")
 	}
 
-	Expect(len(s)).To(Equal(count))
+	s, found, err = unstructured.NestedSlice(u.Object, "status", "objects")
+	Expect(err).WithOffset(1).ToNot(HaveOccurred(), "reading inventory status.objects")
+	if found {
+		Expect(len(s)).WithOffset(1).To(Equal(statusCount), "inventory status.objects length")
+	} else {
+		Expect(statusCount).WithOffset(1).To(Equal(0), "inventory status.objects not found")
+	}
 }
 
 func customInvCountVerifyFunc(ctx context.Context, c client.Client, namespace string, count int) {

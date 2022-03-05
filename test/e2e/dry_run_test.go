@@ -190,7 +190,7 @@ func dryRunTest(ctx context.Context, c client.Client, invConfig InventoryConfig,
 	assertUnstructuredExists(ctx, c, podBObj)
 
 	By("Verify inventory size")
-	invConfig.InvSizeVerifyFunc(ctx, c, inventoryName, namespaceName, inventoryID, 2)
+	invConfig.InvSizeVerifyFunc(ctx, c, inventoryName, namespaceName, inventoryID, 2, 2)
 
 	By("Destroy with DryRun")
 	destroyer := invConfig.DestroyerFactoryFunc()

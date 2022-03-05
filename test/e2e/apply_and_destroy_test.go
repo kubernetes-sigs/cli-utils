@@ -187,7 +187,7 @@ func applyAndDestroyTest(ctx context.Context, c client.Client, invConfig Invento
 	assertUnstructuredExists(ctx, c, deployment1Obj)
 
 	By("Verify inventory")
-	invConfig.InvSizeVerifyFunc(ctx, c, inventoryName, namespaceName, inventoryID, 1)
+	invConfig.InvSizeVerifyFunc(ctx, c, inventoryName, namespaceName, inventoryID, 1, 1)
 
 	By("Destroy resources")
 	destroyer := invConfig.DestroyerFactoryFunc()

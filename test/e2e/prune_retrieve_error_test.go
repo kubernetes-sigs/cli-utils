@@ -157,7 +157,7 @@ func pruneRetrieveErrorTest(ctx context.Context, c client.Client, invConfig Inve
 
 	By("Verify inventory")
 	// The inventory should still have the previously deleted item.
-	invConfig.InvSizeVerifyFunc(ctx, c, inventoryName, namespaceName, inventoryID, 1)
+	invConfig.InvSizeVerifyFunc(ctx, c, inventoryName, namespaceName, inventoryID, 1, 1)
 
 	By("apply a different resource, and validate the inventory accurately reflects only this object")
 	pod2Obj := withNamespace(manifestToUnstructured(pod2), namespaceName)
@@ -291,7 +291,7 @@ func pruneRetrieveErrorTest(ctx context.Context, c client.Client, invConfig Inve
 
 	By("Verify inventory")
 	// The inventory should only have the currently applied item.
-	invConfig.InvSizeVerifyFunc(ctx, c, inventoryName, namespaceName, inventoryID, 1)
+	invConfig.InvSizeVerifyFunc(ctx, c, inventoryName, namespaceName, inventoryID, 1, 1)
 
 	By("Destroy resources")
 	destroyer := invConfig.DestroyerFactoryFunc()
