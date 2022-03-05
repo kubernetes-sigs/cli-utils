@@ -39,10 +39,11 @@ func podData(name string) map[string]string {
 
 func TestGetClusterInventoryInfo(t *testing.T) {
 	tests := map[string]struct {
-		inv       Info
-		localObjs object.ObjMetadataSet
-		objStatus []actuation.ObjectStatus
-		isError   bool
+		statusPolicy StatusPolicy
+		inv          Info
+		localObjs    object.ObjMetadataSet
+		objStatus    []actuation.ObjectStatus
+		isError      bool
 	}{
 		"Nil local inventory object is an error": {
 			inv:       nil,
@@ -83,7 +84,7 @@ func TestGetClusterInventoryInfo(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			invClient, err := NewClient(tf,
-				WrapInventoryObj, InvInfoToConfigMap)
+				WrapInventoryObj, InvInfoToConfigMap, tc.statusPolicy)
 			require.NoError(t, err)
 
 			var inv *unstructured.Unstructured
@@ -116,11 +117,12 @@ func TestGetClusterInventoryInfo(t *testing.T) {
 
 func TestMerge(t *testing.T) {
 	tests := map[string]struct {
-		localInv    Info
-		localObjs   object.ObjMetadataSet
-		clusterObjs object.ObjMetadataSet
-		pruneObjs   object.ObjMetadataSet
-		isError     bool
+		statusPolicy StatusPolicy
+		localInv     Info
+		localObjs    object.ObjMetadataSet
+		clusterObjs  object.ObjMetadataSet
+		pruneObjs    object.ObjMetadataSet
+		isError      bool
 	}{
 		"Nil local inventory object is error": {
 			localInv:    nil,
@@ -188,7 +190,7 @@ func TestMerge(t *testing.T) {
 				tf.FakeDynamicClient.PrependReactor("list", "configmaps", toReactionFunc(tc.clusterObjs))
 				// Create the local inventory object storing "tc.localObjs"
 				invClient, err := NewClient(tf,
-					WrapInventoryObj, InvInfoToConfigMap)
+					WrapInventoryObj, InvInfoToConfigMap, tc.statusPolicy)
 				require.NoError(t, err)
 
 				// Call "Merge" to create the union of clusterObjs and localObjs.
@@ -212,10 +214,11 @@ func TestMerge(t *testing.T) {
 
 func TestCreateInventory(t *testing.T) {
 	tests := map[string]struct {
-		inv       Info
-		localObjs object.ObjMetadataSet
-		error     string
-		objStatus []actuation.ObjectStatus
+		statusPolicy StatusPolicy
+		inv          Info
+		localObjs    object.ObjMetadataSet
+		error        string
+		objStatus    []actuation.ObjectStatus
 	}{
 		"Nil local inventory object is an error": {
 			inv:       nil,
@@ -260,7 +263,7 @@ func TestCreateInventory(t *testing.T) {
 			})
 
 			invClient, err := NewClient(tf,
-				WrapInventoryObj, InvInfoToConfigMap)
+				WrapInventoryObj, InvInfoToConfigMap, tc.statusPolicy)
 			require.NoError(t, err)
 			inv := invClient.invToUnstructuredFunc(tc.inv)
 			if inv != nil {
@@ -288,10 +291,11 @@ func TestCreateInventory(t *testing.T) {
 
 func TestReplace(t *testing.T) {
 	tests := map[string]struct {
-		localObjs   object.ObjMetadataSet
-		clusterObjs object.ObjMetadataSet
-		objStatus   []actuation.ObjectStatus
-		data        map[string]string
+		statusPolicy StatusPolicy
+		localObjs    object.ObjMetadataSet
+		clusterObjs  object.ObjMetadataSet
+		objStatus    []actuation.ObjectStatus
+		data         map[string]string
 	}{
 		"Cluster and local inventories empty": {
 			localObjs:   object.ObjMetadataSet{},
@@ -336,7 +340,8 @@ func TestReplace(t *testing.T) {
 	defer tf.Cleanup()
 
 	// Client and server dry-run do not throw errors.
-	invClient, err := NewClient(tf, WrapInventoryObj, InvInfoToConfigMap)
+	invClient, err := NewClient(tf,
+		WrapInventoryObj, InvInfoToConfigMap, StatusPolicyAll)
 	require.NoError(t, err)
 	err = invClient.Replace(copyInventory(), object.ObjMetadataSet{}, nil, common.DryRunClient)
 	if err != nil {
@@ -351,7 +356,7 @@ func TestReplace(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			// Create inventory client, and store the cluster objs in the inventory object.
 			invClient, err := NewClient(tf,
-				WrapInventoryObj, InvInfoToConfigMap)
+				WrapInventoryObj, InvInfoToConfigMap, tc.statusPolicy)
 			require.NoError(t, err)
 			wrappedInv := invClient.InventoryFactoryFunc(inventoryObj)
 			if err := wrappedInv.Store(tc.clusterObjs, tc.objStatus); err != nil {
@@ -388,9 +393,10 @@ func TestReplace(t *testing.T) {
 
 func TestGetClusterObjs(t *testing.T) {
 	tests := map[string]struct {
-		localInv    Info
-		clusterObjs object.ObjMetadataSet
-		isError     bool
+		statusPolicy StatusPolicy
+		localInv     Info
+		clusterObjs  object.ObjMetadataSet
+		isError      bool
 	}{
 		"Nil cluster inventory is error": {
 			localInv:    nil,
@@ -421,7 +427,7 @@ func TestGetClusterObjs(t *testing.T) {
 			tf.FakeDynamicClient.PrependReactor("list", "configmaps", toReactionFunc(tc.clusterObjs))
 
 			invClient, err := NewClient(tf,
-				WrapInventoryObj, InvInfoToConfigMap)
+				WrapInventoryObj, InvInfoToConfigMap, tc.statusPolicy)
 			require.NoError(t, err)
 			clusterObjs, err := invClient.GetClusterObjs(tc.localInv)
 			if tc.isError {
@@ -442,9 +448,10 @@ func TestGetClusterObjs(t *testing.T) {
 
 func TestDeleteInventoryObj(t *testing.T) {
 	tests := map[string]struct {
-		inv       Info
-		localObjs object.ObjMetadataSet
-		objStatus []actuation.ObjectStatus
+		statusPolicy StatusPolicy
+		inv          Info
+		localObjs    object.ObjMetadataSet
+		objStatus    []actuation.ObjectStatus
 	}{
 		"Nil local inventory object is an error": {
 			inv:       nil,
@@ -483,7 +490,7 @@ func TestDeleteInventoryObj(t *testing.T) {
 				defer tf.Cleanup()
 
 				invClient, err := NewClient(tf,
-					WrapInventoryObj, InvInfoToConfigMap)
+					WrapInventoryObj, InvInfoToConfigMap, tc.statusPolicy)
 				require.NoError(t, err)
 				inv := invClient.invToUnstructuredFunc(tc.inv)
 				if inv != nil {
@@ -500,6 +507,7 @@ func TestDeleteInventoryObj(t *testing.T) {
 
 func TestApplyInventoryNamespace(t *testing.T) {
 	testCases := map[string]struct {
+		statusPolicy   StatusPolicy
 		namespace      *unstructured.Unstructured
 		dryRunStrategy common.DryRunStrategy
 		reactorError   error
@@ -529,7 +537,7 @@ func TestApplyInventoryNamespace(t *testing.T) {
 			})
 
 			invClient, err := NewClient(tf,
-				WrapInventoryObj, InvInfoToConfigMap)
+				WrapInventoryObj, InvInfoToConfigMap, tc.statusPolicy)
 			require.NoError(t, err)
 			err = invClient.ApplyInventoryNamespace(tc.namespace, tc.dryRunStrategy)
 			assert.NoError(t, err)

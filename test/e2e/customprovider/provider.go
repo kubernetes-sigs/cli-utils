@@ -81,7 +81,9 @@ type CustomClientFactory struct {
 }
 
 func (CustomClientFactory) NewClient(factory util.Factory) (inventory.Client, error) {
-	return inventory.NewClient(factory, WrapInventoryObj, invToUnstructuredFunc)
+	// TODO: add status to custom inventory crd and enable StatusPolicyAll
+	return inventory.NewClient(factory,
+		WrapInventoryObj, invToUnstructuredFunc, inventory.StatusPolicyNone)
 }
 
 func invToUnstructuredFunc(inv inventory.Info) *unstructured.Unstructured {
