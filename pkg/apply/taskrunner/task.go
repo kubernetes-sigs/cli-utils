@@ -152,9 +152,6 @@ func (w *WaitTask) startInner(taskContext *TaskContext) {
 	pending := object.ObjMetadataSet{}
 	for _, id := range w.Ids {
 		switch {
-		case w.changedUID(taskContext, id):
-			// replaced
-			w.handleChangedUID(taskContext, id)
 		case w.skipped(taskContext, id):
 			err := taskContext.InventoryManager().SetSkippedReconcile(id)
 			if err != nil {
@@ -162,6 +159,9 @@ func (w *WaitTask) startInner(taskContext *TaskContext) {
 				klog.Errorf("Failed to mark object as skipped reconcile: %v", err)
 			}
 			w.sendEvent(taskContext, id, event.ReconcileSkipped)
+		case w.changedUID(taskContext, id):
+			// replaced
+			w.handleChangedUID(taskContext, id)
 		case w.reconciledByID(taskContext, id):
 			err := taskContext.InventoryManager().SetSuccessfulReconcile(id)
 			if err != nil {
