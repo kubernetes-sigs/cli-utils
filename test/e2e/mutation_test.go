@@ -15,6 +15,8 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/testutil"
+	"sigs.k8s.io/cli-utils/test/e2e/e2eutil"
+	"sigs.k8s.io/cli-utils/test/e2e/invconfig"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -32,15 +34,15 @@ import (
 // port from pod-b into an environment variable of pod-a.
 
 //nolint:dupl // expEvents similar to CRD tests
-func mutationTest(ctx context.Context, c client.Client, invConfig InventoryConfig, inventoryName, namespaceName string) {
+func mutationTest(ctx context.Context, c client.Client, invConfig invconfig.InventoryConfig, inventoryName, namespaceName string) {
 	By("apply resources in order with substitutions based on apply-time-mutation annotation")
 	applier := invConfig.ApplierFactoryFunc()
 
 	inv := invConfig.InvWrapperFunc(invConfig.FactoryFunc(inventoryName, namespaceName, "test"))
 
 	fields := struct{ Namespace string }{Namespace: namespaceName}
-	podAObj := templateToUnstructured(podATemplate, fields)
-	podBObj := templateToUnstructured(podBTemplate, fields)
+	podAObj := e2eutil.TemplateToUnstructured(podATemplate, fields)
+	podBObj := e2eutil.TemplateToUnstructured(podBTemplate, fields)
 
 	// Dependency order: podA -> podB
 	// Apply order: podB, podA
@@ -49,7 +51,7 @@ func mutationTest(ctx context.Context, c client.Client, invConfig InventoryConfi
 		podBObj,
 	}
 
-	applierEvents := runCollect(applier.Run(ctx, inv, resources, apply.ApplierOptions{
+	applierEvents := e2eutil.RunCollect(applier.Run(ctx, inv, resources, apply.ApplierOptions{
 		EmitStatusEvents: false,
 	}))
 
@@ -227,7 +229,7 @@ func mutationTest(ctx context.Context, c client.Client, invConfig InventoryConfi
 	Expect(testutil.EventsToExpEvents(applierEvents)).To(testutil.Equal(expEvents))
 
 	By("verify podB is created and ready")
-	result := assertUnstructuredExists(ctx, c, podBObj)
+	result := e2eutil.AssertUnstructuredExists(ctx, c, podBObj)
 
 	podIP, found, err := object.NestedField(result.Object, "status", "podIP")
 	Expect(err).NotTo(HaveOccurred())
@@ -242,7 +244,7 @@ func mutationTest(ctx context.Context, c client.Client, invConfig InventoryConfi
 	host := fmt.Sprintf("%s:%d", podIP, containerPort)
 
 	By("verify podA is mutated, created, and ready")
-	result = assertUnstructuredExists(ctx, c, podAObj)
+	result = e2eutil.AssertUnstructuredExists(ctx, c, podAObj)
 
 	podIP, found, err = object.NestedField(result.Object, "status", "podIP")
 	Expect(err).NotTo(HaveOccurred())
@@ -257,7 +259,7 @@ func mutationTest(ctx context.Context, c client.Client, invConfig InventoryConfi
 	By("destroy resources in opposite order")
 	destroyer := invConfig.DestroyerFactoryFunc()
 	options := apply.DestroyerOptions{InventoryPolicy: inventory.PolicyAdoptIfNoInventory}
-	destroyerEvents := runCollect(destroyer.Run(ctx, inv, options))
+	destroyerEvents := e2eutil.RunCollect(destroyer.Run(ctx, inv, options))
 
 	expEvents = []testutil.ExpEvent{
 		{
@@ -416,8 +418,8 @@ func mutationTest(ctx context.Context, c client.Client, invConfig InventoryConfi
 	Expect(testutil.EventsToExpEvents(destroyerEvents)).To(testutil.Equal(expEvents))
 
 	By("verify podB deleted")
-	assertUnstructuredDoesNotExist(ctx, c, podBObj)
+	e2eutil.AssertUnstructuredDoesNotExist(ctx, c, podBObj)
 
 	By("verify podA deleted")
-	assertUnstructuredDoesNotExist(ctx, c, podAObj)
+	e2eutil.AssertUnstructuredDoesNotExist(ctx, c, podAObj)
 }

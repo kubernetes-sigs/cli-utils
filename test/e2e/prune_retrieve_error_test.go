@@ -15,23 +15,25 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/testutil"
+	"sigs.k8s.io/cli-utils/test/e2e/e2eutil"
+	"sigs.k8s.io/cli-utils/test/e2e/invconfig"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func pruneRetrieveErrorTest(ctx context.Context, c client.Client, invConfig InventoryConfig, inventoryName, namespaceName string) {
+func pruneRetrieveErrorTest(ctx context.Context, c client.Client, invConfig invconfig.InventoryConfig, inventoryName, namespaceName string) {
 	By("apply a single resource, which is referenced in the inventory")
 	applier := invConfig.ApplierFactoryFunc()
 
 	inventoryID := fmt.Sprintf("%s-%s", inventoryName, namespaceName)
 
-	inv := createInventoryInfo(invConfig, inventoryName, namespaceName, inventoryID)
+	inv := invconfig.CreateInventoryInfo(invConfig, inventoryName, namespaceName, inventoryID)
 
-	pod1Obj := withNamespace(manifestToUnstructured(pod1), namespaceName)
+	pod1Obj := e2eutil.WithNamespace(e2eutil.ManifestToUnstructured(pod1), namespaceName)
 	resource1 := []*unstructured.Unstructured{
 		pod1Obj,
 	}
 
-	applierEvents := runCollect(applier.Run(ctx, inv, resource1, apply.ApplierOptions{
+	applierEvents := e2eutil.RunCollect(applier.Run(ctx, inv, resource1, apply.ApplierOptions{
 		EmitStatusEvents: false,
 	}))
 
@@ -145,7 +147,7 @@ func pruneRetrieveErrorTest(ctx context.Context, c client.Client, invConfig Inve
 	Expect(testutil.EventsToExpEvents(applierEvents)).To(testutil.Equal(expEvents))
 
 	By("Verify pod1 created and ready")
-	result := assertUnstructuredExists(ctx, c, pod1Obj)
+	result := e2eutil.AssertUnstructuredExists(ctx, c, pod1Obj)
 	podIP, found, err := object.NestedField(result.Object, "status", "podIP")
 	Expect(err).NotTo(HaveOccurred())
 	Expect(found).To(BeTrue())
@@ -153,19 +155,19 @@ func pruneRetrieveErrorTest(ctx context.Context, c client.Client, invConfig Inve
 
 	// Delete the previously applied resource, which is referenced in the inventory.
 	By("delete resource, which is referenced in the inventory")
-	deleteUnstructuredAndWait(ctx, c, pod1Obj)
+	e2eutil.DeleteUnstructuredAndWait(ctx, c, pod1Obj)
 
 	By("Verify inventory")
 	// The inventory should still have the previously deleted item.
 	invConfig.InvSizeVerifyFunc(ctx, c, inventoryName, namespaceName, inventoryID, 1, 1)
 
 	By("apply a different resource, and validate the inventory accurately reflects only this object")
-	pod2Obj := withNamespace(manifestToUnstructured(pod2), namespaceName)
+	pod2Obj := e2eutil.WithNamespace(e2eutil.ManifestToUnstructured(pod2), namespaceName)
 	resource2 := []*unstructured.Unstructured{
 		pod2Obj,
 	}
 
-	applierEvents2 := runCollect(applier.Run(ctx, inv, resource2, apply.ApplierOptions{
+	applierEvents2 := e2eutil.RunCollect(applier.Run(ctx, inv, resource2, apply.ApplierOptions{
 		EmitStatusEvents: false,
 	}))
 
@@ -280,14 +282,14 @@ func pruneRetrieveErrorTest(ctx context.Context, c client.Client, invConfig Inve
 	Expect(testutil.EventsToExpEvents(applierEvents2)).To(testutil.Equal(expEvents2))
 
 	By("Verify pod2 created and ready")
-	result = assertUnstructuredExists(ctx, c, pod2Obj)
+	result = e2eutil.AssertUnstructuredExists(ctx, c, pod2Obj)
 	podIP, found, err = object.NestedField(result.Object, "status", "podIP")
 	Expect(err).NotTo(HaveOccurred())
 	Expect(found).To(BeTrue())
 	Expect(podIP).NotTo(BeEmpty()) // use podIP as proxy for readiness
 
 	By("Verify pod1 still deleted")
-	assertUnstructuredDoesNotExist(ctx, c, pod1Obj)
+	e2eutil.AssertUnstructuredDoesNotExist(ctx, c, pod1Obj)
 
 	By("Verify inventory")
 	// The inventory should only have the currently applied item.
@@ -297,7 +299,7 @@ func pruneRetrieveErrorTest(ctx context.Context, c client.Client, invConfig Inve
 	destroyer := invConfig.DestroyerFactoryFunc()
 
 	options := apply.DestroyerOptions{InventoryPolicy: inventory.PolicyAdoptIfNoInventory}
-	destroyerEvents := runCollect(destroyer.Run(ctx, inv, options))
+	destroyerEvents := e2eutil.RunCollect(destroyer.Run(ctx, inv, options))
 
 	expEvents3 := []testutil.ExpEvent{
 		{
@@ -391,8 +393,8 @@ func pruneRetrieveErrorTest(ctx context.Context, c client.Client, invConfig Inve
 	Expect(testutil.EventsToExpEvents(destroyerEvents)).To(testutil.Equal(expEvents3))
 
 	By("Verify pod1 is deleted")
-	assertUnstructuredDoesNotExist(ctx, c, pod1Obj)
+	e2eutil.AssertUnstructuredDoesNotExist(ctx, c, pod1Obj)
 
 	By("Verify pod2 is deleted")
-	assertUnstructuredDoesNotExist(ctx, c, pod2Obj)
+	e2eutil.AssertUnstructuredDoesNotExist(ctx, c, pod2Obj)
 }

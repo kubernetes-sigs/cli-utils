@@ -17,34 +17,36 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/testutil"
+	"sigs.k8s.io/cli-utils/test/e2e/e2eutil"
+	"sigs.k8s.io/cli-utils/test/e2e/invconfig"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func inventoryPolicyMustMatchTest(ctx context.Context, c client.Client, invConfig InventoryConfig, namespaceName string) {
+func inventoryPolicyMustMatchTest(ctx context.Context, c client.Client, invConfig invconfig.InventoryConfig, namespaceName string) {
 	By("Apply first set of resources")
 	applier := invConfig.ApplierFactoryFunc()
 
-	firstInvName := randomString("first-inv-")
+	firstInvName := e2eutil.RandomString("first-inv-")
 	firstInv := invConfig.InvWrapperFunc(invConfig.FactoryFunc(firstInvName, namespaceName, firstInvName))
-	deployment1Obj := withNamespace(manifestToUnstructured(deployment1), namespaceName)
+	deployment1Obj := e2eutil.WithNamespace(e2eutil.ManifestToUnstructured(deployment1), namespaceName)
 	firstResources := []*unstructured.Unstructured{
 		deployment1Obj,
 	}
 
-	runWithNoErr(applier.Run(ctx, firstInv, firstResources, apply.ApplierOptions{
+	e2eutil.RunWithNoErr(applier.Run(ctx, firstInv, firstResources, apply.ApplierOptions{
 		ReconcileTimeout: 2 * time.Minute,
 		EmitStatusEvents: true,
 	}))
 
 	By("Apply second set of resources")
-	secondInvName := randomString("second-inv-")
+	secondInvName := e2eutil.RandomString("second-inv-")
 	secondInv := invConfig.InvWrapperFunc(invConfig.FactoryFunc(secondInvName, namespaceName, secondInvName))
-	deployment1Obj = withNamespace(manifestToUnstructured(deployment1), namespaceName)
+	deployment1Obj = e2eutil.WithNamespace(e2eutil.ManifestToUnstructured(deployment1), namespaceName)
 	secondResources := []*unstructured.Unstructured{
-		withReplicas(deployment1Obj, 6),
+		e2eutil.WithReplicas(deployment1Obj, 6),
 	}
 
-	applierEvents := runCollect(applier.Run(ctx, secondInv, secondResources, apply.ApplierOptions{
+	applierEvents := e2eutil.RunCollect(applier.Run(ctx, secondInv, secondResources, apply.ApplierOptions{
 		ReconcileTimeout: 2 * time.Minute,
 		EmitStatusEvents: true,
 		InventoryPolicy:  inventory.PolicyMustMatch,
@@ -178,7 +180,7 @@ func inventoryPolicyMustMatchTest(ctx context.Context, c client.Client, invConfi
 	Expect(received).To(testutil.Equal(expEvents))
 
 	By("Verify resource wasn't updated")
-	result := assertUnstructuredExists(ctx, c, deployment1Obj)
+	result := e2eutil.AssertUnstructuredExists(ctx, c, deployment1Obj)
 	replicas, found, err := object.NestedField(result.Object, "spec", "replicas")
 	Expect(err).NotTo(HaveOccurred())
 	Expect(found).To(BeTrue())
@@ -187,22 +189,22 @@ func inventoryPolicyMustMatchTest(ctx context.Context, c client.Client, invConfi
 	invConfig.InvCountVerifyFunc(ctx, c, namespaceName, 2)
 }
 
-func inventoryPolicyAdoptIfNoInventoryTest(ctx context.Context, c client.Client, invConfig InventoryConfig, namespaceName string) {
+func inventoryPolicyAdoptIfNoInventoryTest(ctx context.Context, c client.Client, invConfig invconfig.InventoryConfig, namespaceName string) {
 	By("Create unmanaged resource")
-	deployment1Obj := withNamespace(manifestToUnstructured(deployment1), namespaceName)
-	createUnstructuredAndWait(ctx, c, deployment1Obj)
+	deployment1Obj := e2eutil.WithNamespace(e2eutil.ManifestToUnstructured(deployment1), namespaceName)
+	e2eutil.CreateUnstructuredAndWait(ctx, c, deployment1Obj)
 
 	By("Apply resources")
 	applier := invConfig.ApplierFactoryFunc()
 
-	invName := randomString("test-inv-")
+	invName := e2eutil.RandomString("test-inv-")
 	inv := invConfig.InvWrapperFunc(invConfig.FactoryFunc(invName, namespaceName, invName))
-	deployment1Obj = withNamespace(manifestToUnstructured(deployment1), namespaceName)
+	deployment1Obj = e2eutil.WithNamespace(e2eutil.ManifestToUnstructured(deployment1), namespaceName)
 	resources := []*unstructured.Unstructured{
-		withReplicas(deployment1Obj, 6),
+		e2eutil.WithReplicas(deployment1Obj, 6),
 	}
 
-	applierEvents := runCollect(applier.Run(ctx, inv, resources, apply.ApplierOptions{
+	applierEvents := e2eutil.RunCollect(applier.Run(ctx, inv, resources, apply.ApplierOptions{
 		ReconcileTimeout: 2 * time.Minute,
 		EmitStatusEvents: true,
 		InventoryPolicy:  inventory.PolicyAdoptIfNoInventory,
@@ -344,7 +346,7 @@ func inventoryPolicyAdoptIfNoInventoryTest(ctx context.Context, c client.Client,
 	Expect(received).To(testutil.Equal(expEvents))
 
 	By("Verify resource was updated and added to inventory")
-	result := assertUnstructuredExists(ctx, c, deployment1Obj)
+	result := e2eutil.AssertUnstructuredExists(ctx, c, deployment1Obj)
 
 	replicas, found, err := object.NestedField(result.Object, "spec", "replicas")
 	Expect(err).NotTo(HaveOccurred())
@@ -360,31 +362,31 @@ func inventoryPolicyAdoptIfNoInventoryTest(ctx context.Context, c client.Client,
 	invConfig.InvSizeVerifyFunc(ctx, c, invName, namespaceName, invName, 1, 1)
 }
 
-func inventoryPolicyAdoptAllTest(ctx context.Context, c client.Client, invConfig InventoryConfig, namespaceName string) {
+func inventoryPolicyAdoptAllTest(ctx context.Context, c client.Client, invConfig invconfig.InventoryConfig, namespaceName string) {
 	By("Apply an initial set of resources")
 	applier := invConfig.ApplierFactoryFunc()
 
-	firstInvName := randomString("first-inv-")
+	firstInvName := e2eutil.RandomString("first-inv-")
 	firstInv := invConfig.InvWrapperFunc(invConfig.FactoryFunc(firstInvName, namespaceName, firstInvName))
-	deployment1Obj := withNamespace(manifestToUnstructured(deployment1), namespaceName)
+	deployment1Obj := e2eutil.WithNamespace(e2eutil.ManifestToUnstructured(deployment1), namespaceName)
 	firstResources := []*unstructured.Unstructured{
 		deployment1Obj,
 	}
 
-	runWithNoErr(applier.Run(ctx, firstInv, firstResources, apply.ApplierOptions{
+	e2eutil.RunWithNoErr(applier.Run(ctx, firstInv, firstResources, apply.ApplierOptions{
 		ReconcileTimeout: 2 * time.Minute,
 		EmitStatusEvents: true,
 	}))
 
 	By("Apply resources")
-	secondInvName := randomString("test-inv-")
+	secondInvName := e2eutil.RandomString("test-inv-")
 	secondInv := invConfig.InvWrapperFunc(invConfig.FactoryFunc(secondInvName, namespaceName, secondInvName))
-	deployment1Obj = withNamespace(manifestToUnstructured(deployment1), namespaceName)
+	deployment1Obj = e2eutil.WithNamespace(e2eutil.ManifestToUnstructured(deployment1), namespaceName)
 	secondResources := []*unstructured.Unstructured{
-		withReplicas(deployment1Obj, 6),
+		e2eutil.WithReplicas(deployment1Obj, 6),
 	}
 
-	applierEvents := runCollect(applier.Run(ctx, secondInv, secondResources, apply.ApplierOptions{
+	applierEvents := e2eutil.RunCollect(applier.Run(ctx, secondInv, secondResources, apply.ApplierOptions{
 		ReconcileTimeout: 2 * time.Minute,
 		EmitStatusEvents: true,
 		InventoryPolicy:  inventory.PolicyAdoptAll,
@@ -526,7 +528,7 @@ func inventoryPolicyAdoptAllTest(ctx context.Context, c client.Client, invConfig
 	Expect(received).To(testutil.Equal(expEvents))
 
 	By("Verify resource was updated and added to inventory")
-	result := assertUnstructuredExists(ctx, c, deployment1Obj)
+	result := e2eutil.AssertUnstructuredExists(ctx, c, deployment1Obj)
 
 	replicas, found, err := object.NestedField(result.Object, "spec", "replicas")
 	Expect(err).NotTo(HaveOccurred())

@@ -36,12 +36,6 @@ spec:
       openAPIV3Schema:
         description: Example for cli-utils e2e tests
         properties:
-          apiVersion:
-            type: string
-          kind:
-            type: string
-          metadata:
-            type: object
           spec:
             properties:
               objects:

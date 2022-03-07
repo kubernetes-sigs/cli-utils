@@ -15,21 +15,23 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/testutil"
+	"sigs.k8s.io/cli-utils/test/e2e/e2eutil"
+	"sigs.k8s.io/cli-utils/test/e2e/invconfig"
 )
 
-func reconciliationFailed(ctx context.Context, invConfig InventoryConfig, inventoryName, namespaceName string) {
+func reconciliationFailed(ctx context.Context, invConfig invconfig.InventoryConfig, inventoryName, namespaceName string) {
 	By("Apply resources")
 	applier := invConfig.ApplierFactoryFunc()
 	inventoryID := fmt.Sprintf("%s-%s", inventoryName, namespaceName)
 
-	inventoryInfo := createInventoryInfo(invConfig, inventoryName, namespaceName, inventoryID)
+	inventoryInfo := invconfig.CreateInventoryInfo(invConfig, inventoryName, namespaceName, inventoryID)
 
-	podObj := withNodeSelector(withNamespace(manifestToUnstructured(pod1), namespaceName), "foo", "bar")
+	podObj := e2eutil.WithNodeSelector(e2eutil.WithNamespace(e2eutil.ManifestToUnstructured(pod1), namespaceName), "foo", "bar")
 	resources := []*unstructured.Unstructured{
 		podObj,
 	}
 
-	applierEvents := runCollect(applier.Run(ctx, inventoryInfo, resources, apply.ApplierOptions{
+	applierEvents := e2eutil.RunCollect(applier.Run(ctx, inventoryInfo, resources, apply.ApplierOptions{
 		ReconcileTimeout: 2 * time.Minute,
 		EmitStatusEvents: false,
 	}))
@@ -40,19 +42,19 @@ func reconciliationFailed(ctx context.Context, invConfig InventoryConfig, invent
 	Expect(received).To(testutil.Equal(expEvents))
 }
 
-func reconciliationTimeout(ctx context.Context, invConfig InventoryConfig, inventoryName, namespaceName string) {
+func reconciliationTimeout(ctx context.Context, invConfig invconfig.InventoryConfig, inventoryName, namespaceName string) {
 	By("Apply resources")
 	applier := invConfig.ApplierFactoryFunc()
 	inventoryID := fmt.Sprintf("%s-%s", inventoryName, namespaceName)
 
-	inventoryInfo := createInventoryInfo(invConfig, inventoryName, namespaceName, inventoryID)
+	inventoryInfo := invconfig.CreateInventoryInfo(invConfig, inventoryName, namespaceName, inventoryID)
 
-	podObj := podWithImage(withNamespace(manifestToUnstructured(pod1), namespaceName), "kubernetes-pause", "does-not-exist")
+	podObj := e2eutil.PodWithImage(e2eutil.WithNamespace(e2eutil.ManifestToUnstructured(pod1), namespaceName), "kubernetes-pause", "does-not-exist")
 	resources := []*unstructured.Unstructured{
 		podObj,
 	}
 
-	applierEvents := runCollect(applier.Run(ctx, inventoryInfo, resources, apply.ApplierOptions{
+	applierEvents := e2eutil.RunCollect(applier.Run(ctx, inventoryInfo, resources, apply.ApplierOptions{
 		ReconcileTimeout: 30 * time.Second,
 		EmitStatusEvents: false,
 	}))

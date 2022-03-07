@@ -63,6 +63,10 @@ test-e2e: $(MYGOBIN)/ginkgo $(MYGOBIN)/kind
 	kind delete cluster --name=cli-utils-e2e && kind create cluster --name=cli-utils-e2e
 	$(GOPATH)/bin/ginkgo ./test/e2e/...
 
+test-stress: $(MYGOBIN)/ginkgo $(MYGOBIN)/kind
+	kind delete cluster --name=cli-utils-e2e && kind create cluster --name=cli-utils-e2e
+	$(GOPATH)/bin/ginkgo -v ./test/stress/... -- -v 5
+
 vet:
 	go vet ./...
 

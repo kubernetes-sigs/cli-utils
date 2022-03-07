@@ -15,18 +15,20 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/testutil"
+	"sigs.k8s.io/cli-utils/test/e2e/e2eutil"
+	"sigs.k8s.io/cli-utils/test/e2e/invconfig"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func dependsOnTest(ctx context.Context, c client.Client, invConfig InventoryConfig, inventoryName, namespaceName string) {
+func dependsOnTest(ctx context.Context, c client.Client, invConfig invconfig.InventoryConfig, inventoryName, namespaceName string) {
 	By("apply resources in order based on depends-on annotation")
 	applier := invConfig.ApplierFactoryFunc()
 
 	inv := invConfig.InvWrapperFunc(invConfig.FactoryFunc(inventoryName, namespaceName, "test"))
 
-	pod1Obj := withDependsOn(withNamespace(manifestToUnstructured(pod1), namespaceName), fmt.Sprintf("/namespaces/%s/Pod/pod3", namespaceName))
-	pod2Obj := withNamespace(manifestToUnstructured(pod2), namespaceName)
-	pod3Obj := withDependsOn(withNamespace(manifestToUnstructured(pod3), namespaceName), fmt.Sprintf("/namespaces/%s/Pod/pod2", namespaceName))
+	pod1Obj := e2eutil.WithDependsOn(e2eutil.WithNamespace(e2eutil.ManifestToUnstructured(pod1), namespaceName), fmt.Sprintf("/namespaces/%s/Pod/pod3", namespaceName))
+	pod2Obj := e2eutil.WithNamespace(e2eutil.ManifestToUnstructured(pod2), namespaceName)
+	pod3Obj := e2eutil.WithDependsOn(e2eutil.WithNamespace(e2eutil.ManifestToUnstructured(pod3), namespaceName), fmt.Sprintf("/namespaces/%s/Pod/pod2", namespaceName))
 
 	// Dependency order: pod1 -> pod3 -> pod2
 	// Apply order: pod2, pod3, pod1
@@ -36,7 +38,7 @@ func dependsOnTest(ctx context.Context, c client.Client, invConfig InventoryConf
 		pod3Obj,
 	}
 
-	applierEvents := runCollect(applier.Run(ctx, inv, resources, apply.ApplierOptions{
+	applierEvents := e2eutil.RunCollect(applier.Run(ctx, inv, resources, apply.ApplierOptions{
 		EmitStatusEvents: false,
 	}))
 
@@ -278,21 +280,21 @@ func dependsOnTest(ctx context.Context, c client.Client, invConfig InventoryConf
 	Expect(testutil.EventsToExpEvents(applierEvents)).To(testutil.Equal(expEvents))
 
 	By("verify pod1 created and ready")
-	result := assertUnstructuredExists(ctx, c, pod1Obj)
+	result := e2eutil.AssertUnstructuredExists(ctx, c, pod1Obj)
 	podIP, found, err := object.NestedField(result.Object, "status", "podIP")
 	Expect(err).NotTo(HaveOccurred())
 	Expect(found).To(BeTrue())
 	Expect(podIP).NotTo(BeEmpty()) // use podIP as proxy for readiness
 
 	By("verify pod2 created and ready")
-	result = assertUnstructuredExists(ctx, c, pod2Obj)
+	result = e2eutil.AssertUnstructuredExists(ctx, c, pod2Obj)
 	podIP, found, err = object.NestedField(result.Object, "status", "podIP")
 	Expect(err).NotTo(HaveOccurred())
 	Expect(found).To(BeTrue())
 	Expect(podIP).NotTo(BeEmpty()) // use podIP as proxy for readiness
 
 	By("verify pod3 created and ready")
-	result = assertUnstructuredExists(ctx, c, pod3Obj)
+	result = e2eutil.AssertUnstructuredExists(ctx, c, pod3Obj)
 	podIP, found, err = object.NestedField(result.Object, "status", "podIP")
 	Expect(err).NotTo(HaveOccurred())
 	Expect(found).To(BeTrue())
@@ -301,7 +303,7 @@ func dependsOnTest(ctx context.Context, c client.Client, invConfig InventoryConf
 	By("destroy resources in opposite order")
 	destroyer := invConfig.DestroyerFactoryFunc()
 	options := apply.DestroyerOptions{InventoryPolicy: inventory.PolicyAdoptIfNoInventory}
-	destroyerEvents := runCollect(destroyer.Run(ctx, inv, options))
+	destroyerEvents := e2eutil.RunCollect(destroyer.Run(ctx, inv, options))
 
 	expEvents = []testutil.ExpEvent{
 		{
@@ -523,11 +525,11 @@ func dependsOnTest(ctx context.Context, c client.Client, invConfig InventoryConf
 	Expect(testutil.EventsToExpEvents(destroyerEvents)).To(testutil.Equal(expEvents))
 
 	By("verify pod1 deleted")
-	assertUnstructuredDoesNotExist(ctx, c, pod1Obj)
+	e2eutil.AssertUnstructuredDoesNotExist(ctx, c, pod1Obj)
 
 	By("verify pod2 deleted")
-	assertUnstructuredDoesNotExist(ctx, c, pod2Obj)
+	e2eutil.AssertUnstructuredDoesNotExist(ctx, c, pod2Obj)
 
 	By("verify pod3 deleted")
-	assertUnstructuredDoesNotExist(ctx, c, pod3Obj)
+	e2eutil.AssertUnstructuredDoesNotExist(ctx, c, pod3Obj)
 }
