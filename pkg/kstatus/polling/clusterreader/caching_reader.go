@@ -11,9 +11,14 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/tools/pager"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/engine"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -232,13 +237,11 @@ func (c *CachingClusterReader) Sync(ctx context.Context) error {
 			}
 			return err
 		}
-		var listOptions []client.ListOption
+		ns := ""
 		if mapping.Scope == meta.RESTScopeNamespace {
-			listOptions = append(listOptions, client.InNamespace(gn.Namespace))
+			ns = gn.Namespace
 		}
-		var list unstructured.UnstructuredList
-		list.SetGroupVersionKind(mapping.GroupVersionKind)
-		err = c.reader.List(ctx, &list, listOptions...)
+		list, err := c.listUnstructured(ctx, mapping.GroupVersionKind, ns)
 		if err != nil {
 			// If the context was cancelled, we just stop the work and return
 			// the error.
@@ -254,9 +257,82 @@ func (c *CachingClusterReader) Sync(ctx context.Context) error {
 			continue
 		}
 		cache[gn] = cacheEntry{
-			resources: list,
+			resources: *list,
 		}
 	}
 	c.cache = cache
 	return nil
+}
+
+// listUnstructured performs one or more LIST calls, paginating the requests
+// and aggregating the results.  If aggregated, only the ResourceVersion,
+// SelfLink, and Items will be populated. The default page size is 500.
+func (c *CachingClusterReader) listUnstructured(
+	ctx context.Context,
+	gvk schema.GroupVersionKind,
+	namespace string,
+) (*unstructured.UnstructuredList, error) {
+	mOpts := metav1.ListOptions{}
+	mOpts.SetGroupVersionKind(gvk)
+	obj, _, err := pager.New(c.listPageFunc(namespace)).List(ctx, mOpts)
+	if err != nil {
+		return nil, err
+	}
+
+	switch t := obj.(type) {
+	case *unstructured.UnstructuredList:
+		// all in one
+		return t, nil
+	case *metainternalversion.List:
+		// aggregated result
+		u := &unstructured.UnstructuredList{}
+		u.SetGroupVersionKind(gvk)
+		// Only ResourceVersion & SelfLink are copied into the aggregated result
+		// by ListPager.
+		if t.ResourceVersion != "" {
+			u.SetResourceVersion(t.ResourceVersion)
+		}
+		if t.SelfLink != "" {
+			u.SetSelfLink(t.SelfLink)
+		}
+		u.Items = make([]unstructured.Unstructured, len(t.Items))
+		for i, item := range t.Items {
+			ui, ok := item.(*unstructured.Unstructured)
+			if !ok {
+				return nil, fmt.Errorf("unexpected list item type: %t", item)
+			}
+			u.Items[i] = *ui
+		}
+		return u, nil
+	default:
+		return nil, fmt.Errorf("unexpected list type: %t", t)
+	}
+}
+
+func (c *CachingClusterReader) listPageFunc(namespace string) pager.ListPageFunc {
+	return func(ctx context.Context, mOpts metav1.ListOptions) (runtime.Object, error) {
+		mOptsCopy := mOpts
+		labelSelector, err := labels.Parse(mOpts.LabelSelector)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse label selector: %w", err)
+		}
+		fieldSelector, err := fields.ParseSelector(mOpts.FieldSelector)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse field selector: %w", err)
+		}
+		cOpts := &client.ListOptions{
+			LabelSelector: labelSelector,
+			FieldSelector: fieldSelector,
+			Namespace:     namespace,
+			Limit:         mOpts.Limit,
+			Continue:      mOpts.Continue,
+			Raw:           &mOptsCopy,
+		}
+		var list unstructured.UnstructuredList
+		list.SetGroupVersionKind(mOpts.GroupVersionKind())
+		// Note: client.ListOptions only supports Exact ResourceVersion matching.
+		// So leave ResourceVersion blank to get Any ResourceVersion.
+		err = c.reader.List(ctx, &list, cOpts)
+		return &list, err
+	}
 }
