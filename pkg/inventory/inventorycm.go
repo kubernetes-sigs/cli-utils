@@ -107,14 +107,11 @@ func (icm *ConfigMap) Store(objMetas object.ObjMetadataSet, status []actuation.O
 // or an error if one occurs.
 func (icm *ConfigMap) GetObject() (*unstructured.Unstructured, error) {
 	// Create the objMap of all the resources, and compute the hash.
-	objMap, err := buildObjMap(icm.objMetas, icm.objStatus)
-	if err != nil {
-		return nil, err
-	}
+	objMap := buildObjMap(icm.objMetas, icm.objStatus)
 	// Create the inventory object by copying the template.
 	invCopy := icm.inv.DeepCopy()
 	// Adds the inventory map to the ConfigMap "data" section.
-	err = unstructured.SetNestedStringMap(invCopy.UnstructuredContent(),
+	err := unstructured.SetNestedStringMap(invCopy.UnstructuredContent(),
 		objMap, "data")
 	if err != nil {
 		return nil, err
@@ -122,7 +119,7 @@ func (icm *ConfigMap) GetObject() (*unstructured.Unstructured, error) {
 	return invCopy, nil
 }
 
-func buildObjMap(objMetas object.ObjMetadataSet, objStatus []actuation.ObjectStatus) (map[string]string, error) {
+func buildObjMap(objMetas object.ObjMetadataSet, objStatus []actuation.ObjectStatus) map[string]string {
 	objMap := map[string]string{}
 	objStatusMap := map[object.ObjMetadata]actuation.ObjectStatus{}
 	for _, status := range objStatus {
@@ -132,12 +129,11 @@ func buildObjMap(objMetas object.ObjMetadataSet, objStatus []actuation.ObjectSta
 		if status, found := objStatusMap[objMetadata]; found {
 			objMap[objMetadata.String()] = stringFrom(status)
 		} else {
-			// This should never happen since the objStatus have captured all the
-			// object status
-			return nil, fmt.Errorf("object status not found for %s", objMetadata)
+			// It's possible that the passed in status doesn't any object status
+			objMap[objMetadata.String()] = ""
 		}
 	}
-	return objMap, nil
+	return objMap
 }
 
 func stringFrom(status actuation.ObjectStatus) string {

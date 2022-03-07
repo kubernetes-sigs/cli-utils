@@ -37,6 +37,12 @@ func podData(name string) map[string]string {
 	}
 }
 
+func podDataNoStatus(name string) map[string]string {
+	return map[string]string{
+		fmt.Sprintf("test-inventory-namespace_%s__Pod", name): "",
+	}
+}
+
 func TestGetClusterInventoryInfo(t *testing.T) {
 	tests := map[string]struct {
 		statusPolicy StatusPolicy
@@ -125,18 +131,20 @@ func TestMerge(t *testing.T) {
 		isError      bool
 	}{
 		"Nil local inventory object is error": {
-			localInv:    nil,
-			localObjs:   object.ObjMetadataSet{},
-			clusterObjs: object.ObjMetadataSet{},
-			pruneObjs:   object.ObjMetadataSet{},
-			isError:     true,
+			localInv:     nil,
+			localObjs:    object.ObjMetadataSet{},
+			clusterObjs:  object.ObjMetadataSet{},
+			pruneObjs:    object.ObjMetadataSet{},
+			isError:      true,
+			statusPolicy: StatusPolicyAll,
 		},
 		"Cluster and local inventories empty: no prune objects; no change": {
-			localInv:    copyInventory(),
-			localObjs:   object.ObjMetadataSet{},
-			clusterObjs: object.ObjMetadataSet{},
-			pruneObjs:   object.ObjMetadataSet{},
-			isError:     false,
+			localInv:     copyInventory(),
+			localObjs:    object.ObjMetadataSet{},
+			clusterObjs:  object.ObjMetadataSet{},
+			pruneObjs:    object.ObjMetadataSet{},
+			isError:      false,
+			statusPolicy: StatusPolicyAll,
 		},
 		"Cluster and local inventories same: no prune objects; no change": {
 			localInv: copyInventory(),
@@ -146,8 +154,9 @@ func TestMerge(t *testing.T) {
 			clusterObjs: object.ObjMetadataSet{
 				ignoreErrInfoToObjMeta(pod1Info),
 			},
-			pruneObjs: object.ObjMetadataSet{},
-			isError:   false,
+			pruneObjs:    object.ObjMetadataSet{},
+			isError:      false,
+			statusPolicy: StatusPolicyAll,
 		},
 		"Cluster two obj, local one: prune obj": {
 			localInv: copyInventory(),
@@ -161,7 +170,8 @@ func TestMerge(t *testing.T) {
 			pruneObjs: object.ObjMetadataSet{
 				ignoreErrInfoToObjMeta(pod3Info),
 			},
-			isError: false,
+			statusPolicy: StatusPolicyAll,
+			isError:      false,
 		},
 		"Cluster multiple objs, local multiple different objs: prune objs": {
 			localInv: copyInventory(),
@@ -176,7 +186,8 @@ func TestMerge(t *testing.T) {
 				ignoreErrInfoToObjMeta(pod1Info),
 				ignoreErrInfoToObjMeta(pod3Info),
 			},
-			isError: false,
+			statusPolicy: StatusPolicyAll,
+			isError:      false,
 		},
 	}
 
@@ -309,8 +320,9 @@ func TestReplace(t *testing.T) {
 			clusterObjs: object.ObjMetadataSet{
 				ignoreErrInfoToObjMeta(pod1Info),
 			},
-			objStatus: []actuation.ObjectStatus{podStatus(pod1Info)},
-			data:      podData("pod-1"),
+			objStatus:    []actuation.ObjectStatus{podStatus(pod1Info)},
+			data:         podData("pod-1"),
+			statusPolicy: StatusPolicyAll,
 		},
 		"Cluster two obj, local one": {
 			localObjs: object.ObjMetadataSet{
@@ -320,8 +332,9 @@ func TestReplace(t *testing.T) {
 				ignoreErrInfoToObjMeta(pod1Info),
 				ignoreErrInfoToObjMeta(pod3Info),
 			},
-			objStatus: []actuation.ObjectStatus{podStatus(pod1Info), podStatus(pod3Info)},
-			data:      podData("pod-1"),
+			objStatus:    []actuation.ObjectStatus{podStatus(pod1Info), podStatus(pod3Info)},
+			data:         podData("pod-1"),
+			statusPolicy: StatusPolicyAll,
 		},
 		"Cluster multiple objs, local multiple different objs": {
 			localObjs: object.ObjMetadataSet{
@@ -331,8 +344,21 @@ func TestReplace(t *testing.T) {
 				ignoreErrInfoToObjMeta(pod1Info),
 				ignoreErrInfoToObjMeta(pod2Info),
 				ignoreErrInfoToObjMeta(pod3Info)},
-			objStatus: []actuation.ObjectStatus{podStatus(pod2Info), podStatus(pod1Info), podStatus(pod3Info)},
-			data:      podData("pod-2"),
+			objStatus:    []actuation.ObjectStatus{podStatus(pod2Info), podStatus(pod1Info), podStatus(pod3Info)},
+			data:         podData("pod-2"),
+			statusPolicy: StatusPolicyAll,
+		},
+		"Cluster multiple objs, local multiple different objs with StatusPolicyNone": {
+			localObjs: object.ObjMetadataSet{
+				ignoreErrInfoToObjMeta(pod2Info),
+			},
+			clusterObjs: object.ObjMetadataSet{
+				ignoreErrInfoToObjMeta(pod1Info),
+				ignoreErrInfoToObjMeta(pod2Info),
+				ignoreErrInfoToObjMeta(pod3Info)},
+			objStatus:    []actuation.ObjectStatus{podStatus(pod2Info), podStatus(pod1Info), podStatus(pod3Info)},
+			data:         podDataNoStatus("pod-2"),
+			statusPolicy: StatusPolicyNone,
 		},
 	}
 

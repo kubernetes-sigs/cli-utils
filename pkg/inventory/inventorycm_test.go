@@ -54,21 +54,16 @@ func TestBuildObjMap(t *testing.T) {
 		},
 		"empty object status list": {
 			objSet:   object.ObjMetadataSet{ObjMetadataFromObjectReference(obj1), ObjMetadataFromObjectReference(obj2)},
-			hasError: true,
+			hasError: false,
+			expected: map[string]string{
+				"ns_na_group1_Kind": "",
+				"ns_na_group2_Kind": "",
+			},
 		},
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			actual, err := buildObjMap(tc.objSet, tc.objStatus)
-			if tc.hasError {
-				if err == nil {
-					t.Fatalf("expected erroe, but not happened")
-				}
-				return
-			}
-			if err != nil {
-				t.Fatal(err)
-			}
+			actual := buildObjMap(tc.objSet, tc.objStatus)
 			if diff := cmp.Diff(actual, tc.expected); diff != "" {
 				t.Errorf(diff)
 			}

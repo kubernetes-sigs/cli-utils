@@ -345,11 +345,11 @@ func deleteNamespace(ctx context.Context, c client.Client, namespace *v1.Namespa
 }
 
 func newDefaultInvApplier() *apply.Applier {
-	return newApplierFromInvFactory(inventory.ClusterClientFactory{})
+	return newApplierFromInvFactory(inventory.ClusterClientFactory{StatusPolicy: inventory.StatusPolicyAll})
 }
 
 func newDefaultInvDestroyer() *apply.Destroyer {
-	return newDestroyerFromInvFactory(inventory.ClusterClientFactory{})
+	return newDestroyerFromInvFactory(inventory.ClusterClientFactory{StatusPolicy: inventory.StatusPolicyAll})
 }
 
 func defaultInvNotExistsFunc(ctx context.Context, c client.Client, name, namespace, id string) {
