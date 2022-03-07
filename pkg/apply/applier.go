@@ -28,6 +28,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/object/validation"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const defaultPollInterval = 2 * time.Second
@@ -46,7 +47,8 @@ type Applier struct {
 	pruner        *prune.Pruner
 	statusPoller  poller.Poller
 	invClient     inventory.Client
-	client        dynamic.Interface
+	client        client.Client
+	dynamicClient dynamic.Interface
 	openAPIGetter discovery.OpenAPISchemaInterface
 	mapper        meta.RESTMapper
 	infoHelper    info.Helper
@@ -135,7 +137,7 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.Info, objects objec
 		// Build list of apply validation filters.
 		applyFilters := []filter.ValidationFilter{
 			filter.InventoryPolicyApplyFilter{
-				Client:    a.client,
+				Client:    a.dynamicClient,
 				Mapper:    a.mapper,
 				Inv:       invInfo,
 				InvPolicy: options.InventoryPolicy,
@@ -165,14 +167,15 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.Info, objects objec
 		// Build list of apply mutators.
 		applyMutators := []mutator.Interface{
 			&mutator.ApplyTimeMutator{
-				Client:        a.client,
+				Client:        a.dynamicClient,
 				Mapper:        a.mapper,
 				ResourceCache: resourceCache,
 			},
 		}
 		taskBuilder := &solver.TaskQueueBuilder{
 			Pruner:        a.pruner,
-			DynamicClient: a.client,
+			Client:        a.client,
+			DynamicClient: a.dynamicClient,
 			OpenAPIGetter: a.openAPIGetter,
 			InfoHelper:    a.infoHelper,
 			Mapper:        a.mapper,

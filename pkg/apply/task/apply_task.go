@@ -11,6 +11,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
@@ -19,6 +20,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/cmd/apply"
 	cmddelete "k8s.io/kubectl/pkg/cmd/delete"
+	"sigs.k8s.io/cli-utils/pkg/apply/cache"
 	applyerror "sigs.k8s.io/cli-utils/pkg/apply/error"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/filter"
@@ -26,7 +28,11 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/apply/mutator"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
 	"sigs.k8s.io/cli-utils/pkg/common"
+	"sigs.k8s.io/cli-utils/pkg/kstatus/polling"
+	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/clusterreader"
+	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/engine"
 	"sigs.k8s.io/cli-utils/pkg/object"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // applyOptions defines the two key functions on the ApplyOptions
@@ -47,6 +53,7 @@ type applyOptions interface {
 type ApplyTask struct {
 	TaskName string
 
+	Client            client.Client
 	DynamicClient     dynamic.Interface
 	OpenAPIGetter     discovery.OpenAPISchemaInterface
 	InfoHelper        info.Helper
@@ -162,24 +169,72 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 			}
 			if err != nil {
 				if klog.V(4).Enabled() {
-					klog.Errorf("error applying (%s/%s) %s", info.Namespace, info.Name, err)
+					klog.Infof("error applying (%s/%s) %s", info.Namespace, info.Name, err)
 				}
 				taskContext.SendEvent(a.createApplyFailedEvent(
 					id,
 					applyerror.NewApplyRunError(err),
 				))
 				taskContext.InventoryManager().AddFailedApply(id)
-			} else if info.Object != nil {
-				acc, err := meta.Accessor(info.Object)
-				if err == nil {
-					uid := acc.GetUID()
-					gen := acc.GetGeneration()
-					taskContext.InventoryManager().AddSuccessfulApply(id, uid, gen)
+				continue
+			}
+
+			if info.Object == nil {
+				klog.V(5).Infof("apply response missing object (%s/%s)", info.Namespace, info.Name)
+				continue
+			}
+
+			u, ok := info.Object.(*unstructured.Unstructured)
+			if !ok {
+				uMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(info.Object)
+				if err != nil {
+					klog.V(5).Infof("error converting apply response to unstructured (%s/%s): %v", info.Namespace, info.Name, err)
+					continue
 				}
+				u = &unstructured.Unstructured{Object: uMap}
+			}
+
+			klog.V(5).Infof("apply successful (%s/%s)", info.Namespace, info.Name)
+			taskContext.InventoryManager().AddSuccessfulApply(id, u.GetUID(), u.GetGeneration())
+
+			// Update status to shorten wait time with large object sets
+			err = a.updateStatus(ctx, taskContext, u)
+			if err != nil {
+				klog.V(5).Infof("error updating status (%s/%s): %v", info.Namespace, info.Name, err)
 			}
 		}
 		a.sendTaskResult(taskContext)
 	}()
+}
+
+func (a *ApplyTask) updateStatus(ctx context.Context, taskContext *taskrunner.TaskContext, obj *unstructured.Unstructured) error {
+	id := object.UnstructuredToObjMetadata(obj)
+	clusterReaderFactory := engine.ClusterReaderFactoryFunc(clusterreader.NewCachingClusterReader)
+	clusterReader, err := clusterReaderFactory.New(a.Client, a.Mapper, object.ObjMetadataSet{id})
+	if err != nil {
+		return fmt.Errorf("error creating ClusterReader: %w", err)
+	}
+
+	statusReaders, defaultStatusReader := polling.DefaultStatusReaders(a.Mapper)
+	statusReaders = append(statusReaders, defaultStatusReader)
+	for _, statusReader := range statusReaders {
+		if !statusReader.Supports(id.GroupKind) {
+			continue
+		}
+		resourceStatus, err := statusReader.ReadStatusForObject(ctx, clusterReader, obj)
+		if err != nil {
+			return fmt.Errorf("error reading status from apply response: %w", err)
+		}
+
+		taskContext.ResourceCache().Put(id, cache.ResourceStatus{
+			Resource:      resourceStatus.Resource,
+			Status:        resourceStatus.Status,
+			StatusMessage: resourceStatus.Message,
+		})
+		return nil
+	}
+
+	return fmt.Errorf("no supported status readers: %w", err)
 }
 
 func newApplyOptions(taskName string, eventChannel chan<- event.Event, serverSideOptions common.ServerSideOptions,

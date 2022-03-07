@@ -28,7 +28,7 @@ func NewStatusPoller(reader client.Reader, mapper meta.RESTMapper, o Options) *S
 
 	statusReaders = append(statusReaders, o.CustomStatusReaders...)
 
-	srs, defaultStatusReader := createStatusReaders(mapper)
+	srs, defaultStatusReader := DefaultStatusReaders(mapper)
 	statusReaders = append(statusReaders, srs...)
 
 	return &StatusPoller{
@@ -103,12 +103,12 @@ type PollOptions struct {
 	PollInterval time.Duration
 }
 
-// createStatusReaders creates an instance of all the statusreaders. This includes a set of statusreaders for
+// DefaultStatusReaders creates an instance of all the statusreaders. This includes a set of statusreaders for
 // a particular GroupKind, and a default engine used for all resource types that does not have
 // a specific statusreaders.
 // TODO: We should consider making the registration more automatic instead of having to create each of them
 // here. Also, it might be worth creating them on demand.
-func createStatusReaders(mapper meta.RESTMapper) ([]engine.StatusReader, engine.StatusReader) {
+func DefaultStatusReaders(mapper meta.RESTMapper) ([]engine.StatusReader, engine.StatusReader) {
 	defaultStatusReader := statusreaders.NewGenericStatusReader(mapper, status.Compute)
 
 	replicaSetStatusReader := statusreaders.NewReplicaSetStatusReader(mapper, defaultStatusReader)

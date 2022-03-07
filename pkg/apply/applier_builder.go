@@ -26,7 +26,8 @@ type ApplierBuilder struct {
 	// factory is only used to retrieve things that have not been provided explicitly.
 	factory                      util.Factory
 	invClient                    inventory.Client
-	client                       dynamic.Interface
+	client                       client.Client
+	dynamicClient                dynamic.Interface
 	discoClient                  discovery.CachedDiscoveryInterface
 	mapper                       meta.RESTMapper
 	restConfig                   *rest.Config
@@ -49,12 +50,13 @@ func (b *ApplierBuilder) Build() (*Applier, error) {
 	return &Applier{
 		pruner: &prune.Pruner{
 			InvClient: bx.invClient,
-			Client:    bx.client,
+			Client:    bx.dynamicClient,
 			Mapper:    bx.mapper,
 		},
 		statusPoller:  bx.statusPoller,
 		invClient:     bx.invClient,
 		client:        bx.client,
+		dynamicClient: bx.dynamicClient,
 		openAPIGetter: bx.discoClient,
 		mapper:        bx.mapper,
 		infoHelper:    info.NewHelper(bx.mapper, bx.unstructuredClientForMapping),
@@ -67,11 +69,11 @@ func (b *ApplierBuilder) finalize() (*ApplierBuilder, error) {
 	if bx.invClient == nil {
 		return nil, errors.New("inventory client must be provided")
 	}
-	if bx.client == nil {
+	if bx.dynamicClient == nil {
 		if bx.factory == nil {
 			return nil, fmt.Errorf("a factory must be provided or all other options: %v", err)
 		}
-		bx.client, err = bx.factory.DynamicClient()
+		bx.dynamicClient, err = bx.factory.DynamicClient()
 		if err != nil {
 			return nil, fmt.Errorf("error getting dynamic client: %v", err)
 		}
@@ -103,6 +105,13 @@ func (b *ApplierBuilder) finalize() (*ApplierBuilder, error) {
 			return nil, fmt.Errorf("error getting rest config: %v", err)
 		}
 	}
+	if bx.client == nil {
+		c, err := client.New(bx.restConfig, client.Options{Scheme: scheme.Scheme, Mapper: bx.mapper})
+		if err != nil {
+			return nil, fmt.Errorf("error creating client: %v", err)
+		}
+		bx.client = c
+	}
 	if bx.unstructuredClientForMapping == nil {
 		if bx.factory == nil {
 			return nil, fmt.Errorf("a factory must be provided or all other options: %v", err)
@@ -110,11 +119,7 @@ func (b *ApplierBuilder) finalize() (*ApplierBuilder, error) {
 		bx.unstructuredClientForMapping = bx.factory.UnstructuredClientForMapping
 	}
 	if bx.statusPoller == nil {
-		c, err := client.New(bx.restConfig, client.Options{Scheme: scheme.Scheme, Mapper: bx.mapper})
-		if err != nil {
-			return nil, fmt.Errorf("error creating client: %v", err)
-		}
-		bx.statusPoller = polling.NewStatusPoller(c, bx.mapper, polling.Options{})
+		bx.statusPoller = polling.NewStatusPoller(bx.client, bx.mapper, polling.Options{})
 	}
 	return &bx, nil
 }
@@ -129,8 +134,13 @@ func (b *ApplierBuilder) WithInventoryClient(invClient inventory.Client) *Applie
 	return b
 }
 
-func (b *ApplierBuilder) WithDynamicClient(client dynamic.Interface) *ApplierBuilder {
+func (b *ApplierBuilder) WithClient(client client.Client) *ApplierBuilder {
 	b.client = client
+	return b
+}
+
+func (b *ApplierBuilder) WithDynamicClient(client dynamic.Interface) *ApplierBuilder {
+	b.dynamicClient = client
 	return b
 }
 

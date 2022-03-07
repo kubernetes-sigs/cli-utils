@@ -35,9 +35,11 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/object/graph"
 	"sigs.k8s.io/cli-utils/pkg/object/validation"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type TaskQueueBuilder struct {
+	Client        client.Client
 	Pruner        *prune.Pruner
 	DynamicClient dynamic.Interface
 	OpenAPIGetter discovery.OpenAPISchemaInterface
@@ -248,6 +250,7 @@ func (t *TaskQueueBuilder) newApplyTask(applyObjs object.UnstructuredSet,
 		Mutators:          applyMutators,
 		ServerSideOptions: o.ServerSideOptions,
 		DryRunStrategy:    o.DryRunStrategy,
+		Client:            t.Client,
 		DynamicClient:     t.DynamicClient,
 		OpenAPIGetter:     t.OpenAPIGetter,
 		InfoHelper:        t.InfoHelper,
