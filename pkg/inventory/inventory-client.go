@@ -105,7 +105,10 @@ func (cic *ClusterClient) Merge(localInv Info, objs object.ObjMetadataSet, dryRu
 	}
 	if clusterInv == nil {
 		// Wrap inventory object and store the inventory in it.
-		status := getObjStatus(nil, objs)
+		var status []actuation.ObjectStatus
+		if cic.statusPolicy == StatusPolicyAll {
+			status = getObjStatus(nil, objs)
+		}
 		inv := cic.InventoryFactoryFunc(invObj)
 		if err := inv.Store(objs, status); err != nil {
 			return nil, err
@@ -132,7 +135,10 @@ func (cic *ClusterClient) Merge(localInv Info, objs object.ObjMetadataSet, dryRu
 		}
 		pruneIds = clusterObjs.Diff(objs)
 		unionObjs := clusterObjs.Union(objs)
-		status := getObjStatus(pruneIds, unionObjs)
+		var status []actuation.ObjectStatus
+		if cic.statusPolicy == StatusPolicyAll {
+			status = getObjStatus(pruneIds, unionObjs)
+		}
 		klog.V(4).Infof("num objects to prune: %d", len(pruneIds))
 		klog.V(4).Infof("num merged objects to store in inventory: %d", len(unionObjs))
 		wrappedInv := cic.InventoryFactoryFunc(clusterInv)
@@ -203,6 +209,9 @@ func (cic *ClusterClient) Replace(localInv Info, objs object.ObjMetadataSet, sta
 // replaceInventory stores the passed objects into the passed inventory object.
 func (cic *ClusterClient) replaceInventory(inv *unstructured.Unstructured, objs object.ObjMetadataSet,
 	status []actuation.ObjectStatus) (*unstructured.Unstructured, error) {
+	if cic.statusPolicy == StatusPolicyNone {
+		status = nil
+	}
 	wrappedInv := cic.InventoryFactoryFunc(inv)
 	if err := wrappedInv.Store(objs, status); err != nil {
 		return nil, err

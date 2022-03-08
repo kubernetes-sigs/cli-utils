@@ -56,7 +56,7 @@ func main() {
 	initCmd := initcmd.NewCmdInit(f, ioStreams)
 	updateHelp(names, initCmd)
 	loader := manifestreader.NewManifestLoader(f)
-	invFactory := inventory.ClusterClientFactory{}
+	invFactory := inventory.ClusterClientFactory{StatusPolicy: inventory.StatusPolicyNone}
 	applyCmd := apply.Command(f, invFactory, loader, ioStreams)
 	updateHelp(names, applyCmd)
 	previewCmd := preview.Command(f, invFactory, loader, ioStreams)
