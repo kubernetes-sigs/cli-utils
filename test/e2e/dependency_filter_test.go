@@ -15,18 +15,20 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/object/validation"
 	"sigs.k8s.io/cli-utils/pkg/testutil"
+	"sigs.k8s.io/cli-utils/test/e2e/e2eutil"
+	"sigs.k8s.io/cli-utils/test/e2e/invconfig"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 //nolint:dupl // expEvents similar to other tests
-func dependencyFilterTest(ctx context.Context, c client.Client, invConfig InventoryConfig, inventoryName, namespaceName string) {
+func dependencyFilterTest(ctx context.Context, c client.Client, invConfig invconfig.InventoryConfig, inventoryName, namespaceName string) {
 	By("apply resources in order based on depends-on annotation")
 	applier := invConfig.ApplierFactoryFunc()
 
 	inv := invConfig.InvWrapperFunc(invConfig.FactoryFunc(inventoryName, namespaceName, "test"))
 
-	pod1Obj := withDependsOn(withNamespace(manifestToUnstructured(pod1), namespaceName), fmt.Sprintf("/namespaces/%s/Pod/pod2", namespaceName))
-	pod2Obj := withNamespace(manifestToUnstructured(pod2), namespaceName)
+	pod1Obj := e2eutil.WithDependsOn(e2eutil.WithNamespace(e2eutil.ManifestToUnstructured(pod1), namespaceName), fmt.Sprintf("/namespaces/%s/Pod/pod2", namespaceName))
+	pod2Obj := e2eutil.WithNamespace(e2eutil.ManifestToUnstructured(pod2), namespaceName)
 
 	// Dependency order: pod1 -> pod2
 	// Apply order: pod2, pod1
@@ -37,11 +39,11 @@ func dependencyFilterTest(ctx context.Context, c client.Client, invConfig Invent
 
 	// Cleanup
 	defer func(ctx context.Context, c client.Client) {
-		deleteUnstructuredIfExists(ctx, c, pod1Obj)
-		deleteUnstructuredIfExists(ctx, c, pod2Obj)
+		e2eutil.DeleteUnstructuredIfExists(ctx, c, pod1Obj)
+		e2eutil.DeleteUnstructuredIfExists(ctx, c, pod2Obj)
 	}(ctx, c)
 
-	applierEvents := runCollect(applier.Run(ctx, inv, resources, apply.ApplierOptions{
+	applierEvents := e2eutil.RunCollect(applier.Run(ctx, inv, resources, apply.ApplierOptions{
 		EmitStatusEvents: false,
 	}))
 
@@ -219,14 +221,14 @@ func dependencyFilterTest(ctx context.Context, c client.Client, invConfig Invent
 	Expect(testutil.EventsToExpEvents(applierEvents)).To(testutil.Equal(expEvents))
 
 	By("verify pod1 created and ready")
-	result := assertUnstructuredExists(ctx, c, pod1Obj)
+	result := e2eutil.AssertUnstructuredExists(ctx, c, pod1Obj)
 	podIP, found, err := object.NestedField(result.Object, "status", "podIP")
 	Expect(err).NotTo(HaveOccurred())
 	Expect(found).To(BeTrue())
 	Expect(podIP).NotTo(BeEmpty()) // use podIP as proxy for readiness
 
 	By("verify pod2 created and ready")
-	result = assertUnstructuredExists(ctx, c, pod2Obj)
+	result = e2eutil.AssertUnstructuredExists(ctx, c, pod2Obj)
 	podIP, found, err = object.NestedField(result.Object, "status", "podIP")
 	Expect(err).NotTo(HaveOccurred())
 	Expect(found).To(BeTrue())
@@ -237,7 +239,7 @@ func dependencyFilterTest(ctx context.Context, c client.Client, invConfig Invent
 		pod1Obj,
 	}
 
-	applierEvents = runCollect(applier.Run(ctx, inv, resources, apply.ApplierOptions{
+	applierEvents = e2eutil.RunCollect(applier.Run(ctx, inv, resources, apply.ApplierOptions{
 		EmitStatusEvents: false,
 		ValidationPolicy: validation.SkipInvalid,
 	}))
@@ -398,13 +400,13 @@ func dependencyFilterTest(ctx context.Context, c client.Client, invConfig Invent
 	Expect(testutil.EventsToExpEvents(applierEvents)).To(testutil.Equal(expEvents))
 
 	By("verify pod1 not deleted")
-	result = assertUnstructuredExists(ctx, c, pod1Obj)
+	result = e2eutil.AssertUnstructuredExists(ctx, c, pod1Obj)
 	ts, found, err := object.NestedField(result.Object, "metadata", "deletionTimestamp")
 	Expect(err).NotTo(HaveOccurred())
 	Expect(found).To(BeFalse(), "deletionTimestamp found: ", ts)
 
 	By("verify pod2 not deleted")
-	result = assertUnstructuredExists(ctx, c, pod2Obj)
+	result = e2eutil.AssertUnstructuredExists(ctx, c, pod2Obj)
 	ts, found, err = object.NestedField(result.Object, "metadata", "deletionTimestamp")
 	Expect(err).NotTo(HaveOccurred())
 	Expect(found).To(BeFalse(), "deletionTimestamp found: ", ts)

@@ -14,11 +14,13 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/testutil"
+	"sigs.k8s.io/cli-utils/test/e2e/e2eutil"
+	"sigs.k8s.io/cli-utils/test/e2e/invconfig"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 //nolint:dupl // expEvents similar to other tests
-func emptySetTest(ctx context.Context, c client.Client, invConfig InventoryConfig, inventoryName, namespaceName string) {
+func emptySetTest(ctx context.Context, c client.Client, invConfig invconfig.InventoryConfig, inventoryName, namespaceName string) {
 	By("Apply zero resources")
 	applier := invConfig.ApplierFactoryFunc()
 
@@ -27,7 +29,7 @@ func emptySetTest(ctx context.Context, c client.Client, invConfig InventoryConfi
 
 	resources := []*unstructured.Unstructured{}
 
-	applierEvents := runCollect(applier.Run(ctx, inventoryInfo, resources, apply.ApplierOptions{
+	applierEvents := e2eutil.RunCollect(applier.Run(ctx, inventoryInfo, resources, apply.ApplierOptions{
 		EmitStatusEvents: true,
 	}))
 
@@ -83,7 +85,7 @@ func emptySetTest(ctx context.Context, c client.Client, invConfig InventoryConfi
 	destroyer := invConfig.DestroyerFactoryFunc()
 
 	options := apply.DestroyerOptions{InventoryPolicy: inventory.PolicyAdoptIfNoInventory}
-	destroyerEvents := runCollect(destroyer.Run(ctx, inventoryInfo, options))
+	destroyerEvents := e2eutil.RunCollect(destroyer.Run(ctx, inventoryInfo, options))
 
 	expEvents = []testutil.ExpEvent{
 		{

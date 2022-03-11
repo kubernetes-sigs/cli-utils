@@ -16,23 +16,25 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/testutil"
+	"sigs.k8s.io/cli-utils/test/e2e/e2eutil"
+	"sigs.k8s.io/cli-utils/test/e2e/invconfig"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func continueOnErrorTest(ctx context.Context, c client.Client, invConfig InventoryConfig, inventoryName, namespaceName string) {
+func continueOnErrorTest(ctx context.Context, c client.Client, invConfig invconfig.InventoryConfig, inventoryName, namespaceName string) {
 	By("apply an invalid CRD")
 	applier := invConfig.ApplierFactoryFunc()
 
 	inv := invConfig.InvWrapperFunc(invConfig.FactoryFunc(inventoryName, namespaceName, "test"))
 
-	invalidCrdObj := manifestToUnstructured(invalidCrd)
-	pod1Obj := withNamespace(manifestToUnstructured(pod1), namespaceName)
+	invalidCrdObj := e2eutil.ManifestToUnstructured(invalidCrd)
+	pod1Obj := e2eutil.WithNamespace(e2eutil.ManifestToUnstructured(pod1), namespaceName)
 	resources := []*unstructured.Unstructured{
 		invalidCrdObj,
 		pod1Obj,
 	}
 
-	applierEvents := runCollect(applier.Run(ctx, inv, resources, apply.ApplierOptions{}))
+	applierEvents := e2eutil.RunCollect(applier.Run(ctx, inv, resources, apply.ApplierOptions{}))
 
 	expEvents := []testutil.ExpEvent{
 		{
@@ -167,8 +169,8 @@ func continueOnErrorTest(ctx context.Context, c client.Client, invConfig Invento
 	Expect(receivedEvents).To(testutil.Equal(expEvents))
 
 	By("Verify pod1 created")
-	assertUnstructuredExists(ctx, c, pod1Obj)
+	e2eutil.AssertUnstructuredExists(ctx, c, pod1Obj)
 
 	By("Verify CRD not created")
-	assertUnstructuredDoesNotExist(ctx, c, invalidCrdObj)
+	e2eutil.AssertUnstructuredDoesNotExist(ctx, c, invalidCrdObj)
 }

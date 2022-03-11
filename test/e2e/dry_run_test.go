@@ -18,21 +18,23 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/testutil"
+	"sigs.k8s.io/cli-utils/test/e2e/e2eutil"
+	"sigs.k8s.io/cli-utils/test/e2e/invconfig"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func dryRunTest(ctx context.Context, c client.Client, invConfig InventoryConfig, inventoryName, namespaceName string) {
+func dryRunTest(ctx context.Context, c client.Client, invConfig invconfig.InventoryConfig, inventoryName, namespaceName string) {
 	By("Apply with DryRun")
 	applier := invConfig.ApplierFactoryFunc()
 	inventoryID := fmt.Sprintf("%s-%s", inventoryName, namespaceName)
 
-	inventoryInfo := createInventoryInfo(invConfig, inventoryName, namespaceName, inventoryID)
+	inventoryInfo := invconfig.CreateInventoryInfo(invConfig, inventoryName, namespaceName, inventoryID)
 
 	namespace1Name := fmt.Sprintf("%s-ns1", namespaceName)
 
 	fields := struct{ Namespace string }{Namespace: namespace1Name}
-	namespace1Obj := templateToUnstructured(namespaceTemplate, fields)
-	podBObj := templateToUnstructured(podBTemplate, fields)
+	namespace1Obj := e2eutil.TemplateToUnstructured(namespaceTemplate, fields)
+	podBObj := e2eutil.TemplateToUnstructured(podBTemplate, fields)
 
 	// Dependency order: podB -> namespace1
 	// Apply order: namespace1, podB
@@ -41,7 +43,7 @@ func dryRunTest(ctx context.Context, c client.Client, invConfig InventoryConfig,
 		podBObj,
 	}
 
-	applierEvents := runCollect(applier.Run(ctx, inventoryInfo, resources, apply.ApplierOptions{
+	applierEvents := e2eutil.RunCollect(applier.Run(ctx, inventoryInfo, resources, apply.ApplierOptions{
 		ReconcileTimeout: 2 * time.Minute,
 		EmitStatusEvents: true,
 		DryRunStrategy:   common.DryRunClient,
@@ -176,18 +178,18 @@ func dryRunTest(ctx context.Context, c client.Client, invConfig InventoryConfig,
 	Expect(received).To(testutil.Equal(expEvents))
 
 	By("Verify pod NotFound")
-	assertUnstructuredDoesNotExist(ctx, c, podBObj)
+	e2eutil.AssertUnstructuredDoesNotExist(ctx, c, podBObj)
 
 	By("Verify inventory NotFound")
 	invConfig.InvNotExistsFunc(ctx, c, inventoryName, namespaceName, inventoryID)
 
 	By("Apply")
-	runWithNoErr(applier.Run(ctx, inventoryInfo, resources, apply.ApplierOptions{
+	e2eutil.RunWithNoErr(applier.Run(ctx, inventoryInfo, resources, apply.ApplierOptions{
 		ReconcileTimeout: 2 * time.Minute,
 	}))
 
 	By("Verify pod created")
-	assertUnstructuredExists(ctx, c, podBObj)
+	e2eutil.AssertUnstructuredExists(ctx, c, podBObj)
 
 	By("Verify inventory size")
 	invConfig.InvSizeVerifyFunc(ctx, c, inventoryName, namespaceName, inventoryID, 2, 2)
@@ -195,7 +197,7 @@ func dryRunTest(ctx context.Context, c client.Client, invConfig InventoryConfig,
 	By("Destroy with DryRun")
 	destroyer := invConfig.DestroyerFactoryFunc()
 
-	destroyerEvents := runCollect(destroyer.Run(ctx, inventoryInfo, apply.DestroyerOptions{
+	destroyerEvents := e2eutil.RunCollect(destroyer.Run(ctx, inventoryInfo, apply.DestroyerOptions{
 		InventoryPolicy:  inventory.PolicyAdoptIfNoInventory,
 		EmitStatusEvents: true,
 		DryRunStrategy:   common.DryRunClient,
@@ -286,15 +288,15 @@ func dryRunTest(ctx context.Context, c client.Client, invConfig InventoryConfig,
 	Expect(testutil.EventsToExpEvents(destroyerEvents)).To(testutil.Equal(expEvents))
 
 	By("Verify pod still exists")
-	assertUnstructuredExists(ctx, c, podBObj)
+	e2eutil.AssertUnstructuredExists(ctx, c, podBObj)
 
 	By("Destroy")
-	runWithNoErr(destroyer.Run(ctx, inventoryInfo, apply.DestroyerOptions{
+	e2eutil.RunWithNoErr(destroyer.Run(ctx, inventoryInfo, apply.DestroyerOptions{
 		InventoryPolicy: inventory.PolicyAdoptIfNoInventory,
 	}))
 
 	By("Verify pod deleted")
-	assertUnstructuredDoesNotExist(ctx, c, podBObj)
+	e2eutil.AssertUnstructuredDoesNotExist(ctx, c, podBObj)
 
 	By("Verify inventory deleted")
 	invConfig.InvNotExistsFunc(ctx, c, inventoryName, namespaceName, inventoryID)

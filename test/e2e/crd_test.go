@@ -16,25 +16,27 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/testutil"
+	"sigs.k8s.io/cli-utils/test/e2e/e2eutil"
+	"sigs.k8s.io/cli-utils/test/e2e/invconfig"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 //nolint:dupl // expEvents similar to mutation tests
-func crdTest(ctx context.Context, _ client.Client, invConfig InventoryConfig, inventoryName, namespaceName string) {
+func crdTest(ctx context.Context, _ client.Client, invConfig invconfig.InventoryConfig, inventoryName, namespaceName string) {
 	By("apply a set of resources that includes both a crd and a cr")
 	applier := invConfig.ApplierFactoryFunc()
 
 	inv := invConfig.InvWrapperFunc(invConfig.FactoryFunc(inventoryName, namespaceName, "test"))
 
-	crdObj := manifestToUnstructured(crd)
-	crObj := manifestToUnstructured(cr)
+	crdObj := e2eutil.ManifestToUnstructured(crd)
+	crObj := e2eutil.ManifestToUnstructured(cr)
 
 	resources := []*unstructured.Unstructured{
 		crObj,
 		crdObj,
 	}
 
-	applierEvents := runCollect(applier.Run(ctx, inv, resources, apply.ApplierOptions{
+	applierEvents := e2eutil.RunCollect(applier.Run(ctx, inv, resources, apply.ApplierOptions{
 		ReconcileTimeout: 2 * time.Minute,
 		EmitStatusEvents: false,
 	}))
@@ -215,7 +217,7 @@ func crdTest(ctx context.Context, _ client.Client, invConfig InventoryConfig, in
 	By("destroy the resources, including the crd")
 	destroyer := invConfig.DestroyerFactoryFunc()
 	options := apply.DestroyerOptions{InventoryPolicy: inventory.PolicyAdoptIfNoInventory}
-	destroyerEvents := runCollect(destroyer.Run(ctx, inv, options))
+	destroyerEvents := e2eutil.RunCollect(destroyer.Run(ctx, inv, options))
 
 	expEvents = []testutil.ExpEvent{
 		{

@@ -14,11 +14,13 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/testutil"
+	"sigs.k8s.io/cli-utils/test/e2e/e2eutil"
+	"sigs.k8s.io/cli-utils/test/e2e/invconfig"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 //nolint:dupl // expEvents similar to other tests
-func namespaceFilterTest(ctx context.Context, c client.Client, invConfig InventoryConfig, inventoryName, namespaceName string) {
+func namespaceFilterTest(ctx context.Context, c client.Client, invConfig invconfig.InventoryConfig, inventoryName, namespaceName string) {
 	By("apply resources in order based on depends-on annotation")
 	applier := invConfig.ApplierFactoryFunc()
 
@@ -27,8 +29,8 @@ func namespaceFilterTest(ctx context.Context, c client.Client, invConfig Invento
 	namespace1Name := fmt.Sprintf("%s-ns1", namespaceName)
 
 	fields := struct{ Namespace string }{Namespace: namespace1Name}
-	namespace1Obj := templateToUnstructured(namespaceTemplate, fields)
-	podBObj := templateToUnstructured(podBTemplate, fields)
+	namespace1Obj := e2eutil.TemplateToUnstructured(namespaceTemplate, fields)
+	podBObj := e2eutil.TemplateToUnstructured(podBTemplate, fields)
 
 	// Dependency order: podB -> namespace1
 	// Apply order: namespace1, podB
@@ -39,11 +41,11 @@ func namespaceFilterTest(ctx context.Context, c client.Client, invConfig Invento
 
 	// Cleanup
 	defer func(ctx context.Context, c client.Client) {
-		deleteUnstructuredIfExists(ctx, c, podBObj)
-		deleteUnstructuredIfExists(ctx, c, namespace1Obj)
+		e2eutil.DeleteUnstructuredIfExists(ctx, c, podBObj)
+		e2eutil.DeleteUnstructuredIfExists(ctx, c, namespace1Obj)
 	}(ctx, c)
 
-	applierEvents := runCollect(applier.Run(ctx, inv, resources, apply.ApplierOptions{
+	applierEvents := e2eutil.RunCollect(applier.Run(ctx, inv, resources, apply.ApplierOptions{
 		EmitStatusEvents: false,
 	}))
 
@@ -221,10 +223,10 @@ func namespaceFilterTest(ctx context.Context, c client.Client, invConfig Invento
 	Expect(testutil.EventsToExpEvents(applierEvents)).To(testutil.Equal(expEvents))
 
 	By("verify namespace1 created")
-	assertUnstructuredExists(ctx, c, namespace1Obj)
+	e2eutil.AssertUnstructuredExists(ctx, c, namespace1Obj)
 
 	By("verify podB created and ready")
-	result := assertUnstructuredExists(ctx, c, podBObj)
+	result := e2eutil.AssertUnstructuredExists(ctx, c, podBObj)
 	podIP, found, err := object.NestedField(result.Object, "status", "podIP")
 	Expect(err).NotTo(HaveOccurred())
 	Expect(found).To(BeTrue())
@@ -235,7 +237,7 @@ func namespaceFilterTest(ctx context.Context, c client.Client, invConfig Invento
 		podBObj,
 	}
 
-	applierEvents = runCollect(applier.Run(ctx, inv, resources, apply.ApplierOptions{
+	applierEvents = e2eutil.RunCollect(applier.Run(ctx, inv, resources, apply.ApplierOptions{
 		EmitStatusEvents: false,
 	}))
 
@@ -395,13 +397,13 @@ func namespaceFilterTest(ctx context.Context, c client.Client, invConfig Invento
 	Expect(testutil.EventsToExpEvents(applierEvents)).To(testutil.Equal(expEvents))
 
 	By("verify namespace1 not deleted")
-	result = assertUnstructuredExists(ctx, c, namespace1Obj)
+	result = e2eutil.AssertUnstructuredExists(ctx, c, namespace1Obj)
 	ts, found, err := object.NestedField(result.Object, "metadata", "deletionTimestamp")
 	Expect(err).NotTo(HaveOccurred())
 	Expect(found).To(BeFalse(), "deletionTimestamp found: ", ts)
 
 	By("verify podB not deleted")
-	result = assertUnstructuredExists(ctx, c, podBObj)
+	result = e2eutil.AssertUnstructuredExists(ctx, c, podBObj)
 	ts, found, err = object.NestedField(result.Object, "metadata", "deletionTimestamp")
 	Expect(err).NotTo(HaveOccurred())
 	Expect(found).To(BeFalse(), "deletionTimestamp found: ", ts)

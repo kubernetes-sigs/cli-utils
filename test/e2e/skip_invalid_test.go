@@ -21,10 +21,12 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/object/mutation"
 	"sigs.k8s.io/cli-utils/pkg/object/validation"
 	"sigs.k8s.io/cli-utils/pkg/testutil"
+	"sigs.k8s.io/cli-utils/test/e2e/e2eutil"
+	"sigs.k8s.io/cli-utils/test/e2e/invconfig"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func skipInvalidTest(ctx context.Context, c client.Client, invConfig InventoryConfig, inventoryName, namespaceName string) {
+func skipInvalidTest(ctx context.Context, c client.Client, invConfig invconfig.InventoryConfig, inventoryName, namespaceName string) {
 	By("apply valid objects and skip invalid objects")
 	applier := invConfig.ApplierFactoryFunc()
 
@@ -32,19 +34,19 @@ func skipInvalidTest(ctx context.Context, c client.Client, invConfig InventoryCo
 
 	fields := struct{ Namespace string }{Namespace: namespaceName}
 	// valid pod
-	pod1Obj := withNamespace(manifestToUnstructured(pod1), namespaceName)
+	pod1Obj := e2eutil.WithNamespace(e2eutil.ManifestToUnstructured(pod1), namespaceName)
 	// valid deployment with dependency
-	deployment1Obj := withDependsOn(withNamespace(manifestToUnstructured(deployment1), namespaceName),
+	deployment1Obj := e2eutil.WithDependsOn(e2eutil.WithNamespace(e2eutil.ManifestToUnstructured(deployment1), namespaceName),
 		fmt.Sprintf("/namespaces/%s/Pod/%s", namespaceName, pod1Obj.GetName()))
 	// external/missing dependency
-	pod3Obj := withDependsOn(withNamespace(manifestToUnstructured(pod3), namespaceName),
+	pod3Obj := e2eutil.WithDependsOn(e2eutil.WithNamespace(e2eutil.ManifestToUnstructured(pod3), namespaceName),
 		fmt.Sprintf("/namespaces/%s/Pod/pod0", namespaceName))
 	// cyclic dependency (podB)
-	podAObj := templateToUnstructured(podATemplate, fields)
+	podAObj := e2eutil.TemplateToUnstructured(podATemplate, fields)
 	// cyclic dependency (podA) & invalid source reference (dependency not in object set)
-	podBObj := templateToUnstructured(invalidMutationPodBTemplate, fields)
+	podBObj := e2eutil.TemplateToUnstructured(invalidMutationPodBTemplate, fields)
 	// missing name
-	invalidPodObj := templateToUnstructured(invalidPodTemplate, fields)
+	invalidPodObj := e2eutil.TemplateToUnstructured(invalidPodTemplate, fields)
 
 	resources := []*unstructured.Unstructured{
 		pod1Obj,
@@ -55,7 +57,7 @@ func skipInvalidTest(ctx context.Context, c client.Client, invConfig InventoryCo
 		invalidPodObj,
 	}
 
-	applierEvents := runCollect(applier.Run(ctx, inv, resources, apply.ApplierOptions{
+	applierEvents := e2eutil.RunCollect(applier.Run(ctx, inv, resources, apply.ApplierOptions{
 		EmitStatusEvents: false,
 		ValidationPolicy: validation.SkipInvalid,
 	}))
@@ -320,31 +322,31 @@ func skipInvalidTest(ctx context.Context, c client.Client, invConfig InventoryCo
 	Expect(testutil.EventsToExpEvents(applierEvents)).To(testutil.Equal(expEvents))
 
 	By("verify pod1 created and ready")
-	result := assertUnstructuredExists(ctx, c, pod1Obj)
+	result := e2eutil.AssertUnstructuredExists(ctx, c, pod1Obj)
 	podIP, found, err := object.NestedField(result.Object, "status", "podIP")
 	Expect(err).NotTo(HaveOccurred())
 	Expect(found).To(BeTrue())
 	Expect(podIP).NotTo(BeEmpty()) // use podIP as proxy for readiness
 
 	By("verify deployment1 created and ready")
-	result = assertUnstructuredExists(ctx, c, deployment1Obj)
-	assertUnstructuredAvailable(result)
+	result = e2eutil.AssertUnstructuredExists(ctx, c, deployment1Obj)
+	e2eutil.AssertUnstructuredAvailable(result)
 
 	By("verify pod3 not found")
-	assertUnstructuredDoesNotExist(ctx, c, pod3Obj)
+	e2eutil.AssertUnstructuredDoesNotExist(ctx, c, pod3Obj)
 
 	By("verify podA not found")
-	assertUnstructuredDoesNotExist(ctx, c, podAObj)
+	e2eutil.AssertUnstructuredDoesNotExist(ctx, c, podAObj)
 
 	By("verify podB not found")
-	assertUnstructuredDoesNotExist(ctx, c, podBObj)
+	e2eutil.AssertUnstructuredDoesNotExist(ctx, c, podBObj)
 
 	By("modify deployment1 depends-on annotation to be invalid")
-	applyUnstructured(ctx, c, withDependsOn(deployment1Obj, "invalid"))
+	e2eutil.ApplyUnstructured(ctx, c, e2eutil.WithDependsOn(deployment1Obj, "invalid"))
 
 	By("destroy valid objects and skip invalid objects")
 	destroyer := invConfig.DestroyerFactoryFunc()
-	destroyerEvents := runCollect(destroyer.Run(ctx, inv, apply.DestroyerOptions{
+	destroyerEvents := e2eutil.RunCollect(destroyer.Run(ctx, inv, apply.DestroyerOptions{
 		InventoryPolicy:  inventory.PolicyAdoptIfNoInventory,
 		ValidationPolicy: validation.SkipInvalid,
 	}))
@@ -453,18 +455,18 @@ func skipInvalidTest(ctx context.Context, c client.Client, invConfig InventoryCo
 	Expect(testutil.EventsToExpEvents(destroyerEvents)).To(testutil.Equal(expEvents))
 
 	By("verify pod1 deleted")
-	assertUnstructuredDoesNotExist(ctx, c, pod1Obj)
+	e2eutil.AssertUnstructuredDoesNotExist(ctx, c, pod1Obj)
 
 	By("verify deployment1 not deleted")
-	assertUnstructuredExists(ctx, c, deployment1Obj)
-	deleteUnstructuredIfExists(ctx, c, deployment1Obj)
+	e2eutil.AssertUnstructuredExists(ctx, c, deployment1Obj)
+	e2eutil.DeleteUnstructuredIfExists(ctx, c, deployment1Obj)
 
 	By("verify pod3 not found")
-	assertUnstructuredDoesNotExist(ctx, c, pod3Obj)
+	e2eutil.AssertUnstructuredDoesNotExist(ctx, c, pod3Obj)
 
 	By("verify podA not found")
-	assertUnstructuredDoesNotExist(ctx, c, podAObj)
+	e2eutil.AssertUnstructuredDoesNotExist(ctx, c, podAObj)
 
 	By("verify podB not found")
-	assertUnstructuredDoesNotExist(ctx, c, podBObj)
+	e2eutil.AssertUnstructuredDoesNotExist(ctx, c, podBObj)
 }

@@ -17,22 +17,24 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/testutil"
+	"sigs.k8s.io/cli-utils/test/e2e/e2eutil"
+	"sigs.k8s.io/cli-utils/test/e2e/invconfig"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func applyAndDestroyTest(ctx context.Context, c client.Client, invConfig InventoryConfig, inventoryName, namespaceName string) {
+func applyAndDestroyTest(ctx context.Context, c client.Client, invConfig invconfig.InventoryConfig, inventoryName, namespaceName string) {
 	By("Apply resources")
 	applier := invConfig.ApplierFactoryFunc()
 	inventoryID := fmt.Sprintf("%s-%s", inventoryName, namespaceName)
 
-	inventoryInfo := createInventoryInfo(invConfig, inventoryName, namespaceName, inventoryID)
+	inventoryInfo := invconfig.CreateInventoryInfo(invConfig, inventoryName, namespaceName, inventoryID)
 
-	deployment1Obj := withNamespace(manifestToUnstructured(deployment1), namespaceName)
+	deployment1Obj := e2eutil.WithNamespace(e2eutil.ManifestToUnstructured(deployment1), namespaceName)
 	resources := []*unstructured.Unstructured{
 		deployment1Obj,
 	}
 
-	applierEvents := runCollect(applier.Run(ctx, inventoryInfo, resources, apply.ApplierOptions{
+	applierEvents := e2eutil.RunCollect(applier.Run(ctx, inventoryInfo, resources, apply.ApplierOptions{
 		ReconcileTimeout: 2 * time.Minute,
 		EmitStatusEvents: true,
 	}))
@@ -184,7 +186,7 @@ func applyAndDestroyTest(ctx context.Context, c client.Client, invConfig Invento
 	Expect(received).To(testutil.Equal(expEvents))
 
 	By("Verify deployment created")
-	assertUnstructuredExists(ctx, c, deployment1Obj)
+	e2eutil.AssertUnstructuredExists(ctx, c, deployment1Obj)
 
 	By("Verify inventory")
 	invConfig.InvSizeVerifyFunc(ctx, c, inventoryName, namespaceName, inventoryID, 1, 1)
@@ -193,7 +195,7 @@ func applyAndDestroyTest(ctx context.Context, c client.Client, invConfig Invento
 	destroyer := invConfig.DestroyerFactoryFunc()
 
 	options := apply.DestroyerOptions{InventoryPolicy: inventory.PolicyAdoptIfNoInventory}
-	destroyerEvents := runCollect(destroyer.Run(ctx, inventoryInfo, options))
+	destroyerEvents := e2eutil.RunCollect(destroyer.Run(ctx, inventoryInfo, options))
 
 	expEvents = []testutil.ExpEvent{
 		{
@@ -288,16 +290,5 @@ func applyAndDestroyTest(ctx context.Context, c client.Client, invConfig Invento
 	Expect(testutil.EventsToExpEvents(destroyerEvents)).To(testutil.Equal(expEvents))
 
 	By("Verify deployment deleted")
-	assertUnstructuredDoesNotExist(ctx, c, deployment1Obj)
-}
-
-func createInventoryInfo(invConfig InventoryConfig, inventoryName, namespaceName, inventoryID string) inventory.Info {
-	switch invConfig.Strategy {
-	case inventory.NameStrategy:
-		return invConfig.InvWrapperFunc(invConfig.FactoryFunc(inventoryName, namespaceName, randomString("inventory-")))
-	case inventory.LabelStrategy:
-		return invConfig.InvWrapperFunc(invConfig.FactoryFunc(randomString("inventory-"), namespaceName, inventoryID))
-	default:
-		panic(fmt.Errorf("unknown inventory strategy %q", invConfig.Strategy))
-	}
+	e2eutil.AssertUnstructuredDoesNotExist(ctx, c, deployment1Obj)
 }

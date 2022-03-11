@@ -14,20 +14,22 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/apply"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/object"
+	"sigs.k8s.io/cli-utils/test/e2e/e2eutil"
+	"sigs.k8s.io/cli-utils/test/e2e/invconfig"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func serversideApplyTest(ctx context.Context, c client.Client, invConfig InventoryConfig, inventoryName, namespaceName string) {
+func serversideApplyTest(ctx context.Context, c client.Client, invConfig invconfig.InventoryConfig, inventoryName, namespaceName string) {
 	By("Apply a Deployment and an APIService by server-side apply")
 	applier := invConfig.ApplierFactoryFunc()
 
 	inv := invConfig.InvWrapperFunc(invConfig.FactoryFunc(inventoryName, namespaceName, "test"))
 	firstResources := []*unstructured.Unstructured{
-		withNamespace(manifestToUnstructured(deployment1), namespaceName),
-		manifestToUnstructured(apiservice1),
+		e2eutil.WithNamespace(e2eutil.ManifestToUnstructured(deployment1), namespaceName),
+		e2eutil.ManifestToUnstructured(apiservice1),
 	}
 
-	runWithNoErr(applier.Run(ctx, inv, firstResources, apply.ApplierOptions{
+	e2eutil.RunWithNoErr(applier.Run(ctx, inv, firstResources, apply.ApplierOptions{
 		ReconcileTimeout: 2 * time.Minute,
 		EmitStatusEvents: true,
 		ServerSideOptions: common.ServerSideOptions{
@@ -38,7 +40,7 @@ func serversideApplyTest(ctx context.Context, c client.Client, invConfig Invento
 	}))
 
 	By("Verify deployment is server-side applied")
-	result := assertUnstructuredExists(ctx, c, withNamespace(manifestToUnstructured(deployment1), namespaceName))
+	result := e2eutil.AssertUnstructuredExists(ctx, c, e2eutil.WithNamespace(e2eutil.ManifestToUnstructured(deployment1), namespaceName))
 
 	// LastAppliedConfigAnnotation annotation is only set for client-side apply and we've server-side applied here.
 	_, found, err := object.NestedField(result.Object, "metadata", "annotations", v1.LastAppliedConfigAnnotation)
@@ -51,7 +53,7 @@ func serversideApplyTest(ctx context.Context, c client.Client, invConfig Invento
 	Expect(manager).To(Equal("test"))
 
 	By("Verify APIService is server-side applied")
-	result = assertUnstructuredExists(ctx, c, manifestToUnstructured(apiservice1))
+	result = e2eutil.AssertUnstructuredExists(ctx, c, e2eutil.ManifestToUnstructured(apiservice1))
 
 	// LastAppliedConfigAnnotation annotation is only set for client-side apply and we've server-side applied here.
 	_, found, err = object.NestedField(result.Object, "metadata", "annotations", v1.LastAppliedConfigAnnotation)
