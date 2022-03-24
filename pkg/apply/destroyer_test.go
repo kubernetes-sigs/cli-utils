@@ -108,7 +108,7 @@ func TestDestroyerCancel(t *testing.T) {
 					EventType: event.DeleteType,
 					DeleteEvent: &testutil.ExpDeleteEvent{
 						GroupName:  "prune-0",
-						Operation:  event.Deleted,
+						Status:     event.DeleteSuccessful,
 						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
 						Error:      nil,
 					},
@@ -136,7 +136,7 @@ func TestDestroyerCancel(t *testing.T) {
 					EventType: event.WaitType,
 					WaitEvent: &testutil.ExpWaitEvent{
 						GroupName:  "wait-0",
-						Operation:  event.ReconcilePending,
+						Status:     event.ReconcilePending,
 						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
 					},
 				},
@@ -236,7 +236,7 @@ func TestDestroyerCancel(t *testing.T) {
 					EventType: event.DeleteType,
 					DeleteEvent: &testutil.ExpDeleteEvent{
 						GroupName:  "prune-0",
-						Operation:  event.Deleted,
+						Status:     event.DeleteSuccessful,
 						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
 						Error:      nil,
 					},
@@ -264,7 +264,7 @@ func TestDestroyerCancel(t *testing.T) {
 					EventType: event.WaitType,
 					WaitEvent: &testutil.ExpWaitEvent{
 						GroupName:  "wait-0",
-						Operation:  event.ReconcilePending,
+						Status:     event.ReconcilePending,
 						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
 					},
 				},
@@ -273,7 +273,7 @@ func TestDestroyerCancel(t *testing.T) {
 					EventType: event.WaitType,
 					WaitEvent: &testutil.ExpWaitEvent{
 						GroupName:  "wait-0",
-						Operation:  event.Reconciled,
+						Status:     event.ReconcileSuccessful,
 						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
 					},
 				},

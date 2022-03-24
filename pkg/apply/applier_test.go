@@ -158,7 +158,7 @@ func TestApplier(t *testing.T) {
 					EventType: event.ApplyType,
 					ApplyEvent: &testutil.ExpApplyEvent{
 						GroupName:  "apply-0",
-						Operation:  event.Created, // Create new
+						Status:     event.ApplySuccessful, // Create new
 						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
 					},
 				},
@@ -182,7 +182,7 @@ func TestApplier(t *testing.T) {
 					EventType: event.WaitType,
 					WaitEvent: &testutil.ExpWaitEvent{
 						GroupName:  "wait-0",
-						Operation:  event.ReconcilePending,
+						Status:     event.ReconcilePending,
 						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
 					},
 				},
@@ -316,7 +316,7 @@ func TestApplier(t *testing.T) {
 					EventType: event.ApplyType,
 					ApplyEvent: &testutil.ExpApplyEvent{
 						GroupName:  "apply-0",
-						Operation:  event.Created, // Create new
+						Status:     event.ApplySuccessful, // Create new
 						Identifier: testutil.ToIdentifier(t, resources["secret"]),
 					},
 				},
@@ -324,7 +324,7 @@ func TestApplier(t *testing.T) {
 					EventType: event.ApplyType,
 					ApplyEvent: &testutil.ExpApplyEvent{
 						GroupName:  "apply-0",
-						Operation:  event.Created, // Create new
+						Status:     event.ApplySuccessful, // Create new
 						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
 					},
 				},
@@ -349,7 +349,7 @@ func TestApplier(t *testing.T) {
 					EventType: event.WaitType,
 					WaitEvent: &testutil.ExpWaitEvent{
 						GroupName:  "wait-0",
-						Operation:  event.ReconcilePending,
+						Status:     event.ReconcilePending,
 						Identifier: testutil.ToIdentifier(t, resources["secret"]),
 					},
 				},
@@ -357,7 +357,7 @@ func TestApplier(t *testing.T) {
 					EventType: event.WaitType,
 					WaitEvent: &testutil.ExpWaitEvent{
 						GroupName:  "wait-0",
-						Operation:  event.ReconcilePending,
+						Status:     event.ReconcilePending,
 						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
 					},
 				},
@@ -366,7 +366,7 @@ func TestApplier(t *testing.T) {
 					EventType: event.WaitType,
 					WaitEvent: &testutil.ExpWaitEvent{
 						GroupName:  "wait-0",
-						Operation:  event.Reconciled,
+						Status:     event.ReconcileSuccessful,
 						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
 					},
 				},
@@ -374,7 +374,7 @@ func TestApplier(t *testing.T) {
 					EventType: event.WaitType,
 					WaitEvent: &testutil.ExpWaitEvent{
 						GroupName:  "wait-0",
-						Operation:  event.Reconciled,
+						Status:     event.ReconcileSuccessful,
 						Identifier: testutil.ToIdentifier(t, resources["secret"]),
 					},
 				},
@@ -497,7 +497,7 @@ func TestApplier(t *testing.T) {
 					EventType: event.ApplyType,
 					ApplyEvent: &testutil.ExpApplyEvent{
 						GroupName:  "apply-0",
-						Operation:  event.Created, // Create new
+						Status:     event.ApplySuccessful, // Create new
 						Identifier: testutil.ToIdentifier(t, resources["secret"]),
 					},
 				},
@@ -505,7 +505,7 @@ func TestApplier(t *testing.T) {
 					EventType: event.ApplyType,
 					ApplyEvent: &testutil.ExpApplyEvent{
 						GroupName:  "apply-0",
-						Operation:  event.Configured, // Update existing
+						Status:     event.ApplySuccessful, // Update existing
 						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
 					},
 				},
@@ -530,7 +530,7 @@ func TestApplier(t *testing.T) {
 					EventType: event.WaitType,
 					WaitEvent: &testutil.ExpWaitEvent{
 						GroupName:  "wait-0",
-						Operation:  event.ReconcilePending,
+						Status:     event.ReconcilePending,
 						Identifier: testutil.ToIdentifier(t, resources["secret"]),
 					},
 				},
@@ -538,7 +538,7 @@ func TestApplier(t *testing.T) {
 					EventType: event.WaitType,
 					WaitEvent: &testutil.ExpWaitEvent{
 						GroupName:  "wait-0",
-						Operation:  event.ReconcilePending,
+						Status:     event.ReconcilePending,
 						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
 					},
 				},
@@ -547,7 +547,7 @@ func TestApplier(t *testing.T) {
 					EventType: event.WaitType,
 					WaitEvent: &testutil.ExpWaitEvent{
 						GroupName:  "wait-0",
-						Operation:  event.Reconciled,
+						Status:     event.ReconcileSuccessful,
 						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
 					},
 				},
@@ -555,7 +555,7 @@ func TestApplier(t *testing.T) {
 					EventType: event.WaitType,
 					WaitEvent: &testutil.ExpWaitEvent{
 						GroupName:  "wait-0",
-						Operation:  event.Reconciled,
+						Status:     event.ReconcileSuccessful,
 						Identifier: testutil.ToIdentifier(t, resources["secret"]),
 					},
 				},
@@ -703,7 +703,7 @@ func TestApplier(t *testing.T) {
 					EventType: event.PruneType,
 					PruneEvent: &testutil.ExpPruneEvent{
 						GroupName:  "prune-0",
-						Operation:  event.Pruned,
+						Status:     event.PruneSuccessful,
 						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
 					},
 				},
@@ -711,7 +711,7 @@ func TestApplier(t *testing.T) {
 					EventType: event.PruneType,
 					PruneEvent: &testutil.ExpPruneEvent{
 						GroupName:  "prune-0",
-						Operation:  event.Pruned,
+						Status:     event.PruneSuccessful,
 						Identifier: testutil.ToIdentifier(t, resources["secret"]),
 					},
 				},
@@ -736,7 +736,7 @@ func TestApplier(t *testing.T) {
 					EventType: event.WaitType,
 					WaitEvent: &testutil.ExpWaitEvent{
 						GroupName:  "wait-0",
-						Operation:  event.ReconcilePending,
+						Status:     event.ReconcilePending,
 						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
 					},
 				},
@@ -744,7 +744,7 @@ func TestApplier(t *testing.T) {
 					EventType: event.WaitType,
 					WaitEvent: &testutil.ExpWaitEvent{
 						GroupName:  "wait-0",
-						Operation:  event.ReconcilePending,
+						Status:     event.ReconcilePending,
 						Identifier: testutil.ToIdentifier(t, resources["secret"]),
 					},
 				},
@@ -753,7 +753,7 @@ func TestApplier(t *testing.T) {
 					EventType: event.WaitType,
 					WaitEvent: &testutil.ExpWaitEvent{
 						GroupName:  "wait-0",
-						Operation:  event.Reconciled,
+						Status:     event.ReconcileSuccessful,
 						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
 					},
 				},
@@ -761,7 +761,7 @@ func TestApplier(t *testing.T) {
 					EventType: event.WaitType,
 					WaitEvent: &testutil.ExpWaitEvent{
 						GroupName:  "wait-0",
-						Operation:  event.Reconciled,
+						Status:     event.ReconcileSuccessful,
 						Identifier: testutil.ToIdentifier(t, resources["secret"]),
 					},
 				},
@@ -875,7 +875,7 @@ func TestApplier(t *testing.T) {
 					ApplyEvent: &testutil.ExpApplyEvent{
 						GroupName:  "apply-0",
 						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
-						Operation:  event.Unchanged,
+						Status:     event.ApplySkipped,
 						Error: &inventory.PolicyPreventedActuationError{
 							Strategy: actuation.ActuationStrategyApply,
 							Policy:   inventory.PolicyMustMatch,
@@ -903,7 +903,7 @@ func TestApplier(t *testing.T) {
 					EventType: event.WaitType,
 					WaitEvent: &testutil.ExpWaitEvent{
 						GroupName:  "wait-0",
-						Operation:  event.ReconcileSkipped,
+						Status:     event.ReconcileSkipped,
 						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
 					},
 				},
@@ -986,7 +986,7 @@ func TestApplier(t *testing.T) {
 					EventType: event.PruneType,
 					PruneEvent: &testutil.ExpPruneEvent{
 						GroupName:  "prune-0",
-						Operation:  event.PruneSkipped,
+						Status:     event.PruneSkipped,
 						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
 						Error: &inventory.PolicyPreventedActuationError{
 							Strategy: actuation.ActuationStrategyDelete,
@@ -1015,7 +1015,7 @@ func TestApplier(t *testing.T) {
 					EventType: event.WaitType,
 					WaitEvent: &testutil.ExpWaitEvent{
 						GroupName:  "wait-0",
-						Operation:  event.ReconcileSkipped,
+						Status:     event.ReconcileSkipped,
 						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
 					},
 				},
@@ -1130,7 +1130,7 @@ func TestApplier(t *testing.T) {
 					EventType: event.PruneType,
 					PruneEvent: &testutil.ExpPruneEvent{
 						GroupName:  "prune-0",
-						Operation:  event.Pruned,
+						Status:     event.PruneSuccessful,
 						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
 					},
 				},
@@ -1154,7 +1154,7 @@ func TestApplier(t *testing.T) {
 					EventType: event.WaitType,
 					WaitEvent: &testutil.ExpWaitEvent{
 						GroupName:  "wait-0",
-						Operation:  event.ReconcilePending,
+						Status:     event.ReconcilePending,
 						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
 					},
 				},
@@ -1162,7 +1162,7 @@ func TestApplier(t *testing.T) {
 					EventType: event.WaitType,
 					WaitEvent: &testutil.ExpWaitEvent{
 						GroupName:  "wait-0",
-						Operation:  event.Reconciled,
+						Status:     event.ReconcileSuccessful,
 						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
 					},
 				},
@@ -1309,7 +1309,7 @@ func TestApplier(t *testing.T) {
 					EventType: event.ApplyType,
 					ApplyEvent: &testutil.ExpApplyEvent{
 						GroupName:  "apply-0",
-						Operation:  event.Created, // Create new
+						Status:     event.ApplySuccessful, // Create new
 						Identifier: testutil.ToIdentifier(t, resources["secret"]),
 					},
 				},
@@ -1334,7 +1334,7 @@ func TestApplier(t *testing.T) {
 					EventType: event.WaitType,
 					WaitEvent: &testutil.ExpWaitEvent{
 						GroupName:  "wait-0",
-						Operation:  event.ReconcilePending,
+						Status:     event.ReconcilePending,
 						Identifier: testutil.ToIdentifier(t, resources["secret"]),
 					},
 				},
@@ -1343,7 +1343,7 @@ func TestApplier(t *testing.T) {
 					EventType: event.WaitType,
 					WaitEvent: &testutil.ExpWaitEvent{
 						GroupName:  "wait-0",
-						Operation:  event.Reconciled,
+						Status:     event.ReconcileSuccessful,
 						Identifier: testutil.ToIdentifier(t, resources["secret"]),
 					},
 				},
@@ -1484,7 +1484,7 @@ func TestApplier(t *testing.T) {
 						break loop
 					}
 					if e.Type == event.ActionGroupType &&
-						e.ActionGroupEvent.Type == event.Finished {
+						e.ActionGroupEvent.Status == event.Finished {
 						// Send events after the first apply/prune task ends
 						if e.ActionGroupEvent.Action == event.ApplyAction ||
 							e.ActionGroupEvent.Action == event.PruneAction {
@@ -1642,7 +1642,7 @@ func TestApplierCancel(t *testing.T) {
 					EventType: event.ApplyType,
 					ApplyEvent: &testutil.ExpApplyEvent{
 						GroupName:  "apply-0",
-						Operation:  event.Created,
+						Status:     event.ApplySuccessful,
 						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
 					},
 				},
@@ -1670,7 +1670,7 @@ func TestApplierCancel(t *testing.T) {
 					WaitEvent: &testutil.ExpWaitEvent{
 						GroupName:  "wait-0",
 						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
-						Operation:  event.ReconcilePending,
+						Status:     event.ReconcilePending,
 					},
 				},
 				// Deployment never becomes Current.
@@ -1807,7 +1807,7 @@ func TestApplierCancel(t *testing.T) {
 					EventType: event.ApplyType,
 					ApplyEvent: &testutil.ExpApplyEvent{
 						GroupName:  "apply-0",
-						Operation:  event.Created,
+						Status:     event.ApplySuccessful,
 						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
 					},
 				},
@@ -1835,7 +1835,7 @@ func TestApplierCancel(t *testing.T) {
 					WaitEvent: &testutil.ExpWaitEvent{
 						GroupName:  "wait-0",
 						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
-						Operation:  event.ReconcilePending,
+						Status:     event.ReconcilePending,
 					},
 				},
 				{
@@ -1844,7 +1844,7 @@ func TestApplierCancel(t *testing.T) {
 					WaitEvent: &testutil.ExpWaitEvent{
 						GroupName:  "wait-0",
 						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
-						Operation:  event.Reconciled,
+						Status:     event.ReconcileSuccessful,
 					},
 				},
 				{
@@ -1922,7 +1922,7 @@ func TestApplierCancel(t *testing.T) {
 					events = append(events, e)
 
 					if e.Type == event.ActionGroupType &&
-						e.ActionGroupEvent.Type == event.Finished {
+						e.ActionGroupEvent.Status == event.Finished {
 						// Send events after the first apply/prune task ends
 						if e.ActionGroupEvent.Action == event.ApplyAction ||
 							e.ActionGroupEvent.Action == event.PruneAction {

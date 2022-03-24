@@ -58,21 +58,16 @@ func (ef *formatter) FormatValidationEvent(ve event.ValidationEvent) error {
 	return nil
 }
 
-func (ef *formatter) FormatApplyEvent(ae event.ApplyEvent) error {
-	gk := ae.Identifier.GroupKind
-	name := ae.Identifier.Name
-	if ae.Error != nil {
-		if ae.Operation == event.Unchanged {
-			ef.print("%s apply skipped: %s", resourceIDToString(gk, name),
-				ae.Error.Error())
-		} else {
-			ef.print("%s apply failed: %s", resourceIDToString(gk, name),
-				ae.Error.Error())
-		}
-		return nil
+func (ef *formatter) FormatApplyEvent(e event.ApplyEvent) error {
+	gk := e.Identifier.GroupKind
+	name := e.Identifier.Name
+	if e.Error != nil {
+		ef.print("%s apply %s: %s", resourceIDToString(gk, name),
+			strings.ToLower(e.Status.String()), e.Error.Error())
+	} else {
+		ef.print("%s apply %s", resourceIDToString(gk, name),
+			strings.ToLower(e.Status.String()))
 	}
-	ef.print("%s %s", resourceIDToString(gk, name),
-		strings.ToLower(ae.Operation.String()))
 	return nil
 }
 
@@ -82,69 +77,37 @@ func (ef *formatter) FormatStatusEvent(se event.StatusEvent) error {
 	return nil
 }
 
-func (ef *formatter) FormatPruneEvent(pe event.PruneEvent) error {
-	gk := pe.Identifier.GroupKind
-	name := pe.Identifier.Name
-	if pe.Error != nil {
-		if pe.Operation == event.PruneSkipped {
-			ef.print("%s prune skipped: %s", resourceIDToString(gk, name),
-				pe.Error.Error())
-		} else {
-			ef.print("%s prune failed: %s", resourceIDToString(gk, name),
-				pe.Error.Error())
-		}
-		return nil
-	}
-
-	switch pe.Operation {
-	case event.Pruned:
-		ef.print("%s pruned", resourceIDToString(gk, name))
-	case event.PruneSkipped:
-		ef.print("%s prune skipped", resourceIDToString(gk, name))
+func (ef *formatter) FormatPruneEvent(e event.PruneEvent) error {
+	gk := e.Identifier.GroupKind
+	name := e.Identifier.Name
+	if e.Error != nil {
+		ef.print("%s prune %s: %s", resourceIDToString(gk, name),
+			strings.ToLower(e.Status.String()), e.Error.Error())
+	} else {
+		ef.print("%s prune %s", resourceIDToString(gk, name),
+			strings.ToLower(e.Status.String()))
 	}
 	return nil
 }
 
-func (ef *formatter) FormatDeleteEvent(de event.DeleteEvent) error {
-	gk := de.Identifier.GroupKind
-	name := de.Identifier.Name
-
-	if de.Error != nil {
-		if de.Operation == event.DeleteSkipped {
-			ef.print("%s delete skipped: %s", resourceIDToString(gk, name),
-				de.Error.Error())
-		} else {
-			ef.print("%s delete failed: %s", resourceIDToString(gk, name),
-				de.Error.Error())
-		}
-		return nil
-	}
-
-	switch de.Operation {
-	case event.Deleted:
-		ef.print("%s deleted", resourceIDToString(gk, name))
-	case event.DeleteSkipped:
-		ef.print("%s delete skipped", resourceIDToString(gk, name))
+func (ef *formatter) FormatDeleteEvent(e event.DeleteEvent) error {
+	gk := e.Identifier.GroupKind
+	name := e.Identifier.Name
+	if e.Error != nil {
+		ef.print("%s delete %s: %s", resourceIDToString(gk, name),
+			strings.ToLower(e.Status.String()), e.Error.Error())
+	} else {
+		ef.print("%s delete %s", resourceIDToString(gk, name),
+			strings.ToLower(e.Status.String()))
 	}
 	return nil
 }
 
-func (ef *formatter) FormatWaitEvent(we event.WaitEvent) error {
-	gk := we.Identifier.GroupKind
-	name := we.Identifier.Name
-
-	switch we.Operation {
-	case event.ReconcilePending:
-		ef.print("%s reconcile pending", resourceIDToString(gk, name))
-	case event.Reconciled:
-		ef.print("%s reconciled", resourceIDToString(gk, name))
-	case event.ReconcileSkipped:
-		ef.print("%s reconcile skipped", resourceIDToString(gk, name))
-	case event.ReconcileTimeout:
-		ef.print("%s reconcile timeout", resourceIDToString(gk, name))
-	case event.ReconcileFailed:
-		ef.print("%s reconcile failed", resourceIDToString(gk, name))
-	}
+func (ef *formatter) FormatWaitEvent(e event.WaitEvent) error {
+	gk := e.Identifier.GroupKind
+	name := e.Identifier.Name
+	ef.print("%s reconcile %s", resourceIDToString(gk, name),
+		strings.ToLower(e.Status.String()))
 	return nil
 }
 
@@ -158,40 +121,43 @@ func (ef *formatter) FormatActionGroupEvent(
 	s stats.Stats,
 	_ list.Collector,
 ) error {
-	if age.Action == event.ApplyAction &&
-		age.Type == event.Finished &&
-		list.IsLastActionGroup(age, ags) {
+	switch age.Action {
+	case event.ApplyAction:
+		ef.print("apply phase %s", strings.ToLower(age.Status.String()))
+	case event.PruneAction:
+		ef.print("prune phase %s", strings.ToLower(age.Status.String()))
+	case event.DeleteAction:
+		ef.print("delete phase %s", strings.ToLower(age.Status.String()))
+	case event.WaitAction:
+		ef.print("reconcile phase %s", strings.ToLower(age.Status.String()))
+	case event.InventoryAction:
+		ef.print("inventory update %s", strings.ToLower(age.Status.String()))
+	default:
+		return fmt.Errorf("invalid action group action: %+v", age)
+	}
+	return nil
+}
+
+func (ef *formatter) FormatSummary(s stats.Stats) error {
+	if s.ApplyStats != (stats.ApplyStats{}) {
 		as := s.ApplyStats
-		output := fmt.Sprintf("%d resource(s) applied. %d created, %d unchanged, %d configured, %d failed",
-			as.Sum(), as.Created, as.Unchanged, as.Configured, as.Failed)
-		// Only print information about serverside apply if some of the
-		// resources actually were applied serverside.
-		if as.ServersideApplied > 0 {
-			output += fmt.Sprintf(", %d serverside applied", as.ServersideApplied)
-		}
-		ef.print(output)
+		ef.print("apply result: %d attempted, %d successful, %d skipped, %d failed",
+			as.Sum(), as.Successful, as.Skipped, as.Failed)
 	}
-
-	if age.Action == event.PruneAction &&
-		age.Type == event.Finished &&
-		list.IsLastActionGroup(age, ags) {
+	if s.PruneStats != (stats.PruneStats{}) {
 		ps := s.PruneStats
-		ef.print("%d resource(s) pruned, %d skipped, %d failed to prune", ps.Pruned, ps.Skipped, ps.Failed)
+		ef.print("prune result: %d attempted, %d successful, %d skipped, %d failed",
+			ps.Sum(), ps.Successful, ps.Skipped, ps.Failed)
 	}
-
-	if age.Action == event.DeleteAction &&
-		age.Type == event.Finished &&
-		list.IsLastActionGroup(age, ags) {
+	if s.DeleteStats != (stats.DeleteStats{}) {
 		ds := s.DeleteStats
-		ef.print("%d resource(s) deleted, %d skipped, %d failed to delete", ds.Deleted, ds.Skipped, ds.Failed)
+		ef.print("delete result: %d attempted, %d successful, %d skipped, %d failed",
+			ds.Sum(), ds.Successful, ds.Skipped, ds.Failed)
 	}
-
-	if age.Action == event.WaitAction &&
-		age.Type == event.Finished &&
-		list.IsLastActionGroup(age, ags) {
+	if s.WaitStats != (stats.WaitStats{}) {
 		ws := s.WaitStats
-		ef.print("%d resource(s) reconciled, %d skipped, %d failed to reconcile, %d timed out", ws.Reconciled,
-			ws.Skipped, ws.Failed, ws.Timeout)
+		ef.print("reconcile result: %d attempted, %d successful, %d skipped, %d failed, %d timed out",
+			ws.Sum(), ws.Successful, ws.Skipped, ws.Failed, ws.Timeout)
 	}
 	return nil
 }

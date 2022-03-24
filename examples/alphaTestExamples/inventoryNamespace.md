@@ -93,9 +93,10 @@ test-namespace is created first, so the following resources within the namespace
 <!-- @runApply @testE2EAgainstLatestRelease -->
 ```
 kapply apply $BASE --reconcile-timeout=1m | tee $OUTPUT/status
-expectedOutputLine "namespace/test-namespace unchanged"
-expectedOutputLine "configmap/cm-a created"
-expectedOutputLine "2 resource(s) applied. 1 created, 1 unchanged, 0 configured"
+expectedOutputLine "namespace/test-namespace apply successful"
+expectedOutputLine "configmap/cm-a apply successful"
+expectedOutputLine "apply result: 2 attempted, 2 successful, 0 skipped, 0 failed"
+expectedOutputLine "reconcile result: 2 attempted, 2 successful, 0 skipped, 0 failed, 0 timed out"
 
 # There should be only one inventory object
 kubectl get cm -n test-namespace --selector='cli-utils.sigs.k8s.io/inventory-id' --no-headers | wc -l | tee $OUTPUT/status
@@ -119,7 +120,8 @@ that the subsequent apply does not prune this omitted namespace.
 ```
 rm -f $BASE/test-namespace.yaml
 kapply apply $BASE --reconcile-timeout=1m | tee $OUTPUT/status
-expectedOutputLine "0 resource(s) pruned, 1 skipped"
+expectedOutputLine "prune result: 1 attempted, 0 successful, 1 skipped, 0 failed"
+expectedOutputLine "reconcile result: 1 attempted, 0 successful, 1 skipped, 0 failed, 0 timed out"
 
 # Inventory namespace should still exist
 kubectl get ns test-namespace --no-headers | wc -l | tee $OUTPUT/status

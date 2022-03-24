@@ -73,8 +73,16 @@ func (c *countingFormatter) FormatErrorEvent(e event.ErrorEvent) error {
 	return nil
 }
 
-func (c *countingFormatter) FormatActionGroupEvent(e event.ActionGroupEvent, _ []event.ActionGroup, _ stats.Stats,
-	_ Collector) error {
+func (c *countingFormatter) FormatActionGroupEvent(
+	e event.ActionGroupEvent,
+	_ []event.ActionGroup,
+	_ stats.Stats,
+	_ Collector,
+) error {
 	c.actionGroupEvent = append(c.actionGroupEvent, e)
+	return nil
+}
+
+func (c *countingFormatter) FormatSummary(s stats.Stats) error {
 	return nil
 }

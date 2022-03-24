@@ -58,6 +58,9 @@ type resourceStateCollector struct {
 	// the latest state for the given resource.
 	resourceInfos map[object.ObjMetadata]*resourceInfo
 
+	// stats collect statistics from handled events
+	stats stats.Stats
+
 	err error
 }
 
@@ -82,21 +85,21 @@ type resourceInfo struct {
 	// the desired action on the resource.
 	Error error
 
-	// ApplyOpResult contains the result after
+	// ApplyStatus contains the result after
 	// a resource has been applied to the cluster.
-	ApplyOpResult event.ApplyEventOperation
+	ApplyStatus event.ApplyEventStatus
 
-	// PruneOpResult contains the result after
+	// PruneStatus contains the result after
 	// a prune operation on a resource
-	PruneOpResult event.PruneEventOperation
+	PruneStatus event.PruneEventStatus
 
-	// DeleteOpResult contains the result after
+	// DeleteStatus contains the result after
 	// a delete operation on a resource
-	DeleteOpResult event.DeleteEventOperation
+	DeleteStatus event.DeleteEventStatus
 
-	// WaitOpResult contains the result after
+	// WaitStatus contains the result after
 	// a wait operation on a resource
-	WaitOpResult event.WaitEventOperation
+	WaitStatus event.WaitEventStatus
 }
 
 // Identifier returns the identifier for the given resource.
@@ -193,6 +196,8 @@ func (r *resourceStateCollector) processEvent(ev event.Event) error {
 		r.processApplyEvent(ev.ApplyEvent)
 	case event.PruneType:
 		r.processPruneEvent(ev.PruneEvent)
+	case event.DeleteType:
+		r.processDeleteEvent(ev.DeleteEvent)
 	case event.WaitType:
 		r.processWaitEvent(ev.WaitEvent)
 	case event.ErrorType:
@@ -253,7 +258,8 @@ func (r *resourceStateCollector) processApplyEvent(e event.ApplyEvent) {
 	if e.Error != nil {
 		previous.Error = e.Error
 	}
-	previous.ApplyOpResult = e.Operation
+	previous.ApplyStatus = e.Status
+	r.stats.ApplyStats.Inc(e.Status)
 }
 
 // processPruneEvent handles event related to prune operations.
@@ -268,7 +274,24 @@ func (r *resourceStateCollector) processPruneEvent(e event.PruneEvent) {
 	if e.Error != nil {
 		previous.Error = e.Error
 	}
-	previous.PruneOpResult = e.Operation
+	previous.PruneStatus = e.Status
+	r.stats.PruneStats.Inc(e.Status)
+}
+
+// processDeleteEvent handles event related to delete operations.
+func (r *resourceStateCollector) processDeleteEvent(e event.DeleteEvent) {
+	identifier := e.Identifier
+	klog.V(7).Infof("processing delete event for %s", identifier)
+	previous, found := r.resourceInfos[identifier]
+	if !found {
+		klog.V(4).Infof("%s delete event not found in ResourceInfos; no processing", identifier)
+		return
+	}
+	if e.Error != nil {
+		previous.Error = e.Error
+	}
+	previous.DeleteStatus = e.Status
+	r.stats.DeleteStats.Inc(e.Status)
 }
 
 // processPruneEvent handles event related to prune operations.
@@ -280,7 +303,8 @@ func (r *resourceStateCollector) processWaitEvent(e event.WaitEvent) {
 		klog.V(4).Infof("%s wait event not found in ResourceInfos; no processing", identifier)
 		return
 	}
-	previous.WaitOpResult = e.Operation
+	previous.WaitStatus = e.Status
+	r.stats.WaitStats.Inc(e.Status)
 }
 
 // ResourceState contains the latest state for all the resources.
@@ -316,10 +340,10 @@ func (r *resourceStateCollector) LatestState() *ResourceState {
 			identifier:     ri.identifier,
 			resourceStatus: ri.resourceStatus,
 			ResourceAction: ri.ResourceAction,
-			ApplyOpResult:  ri.ApplyOpResult,
-			PruneOpResult:  ri.PruneOpResult,
-			DeleteOpResult: ri.DeleteOpResult,
-			WaitOpResult:   ri.WaitOpResult,
+			ApplyStatus:    ri.ApplyStatus,
+			PruneStatus:    ri.PruneStatus,
+			DeleteStatus:   ri.DeleteStatus,
+			WaitStatus:     ri.WaitStatus,
 		})
 	}
 	sort.Sort(resourceInfos)
@@ -328,33 +352,6 @@ func (r *resourceStateCollector) LatestState() *ResourceState {
 		resourceInfos: resourceInfos,
 		err:           r.err,
 	}
-}
-
-// Stats returns a summary of the results from the actuation operation
-// as a stats.Stats object.
-func (r *resourceStateCollector) Stats() stats.Stats {
-	var s stats.Stats
-	for _, res := range r.resourceInfos {
-		switch res.ResourceAction {
-		case event.ApplyAction:
-			if res.Error != nil {
-				s.ApplyStats.IncFailed()
-			}
-			s.ApplyStats.Inc(res.ApplyOpResult)
-		case event.PruneAction:
-			if res.Error != nil {
-				s.PruneStats.IncFailed()
-			}
-			s.PruneStats.Inc(res.PruneOpResult)
-		case event.DeleteAction:
-			if res.Error != nil {
-				s.DeleteStats.IncFailed()
-			}
-			s.DeleteStats.Inc(res.DeleteOpResult)
-		}
-		s.WaitStats.Inc(res.WaitOpResult)
-	}
-	return s
 }
 
 type ResourceInfos []*resourceInfo

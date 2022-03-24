@@ -205,7 +205,7 @@ func TestPrune(t *testing.T) {
 					Type: event.PruneType,
 					PruneEvent: event.PruneEvent{
 						Identifier: object.UnstructuredToObjMetadata(pod),
-						Operation:  event.Pruned,
+						Status:     event.PruneSuccessful,
 						Object:     pod,
 					},
 				},
@@ -219,7 +219,7 @@ func TestPrune(t *testing.T) {
 					Type: event.PruneType,
 					PruneEvent: event.PruneEvent{
 						Identifier: object.UnstructuredToObjMetadata(pod),
-						Operation:  event.Pruned,
+						Status:     event.PruneSuccessful,
 						Object:     pod,
 					},
 				},
@@ -227,7 +227,7 @@ func TestPrune(t *testing.T) {
 					Type: event.PruneType,
 					PruneEvent: event.PruneEvent{
 						Identifier: object.UnstructuredToObjMetadata(pdb),
-						Operation:  event.Pruned,
+						Status:     event.PruneSuccessful,
 						Object:     pdb,
 					},
 				},
@@ -235,7 +235,7 @@ func TestPrune(t *testing.T) {
 					Type: event.PruneType,
 					PruneEvent: event.PruneEvent{
 						Identifier: object.UnstructuredToObjMetadata(namespace),
-						Operation:  event.Pruned,
+						Status:     event.PruneSuccessful,
 						Object:     namespace,
 					},
 				},
@@ -249,7 +249,7 @@ func TestPrune(t *testing.T) {
 					Type: event.DeleteType,
 					DeleteEvent: event.DeleteEvent{
 						Identifier: object.UnstructuredToObjMetadata(pod),
-						Operation:  event.Deleted,
+						Status:     event.DeleteSuccessful,
 						Object:     pod,
 					},
 				},
@@ -263,7 +263,7 @@ func TestPrune(t *testing.T) {
 					Type: event.DeleteType,
 					DeleteEvent: event.DeleteEvent{
 						Identifier: object.UnstructuredToObjMetadata(pod),
-						Operation:  event.Deleted,
+						Status:     event.DeleteSuccessful,
 						Object:     pod,
 					},
 				},
@@ -271,7 +271,7 @@ func TestPrune(t *testing.T) {
 					Type: event.DeleteType,
 					DeleteEvent: event.DeleteEvent{
 						Identifier: object.UnstructuredToObjMetadata(pdb),
-						Operation:  event.Deleted,
+						Status:     event.DeleteSuccessful,
 						Object:     pdb,
 					},
 				},
@@ -279,7 +279,7 @@ func TestPrune(t *testing.T) {
 					Type: event.DeleteType,
 					DeleteEvent: event.DeleteEvent{
 						Identifier: object.UnstructuredToObjMetadata(namespace),
-						Operation:  event.Deleted,
+						Status:     event.DeleteSuccessful,
 						Object:     namespace,
 					},
 				},
@@ -293,7 +293,7 @@ func TestPrune(t *testing.T) {
 					Type: event.PruneType,
 					PruneEvent: event.PruneEvent{
 						Identifier: object.UnstructuredToObjMetadata(pod),
-						Operation:  event.Pruned,
+						Status:     event.PruneSuccessful,
 						Object:     pod,
 					},
 				},
@@ -311,7 +311,7 @@ func TestPrune(t *testing.T) {
 					Type: event.DeleteType,
 					DeleteEvent: event.DeleteEvent{
 						Identifier: object.UnstructuredToObjMetadata(pod),
-						Operation:  event.Deleted,
+						Status:     event.DeleteSuccessful,
 						Object:     pod,
 					},
 				},
@@ -331,7 +331,7 @@ func TestPrune(t *testing.T) {
 					Type: event.PruneType,
 					PruneEvent: event.PruneEvent{
 						Identifier: object.UnstructuredToObjMetadata(pod),
-						Operation:  event.PruneSkipped,
+						Status:     event.PruneSkipped,
 						Object:     pod,
 						Error: testutil.EqualError(&filter.ApplyPreventedDeletionError{
 							UID: "pod-uid",
@@ -357,7 +357,7 @@ func TestPrune(t *testing.T) {
 					Type: event.PruneType,
 					PruneEvent: event.PruneEvent{
 						Identifier: object.UnstructuredToObjMetadata(pod),
-						Operation:  event.PruneSkipped,
+						Status:     event.PruneSkipped,
 						Object:     pod,
 						Error: testutil.EqualError(&filter.ApplyPreventedDeletionError{
 							UID: "pod-uid",
@@ -368,7 +368,7 @@ func TestPrune(t *testing.T) {
 					Type: event.PruneType,
 					PruneEvent: event.PruneEvent{
 						Identifier: object.UnstructuredToObjMetadata(pdb),
-						Operation:  event.Pruned,
+						Status:     event.PruneSuccessful,
 						Object:     pdb,
 					},
 				},
@@ -389,7 +389,7 @@ func TestPrune(t *testing.T) {
 					Type: event.PruneType,
 					PruneEvent: event.PruneEvent{
 						Identifier: object.UnstructuredToObjMetadata(podDeletionPrevention),
-						Operation:  event.PruneSkipped,
+						Status:     event.PruneSkipped,
 						Object: testutil.Mutate(podDeletionPrevention.DeepCopy(),
 							testutil.DeleteOwningInv(t, testInventoryLabel)),
 						Error: testutil.EqualError(&filter.AnnotationPreventedDeletionError{
@@ -402,7 +402,7 @@ func TestPrune(t *testing.T) {
 					Type: event.PruneType,
 					PruneEvent: event.PruneEvent{
 						Identifier: testutil.ToIdentifier(t, pdbDeletePreventionManifest),
-						Operation:  event.PruneSkipped,
+						Status:     event.PruneSkipped,
 						Object: testutil.Unstructured(t, pdbDeletePreventionManifest,
 							testutil.DeleteOwningInv(t, testInventoryLabel)),
 						Error: testutil.EqualError(&filter.AnnotationPreventedDeletionError{
@@ -433,7 +433,7 @@ func TestPrune(t *testing.T) {
 					Type: event.DeleteType,
 					DeleteEvent: event.DeleteEvent{
 						Identifier: object.UnstructuredToObjMetadata(podDeletionPrevention),
-						Operation:  event.DeleteSkipped,
+						Status:     event.DeleteSkipped,
 						Object: testutil.Mutate(podDeletionPrevention.DeepCopy(),
 							testutil.DeleteOwningInv(t, testInventoryLabel)),
 						Error: testutil.EqualError(&filter.AnnotationPreventedDeletionError{
@@ -446,7 +446,7 @@ func TestPrune(t *testing.T) {
 					Type: event.DeleteType,
 					DeleteEvent: event.DeleteEvent{
 						Identifier: testutil.ToIdentifier(t, pdbDeletePreventionManifest),
-						Operation:  event.DeleteSkipped,
+						Status:     event.DeleteSkipped,
 						Object: testutil.Unstructured(t, pdbDeletePreventionManifest,
 							testutil.DeleteOwningInv(t, testInventoryLabel)),
 						Error: testutil.EqualError(&filter.AnnotationPreventedDeletionError{
@@ -474,7 +474,7 @@ func TestPrune(t *testing.T) {
 					Type: event.PruneType,
 					PruneEvent: event.PruneEvent{
 						Identifier: object.UnstructuredToObjMetadata(podDeletionPrevention),
-						Operation:  event.PruneSkipped,
+						Status:     event.PruneSkipped,
 						Object: testutil.Mutate(podDeletionPrevention.DeepCopy(),
 							testutil.DeleteOwningInv(t, testInventoryLabel)),
 						Error: testutil.EqualError(&filter.AnnotationPreventedDeletionError{
@@ -486,8 +486,8 @@ func TestPrune(t *testing.T) {
 				{
 					Type: event.PruneType,
 					PruneEvent: event.PruneEvent{
+						Status:     event.PruneSuccessful,
 						Identifier: object.UnstructuredToObjMetadata(pod),
-						Operation:  event.Pruned,
 						Object:     pod,
 					},
 				},
@@ -512,7 +512,7 @@ func TestPrune(t *testing.T) {
 					Type: event.PruneType,
 					PruneEvent: event.PruneEvent{
 						Identifier: object.UnstructuredToObjMetadata(namespace),
-						Operation:  event.PruneSkipped,
+						Status:     event.PruneSkipped,
 						Object:     namespace,
 						Error: testutil.EqualError(&filter.NamespaceInUseError{
 							Namespace: namespace.GetName(),

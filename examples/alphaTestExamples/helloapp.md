@@ -174,11 +174,11 @@ Run preview to check which commands will be executed
 ```
 kapply preview $BASE | tee $OUTPUT/status
 
-expectedOutputLine "3 resource(s) applied. 3 created, 0 unchanged, 0 configured, 0 failed"
+expectedOutputLine "apply result: 3 attempted, 3 successful, 0 skipped, 0 failed"
 
 kapply preview $BASE --server-side | tee $OUTPUT/status
 
-expectedOutputLine "3 resource(s) applied. 0 created, 0 unchanged, 0 configured, 0 failed, 3 serverside applied"
+expectedOutputLine "apply result: 3 attempted, 3 successful, 0 skipped, 0 failed"
 
 # Verify that preview didn't create any resources.
 kubectl get all -n hellospace 2>&1 | tee $OUTPUT/status
@@ -222,7 +222,7 @@ kapply apply $BASE --reconcile-timeout=120s --status-events | tee $OUTPUT/status
 
 expectedOutputLine "configmap/the-map2 is Current: Resource is always ready"
 
-expectedOutputLine "configmap/the-map1 pruned"
+expectedOutputLine "configmap/the-map1 prune successful"
 
 # Verify that the new configmap has been created and the old one pruned.
 kubectl get cm -n hellospace --no-headers | awk '{print $1}' | tee $OUTPUT/status
@@ -235,19 +235,17 @@ Clean-up the cluster
 ```
 kapply preview $BASE --destroy | tee $OUTPUT/status
 
-expectedOutputLine "deployment.apps/the-deployment deleted"
-
-expectedOutputLine "configmap/the-map2 deleted"
-
-expectedOutputLine "service/the-service deleted"
+expectedOutputLine "deployment.apps/the-deployment delete successful"
+expectedOutputLine "configmap/the-map2 delete successful"
+expectedOutputLine "service/the-service delete successful"
+expectedOutputLine "delete result: 3 attempted, 3 successful, 0 skipped, 0 failed"
 
 kapply preview $BASE --destroy --server-side | tee $OUTPUT/status
 
-expectedOutputLine "deployment.apps/the-deployment deleted"
-
-expectedOutputLine "configmap/the-map2 deleted"
-
-expectedOutputLine "service/the-service deleted"
+expectedOutputLine "deployment.apps/the-deployment delete successful"
+expectedOutputLine "configmap/the-map2 delete successful"
+expectedOutputLine "service/the-service delete successful"
+expectedOutputLine "delete result: 3 attempted, 3 successful, 0 skipped, 0 failed"
 
 # Verify that preview all resources are still there after running preview.
 kubectl get --no-headers all -n hellospace | wc -l | xargs | tee $OUTPUT/status
@@ -255,14 +253,12 @@ expectedOutputLine "6"
 
 kapply destroy $BASE | tee $OUTPUT/status;
 
-expectedOutputLine "deployment.apps/the-deployment deleted"
-
-expectedOutputLine "configmap/the-map2 deleted"
-
-expectedOutputLine "service/the-service deleted"
-
-expectedOutputLine "3 resource(s) deleted, 0 skipped"
-expectedNotFound "resource(s) pruned"
+expectedOutputLine "deployment.apps/the-deployment delete successful"
+expectedOutputLine "configmap/the-map2 delete successful"
+expectedOutputLine "service/the-service delete successful"
+expectedOutputLine "delete result: 3 attempted, 3 successful, 0 skipped, 0 failed"
+expectedOutputLine "reconcile result: 3 attempted, 3 successful, 0 skipped, 0 failed, 0 timed out"
+expectedNotFound "prune result"
 
 kind delete cluster;
 ```

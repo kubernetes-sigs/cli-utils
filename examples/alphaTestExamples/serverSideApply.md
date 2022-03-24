@@ -93,9 +93,10 @@ no resources should be pruned.
 <!-- @runServerSideApply @testE2EAgainstLatestRelease -->
 ```
 kapply apply $BASE --server-side --reconcile-timeout=1m | tee $OUTPUT/status
-expectedOutputLine "configmap/cm-a serversideapplied"
-expectedOutputLine "configmap/cm-b serversideapplied"
-expectedOutputLine "2 serverside applied"
+expectedOutputLine "configmap/cm-a apply successful"
+expectedOutputLine "configmap/cm-b apply successful"
+expectedOutputLine "apply result: 2 attempted, 2 successful, 0 skipped, 0 failed"
+expectedOutputLine "reconcile result: 2 attempted, 2 successful, 0 skipped, 0 failed, 0 timed out"
 
 # There should be only one inventory object
 kubectl get cm --selector='cli-utils.sigs.k8s.io/inventory-id' --no-headers | wc -l | tee $OUTPUT/status
@@ -129,7 +130,8 @@ data:
 EOF
 
 kapply apply $BASE --server-side --field-manager=sean --force-conflicts --reconcile-timeout=1m | tee $OUTPUT/status
-expectedOutputLine "configmap/cm-a serversideapplied"
-expectedOutputLine "configmap/cm-b serversideapplied"
-expectedOutputLine "2 serverside applied"
+expectedOutputLine "configmap/cm-a apply successful"
+expectedOutputLine "configmap/cm-b apply successful"
+expectedOutputLine "apply result: 2 attempted, 2 successful, 0 skipped, 0 failed"
+expectedOutputLine "reconcile result: 2 attempted, 2 successful, 0 skipped, 0 failed, 0 timed out"
 ```

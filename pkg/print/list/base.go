@@ -25,6 +25,7 @@ type Formatter interface {
 		s stats.Stats,
 		c Collector,
 	) error
+	FormatSummary(s stats.Stats) error
 }
 
 type FormatterFactory func(previewStrategy common.DryRunStrategy) Formatter
@@ -106,6 +107,10 @@ func (b *BaseListPrinter) Print(ch <-chan event.Event, previewStrategy common.Dr
 				return err
 			}
 		}
+	}
+
+	if err := formatter.FormatSummary(statsCollector); err != nil {
+		return err
 	}
 	return printcommon.ResultErrorFromStats(statsCollector)
 }

@@ -188,7 +188,7 @@ func skipInvalidTest(ctx context.Context, c client.Client, invConfig invconfig.I
 			EventType: event.ApplyType,
 			ApplyEvent: &testutil.ExpApplyEvent{
 				GroupName:  "apply-0",
-				Operation:  event.Created,
+				Status:     event.ApplySuccessful,
 				Identifier: object.UnstructuredToObjMetadata(pod1Obj),
 			},
 		},
@@ -215,7 +215,7 @@ func skipInvalidTest(ctx context.Context, c client.Client, invConfig invconfig.I
 			EventType: event.WaitType,
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-0",
-				Operation:  event.ReconcilePending,
+				Status:     event.ReconcilePending,
 				Identifier: object.UnstructuredToObjMetadata(pod1Obj),
 			},
 		},
@@ -224,7 +224,7 @@ func skipInvalidTest(ctx context.Context, c client.Client, invConfig invconfig.I
 			EventType: event.WaitType,
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-0",
-				Operation:  event.Reconciled,
+				Status:     event.ReconcileSuccessful,
 				Identifier: object.UnstructuredToObjMetadata(pod1Obj),
 			},
 		},
@@ -251,7 +251,7 @@ func skipInvalidTest(ctx context.Context, c client.Client, invConfig invconfig.I
 			EventType: event.ApplyType,
 			ApplyEvent: &testutil.ExpApplyEvent{
 				GroupName:  "apply-1",
-				Operation:  event.Created,
+				Status:     event.ApplySuccessful,
 				Identifier: object.UnstructuredToObjMetadata(deployment1Obj),
 			},
 		},
@@ -278,7 +278,7 @@ func skipInvalidTest(ctx context.Context, c client.Client, invConfig invconfig.I
 			EventType: event.WaitType,
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-1",
-				Operation:  event.ReconcilePending,
+				Status:     event.ReconcilePending,
 				Identifier: object.UnstructuredToObjMetadata(deployment1Obj),
 			},
 		},
@@ -287,7 +287,7 @@ func skipInvalidTest(ctx context.Context, c client.Client, invConfig invconfig.I
 			EventType: event.WaitType,
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-1",
-				Operation:  event.Reconciled,
+				Status:     event.ReconcileSuccessful,
 				Identifier: object.UnstructuredToObjMetadata(deployment1Obj),
 			},
 		},
@@ -384,7 +384,7 @@ func skipInvalidTest(ctx context.Context, c client.Client, invConfig invconfig.I
 			EventType: event.DeleteType,
 			DeleteEvent: &testutil.ExpDeleteEvent{
 				GroupName:  "prune-0",
-				Operation:  event.Deleted,
+				Status:     event.DeleteSuccessful,
 				Identifier: object.UnstructuredToObjMetadata(pod1Obj),
 			},
 		},
@@ -411,7 +411,7 @@ func skipInvalidTest(ctx context.Context, c client.Client, invConfig invconfig.I
 			EventType: event.WaitType,
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-0",
-				Operation:  event.ReconcilePending,
+				Status:     event.ReconcilePending,
 				Identifier: object.UnstructuredToObjMetadata(pod1Obj),
 			},
 		},
@@ -420,7 +420,7 @@ func skipInvalidTest(ctx context.Context, c client.Client, invConfig invconfig.I
 			EventType: event.WaitType,
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-0",
-				Operation:  event.Reconciled,
+				Status:     event.ReconcileSuccessful,
 				Identifier: object.UnstructuredToObjMetadata(pod1Obj),
 			},
 		},

@@ -102,9 +102,11 @@ no resources should be pruned.
 <!-- @runApply @testE2EAgainstLatestRelease -->
 ```
 kapply apply $BASE --reconcile-timeout=1m | tee $OUTPUT/status
-expectedOutputLine "configmap/cm-a created"
-expectedOutputLine "configmap/cm-b created"
-expectedOutputLine "configmap/cm-c created"
+expectedOutputLine "configmap/cm-a apply successful"
+expectedOutputLine "configmap/cm-b apply successful"
+expectedOutputLine "configmap/cm-c apply successful"
+expectedOutputLine "apply result: 3 attempted, 3 successful, 0 skipped, 0 failed"
+expectedOutputLine "reconcile result: 3 attempted, 3 successful, 0 skipped, 0 failed, 0 timed out"
 
 # There should be only one inventory object
 kubectl get cm --selector='cli-utils.sigs.k8s.io/inventory-id' --no-headers | wc -l | tee $OUTPUT/status
@@ -154,11 +156,13 @@ cm-d should be created.
 <!-- @applySecondTime @testE2EAgainstLatestRelease -->
 ```
 kapply apply $BASE --reconcile-timeout=1m | tee $OUTPUT/status
-expectedOutputLine "configmap/cm-a pruned"
-expectedOutputLine "configmap/cm-b unchanged"
-expectedOutputLine "configmap/cm-c unchanged"
-expectedOutputLine "configmap/cm-d created"
-expectedOutputLine "1 resource(s) pruned, 0 skipped"
+expectedOutputLine "configmap/cm-a prune successful"
+expectedOutputLine "configmap/cm-b apply successful"
+expectedOutputLine "configmap/cm-c apply successful"
+expectedOutputLine "configmap/cm-d apply successful"
+expectedOutputLine "apply result: 3 attempted, 3 successful, 0 skipped, 0 failed"
+expectedOutputLine "prune result: 1 attempted, 1 successful, 0 skipped, 0 failed"
+expectedOutputLine "reconcile result: 4 attempted, 4 successful, 0 skipped, 0 failed, 0 timed out"
 
 # There should be only one inventory object
 kubectl get cm --selector='cli-utils.sigs.k8s.io/inventory-id' --no-headers | wc -l | tee $OUTPUT/status

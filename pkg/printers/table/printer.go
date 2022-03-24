@@ -68,7 +68,7 @@ func (t *Printer) Print(ch <-chan event.Event, _ common.DryRunStrategy, _ bool) 
 	}
 	// If no fatal errors happened, we will return a ResultError if
 	// one or more resources failed to apply/prune or reconcile.
-	return printcommon.ResultErrorFromStats(coll.Stats())
+	return printcommon.ResultErrorFromStats(coll.stats)
 }
 
 // columns defines the columns we want to print
@@ -96,12 +96,12 @@ var (
 			var text string
 			switch resInfo.ResourceAction {
 			case event.ApplyAction:
-				if resInfo.ApplyOpResult != event.ApplyUnspecified {
-					text = resInfo.ApplyOpResult.String()
+				if resInfo.ApplyStatus != event.ApplyFailed {
+					text = resInfo.ApplyStatus.String()
 				}
 			case event.PruneAction:
-				if resInfo.PruneOpResult != event.PruneUnspecified {
-					text = resInfo.PruneOpResult.String()
+				if resInfo.PruneStatus != event.PruneFailed {
+					text = resInfo.PruneStatus.String()
 				}
 			}
 
@@ -133,7 +133,7 @@ var (
 			var text string
 			switch resInfo.ResourceAction {
 			case event.WaitAction:
-				text = resInfo.WaitOpResult.String()
+				text = resInfo.WaitStatus.String()
 			}
 
 			if len(text) > width {

@@ -89,7 +89,7 @@ func namespaceFilterTest(ctx context.Context, c client.Client, invConfig invconf
 			EventType: event.ApplyType,
 			ApplyEvent: &testutil.ExpApplyEvent{
 				GroupName:  "apply-0",
-				Operation:  event.Created,
+				Status:     event.ApplySuccessful,
 				Identifier: object.UnstructuredToObjMetadata(namespace1Obj),
 				Error:      nil,
 			},
@@ -117,7 +117,7 @@ func namespaceFilterTest(ctx context.Context, c client.Client, invConfig invconf
 			EventType: event.WaitType,
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-0",
-				Operation:  event.ReconcilePending,
+				Status:     event.ReconcilePending,
 				Identifier: object.UnstructuredToObjMetadata(namespace1Obj),
 			},
 		},
@@ -126,7 +126,7 @@ func namespaceFilterTest(ctx context.Context, c client.Client, invConfig invconf
 			EventType: event.WaitType,
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-0",
-				Operation:  event.Reconciled,
+				Status:     event.ReconcileSuccessful,
 				Identifier: object.UnstructuredToObjMetadata(namespace1Obj),
 			},
 		},
@@ -153,7 +153,7 @@ func namespaceFilterTest(ctx context.Context, c client.Client, invConfig invconf
 			EventType: event.ApplyType,
 			ApplyEvent: &testutil.ExpApplyEvent{
 				GroupName:  "apply-1",
-				Operation:  event.Created,
+				Status:     event.ApplySuccessful,
 				Identifier: object.UnstructuredToObjMetadata(podBObj),
 				Error:      nil,
 			},
@@ -181,7 +181,7 @@ func namespaceFilterTest(ctx context.Context, c client.Client, invConfig invconf
 			EventType: event.WaitType,
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-1",
-				Operation:  event.ReconcilePending,
+				Status:     event.ReconcilePending,
 				Identifier: object.UnstructuredToObjMetadata(podBObj),
 			},
 		},
@@ -190,7 +190,7 @@ func namespaceFilterTest(ctx context.Context, c client.Client, invConfig invconf
 			EventType: event.WaitType,
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-1",
-				Operation:  event.Reconciled,
+				Status:     event.ReconcileSuccessful,
 				Identifier: object.UnstructuredToObjMetadata(podBObj),
 			},
 		},
@@ -281,7 +281,7 @@ func namespaceFilterTest(ctx context.Context, c client.Client, invConfig invconf
 			EventType: event.ApplyType,
 			ApplyEvent: &testutil.ExpApplyEvent{
 				GroupName:  "apply-0",
-				Operation:  event.Unchanged,
+				Status:     event.ApplySkipped,
 				Identifier: object.UnstructuredToObjMetadata(podBObj),
 				Error: testutil.EqualError(&filter.DependencyActuationMismatchError{
 					Object:           object.UnstructuredToObjMetadata(podBObj),
@@ -315,7 +315,7 @@ func namespaceFilterTest(ctx context.Context, c client.Client, invConfig invconf
 			EventType: event.WaitType,
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-0",
-				Operation:  event.ReconcileSkipped,
+				Status:     event.ReconcileSkipped,
 				Identifier: object.UnstructuredToObjMetadata(podBObj),
 			},
 		},
@@ -342,7 +342,7 @@ func namespaceFilterTest(ctx context.Context, c client.Client, invConfig invconf
 			EventType: event.PruneType,
 			PruneEvent: &testutil.ExpPruneEvent{
 				GroupName:  "prune-0",
-				Operation:  event.PruneSkipped,
+				Status:     event.PruneSkipped,
 				Identifier: object.UnstructuredToObjMetadata(namespace1Obj),
 				Error: testutil.EqualError(&filter.NamespaceInUseError{
 					Namespace: namespace1Name,
@@ -372,7 +372,7 @@ func namespaceFilterTest(ctx context.Context, c client.Client, invConfig invconf
 			EventType: event.WaitType,
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-1",
-				Operation:  event.ReconcileSkipped,
+				Status:     event.ReconcileSkipped,
 				Identifier: object.UnstructuredToObjMetadata(namespace1Obj),
 			},
 		},

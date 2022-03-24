@@ -117,11 +117,10 @@ Destroy one service and make sure that only that service is destroyed and clean-
 ```
 kapply destroy $BASE/wordpress | tee $OUTPUT/status;
 
-expectedOutputLine "service/wordpress deleted"
-
-expectedOutputLine "deployment.apps/wordpress deleted"
-
-expectedOutputLine "2 resource(s) deleted, 0 skipped"
+expectedOutputLine "service/wordpress delete successful"
+expectedOutputLine "deployment.apps/wordpress delete successful"
+expectedOutputLine "delete result: 2 attempted, 2 successful, 0 skipped, 0 failed"
+expectedOutputLine "reconcile result: 2 attempted, 2 successful, 0 skipped, 0 failed, 0 timed out"
 
 # Verify that we still have the mysql resources in the cluster.
 kubectl get all --no-headers --selector=app=mysql | wc -l | xargs | tee $OUTPUT/status

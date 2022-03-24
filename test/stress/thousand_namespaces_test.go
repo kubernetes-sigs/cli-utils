@@ -100,7 +100,7 @@ func thousandNamespacesTest(ctx context.Context, c client.Client, invConfig invc
 	}
 	for _, e := range applierEvents {
 		if e.Type == event.WaitType {
-			Expect(e.WaitEvent.Operation).To(BeElementOf(event.ReconcilePending, event.Reconciled), "WaitEvent: %v", e.WaitEvent)
+			Expect(e.WaitEvent.Status).To(BeElementOf(event.ReconcilePending, event.ReconcileSuccessful), "WaitEvent: %v", e.WaitEvent)
 		}
 	}
 
@@ -140,7 +140,7 @@ func thousandNamespacesTest(ctx context.Context, c client.Client, invConfig invc
 	}
 	for _, e := range destroyerEvents {
 		if e.Type == event.WaitType {
-			Expect(e.WaitEvent.Operation).To(BeElementOf(event.ReconcilePending, event.Reconciled), "WaitEvent: %v", e.WaitEvent)
+			Expect(e.WaitEvent.Status).To(BeElementOf(event.ReconcilePending, event.ReconcileSuccessful), "WaitEvent: %v", e.WaitEvent)
 		}
 	}
 

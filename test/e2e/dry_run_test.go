@@ -87,7 +87,7 @@ func dryRunTest(ctx context.Context, c client.Client, invConfig invconfig.Invent
 			EventType: event.ApplyType,
 			ApplyEvent: &testutil.ExpApplyEvent{
 				GroupName:  "apply-0",
-				Operation:  event.Created,
+				Status:     event.ApplySuccessful,
 				Identifier: object.UnstructuredToObjMetadata(namespace1Obj),
 				Error:      nil,
 			},
@@ -115,7 +115,7 @@ func dryRunTest(ctx context.Context, c client.Client, invConfig invconfig.Invent
 			EventType: event.ApplyType,
 			ApplyEvent: &testutil.ExpApplyEvent{
 				GroupName:  "apply-1",
-				Operation:  event.Created,
+				Status:     event.ApplySuccessful,
 				Identifier: object.UnstructuredToObjMetadata(podBObj),
 				Error:      nil,
 			},
@@ -223,7 +223,7 @@ func dryRunTest(ctx context.Context, c client.Client, invConfig invconfig.Invent
 			EventType: event.DeleteType,
 			DeleteEvent: &testutil.ExpDeleteEvent{
 				GroupName:  "prune-0",
-				Operation:  event.Deleted,
+				Status:     event.DeleteSuccessful,
 				Identifier: object.UnstructuredToObjMetadata(podBObj),
 				Error:      nil,
 			},
@@ -251,7 +251,7 @@ func dryRunTest(ctx context.Context, c client.Client, invConfig invconfig.Invent
 			EventType: event.DeleteType,
 			DeleteEvent: &testutil.ExpDeleteEvent{
 				GroupName:  "prune-1",
-				Operation:  event.Deleted,
+				Status:     event.DeleteSuccessful,
 				Identifier: object.UnstructuredToObjMetadata(namespace1Obj),
 				Error:      nil,
 			},
