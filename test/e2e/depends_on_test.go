@@ -26,13 +26,28 @@ func dependsOnTest(ctx context.Context, c client.Client, invConfig invconfig.Inv
 
 	inv := invConfig.InvWrapperFunc(invConfig.FactoryFunc(inventoryName, namespaceName, "test"))
 
-	pod1Obj := e2eutil.WithDependsOn(e2eutil.WithNamespace(e2eutil.ManifestToUnstructured(pod1), namespaceName), fmt.Sprintf("/namespaces/%s/Pod/pod3", namespaceName))
-	pod2Obj := e2eutil.WithNamespace(e2eutil.ManifestToUnstructured(pod2), namespaceName)
-	pod3Obj := e2eutil.WithDependsOn(e2eutil.WithNamespace(e2eutil.ManifestToUnstructured(pod3), namespaceName), fmt.Sprintf("/namespaces/%s/Pod/pod2", namespaceName))
+	namespace1Name := fmt.Sprintf("%s-ns1", namespaceName)
+	namespace1Obj := e2eutil.UnstructuredNamespace(namespace1Name)
+
+	namespace2Name := fmt.Sprintf("%s-ns2", namespaceName)
+	namespace2Obj := e2eutil.UnstructuredNamespace(namespace2Name)
+
+	pod1Obj := e2eutil.ManifestToUnstructured(pod1)
+	pod1Obj = e2eutil.WithNamespace(pod1Obj, namespace1Name)
+	pod1Obj = e2eutil.WithDependsOn(pod1Obj, fmt.Sprintf("/namespaces/%s/Pod/pod3", namespace1Name))
+
+	pod2Obj := e2eutil.ManifestToUnstructured(pod2)
+	pod2Obj = e2eutil.WithNamespace(pod2Obj, namespace2Name)
+
+	pod3Obj := e2eutil.ManifestToUnstructured(pod3)
+	pod3Obj = e2eutil.WithNamespace(pod3Obj, namespace1Name)
+	pod3Obj = e2eutil.WithDependsOn(pod3Obj, fmt.Sprintf("/namespaces/%s/Pod/pod2", namespace2Name))
 
 	// Dependency order: pod1 -> pod3 -> pod2
 	// Apply order: pod2, pod3, pod1
 	resources := []*unstructured.Unstructured{
+		namespace1Obj,
+		namespace2Obj,
 		pod1Obj,
 		pod2Obj,
 		pod3Obj,
@@ -76,13 +91,21 @@ func dependsOnTest(ctx context.Context, c client.Client, invConfig invconfig.Inv
 			},
 		},
 		{
-			// Apply Pod2 first
+			// Apply Namespace1 first
 			EventType: event.ApplyType,
 			ApplyEvent: &testutil.ExpApplyEvent{
 				GroupName:  "apply-0",
 				Operation:  event.Created,
-				Identifier: object.UnstructuredToObjMetadata(pod2Obj),
-				Error:      nil,
+				Identifier: object.UnstructuredToObjMetadata(namespace1Obj),
+			},
+		},
+		{
+			// Apply Namespace2 first
+			EventType: event.ApplyType,
+			ApplyEvent: &testutil.ExpApplyEvent{
+				GroupName:  "apply-0",
+				Operation:  event.Created,
+				Identifier: object.UnstructuredToObjMetadata(namespace2Obj),
 			},
 		},
 		{
@@ -104,21 +127,39 @@ func dependsOnTest(ctx context.Context, c client.Client, invConfig invconfig.Inv
 			},
 		},
 		{
-			// Pod2 reconcile Pending.
+			// Namespace1 reconcile Pending.
 			EventType: event.WaitType,
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-0",
 				Operation:  event.ReconcilePending,
-				Identifier: object.UnstructuredToObjMetadata(pod2Obj),
+				Identifier: object.UnstructuredToObjMetadata(namespace1Obj),
 			},
 		},
 		{
-			// Pod2 confirmed Current.
+			// Namespace2 reconcile Pending.
+			EventType: event.WaitType,
+			WaitEvent: &testutil.ExpWaitEvent{
+				GroupName:  "wait-0",
+				Operation:  event.ReconcilePending,
+				Identifier: object.UnstructuredToObjMetadata(namespace2Obj),
+			},
+		},
+		{
+			// Namespace1 confirmed Current.
 			EventType: event.WaitType,
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-0",
 				Operation:  event.Reconciled,
-				Identifier: object.UnstructuredToObjMetadata(pod2Obj),
+				Identifier: object.UnstructuredToObjMetadata(namespace1Obj),
+			},
+		},
+		{
+			// Namespace2 confirmed Current.
+			EventType: event.WaitType,
+			WaitEvent: &testutil.ExpWaitEvent{
+				GroupName:  "wait-0",
+				Operation:  event.Reconciled,
+				Identifier: object.UnstructuredToObjMetadata(namespace2Obj),
 			},
 		},
 		{
@@ -140,12 +181,12 @@ func dependsOnTest(ctx context.Context, c client.Client, invConfig invconfig.Inv
 			},
 		},
 		{
-			// Apply Pod3 second
+			// Apply Pod2 first
 			EventType: event.ApplyType,
 			ApplyEvent: &testutil.ExpApplyEvent{
 				GroupName:  "apply-1",
 				Operation:  event.Created,
-				Identifier: object.UnstructuredToObjMetadata(pod3Obj),
+				Identifier: object.UnstructuredToObjMetadata(pod2Obj),
 				Error:      nil,
 			},
 		},
@@ -168,21 +209,21 @@ func dependsOnTest(ctx context.Context, c client.Client, invConfig invconfig.Inv
 			},
 		},
 		{
-			// Pod3 reconcile Pending.
+			// Pod2 reconcile Pending.
 			EventType: event.WaitType,
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-1",
 				Operation:  event.ReconcilePending,
-				Identifier: object.UnstructuredToObjMetadata(pod3Obj),
+				Identifier: object.UnstructuredToObjMetadata(pod2Obj),
 			},
 		},
 		{
-			// Pod3 confirmed Current.
+			// Pod2 confirmed Current.
 			EventType: event.WaitType,
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-1",
 				Operation:  event.Reconciled,
-				Identifier: object.UnstructuredToObjMetadata(pod3Obj),
+				Identifier: object.UnstructuredToObjMetadata(pod2Obj),
 			},
 		},
 		{
@@ -204,12 +245,12 @@ func dependsOnTest(ctx context.Context, c client.Client, invConfig invconfig.Inv
 			},
 		},
 		{
-			// Apply Pod1 third
+			// Apply Pod3 second
 			EventType: event.ApplyType,
 			ApplyEvent: &testutil.ExpApplyEvent{
 				GroupName:  "apply-2",
 				Operation:  event.Created,
-				Identifier: object.UnstructuredToObjMetadata(pod1Obj),
+				Identifier: object.UnstructuredToObjMetadata(pod3Obj),
 				Error:      nil,
 			},
 		},
@@ -232,10 +273,74 @@ func dependsOnTest(ctx context.Context, c client.Client, invConfig invconfig.Inv
 			},
 		},
 		{
-			// Pod1 reconcile Pending.
+			// Pod3 reconcile Pending.
 			EventType: event.WaitType,
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-2",
+				Operation:  event.ReconcilePending,
+				Identifier: object.UnstructuredToObjMetadata(pod3Obj),
+			},
+		},
+		{
+			// Pod3 confirmed Current.
+			EventType: event.WaitType,
+			WaitEvent: &testutil.ExpWaitEvent{
+				GroupName:  "wait-2",
+				Operation:  event.Reconciled,
+				Identifier: object.UnstructuredToObjMetadata(pod3Obj),
+			},
+		},
+		{
+			// WaitTask finished
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action:    event.WaitAction,
+				GroupName: "wait-2",
+				Type:      event.Finished,
+			},
+		},
+		{
+			// ApplyTask start
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action:    event.ApplyAction,
+				GroupName: "apply-3",
+				Type:      event.Started,
+			},
+		},
+		{
+			// Apply Pod1 third
+			EventType: event.ApplyType,
+			ApplyEvent: &testutil.ExpApplyEvent{
+				GroupName:  "apply-3",
+				Operation:  event.Created,
+				Identifier: object.UnstructuredToObjMetadata(pod1Obj),
+				Error:      nil,
+			},
+		},
+		{
+			// ApplyTask finished
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action:    event.ApplyAction,
+				GroupName: "apply-3",
+				Type:      event.Finished,
+			},
+		},
+		{
+			// WaitTask start
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action:    event.WaitAction,
+				GroupName: "wait-3",
+				Type:      event.Started,
+			},
+		},
+		{
+			// Pod1 reconcile Pending.
+			EventType: event.WaitType,
+			WaitEvent: &testutil.ExpWaitEvent{
+				GroupName:  "wait-3",
 				Operation:  event.ReconcilePending,
 				Identifier: object.UnstructuredToObjMetadata(pod1Obj),
 			},
@@ -244,7 +349,7 @@ func dependsOnTest(ctx context.Context, c client.Client, invConfig invconfig.Inv
 			// Pod1 confirmed Current.
 			EventType: event.WaitType,
 			WaitEvent: &testutil.ExpWaitEvent{
-				GroupName:  "wait-2",
+				GroupName:  "wait-3",
 				Operation:  event.Reconciled,
 				Identifier: object.UnstructuredToObjMetadata(pod1Obj),
 			},
@@ -254,7 +359,7 @@ func dependsOnTest(ctx context.Context, c client.Client, invConfig invconfig.Inv
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
 				Action:    event.WaitAction,
-				GroupName: "wait-2",
+				GroupName: "wait-3",
 				Type:      event.Finished,
 			},
 		},
@@ -278,6 +383,12 @@ func dependsOnTest(ctx context.Context, c client.Client, invConfig invconfig.Inv
 		},
 	}
 	Expect(testutil.EventsToExpEvents(applierEvents)).To(testutil.Equal(expEvents))
+
+	By("verify namespace1 created")
+	e2eutil.AssertUnstructuredExists(ctx, c, namespace1Obj)
+
+	By("verify namespace2 created")
+	e2eutil.AssertUnstructuredExists(ctx, c, namespace2Obj)
 
 	By("verify pod1 created and ready")
 	result := e2eutil.AssertUnstructuredExists(ctx, c, pod1Obj)
@@ -504,6 +615,96 @@ func dependsOnTest(ctx context.Context, c client.Client, invConfig invconfig.Inv
 			},
 		},
 		{
+			// PruneTask start
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action:    event.DeleteAction,
+				GroupName: "prune-3",
+				Type:      event.Started,
+			},
+		},
+		{
+			// Delete Namespace2 last
+			EventType: event.DeleteType,
+			DeleteEvent: &testutil.ExpDeleteEvent{
+				GroupName:  "prune-3",
+				Operation:  event.Deleted,
+				Identifier: object.UnstructuredToObjMetadata(namespace2Obj),
+			},
+		},
+		{
+			// Delete Namespace1 last
+			EventType: event.DeleteType,
+			DeleteEvent: &testutil.ExpDeleteEvent{
+				GroupName:  "prune-3",
+				Operation:  event.Deleted,
+				Identifier: object.UnstructuredToObjMetadata(namespace1Obj),
+			},
+		},
+		{
+			// PruneTask finished
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action:    event.DeleteAction,
+				GroupName: "prune-3",
+				Type:      event.Finished,
+			},
+		},
+		{
+			// WaitTask start
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action:    event.WaitAction,
+				GroupName: "wait-3",
+				Type:      event.Started,
+			},
+		},
+		{
+			// Namespace2 reconcile Pending.
+			EventType: event.WaitType,
+			WaitEvent: &testutil.ExpWaitEvent{
+				GroupName:  "wait-3",
+				Operation:  event.ReconcilePending,
+				Identifier: object.UnstructuredToObjMetadata(namespace2Obj),
+			},
+		},
+		{
+			// Namespace1 reconcile Pending.
+			EventType: event.WaitType,
+			WaitEvent: &testutil.ExpWaitEvent{
+				GroupName:  "wait-3",
+				Operation:  event.ReconcilePending,
+				Identifier: object.UnstructuredToObjMetadata(namespace1Obj),
+			},
+		},
+		{
+			// Namespace1 confirmed NotFound.
+			EventType: event.WaitType,
+			WaitEvent: &testutil.ExpWaitEvent{
+				GroupName:  "wait-3",
+				Operation:  event.Reconciled,
+				Identifier: object.UnstructuredToObjMetadata(namespace1Obj),
+			},
+		},
+		{
+			// Namespace2 confirmed NotFound.
+			EventType: event.WaitType,
+			WaitEvent: &testutil.ExpWaitEvent{
+				GroupName:  "wait-3",
+				Operation:  event.Reconciled,
+				Identifier: object.UnstructuredToObjMetadata(namespace2Obj),
+			},
+		},
+		{
+			// WaitTask finished
+			EventType: event.ActionGroupType,
+			ActionGroupEvent: &testutil.ExpActionGroupEvent{
+				Action:    event.WaitAction,
+				GroupName: "wait-3",
+				Type:      event.Finished,
+			},
+		},
+		{
 			// DeleteInvTask start
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
@@ -532,4 +733,10 @@ func dependsOnTest(ctx context.Context, c client.Client, invConfig invconfig.Inv
 
 	By("verify pod3 deleted")
 	e2eutil.AssertUnstructuredDoesNotExist(ctx, c, pod3Obj)
+
+	By("verify namespace1 deleted")
+	e2eutil.AssertUnstructuredDoesNotExist(ctx, c, namespace1Obj)
+
+	By("verify namespace2 deleted")
+	e2eutil.AssertUnstructuredDoesNotExist(ctx, c, namespace2Obj)
 }

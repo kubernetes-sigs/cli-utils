@@ -402,3 +402,11 @@ func UnstructuredIsTerminating(obj *unstructured.Unstructured) bool {
 	}
 	return false
 }
+
+func UnstructuredNamespace(name string) *unstructured.Unstructured {
+	u := &unstructured.Unstructured{}
+	u.SetAPIVersion("v1")
+	u.SetKind("Namespace")
+	u.SetName(name)
+	return u
+}
