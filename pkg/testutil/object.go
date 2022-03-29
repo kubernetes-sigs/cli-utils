@@ -16,6 +16,10 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/object/dependson"
 )
 
+// OwningInventoryKey is the annotation key indicating the inventory owning an object.
+// This is a copy of inventory.OwningInventoryKey to avoid dependency cycle.
+const OwningInventoryKey = "config.k8s.io/owning-inventory"
+
 var codec = scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 // Unstructured translates the passed object config string into an
@@ -27,6 +31,11 @@ func Unstructured(t *testing.T, manifest string, mutators ...Mutator) *unstructu
 	if !assert.NoError(t, err) {
 		t.FailNow()
 	}
+	return Mutate(u, mutators...)
+}
+
+// Mutate executes the specified Mutators on the specified object.
+func Mutate(u *unstructured.Unstructured, mutators ...Mutator) *unstructured.Unstructured {
 	for _, m := range mutators {
 		m.Mutate(u)
 	}
@@ -52,7 +61,7 @@ func ToIdentifier(t *testing.T, manifest string) object.ObjMetadata {
 // AddOwningInv returns a Mutator which adds the passed inv string
 // as the owning inventory annotation.
 func AddOwningInv(t *testing.T, inv string) Mutator {
-	return owningInvMutator{
+	return addOwningInvMutator{
 		t:   t,
 		inv: inv,
 	}
@@ -61,14 +70,14 @@ func AddOwningInv(t *testing.T, inv string) Mutator {
 // owningInvMutator encapsulates the fields necessary to modify
 // an object by adding the owning inventory annotation. This
 // structure implements the Mutator interface.
-type owningInvMutator struct {
+type addOwningInvMutator struct {
 	t   *testing.T
 	inv string
 }
 
 // Mutate updates the passed object by adding the owning
 // inventory annotation. Needed to implement the Mutator interface.
-func (a owningInvMutator) Mutate(u *unstructured.Unstructured) {
+func (a addOwningInvMutator) Mutate(u *unstructured.Unstructured) {
 	annos, found, err := unstructured.NestedStringMap(u.Object, "metadata", "annotations")
 	if !assert.NoError(a.t, err) {
 		a.t.FailNow()
@@ -76,10 +85,51 @@ func (a owningInvMutator) Mutate(u *unstructured.Unstructured) {
 	if !found {
 		annos = make(map[string]string)
 	}
-	annos["config.k8s.io/owning-inventory"] = a.inv
+	annos[OwningInventoryKey] = a.inv
 	err = unstructured.SetNestedStringMap(u.Object, annos, "metadata", "annotations")
 	if !assert.NoError(a.t, err) {
 		a.t.FailNow()
+	}
+}
+
+// DeleteOwningInv returns a Mutator which deletes the passed inv string
+// from the owning inventory annotation.
+func DeleteOwningInv(t *testing.T, inv string) Mutator {
+	return deleteOwningInvMutator{
+		t:   t,
+		inv: inv,
+	}
+}
+
+// deleteOwningInvMutator encapsulates the fields necessary to modify
+// an object by deleting the owning inventory annotation. This
+// structure implements the Mutator interface.
+type deleteOwningInvMutator struct {
+	t   *testing.T
+	inv string
+}
+
+// Mutate updates the passed object by deleting the owning
+// inventory annotation. Needed to implement the Mutator interface.
+func (a deleteOwningInvMutator) Mutate(u *unstructured.Unstructured) {
+	annos, found, err := unstructured.NestedStringMap(u.Object, "metadata", "annotations")
+	if !assert.NoError(a.t, err) {
+		a.t.FailNow()
+	}
+	if !found {
+		annos = make(map[string]string)
+	}
+	if !assert.Equal(a.t, a.inv, annos[OwningInventoryKey]) {
+		a.t.FailNow()
+	}
+	delete(annos, OwningInventoryKey)
+	if len(annos) > 0 {
+		err = unstructured.SetNestedStringMap(u.Object, annos, "metadata", "annotations")
+		if !assert.NoError(a.t, err) {
+			a.t.FailNow()
+		}
+	} else {
+		unstructured.RemoveNestedField(u.Object, "metadata", "annotations")
 	}
 }
 

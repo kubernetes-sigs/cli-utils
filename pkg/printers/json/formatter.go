@@ -52,7 +52,10 @@ func (jf *formatter) FormatApplyEvent(ae event.ApplyEvent) error {
 	eventInfo := jf.baseResourceEvent(ae.Identifier)
 	if ae.Error != nil {
 		eventInfo["error"] = ae.Error.Error()
-		return jf.printEvent("apply", "resourceFailed", eventInfo)
+		// skipped apply sets both error and operation
+		if ae.Operation != event.Unchanged {
+			return jf.printEvent("apply", "resourceFailed", eventInfo)
+		}
 	}
 	eventInfo["operation"] = ae.Operation.String()
 	return jf.printEvent("apply", "resourceApplied", eventInfo)
@@ -73,7 +76,10 @@ func (jf *formatter) FormatPruneEvent(pe event.PruneEvent) error {
 	eventInfo := jf.baseResourceEvent(pe.Identifier)
 	if pe.Error != nil {
 		eventInfo["error"] = pe.Error.Error()
-		return jf.printEvent("prune", "resourceFailed", eventInfo)
+		// skipped prune sets both error and operation
+		if pe.Operation != event.PruneSkipped {
+			return jf.printEvent("prune", "resourceFailed", eventInfo)
+		}
 	}
 	eventInfo["operation"] = pe.Operation.String()
 	return jf.printEvent("prune", "resourcePruned", eventInfo)
@@ -83,7 +89,10 @@ func (jf *formatter) FormatDeleteEvent(de event.DeleteEvent) error {
 	eventInfo := jf.baseResourceEvent(de.Identifier)
 	if de.Error != nil {
 		eventInfo["error"] = de.Error.Error()
-		return jf.printEvent("delete", "resourceFailed", eventInfo)
+		// skipped delete sets both error and operation
+		if de.Operation != event.DeleteSkipped {
+			return jf.printEvent("delete", "resourceFailed", eventInfo)
+		}
 	}
 	eventInfo["operation"] = de.Operation.String()
 	return jf.printEvent("delete", "resourceDeleted", eventInfo)

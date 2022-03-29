@@ -68,7 +68,7 @@ type equalErrorType struct {
 }
 
 func (e equalErrorType) Error() string {
-	return "EqualErrorType"
+	return fmt.Sprintf("EqualErrorType{Type: %T}", e.err)
 }
 
 func (e equalErrorType) Is(err error) bool {
@@ -98,7 +98,7 @@ type equalErrorString struct {
 }
 
 func (e equalErrorString) Error() string {
-	return e.err
+	return fmt.Sprintf("EqualErrorString{Error: %q}", e.err)
 }
 
 func (e equalErrorString) Is(err error) bool {
@@ -106,4 +106,34 @@ func (e equalErrorString) Is(err error) bool {
 		return false
 	}
 	return e.err == err.Error()
+}
+
+// EqualError returns an error with an Is(error)bool function that matches
+// any error with the same type and string value as the supplied error.
+//
+// Use with testutil.Equal to handle error comparisons.
+func EqualError(err error) error {
+	return equalError{
+		err: err,
+	}
+}
+
+type equalError struct {
+	err error
+}
+
+func (e equalError) Error() string {
+	return fmt.Sprintf("EqualError{Type: %T, Error: %q}", e.err, e.err)
+}
+
+func (e equalError) Is(err error) bool {
+	if err == nil {
+		return false
+	}
+	return reflect.TypeOf(e.err) == reflect.TypeOf(err) &&
+		e.err.Error() == err.Error()
+}
+
+func (e equalError) Unwrap() error {
+	return e.err
 }

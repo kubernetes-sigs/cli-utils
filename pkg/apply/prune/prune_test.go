@@ -187,7 +187,7 @@ func TestPrune(t *testing.T) {
 		pruneObjs         []*unstructured.Unstructured
 		pruneFilters      []filter.ValidationFilter
 		options           Options
-		expectedEvents    []testutil.ExpEvent
+		expectedEvents    []event.Event
 		expectedSkipped   object.ObjMetadataSet
 		expectedFailed    object.ObjMetadataSet
 		expectedAbandoned object.ObjMetadataSet
@@ -195,16 +195,18 @@ func TestPrune(t *testing.T) {
 		"No pruned objects; no prune/delete events": {
 			pruneObjs:      []*unstructured.Unstructured{},
 			options:        defaultOptions,
-			expectedEvents: []testutil.ExpEvent{},
+			expectedEvents: nil,
 		},
 		"One successfully pruned object": {
 			pruneObjs: []*unstructured.Unstructured{pod},
 			options:   defaultOptions,
-			expectedEvents: []testutil.ExpEvent{
+			expectedEvents: []event.Event{
 				{
-					EventType: event.PruneType,
-					PruneEvent: &testutil.ExpPruneEvent{
-						Operation: event.Pruned,
+					Type: event.PruneType,
+					PruneEvent: event.PruneEvent{
+						Identifier: object.UnstructuredToObjMetadata(pod),
+						Operation:  event.Pruned,
+						Object:     pod,
 					},
 				},
 			},
@@ -212,23 +214,29 @@ func TestPrune(t *testing.T) {
 		"Multiple successfully pruned object": {
 			pruneObjs: []*unstructured.Unstructured{pod, pdb, namespace},
 			options:   defaultOptions,
-			expectedEvents: []testutil.ExpEvent{
+			expectedEvents: []event.Event{
 				{
-					EventType: event.PruneType,
-					PruneEvent: &testutil.ExpPruneEvent{
-						Operation: event.Pruned,
+					Type: event.PruneType,
+					PruneEvent: event.PruneEvent{
+						Identifier: object.UnstructuredToObjMetadata(pod),
+						Operation:  event.Pruned,
+						Object:     pod,
 					},
 				},
 				{
-					EventType: event.PruneType,
-					PruneEvent: &testutil.ExpPruneEvent{
-						Operation: event.Pruned,
+					Type: event.PruneType,
+					PruneEvent: event.PruneEvent{
+						Identifier: object.UnstructuredToObjMetadata(pdb),
+						Operation:  event.Pruned,
+						Object:     pdb,
 					},
 				},
 				{
-					EventType: event.PruneType,
-					PruneEvent: &testutil.ExpPruneEvent{
-						Operation: event.Pruned,
+					Type: event.PruneType,
+					PruneEvent: event.PruneEvent{
+						Identifier: object.UnstructuredToObjMetadata(namespace),
+						Operation:  event.Pruned,
+						Object:     namespace,
 					},
 				},
 			},
@@ -236,11 +244,13 @@ func TestPrune(t *testing.T) {
 		"One successfully deleted object": {
 			pruneObjs: []*unstructured.Unstructured{pod},
 			options:   defaultOptionsDestroy,
-			expectedEvents: []testutil.ExpEvent{
+			expectedEvents: []event.Event{
 				{
-					EventType: event.DeleteType,
-					DeleteEvent: &testutil.ExpDeleteEvent{
-						Operation: event.Deleted,
+					Type: event.DeleteType,
+					DeleteEvent: event.DeleteEvent{
+						Identifier: object.UnstructuredToObjMetadata(pod),
+						Operation:  event.Deleted,
+						Object:     pod,
 					},
 				},
 			},
@@ -248,23 +258,29 @@ func TestPrune(t *testing.T) {
 		"Multiple successfully deleted objects": {
 			pruneObjs: []*unstructured.Unstructured{pod, pdb, namespace},
 			options:   defaultOptionsDestroy,
-			expectedEvents: []testutil.ExpEvent{
+			expectedEvents: []event.Event{
 				{
-					EventType: event.DeleteType,
-					DeleteEvent: &testutil.ExpDeleteEvent{
-						Operation: event.Deleted,
+					Type: event.DeleteType,
+					DeleteEvent: event.DeleteEvent{
+						Identifier: object.UnstructuredToObjMetadata(pod),
+						Operation:  event.Deleted,
+						Object:     pod,
 					},
 				},
 				{
-					EventType: event.DeleteType,
-					DeleteEvent: &testutil.ExpDeleteEvent{
-						Operation: event.Deleted,
+					Type: event.DeleteType,
+					DeleteEvent: event.DeleteEvent{
+						Identifier: object.UnstructuredToObjMetadata(pdb),
+						Operation:  event.Deleted,
+						Object:     pdb,
 					},
 				},
 				{
-					EventType: event.DeleteType,
-					DeleteEvent: &testutil.ExpDeleteEvent{
-						Operation: event.Deleted,
+					Type: event.DeleteType,
+					DeleteEvent: event.DeleteEvent{
+						Identifier: object.UnstructuredToObjMetadata(namespace),
+						Operation:  event.Deleted,
+						Object:     namespace,
 					},
 				},
 			},
@@ -272,11 +288,13 @@ func TestPrune(t *testing.T) {
 		"Client dry run still pruned event": {
 			pruneObjs: []*unstructured.Unstructured{pod},
 			options:   clientDryRunOptions,
-			expectedEvents: []testutil.ExpEvent{
+			expectedEvents: []event.Event{
 				{
-					EventType: event.PruneType,
-					PruneEvent: &testutil.ExpPruneEvent{
-						Operation: event.Pruned,
+					Type: event.PruneType,
+					PruneEvent: event.PruneEvent{
+						Identifier: object.UnstructuredToObjMetadata(pod),
+						Operation:  event.Pruned,
+						Object:     pod,
 					},
 				},
 			},
@@ -288,11 +306,13 @@ func TestPrune(t *testing.T) {
 				PropagationPolicy: metav1.DeletePropagationBackground,
 				Destroy:           true,
 			},
-			expectedEvents: []testutil.ExpEvent{
+			expectedEvents: []event.Event{
 				{
-					EventType: event.DeleteType,
-					DeleteEvent: &testutil.ExpDeleteEvent{
-						Operation: event.Deleted,
+					Type: event.DeleteType,
+					DeleteEvent: event.DeleteEvent{
+						Identifier: object.UnstructuredToObjMetadata(pod),
+						Operation:  event.Deleted,
+						Object:     pod,
 					},
 				},
 			},
@@ -306,11 +326,16 @@ func TestPrune(t *testing.T) {
 				},
 			},
 			options: defaultOptions,
-			expectedEvents: []testutil.ExpEvent{
+			expectedEvents: []event.Event{
 				{
-					EventType: event.PruneType,
-					PruneEvent: &testutil.ExpPruneEvent{
-						Operation: event.PruneSkipped,
+					Type: event.PruneType,
+					PruneEvent: event.PruneEvent{
+						Identifier: object.UnstructuredToObjMetadata(pod),
+						Operation:  event.PruneSkipped,
+						Object:     pod,
+						Error: testutil.EqualError(&filter.ApplyPreventedDeletionError{
+							UID: "pod-uid",
+						}),
 					},
 				},
 			},
@@ -327,17 +352,24 @@ func TestPrune(t *testing.T) {
 				},
 			},
 			options: defaultOptions,
-			expectedEvents: []testutil.ExpEvent{
+			expectedEvents: []event.Event{
 				{
-					EventType: event.PruneType,
-					PruneEvent: &testutil.ExpPruneEvent{
-						Operation: event.PruneSkipped,
+					Type: event.PruneType,
+					PruneEvent: event.PruneEvent{
+						Identifier: object.UnstructuredToObjMetadata(pod),
+						Operation:  event.PruneSkipped,
+						Object:     pod,
+						Error: testutil.EqualError(&filter.ApplyPreventedDeletionError{
+							UID: "pod-uid",
+						}),
 					},
 				},
 				{
-					EventType: event.PruneType,
-					PruneEvent: &testutil.ExpPruneEvent{
-						Operation: event.Pruned,
+					Type: event.PruneType,
+					PruneEvent: event.PruneEvent{
+						Identifier: object.UnstructuredToObjMetadata(pdb),
+						Operation:  event.Pruned,
+						Object:     pdb,
 					},
 				},
 			},
@@ -346,20 +378,37 @@ func TestPrune(t *testing.T) {
 			},
 		},
 		"Prevent delete annotation equals prune skipped": {
-			pruneObjs:    []*unstructured.Unstructured{podDeletionPrevention, testutil.Unstructured(t, pdbDeletePreventionManifest)},
+			pruneObjs: []*unstructured.Unstructured{
+				podDeletionPrevention,
+				testutil.Unstructured(t, pdbDeletePreventionManifest),
+			},
 			pruneFilters: []filter.ValidationFilter{filter.PreventRemoveFilter{}},
 			options:      defaultOptions,
-			expectedEvents: []testutil.ExpEvent{
+			expectedEvents: []event.Event{
 				{
-					EventType: event.PruneType,
-					PruneEvent: &testutil.ExpPruneEvent{
-						Operation: event.PruneSkipped,
+					Type: event.PruneType,
+					PruneEvent: event.PruneEvent{
+						Identifier: object.UnstructuredToObjMetadata(podDeletionPrevention),
+						Operation:  event.PruneSkipped,
+						Object: testutil.Mutate(podDeletionPrevention.DeepCopy(),
+							testutil.DeleteOwningInv(t, testInventoryLabel)),
+						Error: testutil.EqualError(&filter.AnnotationPreventedDeletionError{
+							Annotation: common.OnRemoveAnnotation,
+							Value:      common.OnRemoveKeep,
+						}),
 					},
 				},
 				{
-					EventType: event.PruneType,
-					PruneEvent: &testutil.ExpPruneEvent{
-						Operation: event.PruneSkipped,
+					Type: event.PruneType,
+					PruneEvent: event.PruneEvent{
+						Identifier: testutil.ToIdentifier(t, pdbDeletePreventionManifest),
+						Operation:  event.PruneSkipped,
+						Object: testutil.Unstructured(t, pdbDeletePreventionManifest,
+							testutil.DeleteOwningInv(t, testInventoryLabel)),
+						Error: testutil.EqualError(&filter.AnnotationPreventedDeletionError{
+							Annotation: common.LifecycleDeleteAnnotation,
+							Value:      common.PreventDeletion,
+						}),
 					},
 				},
 			},
@@ -373,20 +422,37 @@ func TestPrune(t *testing.T) {
 			},
 		},
 		"Prevent delete annotation equals delete skipped": {
-			pruneObjs:    []*unstructured.Unstructured{podDeletionPrevention, testutil.Unstructured(t, pdbDeletePreventionManifest)},
+			pruneObjs: []*unstructured.Unstructured{
+				podDeletionPrevention,
+				testutil.Unstructured(t, pdbDeletePreventionManifest),
+			},
 			pruneFilters: []filter.ValidationFilter{filter.PreventRemoveFilter{}},
 			options:      defaultOptionsDestroy,
-			expectedEvents: []testutil.ExpEvent{
+			expectedEvents: []event.Event{
 				{
-					EventType: event.DeleteType,
-					DeleteEvent: &testutil.ExpDeleteEvent{
-						Operation: event.DeleteSkipped,
+					Type: event.DeleteType,
+					DeleteEvent: event.DeleteEvent{
+						Identifier: object.UnstructuredToObjMetadata(podDeletionPrevention),
+						Operation:  event.DeleteSkipped,
+						Object: testutil.Mutate(podDeletionPrevention.DeepCopy(),
+							testutil.DeleteOwningInv(t, testInventoryLabel)),
+						Error: testutil.EqualError(&filter.AnnotationPreventedDeletionError{
+							Annotation: common.OnRemoveAnnotation,
+							Value:      common.OnRemoveKeep,
+						}),
 					},
 				},
 				{
-					EventType: event.DeleteType,
-					DeleteEvent: &testutil.ExpDeleteEvent{
-						Operation: event.DeleteSkipped,
+					Type: event.DeleteType,
+					DeleteEvent: event.DeleteEvent{
+						Identifier: testutil.ToIdentifier(t, pdbDeletePreventionManifest),
+						Operation:  event.DeleteSkipped,
+						Object: testutil.Unstructured(t, pdbDeletePreventionManifest,
+							testutil.DeleteOwningInv(t, testInventoryLabel)),
+						Error: testutil.EqualError(&filter.AnnotationPreventedDeletionError{
+							Annotation: common.LifecycleDeleteAnnotation,
+							Value:      common.PreventDeletion,
+						}),
 					},
 				},
 			},
@@ -403,17 +469,26 @@ func TestPrune(t *testing.T) {
 			pruneObjs:    []*unstructured.Unstructured{podDeletionPrevention, pod},
 			pruneFilters: []filter.ValidationFilter{filter.PreventRemoveFilter{}},
 			options:      defaultOptions,
-			expectedEvents: []testutil.ExpEvent{
+			expectedEvents: []event.Event{
 				{
-					EventType: event.PruneType,
-					PruneEvent: &testutil.ExpPruneEvent{
-						Operation: event.PruneSkipped,
+					Type: event.PruneType,
+					PruneEvent: event.PruneEvent{
+						Identifier: object.UnstructuredToObjMetadata(podDeletionPrevention),
+						Operation:  event.PruneSkipped,
+						Object: testutil.Mutate(podDeletionPrevention.DeepCopy(),
+							testutil.DeleteOwningInv(t, testInventoryLabel)),
+						Error: testutil.EqualError(&filter.AnnotationPreventedDeletionError{
+							Annotation: common.OnRemoveAnnotation,
+							Value:      common.OnRemoveKeep,
+						}),
 					},
 				},
 				{
-					EventType: event.PruneType,
-					PruneEvent: &testutil.ExpPruneEvent{
-						Operation: event.Pruned,
+					Type: event.PruneType,
+					PruneEvent: event.PruneEvent{
+						Identifier: object.UnstructuredToObjMetadata(pod),
+						Operation:  event.Pruned,
+						Object:     pod,
 					},
 				},
 			},
@@ -432,11 +507,16 @@ func TestPrune(t *testing.T) {
 				},
 			},
 			options: defaultOptions,
-			expectedEvents: []testutil.ExpEvent{
+			expectedEvents: []event.Event{
 				{
-					EventType: event.PruneType,
-					PruneEvent: &testutil.ExpPruneEvent{
-						Operation: event.PruneSkipped,
+					Type: event.PruneType,
+					PruneEvent: event.PruneEvent{
+						Identifier: object.UnstructuredToObjMetadata(namespace),
+						Operation:  event.PruneSkipped,
+						Object:     namespace,
+						Error: testutil.EqualError(&filter.NamespaceInUseError{
+							Namespace: namespace.GetName(),
+						}),
 					},
 				},
 			},
@@ -465,10 +545,11 @@ func TestPrune(t *testing.T) {
 			eventChannel := make(chan event.Event, len(tc.pruneObjs)+1)
 			resourceCache := cache.NewResourceCacheMap()
 			taskContext := taskrunner.NewTaskContext(eventChannel, resourceCache)
+			taskName := "test-0"
 			err := func() error {
 				defer close(eventChannel)
 				// Run the prune and validate.
-				return po.Prune(tc.pruneObjs, tc.pruneFilters, taskContext, "test-0", tc.options)
+				return po.Prune(tc.pruneObjs, tc.pruneFilters, taskContext, taskName, tc.options)
 			}()
 
 			if err != nil {
@@ -478,9 +559,19 @@ func TestPrune(t *testing.T) {
 			for e := range eventChannel {
 				actualEvents = append(actualEvents, e)
 			}
+			// Inject expected GroupName for event comparison
+			for i := range tc.expectedEvents {
+				switch tc.expectedEvents[i].Type {
+				case event.ApplyType:
+					tc.expectedEvents[i].ApplyEvent.GroupName = taskName
+				case event.DeleteType:
+					tc.expectedEvents[i].DeleteEvent.GroupName = taskName
+				case event.PruneType:
+					tc.expectedEvents[i].PruneEvent.GroupName = taskName
+				}
+			}
 			// Validate the expected/actual events
-			err = testutil.VerifyEvents(tc.expectedEvents, actualEvents)
-			assert.NoError(t, err)
+			testutil.AssertEqual(t, tc.expectedEvents, actualEvents)
 
 			im := taskContext.InventoryManager()
 

@@ -32,19 +32,22 @@ func (s *Stats) FailedReconciliationSum() int {
 func (s *Stats) Handle(e event.Event) {
 	switch e.Type {
 	case event.ApplyType:
-		if e.ApplyEvent.Error != nil {
+		if e.ApplyEvent.Error != nil &&
+			e.ApplyEvent.Operation != event.Unchanged {
 			s.ApplyStats.IncFailed()
 			return
 		}
 		s.ApplyStats.Inc(e.ApplyEvent.Operation)
 	case event.PruneType:
-		if e.PruneEvent.Error != nil {
+		if e.PruneEvent.Error != nil &&
+			e.PruneEvent.Operation != event.PruneSkipped {
 			s.PruneStats.IncFailed()
 			return
 		}
 		s.PruneStats.Inc(e.PruneEvent.Operation)
 	case event.DeleteType:
-		if e.DeleteEvent.Error != nil {
+		if e.DeleteEvent.Error != nil &&
+			e.DeleteEvent.Operation != event.DeleteSkipped {
 			s.DeleteStats.IncFailed()
 			return
 		}

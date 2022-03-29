@@ -8,6 +8,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/cli-utils/pkg/common"
+	"sigs.k8s.io/cli-utils/pkg/testutil"
 )
 
 var defaultObj = &unstructured.Unstructured{
@@ -23,46 +24,47 @@ var defaultObj = &unstructured.Unstructured{
 
 func TestPreventDeleteAnnotation(t *testing.T) {
 	tests := map[string]struct {
-		annotations map[string]string
-		expected    bool
+		annotations   map[string]string
+		expectedError error
 	}{
 		"Nil map returns false": {
 			annotations: nil,
-			expected:    false,
 		},
 		"Empty map returns false": {
 			annotations: map[string]string{},
-			expected:    false,
 		},
 		"Wrong annotation key/value is false": {
 			annotations: map[string]string{
 				"foo": "bar",
 			},
-			expected: false,
 		},
 		"Annotation key without value is false": {
 			annotations: map[string]string{
 				common.OnRemoveAnnotation: "bar",
 			},
-			expected: false,
 		},
 		"Annotation key and value is true": {
 			annotations: map[string]string{
 				common.OnRemoveAnnotation: common.OnRemoveKeep,
 			},
-			expected: true,
+			expectedError: &AnnotationPreventedDeletionError{
+				Annotation: common.OnRemoveAnnotation,
+				Value:      common.OnRemoveKeep,
+			},
 		},
 		"Annotation key client.lifecycle.config.k8s.io/deletion without value is false": {
 			annotations: map[string]string{
 				common.LifecycleDeleteAnnotation: "any",
 			},
-			expected: false,
 		},
 		"Annotation key client.lifecycle.config.k8s.io/deletion and value is true": {
 			annotations: map[string]string{
 				common.LifecycleDeleteAnnotation: common.PreventDeletion,
 			},
-			expected: true,
+			expectedError: &AnnotationPreventedDeletionError{
+				Annotation: common.LifecycleDeleteAnnotation,
+				Value:      common.PreventDeletion,
+			},
 		},
 	}
 
@@ -71,19 +73,8 @@ func TestPreventDeleteAnnotation(t *testing.T) {
 			filter := PreventRemoveFilter{}
 			obj := defaultObj.DeepCopy()
 			obj.SetAnnotations(tc.annotations)
-			actual, reason, err := filter.Filter(obj)
-			if err != nil {
-				t.Fatalf("PreventRemoveFilter unexpected error (%s)", err)
-			}
-			if tc.expected != actual {
-				t.Errorf("PreventRemoveFilter expected (%t), got (%t)", tc.expected, actual)
-			}
-			if tc.expected && len(reason) == 0 {
-				t.Errorf("PreventRemoveFilter expected Reason, but none found")
-			}
-			if !tc.expected && len(reason) > 0 {
-				t.Errorf("PreventRemoveFilter expected no Reason, but found (%s)", reason)
-			}
+			err := filter.Filter(obj)
+			testutil.AssertEqual(t, tc.expectedError, err)
 		})
 	}
 }

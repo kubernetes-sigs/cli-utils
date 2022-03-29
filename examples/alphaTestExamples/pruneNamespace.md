@@ -170,10 +170,21 @@ test-namespace should **not** be pruned.
 <!-- @applySecondTime @testE2EAgainstLatestRelease -->
 ```
 kapply apply $BASE --reconcile-timeout=1m | tee $OUTPUT/status
+
+expectedOutputLine "configmap/cm-c apply skipped: dependency scheduled for delete: _test-namespace__Namespace"
+expectedOutputLine "1 resource(s) applied. 0 created, 1 unchanged, 0 configured, 0 failed"
+expectedOutputLine "configmap/cm-c reconcile skipped"
+
 expectedOutputLine "configmap/cm-a pruned"
 expectedOutputLine "configmap/cm-b pruned"
-expectedOutputLine "configmap/cm-c unchanged"
-expectedOutputLine "2 resource(s) pruned, 1 skipped"
+expectedOutputLine "namespace/test-namespace prune skipped: namespace still in use: test-namespace"
+expectedOutputLine "2 resource(s) pruned, 1 skipped, 0 failed to prune"
+
+expectedOutputLine "namespace/test-namespace reconcile skipped"
+expectedOutputLine "configmap/cm-a reconciled"
+expectedOutputLine "configmap/cm-b reconciled"
+expectedOutputLine "configmap/cm-c reconcile skipped"
+expectedOutputLine "2 resource(s) reconciled, 2 skipped, 0 failed to reconcile, 0 timed out"
 
 # The test-namespace should not be pruned.
 kubectl get ns test-namespace --no-headers | wc -l | tee $OUTPUT/status

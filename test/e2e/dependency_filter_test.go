@@ -10,8 +10,10 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"sigs.k8s.io/cli-utils/pkg/apis/actuation"
 	"sigs.k8s.io/cli-utils/pkg/apply"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
+	"sigs.k8s.io/cli-utils/pkg/apply/filter"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/object/validation"
 	"sigs.k8s.io/cli-utils/pkg/testutil"
@@ -284,7 +286,13 @@ func dependencyFilterTest(ctx context.Context, c client.Client, invConfig invcon
 				GroupName:  "apply-0",
 				Operation:  event.Unchanged,
 				Identifier: object.UnstructuredToObjMetadata(pod1Obj),
-				Error:      nil,
+				Error: testutil.EqualError(&filter.DependencyActuationMismatchError{
+					Object:           object.UnstructuredToObjMetadata(pod1Obj),
+					Strategy:         actuation.ActuationStrategyApply,
+					Relationship:     filter.RelationshipDependency,
+					Relation:         object.UnstructuredToObjMetadata(pod2Obj),
+					RelationStrategy: actuation.ActuationStrategyDelete,
+				}),
 			},
 		},
 		{
@@ -339,7 +347,13 @@ func dependencyFilterTest(ctx context.Context, c client.Client, invConfig invcon
 				GroupName:  "prune-0",
 				Operation:  event.PruneSkipped,
 				Identifier: object.UnstructuredToObjMetadata(pod2Obj),
-				Error:      nil,
+				Error: testutil.EqualError(&filter.DependencyActuationMismatchError{
+					Object:           object.UnstructuredToObjMetadata(pod2Obj),
+					Strategy:         actuation.ActuationStrategyDelete,
+					Relationship:     filter.RelationshipDependent,
+					Relation:         object.UnstructuredToObjMetadata(pod1Obj),
+					RelationStrategy: actuation.ActuationStrategyApply,
+				}),
 			},
 		},
 		{

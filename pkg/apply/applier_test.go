@@ -5,7 +5,6 @@ package apply
 
 import (
 	"context"
-	"fmt"
 	"sort"
 	"sync"
 	"testing"
@@ -15,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubectl/pkg/scheme"
+	"sigs.k8s.io/cli-utils/pkg/apis/actuation"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	pollevent "sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
@@ -875,7 +875,12 @@ func TestApplier(t *testing.T) {
 					ApplyEvent: &testutil.ExpApplyEvent{
 						GroupName:  "apply-0",
 						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
-						Error:      testutil.EqualErrorType(inventory.NewInventoryOverlapError(fmt.Errorf(""))),
+						Operation:  event.Unchanged,
+						Error: &inventory.PolicyPreventedActuationError{
+							Strategy: actuation.ActuationStrategyApply,
+							Policy:   inventory.PolicyMustMatch,
+							Status:   inventory.NoMatch,
+						},
 					},
 				},
 				{
@@ -983,6 +988,11 @@ func TestApplier(t *testing.T) {
 						GroupName:  "prune-0",
 						Operation:  event.PruneSkipped,
 						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
+						Error: &inventory.PolicyPreventedActuationError{
+							Strategy: actuation.ActuationStrategyDelete,
+							Policy:   inventory.PolicyMustMatch,
+							Status:   inventory.NoMatch,
+						},
 					},
 				},
 				{

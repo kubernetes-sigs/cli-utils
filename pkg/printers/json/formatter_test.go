@@ -106,6 +106,27 @@ func TestFormatter_FormatApplyEvent(t *testing.T) {
 				},
 			},
 		},
+		"resource apply skip error": {
+			previewStrategy: common.DryRunNone,
+			event: event.ApplyEvent{
+				Operation:  event.Unchanged,
+				Identifier: createIdentifier("apps", "Deployment", "", "my-dep"),
+				Error:      errors.New("example error"),
+			},
+			expected: []map[string]interface{}{
+				{
+					"eventType": "resourceApplied",
+					"group":     "apps",
+					"kind":      "Deployment",
+					"name":      "my-dep",
+					"namespace": "",
+					"operation": "Unchanged",
+					"timestamp": "",
+					"type":      "apply",
+					"error":     "example error",
+				},
+			},
+		},
 	}
 
 	for tn, tc := range testCases {
@@ -240,6 +261,25 @@ func TestFormatter_FormatPruneEvent(t *testing.T) {
 				"error":     "example error",
 			},
 		},
+		"resource prune skip error": {
+			previewStrategy: common.DryRunNone,
+			event: event.PruneEvent{
+				Operation:  event.PruneSkipped,
+				Identifier: createIdentifier("apps", "Deployment", "", "my-dep"),
+				Error:      errors.New("example error"),
+			},
+			expected: map[string]interface{}{
+				"eventType": "resourcePruned",
+				"group":     "apps",
+				"kind":      "Deployment",
+				"name":      "my-dep",
+				"namespace": "",
+				"operation": "PruneSkipped",
+				"timestamp": "",
+				"type":      "prune",
+				"error":     "example error",
+			},
+		},
 	}
 
 	for tn, tc := range testCases {
@@ -307,6 +347,25 @@ func TestFormatter_FormatDeleteEvent(t *testing.T) {
 				"kind":      "Deployment",
 				"name":      "my-dep",
 				"namespace": "default",
+				"timestamp": "",
+				"type":      "delete",
+				"error":     "example error",
+			},
+		},
+		"resource delete skip error": {
+			previewStrategy: common.DryRunNone,
+			event: event.DeleteEvent{
+				Operation:  event.DeleteSkipped,
+				Identifier: createIdentifier("apps", "Deployment", "default", "my-dep"),
+				Error:      errors.New("example error"),
+			},
+			expected: map[string]interface{}{
+				"eventType": "resourceDeleted",
+				"group":     "apps",
+				"kind":      "Deployment",
+				"name":      "my-dep",
+				"namespace": "default",
+				"operation": "DeleteSkipped",
 				"timestamp": "",
 				"type":      "delete",
 				"error":     "example error",

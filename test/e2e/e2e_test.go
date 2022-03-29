@@ -198,7 +198,7 @@ var _ = Describe("Applier", func() {
 				})
 			})
 
-			Context("Inventory policy", func() {
+			Context("InventoryPolicy", func() {
 				var namespace *v1.Namespace
 				var ctx context.Context
 				var cancel context.CancelFunc
@@ -218,15 +218,15 @@ var _ = Describe("Applier", func() {
 					e2eutil.DeleteNamespace(ctx, c, namespace)
 				})
 
-				It("MustMatch policy", func() {
+				It("MustMatch", func() {
 					inventoryPolicyMustMatchTest(ctx, c, invConfig, namespace.GetName())
 				})
 
-				It("AdoptIfNoInventory policy", func() {
+				It("AdoptIfNoInventory", func() {
 					inventoryPolicyAdoptIfNoInventoryTest(ctx, c, invConfig, namespace.GetName())
 				})
 
-				It("AdoptAll policy", func() {
+				It("AdoptAll", func() {
 					inventoryPolicyAdoptAllTest(ctx, c, invConfig, namespace.GetName())
 				})
 			})
