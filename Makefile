@@ -18,13 +18,22 @@ prow-presubmit-check: \
 
 .PHONY: prow-presubmit-check-e2e
 prow-presubmit-check-e2e: \
-	test-e2e verify-kapply-e2e
+	install-column-apt test-e2e verify-kapply-e2e
 
 fix:
 	go fix ./...
 
 fmt:
 	go fmt ./...
+
+# Install column (required by verify-kapply-e2e)
+# Update is included because the kubekins-e2e container build strips out the package cache.
+# In newer versions of debian, column is in the bsdextrautils package,
+# but in buster (used by kubekins-e2e) it's in bsdmainutils.
+.PHONY: install-column-apt
+install-column-apt:
+	apt-get update
+	apt-get install -y bsdmainutils
 
 install-stringer:
 	(which $(GOPATH)/bin/stringer || go install golang.org/x/tools/cmd/stringer@v0.1.5)
