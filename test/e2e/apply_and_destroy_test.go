@@ -146,9 +146,9 @@ func applyAndDestroyTest(ctx context.Context, c client.Client, invConfig invconf
 			},
 		},
 	}
-	received := testutil.EventsToExpEvents(applierEvents)
+	receivedEvents := testutil.EventsToExpEvents(applierEvents)
 
-	// handle required async NotFound StatusEvents
+	// handle optional async NotFound StatusEvents
 	expected := testutil.ExpEvent{
 		EventType: event.StatusType,
 		StatusEvent: &testutil.ExpStatusEvent{
@@ -157,8 +157,7 @@ func applyAndDestroyTest(ctx context.Context, c client.Client, invConfig invconf
 			Error:      nil,
 		},
 	}
-	received, matches := testutil.RemoveEqualEvents(received, expected)
-	Expect(matches).To(BeNumerically(">=", 1), "unexpected number of %q status events", status.NotFoundStatus)
+	receivedEvents, _ = testutil.RemoveEqualEvents(receivedEvents, expected)
 
 	// handle optional async InProgress StatusEvents
 	expected = testutil.ExpEvent{
@@ -169,7 +168,7 @@ func applyAndDestroyTest(ctx context.Context, c client.Client, invConfig invconf
 			Error:      nil,
 		},
 	}
-	received, _ = testutil.RemoveEqualEvents(received, expected)
+	receivedEvents, _ = testutil.RemoveEqualEvents(receivedEvents, expected)
 
 	// handle required async Current StatusEvents
 	expected = testutil.ExpEvent{
@@ -180,10 +179,12 @@ func applyAndDestroyTest(ctx context.Context, c client.Client, invConfig invconf
 			Error:      nil,
 		},
 	}
-	received, matches = testutil.RemoveEqualEvents(received, expected)
+	receivedEvents, matches := testutil.RemoveEqualEvents(receivedEvents, expected)
 	Expect(matches).To(BeNumerically(">=", 1), "unexpected number of %q status events", status.CurrentStatus)
 
-	Expect(received).To(testutil.Equal(expEvents))
+	expEvents, receivedEvents = e2eutil.FilterOptionalEvents(expEvents, receivedEvents)
+
+	Expect(receivedEvents).To(testutil.Equal(expEvents))
 
 	By("Verify deployment created")
 	e2eutil.AssertUnstructuredExists(ctx, c, deployment1Obj)
@@ -286,8 +287,11 @@ func applyAndDestroyTest(ctx context.Context, c client.Client, invConfig invconf
 			},
 		},
 	}
+	receivedEvents = testutil.EventsToExpEvents(destroyerEvents)
 
-	Expect(testutil.EventsToExpEvents(destroyerEvents)).To(testutil.Equal(expEvents))
+	expEvents, receivedEvents = e2eutil.FilterOptionalEvents(expEvents, receivedEvents)
+
+	Expect(receivedEvents).To(testutil.Equal(expEvents))
 
 	By("Verify deployment deleted")
 	e2eutil.AssertUnstructuredDoesNotExist(ctx, c, deployment1Obj)

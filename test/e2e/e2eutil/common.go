@@ -10,6 +10,8 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
@@ -26,6 +28,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
 	"sigs.k8s.io/cli-utils/pkg/object/dependson"
 	"sigs.k8s.io/cli-utils/pkg/object/mutation"
+	"sigs.k8s.io/cli-utils/pkg/testutil"
 	"sigs.k8s.io/cli-utils/test/e2e/customprovider"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -421,4 +424,32 @@ func IsFlowControlEnabled(config *rest.Config) bool {
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 	return enabled
+}
+
+// FilterOptionalEvents looks for optional events in the expected list and
+// removes them from both lists. This allows the output to be compared for
+// equality.
+//
+// Optional events include:
+// - WaitEvent with ReconcilePending
+func FilterOptionalEvents(expected, received []testutil.ExpEvent) ([]testutil.ExpEvent, []testutil.ExpEvent) {
+	expectedCopy := make([]testutil.ExpEvent, 0, len(expected))
+	for _, ee := range expected {
+		if ee.EventType == event.WaitType &&
+			ee.WaitEvent != nil &&
+			ee.WaitEvent.Status == event.ReconcilePending {
+			// Pending WaitEvent is optional.
+			// Remove first event match, if exists.
+			for i, re := range received {
+				if cmp.Equal(re, ee, cmpopts.EquateErrors()) {
+					// remove event at index i
+					received = append(received[:i], received[i+1:]...)
+					break
+				}
+			}
+		} else {
+			expectedCopy = append(expectedCopy, ee)
+		}
+	}
+	return expectedCopy, received
 }

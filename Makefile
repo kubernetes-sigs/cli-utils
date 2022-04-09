@@ -101,7 +101,9 @@ test-e2e-focus: "$(MYGOBIN)/ginkgo" "$(MYGOBIN)/kind"
 
 .PHONY: test-stress
 test-stress: "$(MYGOBIN)/ginkgo" "$(MYGOBIN)/kind"
-	kind delete cluster --name=cli-utils-e2e && kind create cluster --name=cli-utils-e2e --wait 5m
+	kind delete cluster --name=cli-utils-e2e && kind create cluster --name=cli-utils-e2e --wait 5m \
+		--config=./test/stress/kind-cluster.yaml
+	kubectl wait nodes --for=condition=ready --all --timeout=5m
 	"$(MYGOBIN)/ginkgo" -v ./test/stress/... -- -v 3
 
 .PHONY: vet

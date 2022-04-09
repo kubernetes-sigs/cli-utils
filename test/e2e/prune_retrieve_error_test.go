@@ -144,7 +144,11 @@ func pruneRetrieveErrorTest(ctx context.Context, c client.Client, invConfig invc
 			},
 		},
 	}
-	Expect(testutil.EventsToExpEvents(applierEvents)).To(testutil.Equal(expEvents))
+	receivedEvents := testutil.EventsToExpEvents(applierEvents)
+
+	expEvents, receivedEvents = e2eutil.FilterOptionalEvents(expEvents, receivedEvents)
+
+	Expect(receivedEvents).To(testutil.Equal(expEvents))
 
 	By("Verify pod1 created and ready")
 	result := e2eutil.AssertUnstructuredExists(ctx, c, pod1Obj)
@@ -167,11 +171,11 @@ func pruneRetrieveErrorTest(ctx context.Context, c client.Client, invConfig invc
 		pod2Obj,
 	}
 
-	applierEvents2 := e2eutil.RunCollect(applier.Run(ctx, inv, resource2, apply.ApplierOptions{
+	applierEvents = e2eutil.RunCollect(applier.Run(ctx, inv, resource2, apply.ApplierOptions{
 		EmitStatusEvents: false,
 	}))
 
-	expEvents2 := []testutil.ExpEvent{
+	expEvents = []testutil.ExpEvent{
 		{
 			// InitTask
 			EventType: event.InitType,
@@ -279,7 +283,11 @@ func pruneRetrieveErrorTest(ctx context.Context, c client.Client, invConfig invc
 			},
 		},
 	}
-	Expect(testutil.EventsToExpEvents(applierEvents2)).To(testutil.Equal(expEvents2))
+	receivedEvents = testutil.EventsToExpEvents(applierEvents)
+
+	expEvents, receivedEvents = e2eutil.FilterOptionalEvents(expEvents, receivedEvents)
+
+	Expect(receivedEvents).To(testutil.Equal(expEvents))
 
 	By("Verify pod2 created and ready")
 	result = e2eutil.AssertUnstructuredExists(ctx, c, pod2Obj)
@@ -301,7 +309,7 @@ func pruneRetrieveErrorTest(ctx context.Context, c client.Client, invConfig invc
 	options := apply.DestroyerOptions{InventoryPolicy: inventory.PolicyAdoptIfNoInventory}
 	destroyerEvents := e2eutil.RunCollect(destroyer.Run(ctx, inv, options))
 
-	expEvents3 := []testutil.ExpEvent{
+	expEvents = []testutil.ExpEvent{
 		{
 			// InitTask
 			EventType: event.InitType,
@@ -390,7 +398,11 @@ func pruneRetrieveErrorTest(ctx context.Context, c client.Client, invConfig invc
 			},
 		},
 	}
-	Expect(testutil.EventsToExpEvents(destroyerEvents)).To(testutil.Equal(expEvents3))
+	receivedEvents = testutil.EventsToExpEvents(destroyerEvents)
+
+	expEvents, receivedEvents = e2eutil.FilterOptionalEvents(expEvents, receivedEvents)
+
+	Expect(receivedEvents).To(testutil.Equal(expEvents))
 
 	By("Verify pod1 is deleted")
 	e2eutil.AssertUnstructuredDoesNotExist(ctx, c, pod1Obj)

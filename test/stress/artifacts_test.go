@@ -65,3 +65,30 @@ metadata:
 spec:
   cronSpec: "* * * * */5"
 `
+
+var deploymentYaml = `
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ""
+  namespace: ""
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:1.19.6
+        ports:
+        - containerPort: 80
+        resources:
+          requests:
+            cpu: 10m
+            memory: 1Mi
+`

@@ -60,9 +60,11 @@ func reconciliationTimeout(ctx context.Context, invConfig invconfig.InventoryCon
 	}))
 
 	expEvents := expectedPodEvents(podObj, event.ReconcileTimeout)
-	received := testutil.EventsToExpEvents(applierEvents)
+	receivedEvents := testutil.EventsToExpEvents(applierEvents)
 
-	Expect(received).To(testutil.Equal(expEvents))
+	expEvents, receivedEvents = e2eutil.FilterOptionalEvents(expEvents, receivedEvents)
+
+	Expect(receivedEvents).To(testutil.Equal(expEvents))
 }
 
 func expectedPodEvents(pod *unstructured.Unstructured, waitStatus event.WaitEventStatus) []testutil.ExpEvent {

@@ -149,9 +149,9 @@ func dryRunTest(ctx context.Context, c client.Client, invConfig invconfig.Invent
 			},
 		},
 	}
-	received := testutil.EventsToExpEvents(applierEvents)
+	receivedEvents := testutil.EventsToExpEvents(applierEvents)
 
-	// handle required async NotFound StatusEvent for pod
+	// handle optional async NotFound StatusEvent for pod
 	expected := testutil.ExpEvent{
 		EventType: event.StatusType,
 		StatusEvent: &testutil.ExpStatusEvent{
@@ -160,10 +160,9 @@ func dryRunTest(ctx context.Context, c client.Client, invConfig invconfig.Invent
 			Error:      nil,
 		},
 	}
-	received, matches := testutil.RemoveEqualEvents(received, expected)
-	Expect(matches).To(BeNumerically(">=", 1), "unexpected number of %q status events for namespace", status.NotFoundStatus)
+	receivedEvents, _ = testutil.RemoveEqualEvents(receivedEvents, expected)
 
-	// handle required async NotFound StatusEvent for namespace
+	// handle optional async NotFound StatusEvent for namespace
 	expected = testutil.ExpEvent{
 		EventType: event.StatusType,
 		StatusEvent: &testutil.ExpStatusEvent{
@@ -172,10 +171,9 @@ func dryRunTest(ctx context.Context, c client.Client, invConfig invconfig.Invent
 			Error:      nil,
 		},
 	}
-	received, matches = testutil.RemoveEqualEvents(received, expected)
-	Expect(matches).To(BeNumerically(">=", 1), "unexpected number of %q status events for pod", status.NotFoundStatus)
+	receivedEvents, _ = testutil.RemoveEqualEvents(receivedEvents, expected)
 
-	Expect(received).To(testutil.Equal(expEvents))
+	Expect(receivedEvents).To(testutil.Equal(expEvents))
 
 	By("Verify pod NotFound")
 	e2eutil.AssertUnstructuredDoesNotExist(ctx, c, podBObj)

@@ -383,8 +383,12 @@ func dependsOnTest(ctx context.Context, c client.Client, invConfig invconfig.Inv
 		},
 	}
 	receivedEvents := testutil.EventsToExpEvents(applierEvents)
-	// sort to handle objects reconciling in random order
+
+	expEvents, receivedEvents = e2eutil.FilterOptionalEvents(expEvents, receivedEvents)
+
+	// sort to compensate for wait task reconcile ordering variations
 	testutil.SortExpEvents(receivedEvents)
+
 	Expect(receivedEvents).To(testutil.Equal(expEvents))
 
 	By("verify namespace1 created")
@@ -627,7 +631,7 @@ func dependsOnTest(ctx context.Context, c client.Client, invConfig invconfig.Inv
 			},
 		},
 		{
-			// Delete Namespace2 last
+			// Delete Namespace1 last
 			EventType: event.DeleteType,
 			DeleteEvent: &testutil.ExpDeleteEvent{
 				GroupName:  "prune-3",
@@ -636,7 +640,7 @@ func dependsOnTest(ctx context.Context, c client.Client, invConfig invconfig.Inv
 			},
 		},
 		{
-			// Delete Namespace1 last
+			// Delete Namespace2 last
 			EventType: event.DeleteType,
 			DeleteEvent: &testutil.ExpDeleteEvent{
 				GroupName:  "prune-3",
@@ -727,8 +731,12 @@ func dependsOnTest(ctx context.Context, c client.Client, invConfig invconfig.Inv
 		},
 	}
 	receivedEvents = testutil.EventsToExpEvents(destroyerEvents)
+
+	expEvents, receivedEvents = e2eutil.FilterOptionalEvents(expEvents, receivedEvents)
+
 	// sort to handle objects reconciling in random order
 	testutil.SortExpEvents(receivedEvents)
+
 	Expect(receivedEvents).To(testutil.Equal(expEvents))
 
 	By("verify pod1 deleted")

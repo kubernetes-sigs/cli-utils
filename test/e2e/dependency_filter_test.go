@@ -220,7 +220,11 @@ func dependencyFilterTest(ctx context.Context, c client.Client, invConfig invcon
 			},
 		},
 	}
-	Expect(testutil.EventsToExpEvents(applierEvents)).To(testutil.Equal(expEvents))
+	receivedEvents := testutil.EventsToExpEvents(applierEvents)
+
+	expEvents, receivedEvents = e2eutil.FilterOptionalEvents(expEvents, receivedEvents)
+
+	Expect(receivedEvents).To(testutil.Equal(expEvents))
 
 	By("verify pod1 created and ready")
 	result := e2eutil.AssertUnstructuredExists(ctx, c, pod1Obj)
@@ -411,7 +415,11 @@ func dependencyFilterTest(ctx context.Context, c client.Client, invConfig invcon
 			},
 		},
 	}
-	Expect(testutil.EventsToExpEvents(applierEvents)).To(testutil.Equal(expEvents))
+	receivedEvents = testutil.EventsToExpEvents(applierEvents)
+
+	expEvents, receivedEvents = e2eutil.FilterOptionalEvents(expEvents, receivedEvents)
+
+	Expect(receivedEvents).To(testutil.Equal(expEvents))
 
 	By("verify pod1 not deleted")
 	result = e2eutil.AssertUnstructuredExists(ctx, c, pod1Obj)

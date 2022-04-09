@@ -97,6 +97,10 @@ var _ = Describe("Stress", func() {
 		e2eutil.DeleteNamespace(ctx, c, namespace)
 	})
 
+	It("ThousandDeployments", func() {
+		thousandDeploymentsTest(ctx, c, invConfig, inventoryName, namespace.GetName())
+	})
+
 	It("ThousandNamespaces", func() {
 		thousandNamespacesTest(ctx, c, invConfig, inventoryName, namespace.GetName())
 	})

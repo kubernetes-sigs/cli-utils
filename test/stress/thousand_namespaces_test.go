@@ -21,6 +21,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+// thousandNamespacesTest tests a CRD and 1,000 new namespaces, each with
+// 1 ConfigMap and 1 CronTab in it. This uses implicit dependencies and many
+// namespaces with custom resources (json storage) as well and built-in
+// resources (proto storage).
+//
+// With the StatusWatcher, this should only needs FOUR root-scoped informers
+// (CRD, Namespace, ConfigMap, CronTab), For comparison, the StatusPoller used
+// 2,002 LISTs for each attempt (two root-scoped and two namespace-scoped per
+// namespace).
 func thousandNamespacesTest(ctx context.Context, c client.Client, invConfig invconfig.InventoryConfig, inventoryName, namespaceName string) {
 	By("Apply LOTS of resources")
 	applier := invConfig.ApplierFactoryFunc()
@@ -44,7 +53,9 @@ func thousandNamespacesTest(ctx context.Context, c client.Client, invConfig invc
 	cronTabObjTemplate := e2eutil.ManifestToUnstructured([]byte(cronTabYaml))
 	cronTabObjTemplate.SetLabels(map[string]string{labelKey: labelValue})
 
-	for i := 1; i <= 1000; i++ {
+	objectCount := 1000
+
+	for i := 1; i <= objectCount; i++ {
 		ns := fmt.Sprintf("%s-%d", namespaceName, i)
 		namespaceObj := namespaceObjTemplate.DeepCopy()
 		namespaceObj.SetName(ns)
@@ -110,14 +121,14 @@ func thousandNamespacesTest(ctx context.Context, c client.Client, invConfig invc
 	By("Verify CRD created")
 	e2eutil.AssertUnstructuredExists(ctx, c, crdObj)
 
-	By("Verify 1000 Namespaces created")
-	e2eutil.AssertUnstructuredCount(ctx, c, namespaceObjTemplate, 1000)
+	By(fmt.Sprintf("Verify %d Namespaces created", objectCount))
+	e2eutil.AssertUnstructuredCount(ctx, c, namespaceObjTemplate, objectCount)
 
-	By("Verify 1000 ConfigMaps created")
-	e2eutil.AssertUnstructuredCount(ctx, c, configMapObjTemplate, 1000)
+	By(fmt.Sprintf("Verify %d ConfigMaps created", objectCount))
+	e2eutil.AssertUnstructuredCount(ctx, c, configMapObjTemplate, objectCount)
 
-	By("Verify 1000 CronTabs created")
-	e2eutil.AssertUnstructuredCount(ctx, c, cronTabObjTemplate, 1000)
+	By(fmt.Sprintf("Verify %d CronTabs created", objectCount))
+	e2eutil.AssertUnstructuredCount(ctx, c, cronTabObjTemplate, objectCount)
 
 	By("Destroy LOTS of resources")
 	destroyer := invConfig.DestroyerFactoryFunc()
@@ -147,13 +158,13 @@ func thousandNamespacesTest(ctx context.Context, c client.Client, invConfig invc
 	By("Verify inventory deleted")
 	invConfig.InvNotExistsFunc(ctx, c, inventoryName, namespaceName, inventoryID)
 
-	By("Verify 1000 CronTabs deleted")
+	By(fmt.Sprintf("Verify %d CronTabs deleted", objectCount))
 	e2eutil.AssertUnstructuredCount(ctx, c, cronTabObjTemplate, 0)
 
-	By("Verify 1000 ConfigMaps deleted")
+	By(fmt.Sprintf("Verify %d ConfigMaps deleted", objectCount))
 	e2eutil.AssertUnstructuredCount(ctx, c, configMapObjTemplate, 0)
 
-	By("Verify 1000 Namespaces deleted")
+	By(fmt.Sprintf("Verify %d Namespaces deleted", objectCount))
 	e2eutil.AssertUnstructuredCount(ctx, c, namespaceObjTemplate, 0)
 
 	By("Verify CRD deleted")

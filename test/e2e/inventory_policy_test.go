@@ -323,7 +323,7 @@ func inventoryPolicyAdoptIfNoInventoryTest(ctx context.Context, c client.Client,
 	}
 
 	// handle optional async InProgress StatusEvents
-	received := testutil.EventsToExpEvents(applierEvents)
+	receivedEvents := testutil.EventsToExpEvents(applierEvents)
 	expected := testutil.ExpEvent{
 		EventType: event.StatusType,
 		StatusEvent: &testutil.ExpStatusEvent{
@@ -332,7 +332,7 @@ func inventoryPolicyAdoptIfNoInventoryTest(ctx context.Context, c client.Client,
 			Error:      nil,
 		},
 	}
-	received, _ = testutil.RemoveEqualEvents(received, expected)
+	receivedEvents, _ = testutil.RemoveEqualEvents(receivedEvents, expected)
 
 	// handle required async Current StatusEvents
 	expected = testutil.ExpEvent{
@@ -343,10 +343,12 @@ func inventoryPolicyAdoptIfNoInventoryTest(ctx context.Context, c client.Client,
 			Error:      nil,
 		},
 	}
-	received, matches := testutil.RemoveEqualEvents(received, expected)
+	receivedEvents, matches := testutil.RemoveEqualEvents(receivedEvents, expected)
 	Expect(matches).To(BeNumerically(">=", 1), "unexpected number of %q status events", status.CurrentStatus)
 
-	Expect(received).To(testutil.Equal(expEvents))
+	expEvents, receivedEvents = e2eutil.FilterOptionalEvents(expEvents, receivedEvents)
+
+	Expect(receivedEvents).To(testutil.Equal(expEvents))
 
 	By("Verify resource was updated and added to inventory")
 	result := e2eutil.AssertUnstructuredExists(ctx, c, deployment1Obj)
@@ -505,7 +507,7 @@ func inventoryPolicyAdoptAllTest(ctx context.Context, c client.Client, invConfig
 	}
 
 	// handle optional async InProgress StatusEvents
-	received := testutil.EventsToExpEvents(applierEvents)
+	receivedEvents := testutil.EventsToExpEvents(applierEvents)
 	expected := testutil.ExpEvent{
 		EventType: event.StatusType,
 		StatusEvent: &testutil.ExpStatusEvent{
@@ -514,7 +516,7 @@ func inventoryPolicyAdoptAllTest(ctx context.Context, c client.Client, invConfig
 			Error:      nil,
 		},
 	}
-	received, _ = testutil.RemoveEqualEvents(received, expected)
+	receivedEvents, _ = testutil.RemoveEqualEvents(receivedEvents, expected)
 
 	// handle required async Current StatusEvents
 	expected = testutil.ExpEvent{
@@ -525,10 +527,12 @@ func inventoryPolicyAdoptAllTest(ctx context.Context, c client.Client, invConfig
 			Error:      nil,
 		},
 	}
-	received, matches := testutil.RemoveEqualEvents(received, expected)
+	receivedEvents, matches := testutil.RemoveEqualEvents(receivedEvents, expected)
 	Expect(matches).To(BeNumerically(">=", 1), "unexpected number of %q status events", status.CurrentStatus)
 
-	Expect(received).To(testutil.Equal(expEvents))
+	expEvents, receivedEvents = e2eutil.FilterOptionalEvents(expEvents, receivedEvents)
+
+	Expect(receivedEvents).To(testutil.Equal(expEvents))
 
 	By("Verify resource was updated and added to inventory")
 	result := e2eutil.AssertUnstructuredExists(ctx, c, deployment1Obj)

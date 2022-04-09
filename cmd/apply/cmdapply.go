@@ -45,8 +45,6 @@ func GetRunner(factory cmdutil.Factory, invFactory inventory.ClientFactory,
 
 	cmd.Flags().StringVar(&r.output, "output", printers.DefaultPrinter(),
 		fmt.Sprintf("Output format, must be one of %s", strings.Join(printers.SupportedPrinters(), ",")))
-	cmd.Flags().DurationVar(&r.period, "poll-period", 2*time.Second,
-		"Polling period for resource statuses.")
 	cmd.Flags().DurationVar(&r.reconcileTimeout, "reconcile-timeout", time.Duration(0),
 		"Timeout threshold for waiting for all resources to reach the Current status.")
 	cmd.Flags().BoolVar(&r.noPrune, "no-prune", r.noPrune,
@@ -81,7 +79,6 @@ type Runner struct {
 
 	serverSideOptions      common.ServerSideOptions
 	output                 string
-	period                 time.Duration
 	reconcileTimeout       time.Duration
 	noPrune                bool
 	prunePropagationPolicy string
@@ -156,7 +153,6 @@ func (r *Runner) RunE(cmd *cobra.Command, args []string) error {
 
 	ch := a.Run(ctx, inv, objs, apply.ApplierOptions{
 		ServerSideOptions: r.serverSideOptions,
-		PollInterval:      r.period,
 		ReconcileTimeout:  r.reconcileTimeout,
 		// If we are not waiting for status, tell the applier to not
 		// emit the events.

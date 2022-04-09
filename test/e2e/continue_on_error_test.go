@@ -191,8 +191,12 @@ func continueOnErrorTest(ctx context.Context, c client.Client, invConfig invconf
 		},
 	}
 	receivedEvents := testutil.EventsToExpEvents(applierEvents)
+
+	expEvents, receivedEvents = e2eutil.FilterOptionalEvents(expEvents, receivedEvents)
+
 	// sort to allow comparison of multiple ApplyTasks in the same task group
 	testutil.SortExpEvents(receivedEvents)
+
 	Expect(receivedEvents).To(testutil.Equal(expEvents))
 
 	By("Verify pod1 created")

@@ -27,12 +27,11 @@ import (
 	"k8s.io/klog/v2"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	"k8s.io/kubectl/pkg/scheme"
-	"sigs.k8s.io/cli-utils/pkg/apply/poller"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/jsonpath"
-	"sigs.k8s.io/cli-utils/pkg/kstatus/polling"
 	pollevent "sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
+	"sigs.k8s.io/cli-utils/pkg/kstatus/watcher"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
@@ -74,7 +73,7 @@ func newTestApplier(
 	invInfo inventoryInfo,
 	resources object.UnstructuredSet,
 	clusterObjs object.UnstructuredSet,
-	statusPoller poller.Poller,
+	statusWatcher watcher.StatusWatcher,
 ) *Applier {
 	tf := newTestFactory(t, invInfo, resources, clusterObjs)
 	defer tf.Cleanup()
@@ -88,7 +87,7 @@ func newTestApplier(
 	applier, err := NewApplierBuilder().
 		WithFactory(tf).
 		WithInventoryClient(invClient).
-		WithStatusPoller(statusPoller).
+		WithStatusWatcher(statusWatcher).
 		Build()
 	require.NoError(t, err)
 
@@ -103,7 +102,7 @@ func newTestDestroyer(
 	t *testing.T,
 	invInfo inventoryInfo,
 	clusterObjs object.UnstructuredSet,
-	statusPoller poller.Poller,
+	statusWatcher watcher.StatusWatcher,
 ) *Destroyer {
 	tf := newTestFactory(t, invInfo, object.UnstructuredSet{}, clusterObjs)
 	defer tf.Cleanup()
@@ -112,7 +111,7 @@ func newTestDestroyer(
 
 	destroyer, err := NewDestroyer(tf, invClient)
 	require.NoError(t, err)
-	destroyer.StatusPoller = statusPoller
+	destroyer.statusWatcher = statusWatcher
 
 	return destroyer
 }
@@ -345,27 +344,29 @@ func (n *nsHandler) handle(t *testing.T, req *http.Request) (*http.Response, boo
 	return nil, false, nil
 }
 
-type fakePoller struct {
+type fakeWatcher struct {
 	start  chan struct{}
 	events []pollevent.Event
 }
 
-func newFakePoller(statusEvents []pollevent.Event) *fakePoller {
-	return &fakePoller{
+func newFakeWatcher(statusEvents []pollevent.Event) *fakeWatcher {
+	return &fakeWatcher{
 		events: statusEvents,
 		start:  make(chan struct{}),
 	}
 }
 
 // Start events being sent on the status channel
-func (f *fakePoller) Start() {
+func (f *fakeWatcher) Start() {
 	close(f.start)
 }
 
-func (f *fakePoller) Poll(ctx context.Context, _ object.ObjMetadataSet, _ polling.PollOptions) <-chan pollevent.Event {
+func (f *fakeWatcher) Watch(ctx context.Context, _ object.ObjMetadataSet, _ watcher.Options) <-chan pollevent.Event {
 	eventChannel := make(chan pollevent.Event)
 	go func() {
 		defer close(eventChannel)
+		// send sync event immediately
+		eventChannel <- pollevent.Event{Type: pollevent.SyncEvent}
 		// wait until started to send the events
 		<-f.start
 		for _, f := range f.events {

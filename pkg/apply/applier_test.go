@@ -18,6 +18,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	pollevent "sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
+	"sigs.k8s.io/cli-utils/pkg/kstatus/watcher"
 	"sigs.k8s.io/cli-utils/pkg/multierror"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/object/validation"
@@ -97,7 +98,7 @@ func TestApplier(t *testing.T) {
 		clusterObjs object.UnstructuredSet
 		// options input to applier.Run
 		options ApplierOptions
-		// fake input events from the status poller
+		// fake input events from the statusWatcher
 		statusEvents []pollevent.Event
 		// expected output status events (async)
 		expectedStatusEvents []testutil.ExpEvent
@@ -1401,7 +1402,7 @@ func TestApplier(t *testing.T) {
 
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
-			poller := newFakePoller(tc.statusEvents)
+			statusWatcher := newFakeWatcher(tc.statusEvents)
 
 			// Only feed valid objects into the TestApplier.
 			// Invalid objects should not generate API requests.
@@ -1418,7 +1419,7 @@ func TestApplier(t *testing.T) {
 				tc.invInfo,
 				validObjs,
 				tc.clusterObjs,
-				poller,
+				statusWatcher,
 			)
 
 			// Context for Applier.Run
@@ -1463,7 +1464,7 @@ func TestApplier(t *testing.T) {
 							e.ActionGroupEvent.Action == event.PruneAction {
 							once.Do(func() {
 								// start events
-								poller.Start()
+								statusWatcher.Start()
 							})
 						}
 					}
@@ -1519,7 +1520,7 @@ func TestApplierCancel(t *testing.T) {
 		runTimeout time.Duration
 		// timeout for the test
 		testTimeout time.Duration
-		// fake input events from the status poller
+		// fake input events from the statusWatcher
 		statusEvents []pollevent.Event
 		// expected output status events (async)
 		expectedStatusEvents []testutil.ExpEvent
@@ -1854,13 +1855,13 @@ func TestApplierCancel(t *testing.T) {
 
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
-			poller := newFakePoller(tc.statusEvents)
+			statusWatcher := newFakeWatcher(tc.statusEvents)
 
 			applier := newTestApplier(t,
 				tc.invInfo,
 				tc.resources,
 				tc.clusterObjs,
-				poller,
+				statusWatcher,
 			)
 
 			// Context for Applier.Run
@@ -1902,7 +1903,7 @@ func TestApplierCancel(t *testing.T) {
 							e.ActionGroupEvent.Action == event.PruneAction {
 							once.Do(func() {
 								// start events
-								poller.Start()
+								statusWatcher.Start()
 							})
 						}
 					}
@@ -2046,7 +2047,7 @@ func TestReadAndPrepareObjects(t *testing.T) {
 				tc.resources,
 				tc.clusterObjs,
 				// no events needed for prepareObjects
-				newFakePoller([]pollevent.Event{}),
+				watcher.BlindStatusWatcher{},
 			)
 
 			applyObjs, pruneObjs, err := applier.prepareObjects(tc.invInfo.toWrapped(), tc.resources, ApplierOptions{})
