@@ -85,7 +85,7 @@ func continueOnErrorTest(ctx context.Context, c client.Client, invConfig invconf
 			EventType: event.ApplyType,
 			ApplyEvent: &testutil.ExpApplyEvent{
 				GroupName:  "apply-0",
-				Operation:  event.Created,
+				Status:     event.ApplySuccessful,
 				Identifier: object.UnstructuredToObjMetadata(pod1Obj),
 				Error:      nil,
 			},
@@ -113,7 +113,7 @@ func continueOnErrorTest(ctx context.Context, c client.Client, invConfig invconf
 			EventType: event.WaitType,
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-0",
-				Operation:  event.ReconcileSkipped,
+				Status:     event.ReconcileSkipped,
 				Identifier: object.UnstructuredToObjMetadata(invalidCrdObj),
 			},
 		},
@@ -122,7 +122,7 @@ func continueOnErrorTest(ctx context.Context, c client.Client, invConfig invconf
 			EventType: event.WaitType,
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-0",
-				Operation:  event.ReconcilePending,
+				Status:     event.ReconcilePending,
 				Identifier: object.UnstructuredToObjMetadata(pod1Obj),
 			},
 		},
@@ -131,7 +131,7 @@ func continueOnErrorTest(ctx context.Context, c client.Client, invConfig invconf
 			EventType: event.WaitType,
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-0",
-				Operation:  event.Reconciled,
+				Status:     event.ReconcileSuccessful,
 				Identifier: object.UnstructuredToObjMetadata(pod1Obj),
 			},
 		},

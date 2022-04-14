@@ -21,11 +21,13 @@ func NewFormatter(ioStreams genericclioptions.IOStreams,
 	_ common.DryRunStrategy) list.Formatter {
 	return &formatter{
 		ioStreams: ioStreams,
+		now:       time.Now,
 	}
 }
 
 type formatter struct {
 	ioStreams genericclioptions.IOStreams
+	now       func() time.Time
 }
 
 func (jf *formatter) FormatValidationEvent(ve event.ValidationEvent) error {
@@ -42,23 +44,19 @@ func (jf *formatter) FormatValidationEvent(ve event.ValidationEvent) error {
 	for i, id := range ve.Identifiers {
 		objects[i] = jf.baseResourceEvent(id)
 	}
-	return jf.printEvent("validation", "validation", map[string]interface{}{
+	return jf.printEvent("validation", map[string]interface{}{
 		"objects": objects,
 		"error":   err.Error(),
 	})
 }
 
-func (jf *formatter) FormatApplyEvent(ae event.ApplyEvent) error {
-	eventInfo := jf.baseResourceEvent(ae.Identifier)
-	if ae.Error != nil {
-		eventInfo["error"] = ae.Error.Error()
-		// skipped apply sets both error and operation
-		if ae.Operation != event.Unchanged {
-			return jf.printEvent("apply", "resourceFailed", eventInfo)
-		}
+func (jf *formatter) FormatApplyEvent(e event.ApplyEvent) error {
+	eventInfo := jf.baseResourceEvent(e.Identifier)
+	if e.Error != nil {
+		eventInfo["error"] = e.Error.Error()
 	}
-	eventInfo["operation"] = ae.Operation.String()
-	return jf.printEvent("apply", "resourceApplied", eventInfo)
+	eventInfo["status"] = e.Status.String()
+	return jf.printEvent("apply", eventInfo)
 }
 
 func (jf *formatter) FormatStatusEvent(se event.StatusEvent) error {
@@ -69,44 +67,36 @@ func (jf *formatter) printResourceStatus(se event.StatusEvent) error {
 	eventInfo := jf.baseResourceEvent(se.Identifier)
 	eventInfo["status"] = se.PollResourceInfo.Status.String()
 	eventInfo["message"] = se.PollResourceInfo.Message
-	return jf.printEvent("status", "resourceStatus", eventInfo)
+	return jf.printEvent("status", eventInfo)
 }
 
-func (jf *formatter) FormatPruneEvent(pe event.PruneEvent) error {
-	eventInfo := jf.baseResourceEvent(pe.Identifier)
-	if pe.Error != nil {
-		eventInfo["error"] = pe.Error.Error()
-		// skipped prune sets both error and operation
-		if pe.Operation != event.PruneSkipped {
-			return jf.printEvent("prune", "resourceFailed", eventInfo)
-		}
+func (jf *formatter) FormatPruneEvent(e event.PruneEvent) error {
+	eventInfo := jf.baseResourceEvent(e.Identifier)
+	if e.Error != nil {
+		eventInfo["error"] = e.Error.Error()
 	}
-	eventInfo["operation"] = pe.Operation.String()
-	return jf.printEvent("prune", "resourcePruned", eventInfo)
+	eventInfo["status"] = e.Status.String()
+	return jf.printEvent("prune", eventInfo)
 }
 
-func (jf *formatter) FormatDeleteEvent(de event.DeleteEvent) error {
-	eventInfo := jf.baseResourceEvent(de.Identifier)
-	if de.Error != nil {
-		eventInfo["error"] = de.Error.Error()
-		// skipped delete sets both error and operation
-		if de.Operation != event.DeleteSkipped {
-			return jf.printEvent("delete", "resourceFailed", eventInfo)
-		}
+func (jf *formatter) FormatDeleteEvent(e event.DeleteEvent) error {
+	eventInfo := jf.baseResourceEvent(e.Identifier)
+	if e.Error != nil {
+		eventInfo["error"] = e.Error.Error()
 	}
-	eventInfo["operation"] = de.Operation.String()
-	return jf.printEvent("delete", "resourceDeleted", eventInfo)
+	eventInfo["status"] = e.Status.String()
+	return jf.printEvent("delete", eventInfo)
 }
 
-func (jf *formatter) FormatWaitEvent(we event.WaitEvent) error {
-	eventInfo := jf.baseResourceEvent(we.Identifier)
-	eventInfo["operation"] = we.Operation.String()
-	return jf.printEvent("wait", "resourceReconciled", eventInfo)
+func (jf *formatter) FormatWaitEvent(e event.WaitEvent) error {
+	eventInfo := jf.baseResourceEvent(e.Identifier)
+	eventInfo["status"] = e.Status.String()
+	return jf.printEvent("wait", eventInfo)
 }
 
-func (jf *formatter) FormatErrorEvent(ee event.ErrorEvent) error {
-	return jf.printEvent("error", "error", map[string]interface{}{
-		"error": ee.Err.Error(),
+func (jf *formatter) FormatErrorEvent(e event.ErrorEvent) error {
+	return jf.printEvent("error", map[string]interface{}{
+		"error": e.Err.Error(),
 	})
 }
 
@@ -116,52 +106,108 @@ func (jf *formatter) FormatActionGroupEvent(
 	s stats.Stats,
 	_ list.Collector,
 ) error {
-	if age.Action == event.ApplyAction && age.Type == event.Finished &&
-		list.IsLastActionGroup(age, ags) {
+	content := map[string]interface{}{
+		"action": age.Action.String(),
+		"status": age.Status.String(),
+	}
+
+	switch age.Action {
+	case event.ApplyAction:
+		if age.Status == event.Finished {
+			as := s.ApplyStats
+			content["count"] = as.Sum()
+			content["successful"] = as.Successful
+			content["skipped"] = as.Skipped
+			content["failed"] = as.Failed
+		}
+	case event.PruneAction:
+		if age.Status == event.Finished {
+			ps := s.PruneStats
+			content["count"] = ps.Sum()
+			content["successful"] = ps.Successful
+			content["skipped"] = ps.Skipped
+			content["failed"] = ps.Failed
+		}
+	case event.DeleteAction:
+		if age.Status == event.Finished {
+			ds := s.DeleteStats
+			content["count"] = ds.Sum()
+			content["successful"] = ds.Successful
+			content["skipped"] = ds.Skipped
+			content["failed"] = ds.Failed
+		}
+	case event.WaitAction:
+		if age.Status == event.Finished {
+			ws := s.WaitStats
+			content["count"] = ws.Sum()
+			content["successful"] = ws.Successful
+			content["skipped"] = ws.Skipped
+			content["failed"] = ws.Failed
+			content["timeout"] = ws.Timeout
+		}
+	case event.InventoryAction:
+		// no extra content
+	default:
+		return fmt.Errorf("invalid action group action: %+v", age)
+	}
+
+	return jf.printEvent("group", content)
+}
+
+func (jf *formatter) FormatSummary(s stats.Stats) error {
+	if s.ApplyStats != (stats.ApplyStats{}) {
 		as := s.ApplyStats
-		if err := jf.printEvent("apply", "completed", map[string]interface{}{
-			"count":           as.Sum(),
-			"createdCount":    as.Created,
-			"unchangedCount":  as.Unchanged,
-			"configuredCount": as.Configured,
-			"serverSideCount": as.ServersideApplied,
-			"failedCount":     as.Failed,
-		}); err != nil {
+		err := jf.printEvent("summary", map[string]interface{}{
+			"action":     event.ApplyAction.String(),
+			"count":      as.Sum(),
+			"successful": as.Successful,
+			"skipped":    as.Skipped,
+			"failed":     as.Failed,
+		})
+		if err != nil {
 			return err
 		}
 	}
-
-	if age.Action == event.PruneAction && age.Type == event.Finished &&
-		list.IsLastActionGroup(age, ags) {
+	if s.PruneStats != (stats.PruneStats{}) {
 		ps := s.PruneStats
-		return jf.printEvent("prune", "completed", map[string]interface{}{
-			"pruned":  ps.Pruned,
-			"skipped": ps.Skipped,
-			"failed":  ps.Failed,
+		err := jf.printEvent("summary", map[string]interface{}{
+			"action":     event.PruneAction.String(),
+			"count":      ps.Sum(),
+			"successful": ps.Successful,
+			"skipped":    ps.Skipped,
+			"failed":     ps.Failed,
 		})
+		if err != nil {
+			return err
+		}
 	}
-
-	if age.Action == event.DeleteAction && age.Type == event.Finished &&
-		list.IsLastActionGroup(age, ags) {
+	if s.DeleteStats != (stats.DeleteStats{}) {
 		ds := s.DeleteStats
-		return jf.printEvent("delete", "completed", map[string]interface{}{
-			"deleted": ds.Deleted,
-			"skipped": ds.Skipped,
-			"failed":  ds.Failed,
+		err := jf.printEvent("summary", map[string]interface{}{
+			"action":     event.DeleteAction.String(),
+			"count":      ds.Sum(),
+			"successful": ds.Successful,
+			"skipped":    ds.Skipped,
+			"failed":     ds.Failed,
 		})
+		if err != nil {
+			return err
+		}
 	}
-
-	if age.Action == event.WaitAction && age.Type == event.Finished &&
-		list.IsLastActionGroup(age, ags) {
+	if s.WaitStats != (stats.WaitStats{}) {
 		ws := s.WaitStats
-		return jf.printEvent("wait", "completed", map[string]interface{}{
-			"reconciled": ws.Reconciled,
+		err := jf.printEvent("summary", map[string]interface{}{
+			"action":     event.WaitAction.String(),
+			"count":      ws.Sum(),
+			"successful": ws.Successful,
 			"skipped":    ws.Skipped,
-			"timeout":    ws.Timeout,
 			"failed":     ws.Failed,
+			"timeout":    ws.Timeout,
 		})
+		if err != nil {
+			return err
+		}
 	}
-
 	return nil
 }
 
@@ -174,11 +220,10 @@ func (jf *formatter) baseResourceEvent(identifier object.ObjMetadata) map[string
 	}
 }
 
-func (jf *formatter) printEvent(t, eventType string, content map[string]interface{}) error {
+func (jf *formatter) printEvent(t string, content map[string]interface{}) error {
 	m := make(map[string]interface{})
-	m["timestamp"] = time.Now().UTC().Format(time.RFC3339)
+	m["timestamp"] = jf.now().UTC().Format(time.RFC3339)
 	m["type"] = t
-	m["eventType"] = eventType
 	for key, val := range content {
 		m[key] = val
 	}

@@ -58,17 +58,51 @@ func PrintResultErrorTest(t *testing.T, f PrinterFactoryFunc) {
 					},
 				},
 				{
+					Type: event.ActionGroupType,
+					ActionGroupEvent: event.ActionGroupEvent{
+						GroupName: "apply-1",
+						Action:    event.ApplyAction,
+						Status:    event.Started,
+					},
+				},
+				{
 					Type: event.ApplyType,
 					ApplyEvent: event.ApplyEvent{
-						Operation:  event.Created,
+						GroupName:  "apply-1",
+						Status:     event.ApplySuccessful,
 						Identifier: deploymentIdentifier,
+					},
+				},
+				{
+					Type: event.ActionGroupType,
+					ActionGroupEvent: event.ActionGroupEvent{
+						GroupName: "apply-1",
+						Action:    event.ApplyAction,
+						Status:    event.Finished,
+					},
+				},
+				{
+					Type: event.ActionGroupType,
+					ActionGroupEvent: event.ActionGroupEvent{
+						GroupName: "wait-1",
+						Action:    event.WaitAction,
+						Status:    event.Started,
 					},
 				},
 				{
 					Type: event.WaitType,
 					WaitEvent: event.WaitEvent{
-						Operation:  event.Reconciled,
+						GroupName:  "wait-1",
+						Status:     event.ReconcileSuccessful,
 						Identifier: deploymentIdentifier,
+					},
+				},
+				{
+					Type: event.ActionGroupType,
+					ActionGroupEvent: event.ActionGroupEvent{
+						GroupName: "wait-1",
+						Action:    event.WaitAction,
+						Status:    event.Finished,
 					},
 				},
 			},
@@ -98,24 +132,58 @@ func PrintResultErrorTest(t *testing.T, f PrinterFactoryFunc) {
 					},
 				},
 				{
+					Type: event.ActionGroupType,
+					ActionGroupEvent: event.ActionGroupEvent{
+						GroupName: "apply-1",
+						Action:    event.ApplyAction,
+						Status:    event.Started,
+					},
+				},
+				{
 					Type: event.ApplyType,
 					ApplyEvent: event.ApplyEvent{
-						Operation:  event.Created,
+						GroupName:  "apply-1",
+						Status:     event.ApplySuccessful,
 						Identifier: deploymentIdentifier,
+					},
+				},
+				{
+					Type: event.ActionGroupType,
+					ActionGroupEvent: event.ActionGroupEvent{
+						GroupName: "apply-1",
+						Action:    event.ApplyAction,
+						Status:    event.Finished,
+					},
+				},
+				{
+					Type: event.ActionGroupType,
+					ActionGroupEvent: event.ActionGroupEvent{
+						GroupName: "wait-1",
+						Action:    event.WaitAction,
+						Status:    event.Started,
 					},
 				},
 				{
 					Type: event.WaitType,
 					WaitEvent: event.WaitEvent{
-						Operation:  event.ReconcileFailed,
+						GroupName:  "wait-1",
+						Status:     event.ReconcileFailed,
 						Identifier: deploymentIdentifier,
+					},
+				},
+				{
+					Type: event.ActionGroupType,
+					ActionGroupEvent: event.ActionGroupEvent{
+						GroupName: "wait-1",
+						Action:    event.WaitAction,
+						Status:    event.Finished,
 					},
 				},
 			},
 			expectedErr: &printcommon.ResultError{
 				Stats: stats.Stats{
 					ApplyStats: stats.ApplyStats{
-						Created: 1,
+						Successful: 1,
 					},
 					WaitStats: stats.WaitStats{
 						Failed: 1,
@@ -147,18 +215,52 @@ func PrintResultErrorTest(t *testing.T, f PrinterFactoryFunc) {
 					},
 				},
 				{
+					Type: event.ActionGroupType,
+					ActionGroupEvent: event.ActionGroupEvent{
+						GroupName: "apply-1",
+						Action:    event.ApplyAction,
+						Status:    event.Started,
+					},
+				},
+				{
 					Type: event.ApplyType,
 					ApplyEvent: event.ApplyEvent{
-						Operation:  event.ApplyUnspecified,
+						GroupName:  "apply-1",
+						Status:     event.ApplyFailed,
 						Identifier: deploymentIdentifier,
 						Error:      fmt.Errorf("apply failed"),
 					},
 				},
 				{
+					Type: event.ActionGroupType,
+					ActionGroupEvent: event.ActionGroupEvent{
+						GroupName: "apply-1",
+						Action:    event.ApplyAction,
+						Status:    event.Finished,
+					},
+				},
+				{
+					Type: event.ActionGroupType,
+					ActionGroupEvent: event.ActionGroupEvent{
+						GroupName: "wait-1",
+						Action:    event.WaitAction,
+						Status:    event.Started,
+					},
+				},
+				{
 					Type: event.WaitType,
 					WaitEvent: event.WaitEvent{
-						Operation:  event.ReconcileSkipped,
+						GroupName:  "wait-1",
+						Status:     event.ReconcileSkipped,
 						Identifier: deploymentIdentifier,
+					},
+				},
+				{
+					Type: event.ActionGroupType,
+					ActionGroupEvent: event.ActionGroupEvent{
+						GroupName: "wait-1",
+						Action:    event.WaitAction,
+						Status:    event.Finished,
 					},
 				},
 			},

@@ -7,69 +7,91 @@
 //
 // Every event will contain the following properties:
 //  * timestamp: RFC3339-formatted timestamp describing when the event happened.
-//  * type: Describes the type of the operation which the event is related to. Values
-//    can be apply, status, prune, delete, or error.
-//  * eventType: Describes the type of the event. The set of possible values depends on the
-//    the value of the type field.
+//  * type: Describes the type of the operation which the event is related to.
+//    Type values include:
+//    * validation - ValidationEvent
+//    * error - ErrorEvent
+//    * group - ActionGroupEvent
+//    * apply - ApplyEvent
+//    * prune - PruneEvent
+//    * delete - DeleteEvent
+//    * wait - WaitEvent
+//    * status - StatusEvent
+//    * summary - aggregate stats collected by the printer
 //
-// All the different types have a similar structure, with the exception of the
-// error type. There is one event type pertaining to a specific resource, it being that
-// it is applied, pruned or its status was updated, and there is a separate event type
-// when all resources have been applied, deleted and so on. For any event that
-// pertains to a particular resource, the fields group, kind, name and namespace
-// will always be present.
+// Validation events correspond to zero or more objects. For these events, the
+// objects field includes a list of object identifiers. These generally fire
+// first before most other events.
 //
-// Events of type apply can have two different values for eventType, each which comes
-// with a specific set of fields:
-//  * resourceApplied: A resource has been applied to the cluster.
-//    * fields identifying the resource.
-//    * operation: The operation that was performed on the resource. Must be one of
-//      created, configured, unchanged and serversideApplied.
-//  * completed: All resources have been applied.
-//    * count: Total number of resources applied
-//    * createdCount: Number of resources created.
-//    * configuredCount: Number of resources configured.
-//    * unchangedCount: Number of resources unchanged.
-//    * serversideAppliedCount: Number of resources applied serverside.
+// Validation events have the following fields:
+// * objects (array of objects) - a list of object identifiers
+//   * group (string, optional) - The object's API group.
+//   * kind (string) - The object's kind.
+//   * name (string) - The object's name.
+//   * namespace (string, optional) - The object's namespace.
+// * timestamp (string) - ISO-8601 format
+// * type (string) - "validation"
+// * error (string) - a fatal error message specific to these objects
 //
-// Events of type status is a notification when either the status of resource
-// has changed, or when a set of resources has reached their desired status. Events
-// of type status can have three different values for eventType:
-//  * resourceStatus: The status has changed for a resource.
-//    * fields identifying the resource.
-//    * status: The new status for the resource.
-//    * message: Text that provides more information about the resource status.
-//  * completed: All resources have reached the desired status.
-//  * error: An error occurred when trying to get the status for a resource.
-//    * fields identifying the resource.
-//    * error: The error message.
+// Error events corespond to a fatal error received outside of a specific task
+// or operation.
 //
-// Events of type prune can have two different values for eventType, each which comes
-// with a specific set of fields:
-//  * resourcePruned: A resource has been pruned or was intended to be pruned but has been
-//    skipped due to the presence of a lifecycle directive.
-//    * fields identifying the resource.
-//    * operation: The operation that was performed on the resource. Must be one
-//      of pruned or skipped.
-//  * completed: All resources have been pruned or skipped.
-//    * count: Total number of resources pruned or skipped.
-//    * prunedCount: Number of resources pruned.
-//    * skippedCount: Number of resources skipped.
+// Error events have the following fields:
+// * timestamp (string) - ISO-8601 format
+// * type (string) - "error"
+// * error (string)  - a fatal error message
 //
-// Events of type delete can have two different values for eventType, each which comes
-// with a specific set of fields:
-//  * resourceDeleted: A resource has been deleted or was intended to be deleted but has been
-//    skipped due to the presence of a lifecycle directive.
-//    * fields identifying the resource.
-//    * operation: The operation that was performed on the resource. Must be one
-//      of deleted or skipped.
-//  * completed: All resources have been deleted or skipped.
-//    * count: Total number of resources deleted or skipped.
-//    * deletedCount: Number of resources deleted.
-//    * skippedCount: Number of resources skipped.
+// Group events correspond to a group of events of the same type: apply, prune,
+// delete, or wait.
 //
-// Events of type error means there is an unrecoverable error and further
-// processing will stop. Only a single value for eventType is possible:
-//  * error: A fatal error has happened.
-//    * error: The error message.
+// Group events have the following fields:
+// * action (string) - One of: "Apply", "Prune", "Delete", or "Wait".
+// * status (string) - One of: "Started" or "Finished"
+// * timestamp (string) - ISO-8601 format
+// * type (string) - "group"
+//
+// Operation events (apply, prune, delete, and wait) corespond to an operation
+// performed on a single object. For these events, the
+// group, kind, name, and namespace fields identify the object.
+//
+// Operation events have the following fields:
+// * group (string, optional) - The object's API group.
+// * kind (string) - The object's kind.
+// * name (string) - The object's name.
+// * namespace (string, optional) - The object's namespace.
+// * status (string) - One of: "Pending", "Successful", "Skipped", "Failed", or
+//                     "Timeout".
+// * timestamp (string) - ISO-8601 format
+// * type (string) - "apply", "prune", "delete", or "wait"
+// * error (string, optional) - A non-fatal error message specific to this object
+//
+// Status types are asynchronous events that correspond to status updates for
+// a specific object.
+//
+// Status events have the following fields:
+// * group (string, optional) - The object's API group.
+// * kind (string) - The object's kind.
+// * name (string) - The object's name.
+// * namespace (string, optional) - The object's namespace.
+// * status (string) - One of: "InProgress", "Failed", "Current", "Terminating",
+//                     "NotFound", or "Unknown".
+// * message (string) - Human readable description of the status.
+// * timestamp (string) - ISO-8601 format
+// * type (string) - "status"
+//
+// Summary types are a meta-event sent by the printer to summarize some stats
+// that have been collected from other events. For these events, the action
+// field corresponds to the event type being summarized: Apply, Prune, Delete,
+// and Wait.
+//
+// Summary events have the following fields:
+// * action (string) - One of: "Apply", "Prune", "Delete", or "Wait".
+// * count (number) - Total number of objects attempted for this action
+// * successful (number) - Number of objects for which the action was successful.
+// * skipped (number) - Number of objects for which the action was skipped.
+// * failed (number) - Number of objects for which the action failed.
+// * timeout (number, optional) - Number of objects for which the action timed out.
+// * timestamp (string) - ISO-8601 format
+// * type (string) - "summary"
+//
 package json

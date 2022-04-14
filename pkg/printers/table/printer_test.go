@@ -14,11 +14,6 @@ import (
 	printertesting "sigs.k8s.io/cli-utils/pkg/printers/testutil"
 )
 
-var (
-	createdOpResult = event.Created
-	prunedOpResult  = event.Pruned
-)
-
 func TestActionColumnDef(t *testing.T) {
 	testCases := map[string]struct {
 		resource       table.Resource
@@ -33,31 +28,31 @@ func TestActionColumnDef(t *testing.T) {
 		"neither applied nor pruned": {
 			resource:       &resourceInfo{},
 			columnWidth:    15,
-			expectedOutput: "",
+			expectedOutput: "Pending",
 		},
 		"applied": {
 			resource: &resourceInfo{
 				ResourceAction: event.ApplyAction,
-				ApplyOpResult:  createdOpResult,
+				ApplyStatus:    event.ApplySuccessful,
 			},
 			columnWidth:    15,
-			expectedOutput: "Created",
+			expectedOutput: "Successful",
 		},
 		"pruned": {
 			resource: &resourceInfo{
 				ResourceAction: event.PruneAction,
-				PruneOpResult:  prunedOpResult,
+				PruneStatus:    event.PruneSuccessful,
 			},
 			columnWidth:    15,
-			expectedOutput: "Pruned",
+			expectedOutput: "Successful",
 		},
 		"trimmed output": {
 			resource: &resourceInfo{
 				ResourceAction: event.ApplyAction,
-				ApplyOpResult:  createdOpResult,
+				ApplyStatus:    event.ApplySuccessful,
 			},
 			columnWidth:    5,
-			expectedOutput: "Creat",
+			expectedOutput: "Succe",
 		},
 	}
 

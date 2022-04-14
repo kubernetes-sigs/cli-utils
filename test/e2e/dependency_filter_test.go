@@ -87,7 +87,7 @@ func dependencyFilterTest(ctx context.Context, c client.Client, invConfig invcon
 			EventType: event.ApplyType,
 			ApplyEvent: &testutil.ExpApplyEvent{
 				GroupName:  "apply-0",
-				Operation:  event.Created,
+				Status:     event.ApplySuccessful,
 				Identifier: object.UnstructuredToObjMetadata(pod2Obj),
 				Error:      nil,
 			},
@@ -115,7 +115,7 @@ func dependencyFilterTest(ctx context.Context, c client.Client, invConfig invcon
 			EventType: event.WaitType,
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-0",
-				Operation:  event.ReconcilePending,
+				Status:     event.ReconcilePending,
 				Identifier: object.UnstructuredToObjMetadata(pod2Obj),
 			},
 		},
@@ -124,7 +124,7 @@ func dependencyFilterTest(ctx context.Context, c client.Client, invConfig invcon
 			EventType: event.WaitType,
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-0",
-				Operation:  event.Reconciled,
+				Status:     event.ReconcileSuccessful,
 				Identifier: object.UnstructuredToObjMetadata(pod2Obj),
 			},
 		},
@@ -151,7 +151,7 @@ func dependencyFilterTest(ctx context.Context, c client.Client, invConfig invcon
 			EventType: event.ApplyType,
 			ApplyEvent: &testutil.ExpApplyEvent{
 				GroupName:  "apply-1",
-				Operation:  event.Created,
+				Status:     event.ApplySuccessful,
 				Identifier: object.UnstructuredToObjMetadata(pod1Obj),
 				Error:      nil,
 			},
@@ -179,7 +179,7 @@ func dependencyFilterTest(ctx context.Context, c client.Client, invConfig invcon
 			EventType: event.WaitType,
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-1",
-				Operation:  event.ReconcilePending,
+				Status:     event.ReconcilePending,
 				Identifier: object.UnstructuredToObjMetadata(pod1Obj),
 			},
 		},
@@ -188,7 +188,7 @@ func dependencyFilterTest(ctx context.Context, c client.Client, invConfig invcon
 			EventType: event.WaitType,
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-1",
-				Operation:  event.Reconciled,
+				Status:     event.ReconcileSuccessful,
 				Identifier: object.UnstructuredToObjMetadata(pod1Obj),
 			},
 		},
@@ -284,7 +284,7 @@ func dependencyFilterTest(ctx context.Context, c client.Client, invConfig invcon
 			EventType: event.ApplyType,
 			ApplyEvent: &testutil.ExpApplyEvent{
 				GroupName:  "apply-0",
-				Operation:  event.Unchanged,
+				Status:     event.ApplySkipped,
 				Identifier: object.UnstructuredToObjMetadata(pod1Obj),
 				Error: testutil.EqualError(&filter.DependencyActuationMismatchError{
 					Object:           object.UnstructuredToObjMetadata(pod1Obj),
@@ -318,7 +318,7 @@ func dependencyFilterTest(ctx context.Context, c client.Client, invConfig invcon
 			EventType: event.WaitType,
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-0",
-				Operation:  event.ReconcileSkipped,
+				Status:     event.ReconcileSkipped,
 				Identifier: object.UnstructuredToObjMetadata(pod1Obj),
 			},
 		},
@@ -345,7 +345,7 @@ func dependencyFilterTest(ctx context.Context, c client.Client, invConfig invcon
 			EventType: event.PruneType,
 			PruneEvent: &testutil.ExpPruneEvent{
 				GroupName:  "prune-0",
-				Operation:  event.PruneSkipped,
+				Status:     event.PruneSkipped,
 				Identifier: object.UnstructuredToObjMetadata(pod2Obj),
 				Error: testutil.EqualError(&filter.DependencyActuationMismatchError{
 					Object:           object.UnstructuredToObjMetadata(pod2Obj),
@@ -379,7 +379,7 @@ func dependencyFilterTest(ctx context.Context, c client.Client, invConfig invcon
 			EventType: event.WaitType,
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-1",
-				Operation:  event.ReconcileSkipped,
+				Status:     event.ReconcileSkipped,
 				Identifier: object.UnstructuredToObjMetadata(pod2Obj),
 			},
 		},

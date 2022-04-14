@@ -114,19 +114,19 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 			// Check filters to see if we're prevented from applying.
 			var filterErr error
 			for _, applyFilter := range a.Filters {
-				klog.V(6).Infof("evaluating apply filter %s: %s", applyFilter.Name(), id)
+				klog.V(6).Infof("apply filter evaluating (filter: %s, object: %s)", applyFilter.Name(), id)
 				filterErr = applyFilter.Filter(obj)
 				if filterErr != nil {
 					var fatalErr *filter.FatalError
 					if errors.As(filterErr, &fatalErr) {
 						if klog.V(5).Enabled() {
-							klog.Errorf("error filtering (object: %q, filter: %q): %v", id, applyFilter.Name(), fatalErr.Err)
+							klog.Errorf("apply filter errored (filter: %s, object: %s): %v", applyFilter.Name(), id, fatalErr.Err)
 						}
 						taskContext.SendEvent(a.createApplyFailedEvent(id, err))
 						taskContext.InventoryManager().AddFailedApply(id)
 						break
 					}
-					klog.V(4).Infof("apply filtered (object: %q, filter: %q): %v", id, applyFilter.Name(), filterErr)
+					klog.V(4).Infof("apply filtered (filter: %s, object: %s): %v", applyFilter.Name(), id, filterErr)
 					taskContext.SendEvent(a.createApplySkippedEvent(id, obj, filterErr))
 					taskContext.InventoryManager().AddSkippedApply(id)
 					break
@@ -262,7 +262,7 @@ func (a *ApplyTask) createApplySkippedEvent(id object.ObjMetadata, resource *uns
 		ApplyEvent: event.ApplyEvent{
 			GroupName:  a.Name(),
 			Identifier: id,
-			Operation:  event.Unchanged,
+			Status:     event.ApplySkipped,
 			Resource:   resource,
 			Error:      err,
 		},

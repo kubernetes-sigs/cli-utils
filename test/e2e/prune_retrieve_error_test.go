@@ -75,7 +75,7 @@ func pruneRetrieveErrorTest(ctx context.Context, c client.Client, invConfig invc
 			EventType: event.ApplyType,
 			ApplyEvent: &testutil.ExpApplyEvent{
 				GroupName:  "apply-0",
-				Operation:  event.Created,
+				Status:     event.ApplySuccessful,
 				Identifier: object.UnstructuredToObjMetadata(pod1Obj),
 				Error:      nil,
 			},
@@ -103,7 +103,7 @@ func pruneRetrieveErrorTest(ctx context.Context, c client.Client, invConfig invc
 			EventType: event.WaitType,
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-0",
-				Operation:  event.ReconcilePending,
+				Status:     event.ReconcilePending,
 				Identifier: object.UnstructuredToObjMetadata(pod1Obj),
 			},
 		},
@@ -112,7 +112,7 @@ func pruneRetrieveErrorTest(ctx context.Context, c client.Client, invConfig invc
 			EventType: event.WaitType,
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-0",
-				Operation:  event.Reconciled,
+				Status:     event.ReconcileSuccessful,
 				Identifier: object.UnstructuredToObjMetadata(pod1Obj),
 			},
 		},
@@ -209,7 +209,7 @@ func pruneRetrieveErrorTest(ctx context.Context, c client.Client, invConfig invc
 			EventType: event.ApplyType,
 			ApplyEvent: &testutil.ExpApplyEvent{
 				GroupName:  "apply-0",
-				Operation:  event.Created,
+				Status:     event.ApplySuccessful,
 				Identifier: object.UnstructuredToObjMetadata(pod2Obj),
 				Error:      nil,
 			},
@@ -237,7 +237,7 @@ func pruneRetrieveErrorTest(ctx context.Context, c client.Client, invConfig invc
 			EventType: event.WaitType,
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-0",
-				Operation:  event.ReconcilePending,
+				Status:     event.ReconcilePending,
 				Identifier: object.UnstructuredToObjMetadata(pod2Obj),
 			},
 		},
@@ -246,7 +246,7 @@ func pruneRetrieveErrorTest(ctx context.Context, c client.Client, invConfig invc
 			EventType: event.WaitType,
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-0",
-				Operation:  event.Reconciled,
+				Status:     event.ReconcileSuccessful,
 				Identifier: object.UnstructuredToObjMetadata(pod2Obj),
 			},
 		},
@@ -321,7 +321,7 @@ func pruneRetrieveErrorTest(ctx context.Context, c client.Client, invConfig invc
 			EventType: event.DeleteType,
 			DeleteEvent: &testutil.ExpDeleteEvent{
 				GroupName:  "prune-0",
-				Operation:  event.Deleted,
+				Status:     event.DeleteSuccessful,
 				Identifier: object.UnstructuredToObjMetadata(pod2Obj),
 				Error:      nil,
 			},
@@ -349,7 +349,7 @@ func pruneRetrieveErrorTest(ctx context.Context, c client.Client, invConfig invc
 			EventType: event.WaitType,
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-0",
-				Operation:  event.ReconcilePending,
+				Status:     event.ReconcilePending,
 				Identifier: object.UnstructuredToObjMetadata(pod2Obj),
 			},
 		},
@@ -358,7 +358,7 @@ func pruneRetrieveErrorTest(ctx context.Context, c client.Client, invConfig invc
 			EventType: event.WaitType,
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-0",
-				Operation:  event.Reconciled,
+				Status:     event.ReconcileSuccessful,
 				Identifier: object.UnstructuredToObjMetadata(pod2Obj),
 			},
 		},

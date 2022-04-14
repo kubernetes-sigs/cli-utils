@@ -46,16 +46,16 @@ func TestEventFactory(t *testing.T) {
 			var actualObj *unstructured.Unstructured
 			var err error
 			if tc.expectedType == event.PruneType {
-				if event.Pruned != actualEvent.PruneEvent.Operation {
-					t.Errorf("success event expected operation (Pruned), got (%s)",
-						actualEvent.PruneEvent.Operation)
+				if event.PruneSuccessful != actualEvent.PruneEvent.Status {
+					t.Errorf("success event expected status (PruneSuccessful), got (%s)",
+						actualEvent.PruneEvent.Status)
 				}
 				actualObj = actualEvent.PruneEvent.Object
 				err = actualEvent.PruneEvent.Error
 			} else {
-				if event.Deleted != actualEvent.DeleteEvent.Operation {
-					t.Errorf("success event expected operation (Deleted), got (%s)",
-						actualEvent.DeleteEvent.Operation)
+				if event.DeleteSuccessful != actualEvent.DeleteEvent.Status {
+					t.Errorf("success event expected status (DeleteSuccessful), got (%s)",
+						actualEvent.DeleteEvent.Status)
 				}
 				actualObj = actualEvent.DeleteEvent.Object
 				err = actualEvent.DeleteEvent.Error
@@ -73,16 +73,16 @@ func TestEventFactory(t *testing.T) {
 					tc.expectedType, actualEvent.Type)
 			}
 			if tc.expectedType == event.PruneType {
-				if event.PruneSkipped != actualEvent.PruneEvent.Operation {
-					t.Errorf("skipped event expected operation (PruneSkipped), got (%s)",
-						actualEvent.PruneEvent.Operation)
+				if event.PruneSkipped != actualEvent.PruneEvent.Status {
+					t.Errorf("skipped event expected status (PruneSkipped), got (%s)",
+						actualEvent.PruneEvent.Status)
 				}
 				actualObj = actualEvent.PruneEvent.Object
 				err = actualEvent.PruneEvent.Error
 			} else {
-				if event.DeleteSkipped != actualEvent.DeleteEvent.Operation {
-					t.Errorf("skipped event expected operation (DeleteSkipped), got (%s)",
-						actualEvent.DeleteEvent.Operation)
+				if event.DeleteSkipped != actualEvent.DeleteEvent.Status {
+					t.Errorf("skipped event expected status (DeleteSkipped), got (%s)",
+						actualEvent.DeleteEvent.Status)
 				}
 				actualObj = actualEvent.DeleteEvent.Object
 				err = actualEvent.DeleteEvent.Error

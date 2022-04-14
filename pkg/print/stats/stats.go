@@ -10,7 +10,8 @@ import (
 )
 
 // Stats captures the summarized numbers from apply/prune/delete and
-// reconciliation of resources.
+// reconciliation of resources. Each item in a stats list represents the stats
+// from all the events in a single action group.
 type Stats struct {
 	ApplyStats  ApplyStats
 	PruneStats  PruneStats
@@ -32,52 +33,32 @@ func (s *Stats) FailedReconciliationSum() int {
 func (s *Stats) Handle(e event.Event) {
 	switch e.Type {
 	case event.ApplyType:
-		if e.ApplyEvent.Error != nil &&
-			e.ApplyEvent.Operation != event.Unchanged {
-			s.ApplyStats.IncFailed()
-			return
-		}
-		s.ApplyStats.Inc(e.ApplyEvent.Operation)
+		s.ApplyStats.Inc(e.ApplyEvent.Status)
 	case event.PruneType:
-		if e.PruneEvent.Error != nil &&
-			e.PruneEvent.Operation != event.PruneSkipped {
-			s.PruneStats.IncFailed()
-			return
-		}
-		s.PruneStats.Inc(e.PruneEvent.Operation)
+		s.PruneStats.Inc(e.PruneEvent.Status)
 	case event.DeleteType:
-		if e.DeleteEvent.Error != nil &&
-			e.DeleteEvent.Operation != event.DeleteSkipped {
-			s.DeleteStats.IncFailed()
-			return
-		}
-		s.DeleteStats.Inc(e.DeleteEvent.Operation)
+		s.DeleteStats.Inc(e.DeleteEvent.Status)
 	case event.WaitType:
-		s.WaitStats.Inc(e.WaitEvent.Operation)
+		s.WaitStats.Inc(e.WaitEvent.Status)
 	}
 }
 
 type ApplyStats struct {
-	ServersideApplied int
-	Created           int
-	Unchanged         int
-	Configured        int
-	Failed            int
+	Successful int
+	Skipped    int
+	Failed     int
 }
 
-func (a *ApplyStats) Inc(op event.ApplyEventOperation) {
+func (a *ApplyStats) Inc(op event.ApplyEventStatus) {
 	switch op {
-	case event.ApplyUnspecified:
-	case event.ServersideApplied:
-		a.ServersideApplied++
-	case event.Created:
-		a.Created++
-	case event.Unchanged:
-		a.Unchanged++
-	case event.Configured:
-		a.Configured++
+	case event.ApplySuccessful:
+		a.Successful++
+	case event.ApplySkipped:
+		a.Skipped++
+	case event.ApplyFailed:
+		a.Failed++
 	default:
-		panic(fmt.Errorf("unknown apply operation %s", op.String()))
+		panic(fmt.Errorf("invalid apply status %s", op.String()))
 	}
 }
 
@@ -86,22 +67,25 @@ func (a *ApplyStats) IncFailed() {
 }
 
 func (a *ApplyStats) Sum() int {
-	return a.ServersideApplied + a.Configured + a.Unchanged + a.Created + a.Failed
+	return a.Successful + a.Skipped + a.Failed
 }
 
 type PruneStats struct {
-	Pruned  int
-	Skipped int
-	Failed  int
+	Successful int
+	Skipped    int
+	Failed     int
 }
 
-func (p *PruneStats) Inc(op event.PruneEventOperation) {
+func (p *PruneStats) Inc(op event.PruneEventStatus) {
 	switch op {
-	case event.PruneUnspecified:
-	case event.Pruned:
-		p.Pruned++
+	case event.PruneSuccessful:
+		p.Successful++
 	case event.PruneSkipped:
 		p.Skipped++
+	case event.PruneFailed:
+		p.Failed++
+	default:
+		panic(fmt.Errorf("invalid prune status %s", op.String()))
 	}
 }
 
@@ -109,19 +93,26 @@ func (p *PruneStats) IncFailed() {
 	p.Failed++
 }
 
-type DeleteStats struct {
-	Deleted int
-	Skipped int
-	Failed  int
+func (p *PruneStats) Sum() int {
+	return p.Successful + p.Skipped + p.Failed
 }
 
-func (d *DeleteStats) Inc(op event.DeleteEventOperation) {
+type DeleteStats struct {
+	Successful int
+	Skipped    int
+	Failed     int
+}
+
+func (d *DeleteStats) Inc(op event.DeleteEventStatus) {
 	switch op {
-	case event.DeleteUnspecified:
-	case event.Deleted:
-		d.Deleted++
+	case event.DeleteSuccessful:
+		d.Successful++
 	case event.DeleteSkipped:
 		d.Skipped++
+	case event.DeleteFailed:
+		d.Failed++
+	default:
+		panic(fmt.Errorf("invalid delete status %s", op.String()))
 	}
 }
 
@@ -129,22 +120,34 @@ func (d *DeleteStats) IncFailed() {
 	d.Failed++
 }
 
+func (d *DeleteStats) Sum() int {
+	return d.Successful + d.Skipped + d.Failed
+}
+
 type WaitStats struct {
-	Reconciled int
+	Successful int
 	Timeout    int
 	Failed     int
 	Skipped    int
 }
 
-func (w *WaitStats) Inc(op event.WaitEventOperation) {
-	switch op {
-	case event.Reconciled:
-		w.Reconciled++
+func (w *WaitStats) Inc(status event.WaitEventStatus) {
+	switch status {
+	case event.ReconcilePending:
+		// ignore - should be replaced by one of the others before the WaitTask exits
+	case event.ReconcileSuccessful:
+		w.Successful++
 	case event.ReconcileSkipped:
 		w.Skipped++
 	case event.ReconcileTimeout:
 		w.Timeout++
 	case event.ReconcileFailed:
 		w.Failed++
+	default:
+		panic(fmt.Errorf("invalid wait status %s", status.String()))
 	}
+}
+
+func (w *WaitStats) Sum() int {
+	return w.Successful + w.Skipped + w.Failed + w.Timeout
 }

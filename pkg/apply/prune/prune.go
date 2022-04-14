@@ -111,19 +111,19 @@ func (p *Pruner) Prune(
 		// Check filters to see if we're prevented from pruning/deleting object.
 		var filterErr error
 		for _, pruneFilter := range pruneFilters {
-			klog.V(6).Infof("evaluating prune filter %s: %s", pruneFilter.Name(), id)
+			klog.V(6).Infof("prune filter evaluating (filter: %s, object: %s)", pruneFilter.Name(), id)
 			filterErr = pruneFilter.Filter(obj)
 			if filterErr != nil {
 				var fatalErr *filter.FatalError
 				if errors.As(filterErr, &fatalErr) {
 					if klog.V(5).Enabled() {
-						klog.Errorf("error filtering (object: %q, filter: %q): %v", id, pruneFilter.Name(), fatalErr.Err)
+						klog.Errorf("prune filter errored (filter: %s, object: %s): %v", pruneFilter.Name(), id, fatalErr.Err)
 					}
 					taskContext.SendEvent(eventFactory.CreateFailedEvent(id, fatalErr.Err))
 					taskContext.InventoryManager().AddFailedDelete(id)
 					break
 				}
-				klog.V(4).Infof("prune filtered (object: %q, filter: %q): %v", id, pruneFilter.Name(), filterErr)
+				klog.V(4).Infof("prune filtered (filter: %s, object: %s): %v", pruneFilter.Name(), id, filterErr)
 
 				// Remove the inventory annotation if deletion was prevented.
 				// This abandons the object so it won't be pruned by future applier runs.

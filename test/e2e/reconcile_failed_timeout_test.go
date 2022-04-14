@@ -65,7 +65,7 @@ func reconciliationTimeout(ctx context.Context, invConfig invconfig.InventoryCon
 	Expect(received).To(testutil.Equal(expEvents))
 }
 
-func expectedPodEvents(pod *unstructured.Unstructured, waitOperation event.WaitEventOperation) []testutil.ExpEvent {
+func expectedPodEvents(pod *unstructured.Unstructured, waitStatus event.WaitEventStatus) []testutil.ExpEvent {
 	return []testutil.ExpEvent{
 		{
 			// InitTask
@@ -104,7 +104,7 @@ func expectedPodEvents(pod *unstructured.Unstructured, waitOperation event.WaitE
 			EventType: event.ApplyType,
 			ApplyEvent: &testutil.ExpApplyEvent{
 				GroupName:  "apply-0",
-				Operation:  event.Created,
+				Status:     event.ApplySuccessful,
 				Identifier: object.UnstructuredToObjMetadata(pod),
 				Error:      nil,
 			},
@@ -132,7 +132,7 @@ func expectedPodEvents(pod *unstructured.Unstructured, waitOperation event.WaitE
 			EventType: event.WaitType,
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-0",
-				Operation:  event.ReconcilePending,
+				Status:     event.ReconcilePending,
 				Identifier: object.UnstructuredToObjMetadata(pod),
 			},
 		},
@@ -141,7 +141,7 @@ func expectedPodEvents(pod *unstructured.Unstructured, waitOperation event.WaitE
 			EventType: event.WaitType,
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-0",
-				Operation:  waitOperation,
+				Status:     waitStatus,
 				Identifier: object.UnstructuredToObjMetadata(pod),
 			},
 		},

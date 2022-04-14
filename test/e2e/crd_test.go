@@ -79,7 +79,7 @@ func crdTest(ctx context.Context, _ client.Client, invConfig invconfig.Inventory
 			EventType: event.ApplyType,
 			ApplyEvent: &testutil.ExpApplyEvent{
 				GroupName:  "apply-0",
-				Operation:  event.Created,
+				Status:     event.ApplySuccessful,
 				Identifier: object.UnstructuredToObjMetadata(crdObj),
 				Error:      nil,
 			},
@@ -107,7 +107,7 @@ func crdTest(ctx context.Context, _ client.Client, invConfig invconfig.Inventory
 			EventType: event.WaitType,
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-0",
-				Operation:  event.ReconcilePending,
+				Status:     event.ReconcilePending,
 				Identifier: object.UnstructuredToObjMetadata(crdObj),
 			},
 		},
@@ -116,7 +116,7 @@ func crdTest(ctx context.Context, _ client.Client, invConfig invconfig.Inventory
 			EventType: event.WaitType,
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-0",
-				Operation:  event.Reconciled,
+				Status:     event.ReconcileSuccessful,
 				Identifier: object.UnstructuredToObjMetadata(crdObj),
 			},
 		},
@@ -143,7 +143,7 @@ func crdTest(ctx context.Context, _ client.Client, invConfig invconfig.Inventory
 			EventType: event.ApplyType,
 			ApplyEvent: &testutil.ExpApplyEvent{
 				GroupName:  "apply-1",
-				Operation:  event.Created,
+				Status:     event.ApplySuccessful,
 				Identifier: object.UnstructuredToObjMetadata(crObj),
 				Error:      nil,
 			},
@@ -171,7 +171,7 @@ func crdTest(ctx context.Context, _ client.Client, invConfig invconfig.Inventory
 			EventType: event.WaitType,
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-1",
-				Operation:  event.ReconcilePending,
+				Status:     event.ReconcilePending,
 				Identifier: object.UnstructuredToObjMetadata(crObj),
 			},
 		},
@@ -180,7 +180,7 @@ func crdTest(ctx context.Context, _ client.Client, invConfig invconfig.Inventory
 			EventType: event.WaitType,
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-1",
-				Operation:  event.Reconciled,
+				Status:     event.ReconcileSuccessful,
 				Identifier: object.UnstructuredToObjMetadata(crObj),
 			},
 		},
@@ -239,7 +239,7 @@ func crdTest(ctx context.Context, _ client.Client, invConfig invconfig.Inventory
 			EventType: event.DeleteType,
 			DeleteEvent: &testutil.ExpDeleteEvent{
 				GroupName:  "prune-0",
-				Operation:  event.Deleted,
+				Status:     event.DeleteSuccessful,
 				Identifier: object.UnstructuredToObjMetadata(crObj),
 				Error:      nil,
 			},
@@ -267,7 +267,7 @@ func crdTest(ctx context.Context, _ client.Client, invConfig invconfig.Inventory
 			EventType: event.WaitType,
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-0",
-				Operation:  event.ReconcilePending,
+				Status:     event.ReconcilePending,
 				Identifier: object.UnstructuredToObjMetadata(crObj),
 			},
 		},
@@ -276,7 +276,7 @@ func crdTest(ctx context.Context, _ client.Client, invConfig invconfig.Inventory
 			EventType: event.WaitType,
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-0",
-				Operation:  event.Reconciled,
+				Status:     event.ReconcileSuccessful,
 				Identifier: object.UnstructuredToObjMetadata(crObj),
 			},
 		},
@@ -303,7 +303,7 @@ func crdTest(ctx context.Context, _ client.Client, invConfig invconfig.Inventory
 			EventType: event.DeleteType,
 			DeleteEvent: &testutil.ExpDeleteEvent{
 				GroupName:  "prune-1",
-				Operation:  event.Deleted,
+				Status:     event.DeleteSuccessful,
 				Identifier: object.UnstructuredToObjMetadata(crdObj),
 				Error:      nil,
 			},
@@ -331,7 +331,7 @@ func crdTest(ctx context.Context, _ client.Client, invConfig invconfig.Inventory
 			EventType: event.WaitType,
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-1",
-				Operation:  event.ReconcilePending,
+				Status:     event.ReconcilePending,
 				Identifier: object.UnstructuredToObjMetadata(crdObj),
 			},
 		},
@@ -340,7 +340,7 @@ func crdTest(ctx context.Context, _ client.Client, invConfig invconfig.Inventory
 			EventType: event.WaitType,
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-1",
-				Operation:  event.Reconciled,
+				Status:     event.ReconcileSuccessful,
 				Identifier: object.UnstructuredToObjMetadata(crdObj),
 			},
 		},

@@ -8,8 +8,10 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -22,6 +24,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/object/validation"
 	"sigs.k8s.io/cli-utils/pkg/print/list"
 	"sigs.k8s.io/cli-utils/pkg/print/stats"
+	"sigs.k8s.io/cli-utils/pkg/testutil"
 )
 
 func TestFormatter_FormatApplyEvent(t *testing.T) {
@@ -33,17 +36,16 @@ func TestFormatter_FormatApplyEvent(t *testing.T) {
 		"resource created without dryrun": {
 			previewStrategy: common.DryRunNone,
 			event: event.ApplyEvent{
-				Operation:  event.Created,
+				Status:     event.ApplySuccessful,
 				Identifier: createIdentifier("apps", "Deployment", "default", "my-dep"),
 			},
 			expected: []map[string]interface{}{
 				{
-					"eventType": "resourceApplied",
 					"group":     "apps",
 					"kind":      "Deployment",
 					"name":      "my-dep",
 					"namespace": "default",
-					"operation": "Created",
+					"status":    "Successful",
 					"timestamp": "",
 					"type":      "apply",
 				},
@@ -52,17 +54,16 @@ func TestFormatter_FormatApplyEvent(t *testing.T) {
 		"resource updated with client dryrun": {
 			previewStrategy: common.DryRunClient,
 			event: event.ApplyEvent{
-				Operation:  event.Configured,
+				Status:     event.ApplySuccessful,
 				Identifier: createIdentifier("apps", "Deployment", "", "my-dep"),
 			},
 			expected: []map[string]interface{}{
 				{
-					"eventType": "resourceApplied",
 					"group":     "apps",
 					"kind":      "Deployment",
 					"name":      "my-dep",
 					"namespace": "",
-					"operation": "Configured",
+					"status":    "Successful",
 					"timestamp": "",
 					"type":      "apply",
 				},
@@ -71,35 +72,35 @@ func TestFormatter_FormatApplyEvent(t *testing.T) {
 		"resource updated with server dryrun": {
 			previewStrategy: common.DryRunServer,
 			event: event.ApplyEvent{
-				Operation:  event.Configured,
+				Status:     event.ApplySuccessful,
 				Identifier: createIdentifier("batch", "CronJob", "foo", "my-cron"),
 			},
 			expected: []map[string]interface{}{
 				{
-					"eventType": "resourceApplied",
 					"group":     "batch",
 					"kind":      "CronJob",
 					"name":      "my-cron",
 					"namespace": "foo",
-					"operation": "Configured",
+					"status":    "Successful",
 					"timestamp": "",
 					"type":      "apply",
 				},
 			},
 		},
-		"resource apply error": {
+		"resource apply failed": {
 			previewStrategy: common.DryRunNone,
 			event: event.ApplyEvent{
+				Status:     event.ApplyFailed,
 				Identifier: createIdentifier("apps", "Deployment", "", "my-dep"),
 				Error:      errors.New("example error"),
 			},
 			expected: []map[string]interface{}{
 				{
-					"eventType": "resourceFailed",
 					"group":     "apps",
 					"kind":      "Deployment",
 					"name":      "my-dep",
 					"namespace": "",
+					"status":    "Failed",
 					"timestamp": "",
 					"type":      "apply",
 					"error":     "example error",
@@ -109,18 +110,17 @@ func TestFormatter_FormatApplyEvent(t *testing.T) {
 		"resource apply skip error": {
 			previewStrategy: common.DryRunNone,
 			event: event.ApplyEvent{
-				Operation:  event.Unchanged,
+				Status:     event.ApplySkipped,
 				Identifier: createIdentifier("apps", "Deployment", "", "my-dep"),
 				Error:      errors.New("example error"),
 			},
 			expected: []map[string]interface{}{
 				{
-					"eventType": "resourceApplied",
 					"group":     "apps",
 					"kind":      "Deployment",
 					"name":      "my-dep",
 					"namespace": "",
-					"operation": "Unchanged",
+					"status":    "Skipped",
 					"timestamp": "",
 					"type":      "apply",
 					"error":     "example error",
@@ -179,7 +179,6 @@ func TestFormatter_FormatStatusEvent(t *testing.T) {
 				},
 			},
 			expected: map[string]interface{}{
-				"eventType": "resourceStatus",
 				"group":     "apps",
 				"kind":      "Deployment",
 				"message":   "Resource is Current",
@@ -213,16 +212,15 @@ func TestFormatter_FormatPruneEvent(t *testing.T) {
 		"resource pruned without dryrun": {
 			previewStrategy: common.DryRunNone,
 			event: event.PruneEvent{
-				Operation:  event.Pruned,
+				Status:     event.PruneSuccessful,
 				Identifier: createIdentifier("apps", "Deployment", "default", "my-dep"),
 			},
 			expected: map[string]interface{}{
-				"eventType": "resourcePruned",
 				"group":     "apps",
 				"kind":      "Deployment",
 				"name":      "my-dep",
 				"namespace": "default",
-				"operation": "Pruned",
+				"status":    "Successful",
 				"timestamp": "",
 				"type":      "prune",
 			},
@@ -230,32 +228,32 @@ func TestFormatter_FormatPruneEvent(t *testing.T) {
 		"resource skipped with client dryrun": {
 			previewStrategy: common.DryRunClient,
 			event: event.PruneEvent{
-				Operation:  event.PruneSkipped,
+				Status:     event.PruneSkipped,
 				Identifier: createIdentifier("apps", "Deployment", "", "my-dep"),
 			},
 			expected: map[string]interface{}{
-				"eventType": "resourcePruned",
 				"group":     "apps",
 				"kind":      "Deployment",
 				"name":      "my-dep",
 				"namespace": "",
-				"operation": "PruneSkipped",
+				"status":    "Skipped",
 				"timestamp": "",
 				"type":      "prune",
 			},
 		},
-		"resource prune error": {
+		"resource prune failed": {
 			previewStrategy: common.DryRunNone,
 			event: event.PruneEvent{
+				Status:     event.PruneFailed,
 				Identifier: createIdentifier("apps", "Deployment", "", "my-dep"),
 				Error:      errors.New("example error"),
 			},
 			expected: map[string]interface{}{
-				"eventType": "resourceFailed",
 				"group":     "apps",
 				"kind":      "Deployment",
 				"name":      "my-dep",
 				"namespace": "",
+				"status":    "Failed",
 				"timestamp": "",
 				"type":      "prune",
 				"error":     "example error",
@@ -264,17 +262,16 @@ func TestFormatter_FormatPruneEvent(t *testing.T) {
 		"resource prune skip error": {
 			previewStrategy: common.DryRunNone,
 			event: event.PruneEvent{
-				Operation:  event.PruneSkipped,
+				Status:     event.PruneSkipped,
 				Identifier: createIdentifier("apps", "Deployment", "", "my-dep"),
 				Error:      errors.New("example error"),
 			},
 			expected: map[string]interface{}{
-				"eventType": "resourcePruned",
 				"group":     "apps",
 				"kind":      "Deployment",
 				"name":      "my-dep",
 				"namespace": "",
-				"operation": "PruneSkipped",
+				"status":    "Skipped",
 				"timestamp": "",
 				"type":      "prune",
 				"error":     "example error",
@@ -304,16 +301,15 @@ func TestFormatter_FormatDeleteEvent(t *testing.T) {
 		"resource deleted without no dryrun": {
 			previewStrategy: common.DryRunNone,
 			event: event.DeleteEvent{
-				Operation:  event.Deleted,
+				Status:     event.DeleteSuccessful,
 				Identifier: createIdentifier("apps", "Deployment", "default", "my-dep"),
 			},
 			expected: map[string]interface{}{
-				"eventType": "resourceDeleted",
 				"group":     "apps",
 				"kind":      "Deployment",
 				"name":      "my-dep",
 				"namespace": "default",
-				"operation": "Deleted",
+				"status":    "Successful",
 				"timestamp": "",
 				"type":      "delete",
 			},
@@ -321,32 +317,32 @@ func TestFormatter_FormatDeleteEvent(t *testing.T) {
 		"resource skipped with client dryrun": {
 			previewStrategy: common.DryRunClient,
 			event: event.DeleteEvent{
-				Operation:  event.DeleteSkipped,
+				Status:     event.DeleteSkipped,
 				Identifier: createIdentifier("apps", "Deployment", "", "my-dep"),
 			},
 			expected: map[string]interface{}{
-				"eventType": "resourceDeleted",
 				"group":     "apps",
 				"kind":      "Deployment",
 				"name":      "my-dep",
 				"namespace": "",
-				"operation": "DeleteSkipped",
+				"status":    "Skipped",
 				"timestamp": "",
 				"type":      "delete",
 			},
 		},
-		"resource delete error": {
+		"resource delete failed": {
 			previewStrategy: common.DryRunNone,
 			event: event.DeleteEvent{
+				Status:     event.DeleteFailed,
 				Identifier: createIdentifier("apps", "Deployment", "default", "my-dep"),
 				Error:      errors.New("example error"),
 			},
 			expected: map[string]interface{}{
-				"eventType": "resourceFailed",
 				"group":     "apps",
 				"kind":      "Deployment",
 				"name":      "my-dep",
 				"namespace": "default",
+				"status":    "Failed",
 				"timestamp": "",
 				"type":      "delete",
 				"error":     "example error",
@@ -355,17 +351,16 @@ func TestFormatter_FormatDeleteEvent(t *testing.T) {
 		"resource delete skip error": {
 			previewStrategy: common.DryRunNone,
 			event: event.DeleteEvent{
-				Operation:  event.DeleteSkipped,
+				Status:     event.DeleteSkipped,
 				Identifier: createIdentifier("apps", "Deployment", "default", "my-dep"),
 				Error:      errors.New("example error"),
 			},
 			expected: map[string]interface{}{
-				"eventType": "resourceDeleted",
 				"group":     "apps",
 				"kind":      "Deployment",
 				"name":      "my-dep",
 				"namespace": "default",
-				"operation": "DeleteSkipped",
+				"status":    "Skipped",
 				"timestamp": "",
 				"type":      "delete",
 				"error":     "example error",
@@ -396,16 +391,15 @@ func TestFormatter_FormatWaitEvent(t *testing.T) {
 			previewStrategy: common.DryRunNone,
 			event: event.WaitEvent{
 				GroupName:  "wait-1",
-				Operation:  event.Reconciled,
+				Status:     event.ReconcileSuccessful,
 				Identifier: createIdentifier("apps", "Deployment", "default", "my-dep"),
 			},
 			expected: map[string]interface{}{
-				"eventType": "resourceReconciled",
 				"group":     "apps",
 				"kind":      "Deployment",
 				"name":      "my-dep",
 				"namespace": "default",
-				"operation": "Reconciled",
+				"status":    "Successful",
 				"timestamp": "",
 				"type":      "wait",
 			},
@@ -414,16 +408,15 @@ func TestFormatter_FormatWaitEvent(t *testing.T) {
 			previewStrategy: common.DryRunClient,
 			event: event.WaitEvent{
 				GroupName:  "wait-1",
-				Operation:  event.Reconciled,
+				Status:     event.ReconcileSuccessful,
 				Identifier: createIdentifier("apps", "Deployment", "default", "my-dep"),
 			},
 			expected: map[string]interface{}{
-				"eventType": "resourceReconciled",
 				"group":     "apps",
 				"kind":      "Deployment",
 				"name":      "my-dep",
 				"namespace": "default",
-				"operation": "Reconciled",
+				"status":    "Successful",
 				"timestamp": "",
 				"type":      "wait",
 			},
@@ -432,16 +425,15 @@ func TestFormatter_FormatWaitEvent(t *testing.T) {
 			previewStrategy: common.DryRunServer,
 			event: event.WaitEvent{
 				GroupName:  "wait-1",
-				Operation:  event.Reconciled,
+				Status:     event.ReconcileSuccessful,
 				Identifier: createIdentifier("apps", "Deployment", "default", "my-dep"),
 			},
 			expected: map[string]interface{}{
-				"eventType": "resourceReconciled",
 				"group":     "apps",
 				"kind":      "Deployment",
 				"name":      "my-dep",
 				"namespace": "default",
-				"operation": "Reconciled",
+				"status":    "Successful",
 				"timestamp": "",
 				"type":      "wait",
 			},
@@ -450,16 +442,15 @@ func TestFormatter_FormatWaitEvent(t *testing.T) {
 			previewStrategy: common.DryRunServer,
 			event: event.WaitEvent{
 				GroupName:  "wait-1",
-				Operation:  event.ReconcilePending,
+				Status:     event.ReconcilePending,
 				Identifier: createIdentifier("apps", "Deployment", "default", "my-dep"),
 			},
 			expected: map[string]interface{}{
-				"eventType": "resourceReconciled",
 				"group":     "apps",
 				"kind":      "Deployment",
 				"name":      "my-dep",
 				"namespace": "default",
-				"operation": "Pending",
+				"status":    "Pending",
 				"timestamp": "",
 				"type":      "wait",
 			},
@@ -468,16 +459,15 @@ func TestFormatter_FormatWaitEvent(t *testing.T) {
 			previewStrategy: common.DryRunServer,
 			event: event.WaitEvent{
 				GroupName:  "wait-1",
-				Operation:  event.ReconcileSkipped,
+				Status:     event.ReconcileSkipped,
 				Identifier: createIdentifier("apps", "Deployment", "default", "my-dep"),
 			},
 			expected: map[string]interface{}{
-				"eventType": "resourceReconciled",
 				"group":     "apps",
 				"kind":      "Deployment",
 				"name":      "my-dep",
 				"namespace": "default",
-				"operation": "Skipped",
+				"status":    "Skipped",
 				"timestamp": "",
 				"type":      "wait",
 			},
@@ -486,16 +476,15 @@ func TestFormatter_FormatWaitEvent(t *testing.T) {
 			previewStrategy: common.DryRunServer,
 			event: event.WaitEvent{
 				GroupName:  "wait-1",
-				Operation:  event.ReconcileTimeout,
+				Status:     event.ReconcileTimeout,
 				Identifier: createIdentifier("apps", "Deployment", "default", "my-dep"),
 			},
 			expected: map[string]interface{}{
-				"eventType": "resourceReconciled",
 				"group":     "apps",
 				"kind":      "Deployment",
 				"name":      "my-dep",
 				"namespace": "default",
-				"operation": "Timeout",
+				"status":    "Timeout",
 				"timestamp": "",
 				"type":      "wait",
 			},
@@ -504,16 +493,15 @@ func TestFormatter_FormatWaitEvent(t *testing.T) {
 			previewStrategy: common.DryRunNone,
 			event: event.WaitEvent{
 				GroupName:  "wait-1",
-				Operation:  event.ReconcileFailed,
+				Status:     event.ReconcileFailed,
 				Identifier: createIdentifier("apps", "Deployment", "default", "my-dep"),
 			},
 			expected: map[string]interface{}{
-				"eventType": "resourceReconciled",
 				"group":     "apps",
 				"kind":      "Deployment",
 				"name":      "my-dep",
 				"namespace": "default",
-				"operation": "Failed",
+				"status":    "Failed",
 				"timestamp": "",
 				"type":      "wait",
 			},
@@ -546,7 +534,7 @@ func TestFormatter_FormatActionGroupEvent(t *testing.T) {
 			event: event.ActionGroupEvent{
 				GroupName: "age-1",
 				Action:    event.ApplyAction,
-				Type:      event.Finished,
+				Status:    event.Finished,
 			},
 			actionGroups: []event.ActionGroup{
 				{
@@ -558,14 +546,26 @@ func TestFormatter_FormatActionGroupEvent(t *testing.T) {
 					Action: event.ApplyAction,
 				},
 			},
-			expected: map[string]interface{}{},
+			statsCollector: stats.Stats{
+				ApplyStats: stats.ApplyStats{},
+			},
+			expected: map[string]interface{}{
+				"action":     "Apply",
+				"count":      0,
+				"failed":     0,
+				"skipped":    0,
+				"status":     "Finished",
+				"successful": 0,
+				"timestamp":  "2022-03-24T01:35:04Z",
+				"type":       "group",
+			},
 		},
 		"the last apply action group finished": {
 			previewStrategy: common.DryRunNone,
 			event: event.ActionGroupEvent{
 				GroupName: "age-2",
 				Action:    event.ApplyAction,
-				Type:      event.Finished,
+				Status:    event.Finished,
 			},
 			actionGroups: []event.ActionGroup{
 				{
@@ -579,19 +579,18 @@ func TestFormatter_FormatActionGroupEvent(t *testing.T) {
 			},
 			statsCollector: stats.Stats{
 				ApplyStats: stats.ApplyStats{
-					ServersideApplied: 42,
+					Successful: 42,
 				},
 			},
 			expected: map[string]interface{}{
-				"eventType":       "completed",
-				"configuredCount": 0,
-				"count":           42,
-				"createdCount":    0,
-				"failedCount":     0,
-				"serverSideCount": 42,
-				"timestamp":       "2022-01-06T05:22:48Z",
-				"type":            "apply",
-				"unchangedCount":  0,
+				"action":     "Apply",
+				"count":      42,
+				"failed":     0,
+				"skipped":    0,
+				"status":     "Finished",
+				"successful": 42,
+				"timestamp":  "2022-03-24T01:35:04Z",
+				"type":       "group",
 			},
 		},
 		"last prune action group started": {
@@ -599,7 +598,7 @@ func TestFormatter_FormatActionGroupEvent(t *testing.T) {
 			event: event.ActionGroupEvent{
 				GroupName: "age-2",
 				Action:    event.PruneAction,
-				Type:      event.Started,
+				Status:    event.Started,
 			},
 			actionGroups: []event.ActionGroup{
 				{
@@ -611,7 +610,12 @@ func TestFormatter_FormatActionGroupEvent(t *testing.T) {
 					Action: event.PruneAction,
 				},
 			},
-			expected: map[string]interface{}{},
+			expected: map[string]interface{}{
+				"action":    "Prune",
+				"status":    "Started",
+				"timestamp": "2022-03-24T01:51:36Z",
+				"type":      "group",
+			},
 		},
 	}
 
@@ -668,7 +672,6 @@ func TestFormatter_FormatValidationEvent(t *testing.T) {
 				),
 			},
 			expected: map[string]interface{}{
-				"eventType": "validation",
 				"type":      "validation",
 				"timestamp": "",
 				"objects": []interface{}{
@@ -763,7 +766,6 @@ func TestFormatter_FormatValidationEvent(t *testing.T) {
 				),
 			},
 			expected: map[string]interface{}{
-				"eventType": "validation",
 				"type":      "validation",
 				"timestamp": "",
 				"objects": []interface{}{
@@ -800,6 +802,93 @@ func TestFormatter_FormatValidationEvent(t *testing.T) {
 			assertOutput(t, tc.expected, out.String())
 		})
 	}
+}
+
+func TestFormatter_FormatSummary(t *testing.T) {
+	now := time.Now()
+	nowStr := now.UTC().Format(time.RFC3339)
+
+	testCases := map[string]struct {
+		statsCollector stats.Stats
+		expected       []map[string]interface{}
+	}{
+		"apply prune wait": {
+			statsCollector: stats.Stats{
+				ApplyStats: stats.ApplyStats{
+					Successful: 1,
+					Skipped:    2,
+					Failed:     3,
+				},
+				PruneStats: stats.PruneStats{
+					Successful: 3,
+					Skipped:    2,
+					Failed:     1,
+				},
+				WaitStats: stats.WaitStats{
+					Successful: 4,
+					Skipped:    6,
+					Failed:     1,
+					Timeout:    1,
+				},
+			},
+			expected: []map[string]interface{}{
+				{
+					"action":     "Apply",
+					"count":      float64(6),
+					"successful": float64(1),
+					"skipped":    float64(2),
+					"failed":     float64(3),
+					"timestamp":  nowStr,
+					"type":       "summary",
+				},
+				{
+					"action":     "Prune",
+					"count":      float64(6),
+					"successful": float64(3),
+					"skipped":    float64(2),
+					"failed":     float64(1),
+					"timestamp":  nowStr,
+					"type":       "summary",
+				},
+				{
+					"action":     "Wait",
+					"count":      float64(12),
+					"successful": float64(4),
+					"skipped":    float64(6),
+					"failed":     float64(1),
+					"timeout":    float64(1),
+					"timestamp":  nowStr,
+					"type":       "summary",
+				},
+			},
+		},
+	}
+
+	for tn, tc := range testCases {
+		t.Run(tn, func(t *testing.T) {
+			ioStreams, _, out, _ := genericclioptions.NewTestIOStreams() //nolint:dogsled
+			jf := &formatter{
+				ioStreams: ioStreams,
+				// fake time func
+				now: func() time.Time { return now },
+			}
+			err := jf.FormatSummary(tc.statsCollector)
+			assert.NoError(t, err)
+
+			assertOutputLines(t, tc.expected, out.String())
+		})
+	}
+}
+
+func assertOutputLines(t *testing.T, expectedMaps []map[string]interface{}, actual string) {
+	actual = strings.TrimRight(actual, "\n")
+	lines := strings.Split(actual, "\n")
+	actualMaps := make([]map[string]interface{}, len(lines))
+	for i, line := range lines {
+		err := json.Unmarshal([]byte(line), &actualMaps[i])
+		require.NoError(t, err)
+	}
+	testutil.AssertEqual(t, expectedMaps, actualMaps)
 }
 
 // nolint:unparam

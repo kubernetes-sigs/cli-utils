@@ -39,39 +39,39 @@ type ExpErrorEvent struct {
 type ExpActionGroupEvent struct {
 	GroupName string
 	Action    event.ResourceAction
-	Type      event.ActionGroupEventType
+	Type      event.ActionGroupEventStatus
 }
 
 type ExpApplyEvent struct {
 	GroupName  string
-	Operation  event.ApplyEventOperation
+	Status     event.ApplyEventStatus
 	Identifier object.ObjMetadata
 	Error      error
 }
 
 type ExpStatusEvent struct {
-	Identifier object.ObjMetadata
 	Status     status.Status
+	Identifier object.ObjMetadata
 	Error      error
 }
 
 type ExpPruneEvent struct {
 	GroupName  string
-	Operation  event.PruneEventOperation
+	Status     event.PruneEventStatus
 	Identifier object.ObjMetadata
 	Error      error
 }
 
 type ExpDeleteEvent struct {
 	GroupName  string
-	Operation  event.DeleteEventOperation
+	Status     event.DeleteEventStatus
 	Identifier object.ObjMetadata
 	Error      error
 }
 
 type ExpWaitEvent struct {
 	GroupName  string
-	Operation  event.WaitEventOperation
+	Status     event.WaitEventStatus
 	Identifier object.ObjMetadata
 }
 
@@ -142,7 +142,7 @@ func isMatch(ee ExpEvent, e event.Event) bool {
 			return false
 		}
 
-		if agee.Type != age.Type {
+		if agee.Type != age.Status {
 			return false
 		}
 		return true
@@ -167,7 +167,7 @@ func isMatch(ee ExpEvent, e event.Event) bool {
 			}
 		}
 
-		if aee.Operation != ae.Operation {
+		if aee.Status != ae.Status {
 			return false
 		}
 
@@ -215,7 +215,7 @@ func isMatch(ee ExpEvent, e event.Event) bool {
 			}
 		}
 
-		if pee.Operation != pe.Operation {
+		if pee.Status != pe.Status {
 			return false
 		}
 
@@ -243,7 +243,7 @@ func isMatch(ee ExpEvent, e event.Event) bool {
 			}
 		}
 
-		if dee.Operation != de.Operation {
+		if dee.Status != de.Status {
 			return false
 		}
 
@@ -271,7 +271,7 @@ func isMatch(ee ExpEvent, e event.Event) bool {
 			}
 		}
 
-		if wee.Operation != we.Operation {
+		if wee.Status != we.Status {
 			return false
 		}
 		return true
@@ -332,7 +332,7 @@ func EventToExpEvent(e event.Event) ExpEvent {
 			ActionGroupEvent: &ExpActionGroupEvent{
 				GroupName: e.ActionGroupEvent.GroupName,
 				Action:    e.ActionGroupEvent.Action,
-				Type:      e.ActionGroupEvent.Type,
+				Type:      e.ActionGroupEvent.Status,
 			},
 		}
 
@@ -342,7 +342,7 @@ func EventToExpEvent(e event.Event) ExpEvent {
 			ApplyEvent: &ExpApplyEvent{
 				GroupName:  e.ApplyEvent.GroupName,
 				Identifier: e.ApplyEvent.Identifier,
-				Operation:  e.ApplyEvent.Operation,
+				Status:     e.ApplyEvent.Status,
 				Error:      e.ApplyEvent.Error,
 			},
 		}
@@ -363,7 +363,7 @@ func EventToExpEvent(e event.Event) ExpEvent {
 			PruneEvent: &ExpPruneEvent{
 				GroupName:  e.PruneEvent.GroupName,
 				Identifier: e.PruneEvent.Identifier,
-				Operation:  e.PruneEvent.Operation,
+				Status:     e.PruneEvent.Status,
 				Error:      e.PruneEvent.Error,
 			},
 		}
@@ -374,7 +374,7 @@ func EventToExpEvent(e event.Event) ExpEvent {
 			DeleteEvent: &ExpDeleteEvent{
 				GroupName:  e.DeleteEvent.GroupName,
 				Identifier: e.DeleteEvent.Identifier,
-				Operation:  e.DeleteEvent.Operation,
+				Status:     e.DeleteEvent.Status,
 				Error:      e.DeleteEvent.Error,
 			},
 		}
@@ -385,7 +385,7 @@ func EventToExpEvent(e event.Event) ExpEvent {
 			WaitEvent: &ExpWaitEvent{
 				GroupName:  e.WaitEvent.GroupName,
 				Identifier: e.WaitEvent.Identifier,
-				Operation:  e.WaitEvent.Operation,
+				Status:     e.WaitEvent.Status,
 			},
 		}
 
@@ -454,12 +454,12 @@ func (ape GroupedEventsByID) Less(i, j int) bool {
 			// don't change order if not the same task group
 			return false
 		}
-		if ape[i].WaitEvent.Operation != ape[j].WaitEvent.Operation {
-			// don't change order if not the same operation
+		if ape[i].WaitEvent.Status != ape[j].WaitEvent.Status {
+			// don't change order if not the same status
 			return false
 		}
-		if ape[i].WaitEvent.Operation != event.Reconciled {
-			// pending, skipped, and timeout operations are predictably ordered
+		if ape[i].WaitEvent.Status != event.ReconcileSuccessful {
+			// pending, skipped, and timeout status are predictably ordered
 			// using the order in WaitTask.Ids.
 			// So we only need to sort Reconciled events, which occur in the
 			// order the Waitask receives StatusEvents with Current/NotFound.

@@ -162,7 +162,7 @@ loop:
 			WaitEvent: event.WaitEvent{
 				GroupName:  taskName,
 				Identifier: testDeployment1ID,
-				Operation:  event.ReconcilePending,
+				Status:     event.ReconcilePending,
 			},
 		},
 		// deployment2 pending
@@ -171,7 +171,7 @@ loop:
 			WaitEvent: event.WaitEvent{
 				GroupName:  taskName,
 				Identifier: testDeployment2ID,
-				Operation:  event.ReconcilePending,
+				Status:     event.ReconcilePending,
 			},
 		},
 		// deployment3 skipped
@@ -180,7 +180,7 @@ loop:
 			WaitEvent: event.WaitEvent{
 				GroupName:  taskName,
 				Identifier: testDeployment3ID,
-				Operation:  event.ReconcileSkipped,
+				Status:     event.ReconcileSkipped,
 			},
 		},
 		// deployment4 skipped
@@ -189,7 +189,7 @@ loop:
 			WaitEvent: event.WaitEvent{
 				GroupName:  taskName,
 				Identifier: testDeployment4ID,
-				Operation:  event.ReconcileSkipped,
+				Status:     event.ReconcileSkipped,
 			},
 		},
 		// current events next, in the order of status updates
@@ -199,7 +199,7 @@ loop:
 			WaitEvent: event.WaitEvent{
 				GroupName:  taskName,
 				Identifier: testDeployment1ID,
-				Operation:  event.Reconciled,
+				Status:     event.ReconcileSuccessful,
 			},
 		},
 		// deployment2 current
@@ -208,7 +208,7 @@ loop:
 			WaitEvent: event.WaitEvent{
 				GroupName:  taskName,
 				Identifier: testDeployment2ID,
-				Operation:  event.Reconciled,
+				Status:     event.ReconcileSuccessful,
 			},
 		},
 	}
@@ -333,7 +333,7 @@ loop:
 			WaitEvent: event.WaitEvent{
 				GroupName:  taskName,
 				Identifier: testDeployment1ID,
-				Operation:  event.ReconcilePending,
+				Status:     event.ReconcilePending,
 			},
 		},
 		// deployment2 pending
@@ -342,7 +342,7 @@ loop:
 			WaitEvent: event.WaitEvent{
 				GroupName:  taskName,
 				Identifier: testDeployment2ID,
-				Operation:  event.ReconcilePending,
+				Status:     event.ReconcilePending,
 			},
 		},
 		// deployment3 skipped
@@ -351,7 +351,7 @@ loop:
 			WaitEvent: event.WaitEvent{
 				GroupName:  taskName,
 				Identifier: testDeployment3ID,
-				Operation:  event.ReconcileSkipped,
+				Status:     event.ReconcileSkipped,
 			},
 		},
 		// deployment4 skipped
@@ -360,7 +360,7 @@ loop:
 			WaitEvent: event.WaitEvent{
 				GroupName:  taskName,
 				Identifier: testDeployment4ID,
-				Operation:  event.ReconcileSkipped,
+				Status:     event.ReconcileSkipped,
 			},
 		},
 		// current events next, in the order of status updates
@@ -370,7 +370,7 @@ loop:
 			WaitEvent: event.WaitEvent{
 				GroupName:  taskName,
 				Identifier: testDeployment1ID,
-				Operation:  event.Reconciled,
+				Status:     event.ReconcileSuccessful,
 			},
 		},
 		// timeout events last, in the order provided to the WaitTask
@@ -380,7 +380,7 @@ loop:
 			WaitEvent: event.WaitEvent{
 				GroupName:  taskName,
 				Identifier: testDeployment2ID,
-				Operation:  event.ReconcileTimeout,
+				Status:     event.ReconcileTimeout,
 			},
 		},
 	}
@@ -485,7 +485,7 @@ loop:
 			WaitEvent: event.WaitEvent{
 				GroupName:  taskName,
 				Identifier: testDeploymentID,
-				Operation:  event.Reconciled,
+				Status:     event.ReconcileSuccessful,
 			},
 		},
 	}
@@ -572,7 +572,7 @@ loop:
 			WaitEvent: event.WaitEvent{
 				GroupName:  taskName,
 				Identifier: testDeploymentID,
-				Operation:  event.ReconcilePending,
+				Status:     event.ReconcilePending,
 			},
 		},
 	}
@@ -666,7 +666,7 @@ loop:
 			WaitEvent: event.WaitEvent{
 				GroupName:  taskName,
 				Identifier: testDeploymentID,
-				Operation:  event.ReconcilePending,
+				Status:     event.ReconcilePending,
 			},
 		},
 		// deployment1 reconciled
@@ -675,7 +675,7 @@ loop:
 			WaitEvent: event.WaitEvent{
 				GroupName:  taskName,
 				Identifier: testDeploymentID,
-				Operation:  event.Reconciled,
+				Status:     event.ReconcileSuccessful,
 			},
 		},
 	}
@@ -760,7 +760,7 @@ func TestWaitTask_Failed(t *testing.T) {
 					WaitEvent: event.WaitEvent{
 						GroupName:  taskName,
 						Identifier: testDeployment1ID,
-						Operation:  event.ReconcilePending,
+						Status:     event.ReconcilePending,
 					},
 				},
 				// deployment2 pending
@@ -769,7 +769,7 @@ func TestWaitTask_Failed(t *testing.T) {
 					WaitEvent: event.WaitEvent{
 						GroupName:  taskName,
 						Identifier: testDeployment2ID,
-						Operation:  event.ReconcilePending,
+						Status:     event.ReconcilePending,
 					},
 				},
 				// deployment1 is failed
@@ -778,7 +778,7 @@ func TestWaitTask_Failed(t *testing.T) {
 					WaitEvent: event.WaitEvent{
 						GroupName:  taskName,
 						Identifier: testDeployment1ID,
-						Operation:  event.ReconcileFailed,
+						Status:     event.ReconcileFailed,
 					},
 				},
 				// deployment2 current
@@ -787,7 +787,7 @@ func TestWaitTask_Failed(t *testing.T) {
 					WaitEvent: event.WaitEvent{
 						GroupName:  taskName,
 						Identifier: testDeployment2ID,
-						Operation:  event.Reconciled,
+						Status:     event.ReconcileSuccessful,
 					},
 				},
 			},
@@ -843,7 +843,7 @@ func TestWaitTask_Failed(t *testing.T) {
 					WaitEvent: event.WaitEvent{
 						GroupName:  taskName,
 						Identifier: testDeployment1ID,
-						Operation:  event.ReconcilePending,
+						Status:     event.ReconcilePending,
 					},
 				},
 				// deployment2 pending
@@ -852,7 +852,7 @@ func TestWaitTask_Failed(t *testing.T) {
 					WaitEvent: event.WaitEvent{
 						GroupName:  taskName,
 						Identifier: testDeployment2ID,
-						Operation:  event.ReconcilePending,
+						Status:     event.ReconcilePending,
 					},
 				},
 				// deployment2 current
@@ -861,7 +861,7 @@ func TestWaitTask_Failed(t *testing.T) {
 					WaitEvent: event.WaitEvent{
 						GroupName:  taskName,
 						Identifier: testDeployment2ID,
-						Operation:  event.Reconciled,
+						Status:     event.ReconcileSuccessful,
 					},
 				},
 				// deployment1 is failed
@@ -870,7 +870,7 @@ func TestWaitTask_Failed(t *testing.T) {
 					WaitEvent: event.WaitEvent{
 						GroupName:  taskName,
 						Identifier: testDeployment1ID,
-						Operation:  event.ReconcileFailed,
+						Status:     event.ReconcileFailed,
 					},
 				},
 			},
@@ -932,7 +932,7 @@ func TestWaitTask_Failed(t *testing.T) {
 					WaitEvent: event.WaitEvent{
 						GroupName:  taskName,
 						Identifier: testDeployment1ID,
-						Operation:  event.ReconcilePending,
+						Status:     event.ReconcilePending,
 					},
 				},
 				// deployment2 pending
@@ -941,7 +941,7 @@ func TestWaitTask_Failed(t *testing.T) {
 					WaitEvent: event.WaitEvent{
 						GroupName:  taskName,
 						Identifier: testDeployment2ID,
-						Operation:  event.ReconcilePending,
+						Status:     event.ReconcilePending,
 					},
 				},
 				// deployment1 is failed
@@ -950,7 +950,7 @@ func TestWaitTask_Failed(t *testing.T) {
 					WaitEvent: event.WaitEvent{
 						GroupName:  taskName,
 						Identifier: testDeployment1ID,
-						Operation:  event.ReconcileFailed,
+						Status:     event.ReconcileFailed,
 					},
 				},
 				// deployment1 is current
@@ -959,7 +959,7 @@ func TestWaitTask_Failed(t *testing.T) {
 					WaitEvent: event.WaitEvent{
 						GroupName:  taskName,
 						Identifier: testDeployment1ID,
-						Operation:  event.Reconciled,
+						Status:     event.ReconcileSuccessful,
 					},
 				},
 				// deployment2 current
@@ -968,7 +968,7 @@ func TestWaitTask_Failed(t *testing.T) {
 					WaitEvent: event.WaitEvent{
 						GroupName:  taskName,
 						Identifier: testDeployment2ID,
-						Operation:  event.Reconciled,
+						Status:     event.ReconcileSuccessful,
 					},
 				},
 			},
@@ -1030,7 +1030,7 @@ func TestWaitTask_Failed(t *testing.T) {
 					WaitEvent: event.WaitEvent{
 						GroupName:  taskName,
 						Identifier: testDeployment1ID,
-						Operation:  event.ReconcilePending,
+						Status:     event.ReconcilePending,
 					},
 				},
 				// deployment2 pending
@@ -1039,7 +1039,7 @@ func TestWaitTask_Failed(t *testing.T) {
 					WaitEvent: event.WaitEvent{
 						GroupName:  taskName,
 						Identifier: testDeployment2ID,
-						Operation:  event.ReconcilePending,
+						Status:     event.ReconcilePending,
 					},
 				},
 				// deployment1 is failed
@@ -1048,7 +1048,7 @@ func TestWaitTask_Failed(t *testing.T) {
 					WaitEvent: event.WaitEvent{
 						GroupName:  taskName,
 						Identifier: testDeployment1ID,
-						Operation:  event.ReconcileFailed,
+						Status:     event.ReconcileFailed,
 					},
 				},
 				// deployment1 pending
@@ -1057,7 +1057,7 @@ func TestWaitTask_Failed(t *testing.T) {
 					WaitEvent: event.WaitEvent{
 						GroupName:  taskName,
 						Identifier: testDeployment1ID,
-						Operation:  event.ReconcilePending,
+						Status:     event.ReconcilePending,
 					},
 				},
 				// deployment2 current
@@ -1066,7 +1066,7 @@ func TestWaitTask_Failed(t *testing.T) {
 					WaitEvent: event.WaitEvent{
 						GroupName:  taskName,
 						Identifier: testDeployment2ID,
-						Operation:  event.Reconciled,
+						Status:     event.ReconcileSuccessful,
 					},
 				},
 				// deployment1 timed out
@@ -1075,7 +1075,7 @@ func TestWaitTask_Failed(t *testing.T) {
 					WaitEvent: event.WaitEvent{
 						GroupName:  taskName,
 						Identifier: testDeployment1ID,
-						Operation:  event.ReconcileTimeout,
+						Status:     event.ReconcileTimeout,
 					},
 				},
 			},
@@ -1209,7 +1209,7 @@ func TestWaitTask_UIDChanged(t *testing.T) {
 					WaitEvent: event.WaitEvent{
 						GroupName:  taskName,
 						Identifier: testDeployment1ID,
-						Operation:  event.ReconcilePending,
+						Status:     event.ReconcilePending,
 					},
 				},
 				// deployment2 pending
@@ -1218,7 +1218,7 @@ func TestWaitTask_UIDChanged(t *testing.T) {
 					WaitEvent: event.WaitEvent{
 						GroupName:  taskName,
 						Identifier: testDeployment2ID,
-						Operation:  event.ReconcilePending,
+						Status:     event.ReconcilePending,
 					},
 				},
 				// deployment1 is failed
@@ -1227,7 +1227,7 @@ func TestWaitTask_UIDChanged(t *testing.T) {
 					WaitEvent: event.WaitEvent{
 						GroupName:  taskName,
 						Identifier: testDeployment1ID,
-						Operation:  event.ReconcileFailed,
+						Status:     event.ReconcileFailed,
 					},
 				},
 				// deployment2 current
@@ -1236,7 +1236,7 @@ func TestWaitTask_UIDChanged(t *testing.T) {
 					WaitEvent: event.WaitEvent{
 						GroupName:  taskName,
 						Identifier: testDeployment2ID,
-						Operation:  event.Reconciled,
+						Status:     event.ReconcileSuccessful,
 					},
 				},
 			},
@@ -1296,7 +1296,7 @@ func TestWaitTask_UIDChanged(t *testing.T) {
 					WaitEvent: event.WaitEvent{
 						GroupName:  taskName,
 						Identifier: testDeployment1ID,
-						Operation:  event.ReconcilePending,
+						Status:     event.ReconcilePending,
 					},
 				},
 				// deployment2 pending
@@ -1305,7 +1305,7 @@ func TestWaitTask_UIDChanged(t *testing.T) {
 					WaitEvent: event.WaitEvent{
 						GroupName:  taskName,
 						Identifier: testDeployment2ID,
-						Operation:  event.ReconcilePending,
+						Status:     event.ReconcilePending,
 					},
 				},
 				// deployment1 is replaced
@@ -1314,7 +1314,7 @@ func TestWaitTask_UIDChanged(t *testing.T) {
 					WaitEvent: event.WaitEvent{
 						GroupName:  taskName,
 						Identifier: testDeployment1ID,
-						Operation:  event.Reconciled,
+						Status:     event.ReconcileSuccessful,
 					},
 				},
 				// deployment2 not found
@@ -1323,7 +1323,7 @@ func TestWaitTask_UIDChanged(t *testing.T) {
 					WaitEvent: event.WaitEvent{
 						GroupName:  taskName,
 						Identifier: testDeployment2ID,
-						Operation:  event.Reconciled,
+						Status:     event.ReconcileSuccessful,
 					},
 				},
 			},
