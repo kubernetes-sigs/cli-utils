@@ -89,14 +89,14 @@ var _ = Describe("Applier", func() {
 
 	for i := range inventoryConfigTypes {
 		invType := inventoryConfigTypes[i]
-		Context(fmt.Sprintf("Inventory: %s", invType), func() {
+		Context(fmt.Sprintf("Inventory%s", invType), func() {
 			var invConfig invconfig.InventoryConfig
 
 			BeforeEach(func() {
 				invConfig = inventoryConfigs[invType]
 			})
 
-			Context("Apply and destroy", func() {
+			Context("Basic", func() {
 				var namespace *v1.Namespace
 				var inventoryName string
 				var ctx context.Context
@@ -133,7 +133,7 @@ var _ = Describe("Applier", func() {
 					e2eutil.DeleteNamespace(ctx, c, namespace)
 				})
 
-				It("Apply and destroy", func() {
+				It("ApplyDestroy", func() {
 					applyAndDestroyTest(ctx, c, invConfig, inventoryName, namespace.GetName())
 				})
 
@@ -145,27 +145,27 @@ var _ = Describe("Applier", func() {
 					emptySetTest(ctx, c, invConfig, inventoryName, namespace.GetName())
 				})
 
-				It("Deletion Prevention", func() {
+				It("DeletionPrevention", func() {
 					deletionPreventionTest(ctx, c, invConfig, inventoryName, namespace.GetName())
 				})
 
-				It("Apply CRD and CR", func() {
+				It("CustomResource", func() {
 					crdTest(ctx, c, invConfig, inventoryName, namespace.GetName())
 				})
 
-				It("Apply continues on error", func() {
+				It("ContinueOnError", func() {
 					continueOnErrorTest(ctx, c, invConfig, inventoryName, namespace.GetName())
 				})
 
-				It("Server-Side Apply", func() {
+				It("ServerSideApply", func() {
 					serversideApplyTest(ctx, c, invConfig, inventoryName, namespace.GetName())
 				})
 
-				It("Implements depends-on apply ordering", func() {
+				It("DependsOn", func() {
 					dependsOnTest(ctx, c, invConfig, inventoryName, namespace.GetName())
 				})
 
-				It("Implements apply-time-mutation", func() {
+				It("ApplyTimeMutation", func() {
 					mutationTest(ctx, c, invConfig, inventoryName, namespace.GetName())
 				})
 
@@ -177,15 +177,15 @@ var _ = Describe("Applier", func() {
 					namespaceFilterTest(ctx, c, invConfig, inventoryName, namespace.GetName())
 				})
 
-				It("Prune retrieval error correctly handled", func() {
+				It("PruneRetrievalError", func() {
 					pruneRetrieveErrorTest(ctx, c, invConfig, inventoryName, namespace.GetName())
 				})
 
-				It("Reconciliation failure and timeout", func() {
+				It("ReconciliationFailure", func() {
 					reconciliationFailed(ctx, invConfig, inventoryName, namespace.GetName())
 				})
 
-				It("Reconciliation timeout", func() {
+				It("ReconciliationTimeout", func() {
 					reconciliationTimeout(ctx, invConfig, inventoryName, namespace.GetName())
 				})
 
@@ -233,7 +233,7 @@ var _ = Describe("Applier", func() {
 		})
 	}
 
-	Context("Strategy: Name", func() {
+	Context("NameStrategy", func() {
 		var namespace *v1.Namespace
 		var inventoryName string
 		var ctx context.Context
@@ -255,7 +255,7 @@ var _ = Describe("Applier", func() {
 			e2eutil.DeleteNamespace(ctx, c, namespace)
 		})
 
-		It("Apply with existing inventory", func() {
+		It("InventoryIDMismatch", func() {
 			applyWithExistingInvTest(ctx, c, inventoryConfigs[CustomTypeInvConfig], inventoryName, namespace.GetName())
 		})
 	})

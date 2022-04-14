@@ -95,7 +95,7 @@ var _ = Describe("Applier", func() {
 			e2eutil.DeleteNamespace(ctx, c, namespace)
 		})
 
-		It("Thousand Namespaces", func() {
+		It("ThousandNamespaces", func() {
 			thousandNamespacesTest(ctx, c, invConfig, inventoryName, namespace.GetName())
 		})
 	})
