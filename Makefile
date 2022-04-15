@@ -70,7 +70,7 @@ test:
 
 test-e2e: $(MYGOBIN)/ginkgo $(MYGOBIN)/kind
 	kind delete cluster --name=cli-utils-e2e && kind create cluster --name=cli-utils-e2e --wait 5m
-	$(GOPATH)/bin/ginkgo ./test/e2e/...
+	$(GOPATH)/bin/ginkgo -v ./test/e2e/... -- -v 3
 
 .PHONY: test-e2e-focus
 test-e2e-focus: $(MYGOBIN)/ginkgo $(MYGOBIN)/kind
