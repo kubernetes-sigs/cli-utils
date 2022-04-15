@@ -6,7 +6,6 @@ package e2e
 import (
 	"context"
 	"errors"
-	"sort"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -165,7 +164,7 @@ func continueOnErrorTest(ctx context.Context, c client.Client, invConfig invconf
 	}
 	receivedEvents := testutil.EventsToExpEvents(applierEvents)
 	// sort to allow comparison of multiple ApplyTasks in the same task group
-	sort.Sort(testutil.GroupedEventsByID(receivedEvents))
+	testutil.SortExpEvents(receivedEvents)
 	Expect(receivedEvents).To(testutil.Equal(expEvents))
 
 	By("Verify pod1 created")
