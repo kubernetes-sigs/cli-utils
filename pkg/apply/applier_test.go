@@ -5,7 +5,6 @@ package apply
 
 import (
 	"context"
-	"sort"
 	"sync"
 	"testing"
 	"time"
@@ -1511,7 +1510,7 @@ func TestApplier(t *testing.T) {
 			}
 
 			// sort to allow comparison of multiple apply/prune tasks in the same task group
-			sort.Sort(testutil.GroupedEventsByID(receivedEvents))
+			testutil.SortExpEvents(receivedEvents)
 
 			// Validate the rest of the events
 			testutil.AssertEqual(t, tc.expectedEvents, receivedEvents,

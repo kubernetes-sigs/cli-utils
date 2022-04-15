@@ -5,6 +5,7 @@ package testutil
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -414,6 +415,21 @@ func RemoveEqualEvents(in []ExpEvent, expected ExpEvent) ([]ExpEvent, int) {
 	return in, matches
 }
 
+// SortExpEvents sorts a list of ExpEvents so they can be compared for equality.
+//
+// This is a stable sort which only sorts nearly identical contiguous events by
+// object identifier, to make the full list easier to validate.
+//
+// You may need to remove StatusEvents from the list before comparing, because
+// these events are fully asynchronous and non-contiguous.
+//
+// Comparison Options:
+// A) Expect(received).To(testutil.Equal(expected))
+// B) testutil.assertEqual(t, expected, received)
+func SortExpEvents(events []ExpEvent) {
+	sort.SliceStable(events, GroupedEventsByID(events).Less)
+}
+
 // GroupedEventsByID implements sort.Interface for []ExpEvent based on
 // the serialized ObjMetadata of Apply, Prune, and Delete events within the same
 // task group.
@@ -428,48 +444,48 @@ func (ape GroupedEventsByID) Swap(i, j int) { ape[i], ape[j] = ape[j], ape[i] }
 func (ape GroupedEventsByID) Less(i, j int) bool {
 	if ape[i].EventType != ape[j].EventType {
 		// don't change order if not the same type
-		return false
+		return i < j
 	}
 	switch ape[i].EventType {
 	case event.ApplyType:
-		if ape[i].ApplyEvent.GroupName != ape[j].ApplyEvent.GroupName {
-			// don't change order if not the same task group
-			return false
+		if ape[i].ApplyEvent.GroupName == ape[j].ApplyEvent.GroupName &&
+			ape[i].ApplyEvent.Status == ape[j].ApplyEvent.Status &&
+			ape[i].ApplyEvent.Identifier.GroupKind == ape[j].ApplyEvent.Identifier.GroupKind {
+			// apply events are predictably ordered by GroupKind, due to
+			// ordering.SortableMetas.
+			// So we only need to sort by namespace & name.
+			return ape[i].ApplyEvent.Identifier.String() < ape[j].ApplyEvent.Identifier.String()
 		}
-		return ape[i].ApplyEvent.Identifier.String() < ape[j].ApplyEvent.Identifier.String()
 	case event.PruneType:
-		if ape[i].PruneEvent.GroupName != ape[j].PruneEvent.GroupName {
-			// don't change order if not the same task group
-			return false
+		if ape[i].PruneEvent.GroupName == ape[j].PruneEvent.GroupName &&
+			ape[i].PruneEvent.Status == ape[j].PruneEvent.Status &&
+			ape[i].PruneEvent.Identifier.GroupKind == ape[j].PruneEvent.Identifier.GroupKind {
+			// prune events are predictably ordered by GroupKind, due to
+			// ordering.SortableMetas (reversed).
+			// So we only need to sort by namespace & name.
+			return ape[i].PruneEvent.Identifier.String() < ape[j].PruneEvent.Identifier.String()
 		}
-		return ape[i].PruneEvent.Identifier.String() < ape[j].PruneEvent.Identifier.String()
 	case event.DeleteType:
-		if ape[i].DeleteEvent.GroupName != ape[j].DeleteEvent.GroupName {
-			// don't change order if not the same task group
-			return false
+		if ape[i].DeleteEvent.GroupName == ape[j].DeleteEvent.GroupName &&
+			ape[i].DeleteEvent.Status == ape[j].DeleteEvent.Status &&
+			ape[i].DeleteEvent.Identifier.GroupKind == ape[j].DeleteEvent.Identifier.GroupKind {
+			// delete events are predictably ordered by GroupKind, due to
+			// ordering.SortableMetas (reversed).
+			// So we only need to sort by namespace & name.
+			return ape[i].DeleteEvent.Identifier.String() < ape[j].DeleteEvent.Identifier.String()
 		}
-		return ape[i].DeleteEvent.Identifier.String() < ape[j].DeleteEvent.Identifier.String()
 	case event.WaitType:
-		if ape[i].WaitEvent.GroupName != ape[j].WaitEvent.GroupName {
-			// don't change order if not the same task group
-			return false
-		}
-		if ape[i].WaitEvent.Status != ape[j].WaitEvent.Status {
-			// don't change order if not the same status
-			return false
-		}
-		if ape[i].WaitEvent.Status != event.ReconcileSuccessful {
-			// pending, skipped, and timeout status are predictably ordered
+		if ape[i].WaitEvent.GroupName == ape[j].WaitEvent.GroupName &&
+			ape[i].WaitEvent.Status == ape[j].WaitEvent.Status &&
+			ape[i].WaitEvent.Status == event.ReconcileSuccessful {
+			// pending, skipped, and timeout operations are predictably ordered
 			// using the order in WaitTask.Ids.
 			// So we only need to sort Reconciled events, which occur in the
 			// order the Waitask receives StatusEvents with Current/NotFound.
-			return false
+			return ape[i].WaitEvent.Identifier.String() < ape[j].WaitEvent.Identifier.String()
 		}
-		return ape[i].WaitEvent.Identifier.String() < ape[j].WaitEvent.Identifier.String()
 	case event.ValidationType:
 		return ape[i].ValidationEvent.Identifiers.Hash() < ape[j].ValidationEvent.Identifiers.Hash()
-	default:
-		// don't change order if not ApplyType, PruneType, or DeleteType
-		return false
 	}
+	return i < j
 }
