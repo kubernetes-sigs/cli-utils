@@ -74,7 +74,6 @@ type Event struct {
 // String returns a string suitable for logging
 func (e Event) String() string {
 	var sb strings.Builder
-	sb.WriteString("Event{ ")
 	switch e.Type {
 	case InitType:
 		sb.WriteString(e.InitEvent.String())
@@ -95,7 +94,6 @@ func (e Event) String() string {
 	case ValidationType:
 		sb.WriteString(e.ValidationEvent.String())
 	}
-	sb.WriteString(" }")
 	return sb.String()
 }
 
@@ -221,8 +219,12 @@ type ApplyEvent struct {
 
 // String returns a string suitable for logging
 func (ae ApplyEvent) String() string {
-	return fmt.Sprintf("ApplyEvent{ GroupName: %q, Status: %q, Identifier: %q, Error: %q }",
-		ae.GroupName, ae.Status, ae.Identifier, ae.Error)
+	if ae.Error != nil {
+		return fmt.Sprintf("ApplyEvent{ GroupName: %q, Status: %q, Identifier: %q, Error: %q }",
+			ae.GroupName, ae.Status, ae.Identifier, ae.Error)
+	}
+	return fmt.Sprintf("ApplyEvent{ GroupName: %q, Status: %q, Identifier: %q }",
+		ae.GroupName, ae.Status, ae.Identifier)
 }
 
 type StatusEvent struct {
@@ -242,8 +244,12 @@ func (se StatusEvent) String() string {
 			gen = se.PollResourceInfo.Resource.GetGeneration()
 		}
 	}
-	return fmt.Sprintf("StatusEvent{ Status: %q, Generation: %d, Identifier: %q, Error: %q }",
-		status, gen, se.Identifier, se.Error)
+	if se.Error != nil {
+		return fmt.Sprintf("StatusEvent{ Status: %q, Generation: %d, Identifier: %q, Error: %q }",
+			status, gen, se.Identifier, se.Error)
+	}
+	return fmt.Sprintf("StatusEvent{ Status: %q, Generation: %d, Identifier: %q }",
+		status, gen, se.Identifier)
 }
 
 //go:generate stringer -type=PruneEventStatus -linecomment
@@ -266,8 +272,12 @@ type PruneEvent struct {
 
 // String returns a string suitable for logging
 func (pe PruneEvent) String() string {
-	return fmt.Sprintf("PruneEvent{ GroupName: %q, Status: %q, Identifier: %q, Error: %q }",
-		pe.GroupName, pe.Status, pe.Identifier, pe.Error)
+	if pe.Error != nil {
+		return fmt.Sprintf("PruneEvent{ GroupName: %q, Status: %q, Identifier: %q, Error: %q }",
+			pe.GroupName, pe.Status, pe.Identifier, pe.Error)
+	}
+	return fmt.Sprintf("PruneEvent{ GroupName: %q, Status: %q, Identifier: %q }",
+		pe.GroupName, pe.Status, pe.Identifier)
 }
 
 //go:generate stringer -type=DeleteEventStatus -linecomment
@@ -290,8 +300,12 @@ type DeleteEvent struct {
 
 // String returns a string suitable for logging
 func (de DeleteEvent) String() string {
-	return fmt.Sprintf("DeleteEvent{ GroupName: %q, Status: %q, Identifier: %q, Error: %q }",
-		de.GroupName, de.Status, de.Identifier, de.Error)
+	if de.Error != nil {
+		return fmt.Sprintf("DeleteEvent{ GroupName: %q, Status: %q, Identifier: %q, Error: %q }",
+			de.GroupName, de.Status, de.Identifier, de.Error)
+	}
+	return fmt.Sprintf("DeleteEvent{ GroupName: %q, Status: %q, Identifier: %q }",
+		de.GroupName, de.Status, de.Identifier)
 }
 
 type ValidationEvent struct {
@@ -301,6 +315,10 @@ type ValidationEvent struct {
 
 // String returns a string suitable for logging
 func (ve ValidationEvent) String() string {
-	return fmt.Sprintf("ValidationEvent{ Identifiers: %+v, Error: %q }",
-		ve.Identifiers, ve.Error)
+	if ve.Error != nil {
+		return fmt.Sprintf("ValidationEvent{ Identifiers: %+v, Error: %q }",
+			ve.Identifiers, ve.Error)
+	}
+	return fmt.Sprintf("ValidationEvent{ Identifiers: %+v }",
+		ve.Identifiers)
 }
