@@ -697,6 +697,7 @@ func TestPruneWithErrors(t *testing.T) {
 					EventType: event.PruneType,
 					PruneEvent: &testutil.ExpPruneEvent{
 						Identifier: object.UnstructuredToObjMetadata(pdbDeleteFailure),
+						Status:     event.PruneFailed,
 						Error:      fmt.Errorf("expected delete error"),
 					},
 				},
@@ -710,6 +711,7 @@ func TestPruneWithErrors(t *testing.T) {
 					EventType: event.DeleteType,
 					DeleteEvent: &testutil.ExpDeleteEvent{
 						Identifier: object.UnstructuredToObjMetadata(pdbDeleteFailure),
+						Status:     event.DeleteFailed,
 						Error:      fmt.Errorf("expected delete error"),
 					},
 				},

@@ -73,6 +73,7 @@ func continueOnErrorTest(ctx context.Context, c client.Client, invConfig invconf
 			EventType: event.ApplyType,
 			ApplyEvent: &testutil.ExpApplyEvent{
 				GroupName:  "apply-0",
+				Status:     event.ApplyFailed,
 				Identifier: object.UnstructuredToObjMetadata(invalidCrdObj),
 				Error: testutil.EqualErrorType(
 					applyerror.NewApplyRunError(errors.New("failed to apply")),
