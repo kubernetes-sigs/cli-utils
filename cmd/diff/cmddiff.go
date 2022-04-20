@@ -80,17 +80,12 @@ func Initialize(o *diff.DiffOptions, f util.Factory, args []string) (func(), err
 		return cleanupFunc, err
 	}
 
-	o.DiscoveryClient, err = f.ToDiscoveryClient()
-	if err != nil {
-		return cleanupFunc, err
-	}
-
 	o.DynamicClient, err = f.DynamicClient()
 	if err != nil {
 		return cleanupFunc, err
 	}
 
-	o.DryRunVerifier = resource.NewDryRunVerifier(o.DynamicClient, o.DiscoveryClient)
+	o.DryRunVerifier = resource.NewQueryParamVerifier(o.DynamicClient, f.OpenAPIGetter(), resource.QueryParamDryRun)
 
 	o.CmdNamespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
