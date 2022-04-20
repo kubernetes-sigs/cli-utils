@@ -382,7 +382,10 @@ func dependsOnTest(ctx context.Context, c client.Client, invConfig invconfig.Inv
 			},
 		},
 	}
-	Expect(testutil.EventsToExpEvents(applierEvents)).To(testutil.Equal(expEvents))
+	receivedEvents := testutil.EventsToExpEvents(applierEvents)
+	// sort to handle objects reconciling in random order
+	testutil.SortExpEvents(receivedEvents)
+	Expect(receivedEvents).To(testutil.Equal(expEvents))
 
 	By("verify namespace1 created")
 	e2eutil.AssertUnstructuredExists(ctx, c, namespace1Obj)
@@ -660,21 +663,21 @@ func dependsOnTest(ctx context.Context, c client.Client, invConfig invconfig.Inv
 			},
 		},
 		{
-			// Namespace2 reconcile Pending.
-			EventType: event.WaitType,
-			WaitEvent: &testutil.ExpWaitEvent{
-				GroupName:  "wait-3",
-				Status:     event.ReconcilePending,
-				Identifier: object.UnstructuredToObjMetadata(namespace2Obj),
-			},
-		},
-		{
 			// Namespace1 reconcile Pending.
 			EventType: event.WaitType,
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-3",
 				Status:     event.ReconcilePending,
 				Identifier: object.UnstructuredToObjMetadata(namespace1Obj),
+			},
+		},
+		{
+			// Namespace2 reconcile Pending.
+			EventType: event.WaitType,
+			WaitEvent: &testutil.ExpWaitEvent{
+				GroupName:  "wait-3",
+				Status:     event.ReconcilePending,
+				Identifier: object.UnstructuredToObjMetadata(namespace2Obj),
 			},
 		},
 		{
@@ -723,7 +726,10 @@ func dependsOnTest(ctx context.Context, c client.Client, invConfig invconfig.Inv
 			},
 		},
 	}
-	Expect(testutil.EventsToExpEvents(destroyerEvents)).To(testutil.Equal(expEvents))
+	receivedEvents = testutil.EventsToExpEvents(destroyerEvents)
+	// sort to handle objects reconciling in random order
+	testutil.SortExpEvents(receivedEvents)
+	Expect(receivedEvents).To(testutil.Equal(expEvents))
 
 	By("verify pod1 deleted")
 	e2eutil.AssertUnstructuredDoesNotExist(ctx, c, pod1Obj)

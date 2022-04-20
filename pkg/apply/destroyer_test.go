@@ -259,6 +259,7 @@ func TestDestroyerCancel(t *testing.T) {
 						Type:      event.Started,
 					},
 				},
+				// Wait events sorted Pending > Successful (see pkg/testutil)
 				{
 					// Deployment reconcile pending.
 					EventType: event.WaitType,
@@ -373,6 +374,9 @@ func TestDestroyerCancel(t *testing.T) {
 					t.Errorf("Expected status event not received: %#v", e)
 				}
 			}
+
+			// sort to allow comparison of multiple wait events
+			testutil.SortExpEvents(receivedEvents)
 
 			// Validate the rest of the events
 			testutil.AssertEqual(t, tc.expectedEvents, receivedEvents,
