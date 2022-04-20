@@ -5,11 +5,15 @@ package e2e
 
 import (
 	"context"
-	"errors"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/util/validation/field"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/cli-utils/pkg/apply"
 	applyerror "sigs.k8s.io/cli-utils/pkg/apply/error"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
@@ -74,8 +78,31 @@ func continueOnErrorTest(ctx context.Context, c client.Client, invConfig invconf
 			ApplyEvent: &testutil.ExpApplyEvent{
 				GroupName:  "apply-0",
 				Identifier: object.UnstructuredToObjMetadata(invalidCrdObj),
-				Error: testutil.EqualErrorType(
-					applyerror.NewApplyRunError(errors.New("failed to apply")),
+				Error: testutil.EqualError(
+					applyerror.NewApplyRunError(
+						cmdutil.AddSourceToErr(
+							"creating",
+							"unstructured",
+							apierrors.NewInvalid(
+								invalidCrdObj.GroupVersionKind().GroupKind(),
+								invalidCrdObj.GetName(),
+								field.ErrorList{
+									&field.Error{
+										Type:     field.ErrorTypeInvalid,
+										Field:    "spec.versions",
+										BadValue: []apiextensions.CustomResourceDefinitionVersion(nil),
+										Detail:   "must have exactly one version marked as storage version",
+									},
+									&field.Error{
+										Type:     field.ErrorTypeInvalid,
+										Field:    "status.storedVersions",
+										BadValue: []string(nil),
+										Detail:   "must have at least one stored version",
+									},
+								},
+							),
+						),
+					),
 				),
 			},
 		},

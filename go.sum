@@ -1155,12 +1155,14 @@ honnef.co/go/tools v0.0.1-2020.1.4/go.mod h1:X/FiERA/W4tHapMX5mGpAtMSVEeEUOyHaw9
 k8s.io/api v0.23.0/go.mod h1:8wmDdLBHBNxtOIytwLstXt5E9PddnZb0GaMcqsvDBpg=
 k8s.io/api v0.23.2 h1:62cpzreV3dCuj0hqPi8r4dyWh48ogMcyh+ga9jEGij4=
 k8s.io/api v0.23.2/go.mod h1:sYuDb3flCtRPI8ghn6qFrcK5ZBu2mhbElxRE95qpwlI=
-k8s.io/apiextensions-apiserver v0.23.0 h1:uii8BYmHYiT2ZTAJxmvc3X8UhNYMxl2A0z0Xq3Pm+WY=
 k8s.io/apiextensions-apiserver v0.23.0/go.mod h1:xIFAEEDlAZgpVBl/1VSjGDmLoXAWRG40+GsWhKhAxY4=
+k8s.io/apiextensions-apiserver v0.23.2 h1:N6CIVAhmF0ahgFKUMDdV/AUyckhUb4nIyVPohPtdUPk=
+k8s.io/apiextensions-apiserver v0.23.2/go.mod h1:9cs7avT6+GfzbB0pambTvH11wcaR85QQg4ovl9s15UU=
 k8s.io/apimachinery v0.23.0/go.mod h1:fFCTTBKvKcwTPFzjlcxp91uPFZr+JA0FubU4fLzzFYc=
 k8s.io/apimachinery v0.23.2 h1:dBmjCOeYBdg2ibcQxMuUq+OopZ9fjfLIR5taP/XKeTs=
 k8s.io/apimachinery v0.23.2/go.mod h1:zDqeV0AK62LbCI0CI7KbWCAYdLg+E+8UXJ0rIz5gmS8=
 k8s.io/apiserver v0.23.0/go.mod h1:Cec35u/9zAepDPPFyT+UMrgqOCjgJ5qtfVJDxjZYmt4=
+k8s.io/apiserver v0.23.2/go.mod h1:Kdt8gafkPev9Gfh+H6lCPbmRu42f7BfhOfHKKa3dtyU=
 k8s.io/cli-runtime v0.23.2 h1:4zOZX78mFSakwe4gef81XDBu94Yu0th6bfveTOx8ZQk=
 k8s.io/cli-runtime v0.23.2/go.mod h1:Ag70akCDvwux4HxY+nH2J3UqE2e6iwSSdG1HE6p1VTU=
 k8s.io/client-go v0.23.0/go.mod h1:hrDnpnK1mSr65lHHcUuIZIXDgEbzc7/683c6hyG4jTA=
@@ -1192,6 +1194,7 @@ rsc.io/binaryregexp v0.2.0/go.mod h1:qTv7/COck+e2FymRvadv62gMdZztPaShugOCi3I+8D8
 rsc.io/quote/v3 v3.1.0/go.mod h1:yEA65RcK8LyAZtP9Kv3t0HmxON59tX3rD+tICJqUlj0=
 rsc.io/sampler v1.3.0/go.mod h1:T1hPZKmBbMNahiBKFy5HrXp6adAjACjK9JXDnKaTXpA=
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.25/go.mod h1:Mlj9PNLmG9bZ6BHFwFKDo5afkpWyUISkb9Me0GnK66I=
+sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.27/go.mod h1:tq2nT0Kx7W+/f2JVE+zxYtUhdjuELJkVpNz+x/QN5R4=
 sigs.k8s.io/controller-runtime v0.11.0 h1:DqO+c8mywcZLFJWILq4iktoECTyn30Bkj0CwgqMpZWQ=
 sigs.k8s.io/controller-runtime v0.11.0/go.mod h1:KKwLiTooNGu+JmLZGn9Sl3Gjmfj66eMbCQznLP5zcqA=
 sigs.k8s.io/json v0.0.0-20211020170558-c049b76a60c6 h1:fD1pz4yfdADVNfFmcP2aBEtudwUQ1AlLnRBALr33v3s=

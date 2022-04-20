@@ -52,10 +52,12 @@ func exitEarlyTest(ctx context.Context, c client.Client, invConfig invconfig.Inv
 			// invalid pod validation error
 			EventType: event.ErrorType,
 			ErrorEvent: &testutil.ExpErrorEvent{
-				Err: testutil.EqualErrorString(validation.NewError(
-					field.Required(field.NewPath("metadata", "name"), "name is required"),
-					object.UnstructuredToObjMetadata(invalidPodObj),
-				).Error()),
+				Err: testutil.EqualError(
+					validation.NewError(
+						field.Required(field.NewPath("metadata", "name"), "name is required"),
+						object.UnstructuredToObjMetadata(invalidPodObj),
+					),
+				),
 			},
 		},
 	}
