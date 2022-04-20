@@ -70,10 +70,12 @@ func skipInvalidTest(ctx context.Context, c client.Client, invConfig invconfig.I
 				Identifiers: object.ObjMetadataSet{
 					object.UnstructuredToObjMetadata(invalidPodObj),
 				},
-				Error: testutil.EqualErrorString(validation.NewError(
-					field.Required(field.NewPath("metadata", "name"), "name is required"),
-					object.UnstructuredToObjMetadata(invalidPodObj),
-				).Error()),
+				Error: testutil.EqualError(
+					validation.NewError(
+						field.Required(field.NewPath("metadata", "name"), "name is required"),
+						object.UnstructuredToObjMetadata(invalidPodObj),
+					),
+				),
 			},
 		},
 		{
@@ -83,22 +85,24 @@ func skipInvalidTest(ctx context.Context, c client.Client, invConfig invconfig.I
 				Identifiers: object.ObjMetadataSet{
 					object.UnstructuredToObjMetadata(pod3Obj),
 				},
-				Error: testutil.EqualErrorString(validation.NewError(
-					object.InvalidAnnotationError{
-						Annotation: dependson.Annotation,
-						Cause: graph.ExternalDependencyError{
-							Edge: graph.Edge{
-								From: object.UnstructuredToObjMetadata(pod3Obj),
-								To: object.ObjMetadata{
-									GroupKind: schema.GroupKind{Kind: "Pod"},
-									Name:      "pod0",
-									Namespace: namespaceName,
+				Error: testutil.EqualError(
+					validation.NewError(
+						object.InvalidAnnotationError{
+							Annotation: dependson.Annotation,
+							Cause: graph.ExternalDependencyError{
+								Edge: graph.Edge{
+									From: object.UnstructuredToObjMetadata(pod3Obj),
+									To: object.ObjMetadata{
+										GroupKind: schema.GroupKind{Kind: "Pod"},
+										Name:      "pod0",
+										Namespace: namespaceName,
+									},
 								},
 							},
 						},
-					},
-					object.UnstructuredToObjMetadata(pod3Obj),
-				).Error()),
+						object.UnstructuredToObjMetadata(pod3Obj),
+					),
+				),
 			},
 		},
 		{
@@ -108,21 +112,23 @@ func skipInvalidTest(ctx context.Context, c client.Client, invConfig invconfig.I
 				Identifiers: object.ObjMetadataSet{
 					object.UnstructuredToObjMetadata(podBObj),
 				},
-				Error: testutil.EqualErrorString(validation.NewError(
-					object.InvalidAnnotationError{
-						Annotation: mutation.Annotation,
-						Cause: graph.ExternalDependencyError{
-							Edge: graph.Edge{
-								From: object.UnstructuredToObjMetadata(podBObj),
-								To: object.ObjMetadata{
-									GroupKind: schema.GroupKind{Kind: "Pod"},
-									Name:      "pod-a",
+				Error: testutil.EqualError(
+					validation.NewError(
+						object.InvalidAnnotationError{
+							Annotation: mutation.Annotation,
+							Cause: graph.ExternalDependencyError{
+								Edge: graph.Edge{
+									From: object.UnstructuredToObjMetadata(podBObj),
+									To: object.ObjMetadata{
+										GroupKind: schema.GroupKind{Kind: "Pod"},
+										Name:      "pod-a",
+									},
 								},
 							},
 						},
-					},
-					object.UnstructuredToObjMetadata(podBObj),
-				).Error()),
+						object.UnstructuredToObjMetadata(podBObj),
+					),
+				),
 			},
 		},
 		{
@@ -133,22 +139,24 @@ func skipInvalidTest(ctx context.Context, c client.Client, invConfig invconfig.I
 					object.UnstructuredToObjMetadata(podAObj),
 					object.UnstructuredToObjMetadata(podBObj),
 				},
-				Error: testutil.EqualErrorString(validation.NewError(
-					graph.CyclicDependencyError{
-						Edges: []graph.Edge{
-							{
-								From: object.UnstructuredToObjMetadata(podAObj),
-								To:   object.UnstructuredToObjMetadata(podBObj),
-							},
-							{
-								From: object.UnstructuredToObjMetadata(podBObj),
-								To:   object.UnstructuredToObjMetadata(podAObj),
+				Error: testutil.EqualError(
+					validation.NewError(
+						graph.CyclicDependencyError{
+							Edges: []graph.Edge{
+								{
+									From: object.UnstructuredToObjMetadata(podAObj),
+									To:   object.UnstructuredToObjMetadata(podBObj),
+								},
+								{
+									From: object.UnstructuredToObjMetadata(podBObj),
+									To:   object.UnstructuredToObjMetadata(podAObj),
+								},
 							},
 						},
-					},
-					object.UnstructuredToObjMetadata(podAObj),
-					object.UnstructuredToObjMetadata(podBObj),
-				).Error()),
+						object.UnstructuredToObjMetadata(podAObj),
+						object.UnstructuredToObjMetadata(podBObj),
+					),
+				),
 			},
 		},
 		{
@@ -359,8 +367,15 @@ func skipInvalidTest(ctx context.Context, c client.Client, invConfig invconfig.I
 				Identifiers: object.ObjMetadataSet{
 					object.UnstructuredToObjMetadata(deployment1Obj),
 				},
-				Error: testutil.EqualErrorType(
-					validation.NewError(nil), // TODO: be more specific
+				Error: testutil.EqualError(
+					validation.NewError(
+						object.InvalidAnnotationError{
+							Annotation: dependson.Annotation,
+							Cause: fmt.Errorf("failed to parse object reference (index: 0): %w",
+								fmt.Errorf("expected 3 or 5 fields, found 1: %q", "invalid")),
+						},
+						object.UnstructuredToObjMetadata(deployment1Obj),
+					),
 				),
 			},
 		},
