@@ -412,7 +412,8 @@ func TestApplyTaskWithError(t *testing.T) {
 				{
 					Type: event.ApplyType,
 					ApplyEvent: event.ApplyEvent{
-						Error: fmt.Errorf("expected apply error"),
+						Status: event.ApplyFailed,
+						Error:  fmt.Errorf("expected apply error"),
 					},
 				},
 			},

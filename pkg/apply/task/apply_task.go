@@ -251,6 +251,7 @@ func (a *ApplyTask) createApplyFailedEvent(id object.ObjMetadata, err error) eve
 		ApplyEvent: event.ApplyEvent{
 			GroupName:  a.Name(),
 			Identifier: id,
+			Status:     event.ApplyFailed,
 			Error:      err,
 		},
 	}

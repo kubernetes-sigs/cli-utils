@@ -68,6 +68,7 @@ func (pef PruneEventFactory) CreateFailedEvent(id object.ObjMetadata, err error)
 		Type: event.PruneType,
 		PruneEvent: event.PruneEvent{
 			GroupName:  pef.groupName,
+			Status:     event.PruneFailed,
 			Identifier: id,
 			Error:      err,
 		},
@@ -110,6 +111,7 @@ func (def DeleteEventFactory) CreateFailedEvent(id object.ObjMetadata, err error
 		Type: event.DeleteType,
 		DeleteEvent: event.DeleteEvent{
 			GroupName:  def.groupName,
+			Status:     event.DeleteFailed,
 			Identifier: id,
 			Error:      err,
 		},
