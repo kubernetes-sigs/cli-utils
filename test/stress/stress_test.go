@@ -45,10 +45,10 @@ var _ = Describe("Applier", func() {
 		cfg, err := ctrl.GetConfig()
 		Expect(err).NotTo(HaveOccurred())
 
-		// increase QPS from 5 to 20
-		cfg.QPS = 20
-		// increase Burst QPS from 10 to 40
-		cfg.Burst = 40
+		// Disable client-side throttling.
+		// Recent versions of kind support server-side throttling.
+		cfg.QPS = -1
+		cfg.Burst = -1
 
 		invConfig = invconfig.NewCustomTypeInvConfig(cfg)
 

@@ -10,7 +10,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestE2e(t *testing.T) {
+func TestStress(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "Stress Test Suite")
 }
