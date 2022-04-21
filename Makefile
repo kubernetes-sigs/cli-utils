@@ -1,14 +1,34 @@
 # Copyright 2019 The Kubernetes Authors.
 # SPDX-License-Identifier: Apache-2.0
 
-.PHONY: generate license fix vet fmt test lint tidy openapi
-
 GOPATH := $(shell go env GOPATH)
 MYGOBIN := $(shell go env GOPATH)/bin
 SHELL := /bin/bash
 export PATH := $(MYGOBIN):$(PATH)
 
+.PHONY: all
 all: generate license fix vet fmt test lint tidy
+
+"$(MYGOBIN)/stringer":
+	go install golang.org/x/tools/cmd/stringer@v0.1.10
+
+"$(MYGOBIN)/addlicense":
+	go install github.com/google/addlicense@v1.0.0
+
+"$(MYGOBIN)/golangci-lint":
+	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.44.2
+
+"$(MYGOBIN)/deepcopy-gen":
+	go install k8s.io/code-generator/cmd/deepcopy-gen@v0.23.6
+
+"$(MYGOBIN)/ginkgo":
+	go install github.com/onsi/ginkgo/ginkgo@v1.16.5
+
+"$(MYGOBIN)/mdrip":
+	go install github.com/monopole/mdrip@v1.0.2
+
+"$(MYGOBIN)/kind":
+	go install sigs.k8s.io/kind@v0.12.0
 
 # The following target intended for reference by a file in
 # https://github.com/kubernetes/test-infra/tree/master/config/jobs/kubernetes-sigs/cli-utils
@@ -20,9 +40,15 @@ prow-presubmit-check: \
 prow-presubmit-check-e2e: \
 	install-column-apt test-e2e verify-kapply-e2e
 
+.PHONY: prow-presubmit-check-stress
+prow-presubmit-check-stress: \
+	test-stress
+
+.PHONY: fix
 fix:
 	go fix ./...
 
+.PHONY: fmt
 fmt:
 	go fmt ./...
 
@@ -35,86 +61,77 @@ install-column-apt:
 	apt-get update
 	apt-get install -y bsdmainutils
 
-install-stringer:
-	(which $(GOPATH)/bin/stringer || go install golang.org/x/tools/cmd/stringer@v0.1.5)
-
-install-addlicense:
-	(which $(GOPATH)/bin/addlicense || go install github.com/google/addlicense@v1.0.0)
-
-install-lint:
-	(which $(GOPATH)/bin/golangci-lint || go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.44.0)
-
-install-deepcopy-gen:
-	(which $(GOPATH)/bin/deepcopy-gen || go install k8s.io/code-generator/cmd/deepcopy-gen@v0.23.3)
-
-generate-deepcopy: install-deepcopy-gen
+.PHONY: generate-deepcopy
+generate-deepcopy: "$(MYGOBIN)/deepcopy-gen"
 	hack/run-in-gopath.sh deepcopy-gen --input-dirs ./pkg/apis/... -O zz_generated.deepcopy --go-header-file ./LICENSE_TEMPLATE_GO
 
-generate: install-stringer generate-deepcopy
+.PHONY: generate
+generate: "$(MYGOBIN)/stringer" generate-deepcopy
 	go generate ./...
 
-license: install-addlicense
-	$(GOPATH)/bin/addlicense -v -y 2021 -c "The Kubernetes Authors." -f LICENSE_TEMPLATE .
+.PHONY: license
+license: "$(MYGOBIN)/addlicense"
+	"$(MYGOBIN)/addlicense" -v -y 2021 -c "The Kubernetes Authors." -f LICENSE_TEMPLATE .
 
-verify-license: install-addlicense
-	$(GOPATH)/bin/addlicense  -check .
+.PHONY: verify-license
+verify-license: "$(MYGOBIN)/addlicense"
+	"$(MYGOBIN)/addlicense" -check .
 
+.PHONY: tidy
 tidy:
 	go mod tidy
 
-lint: install-lint
-	$(GOPATH)/bin/golangci-lint run ./...
+.PHONY: lint
+lint: "$(MYGOBIN)/golangci-lint"
+	"$(MYGOBIN)/golangci-lint" run ./...
 
+.PHONY: test
 test:
 	go test -race -cover ./cmd/... ./pkg/...
 
-test-e2e: $(MYGOBIN)/ginkgo $(MYGOBIN)/kind
+.PHONY: test-e2e
+test-e2e: "$(MYGOBIN)/ginkgo" "$(MYGOBIN)/kind"
 	kind delete cluster --name=cli-utils-e2e && kind create cluster --name=cli-utils-e2e --wait 5m
-	$(GOPATH)/bin/ginkgo -v ./test/e2e/... -- -v 3
+	"$(MYGOBIN)/ginkgo" -v ./test/e2e/... -- -v 3
 
 .PHONY: test-e2e-focus
-test-e2e-focus: $(MYGOBIN)/ginkgo $(MYGOBIN)/kind
+test-e2e-focus: "$(MYGOBIN)/ginkgo" "$(MYGOBIN)/kind"
 	kind delete cluster --name=cli-utils-e2e && kind create cluster --name=cli-utils-e2e --wait 5m
-	$(GOPATH)/bin/ginkgo -v -focus ".*$(FOCUS).*" ./test/e2e/... -- -v 5
+	"$(MYGOBIN)"/ginkgo -v -focus ".*$(FOCUS).*" ./test/e2e/... -- -v 5
 
-test-stress: $(MYGOBIN)/ginkgo $(MYGOBIN)/kind
+.PHONY: test-stress
+test-stress: "$(MYGOBIN)/ginkgo" "$(MYGOBIN)/kind"
 	kind delete cluster --name=cli-utils-e2e && kind create cluster --name=cli-utils-e2e --wait 5m
-	$(GOPATH)/bin/ginkgo -v ./test/stress/... -- -v 3
+	"$(MYGOBIN)/ginkgo" -v ./test/stress/... -- -v 3
 
+.PHONY: vet
 vet:
 	go vet ./...
 
+.PHONY: build
 build:
 	go build -o bin/kapply sigs.k8s.io/cli-utils/cmd;
-	mv bin/kapply $(MYGOBIN)
+	mv bin/kapply "$(MYGOBIN)"
 
+.PHONY: build-with-race-detector
 build-with-race-detector:
 	go build -race -o bin/kapply sigs.k8s.io/cli-utils/cmd;
-	mv bin/kapply $(MYGOBIN)
+	mv bin/kapply "$(MYGOBIN)"
 
 .PHONY: verify-kapply-e2e
 verify-kapply-e2e: test-examples-e2e-kapply
 
-$(MYGOBIN)/ginkgo:
-	go install github.com/onsi/ginkgo/ginkgo@v1.16.2
-
-$(MYGOBIN)/mdrip:
-	go install github.com/monopole/mdrip@v1.0.2
-
-.PHONY:
-test-examples-e2e-kapply: $(MYGOBIN)/mdrip $(MYGOBIN)/kind
+.PHONY: test-examples-e2e-kapply
+test-examples-e2e-kapply: "$(MYGOBIN)/mdrip" "$(MYGOBIN)/kind"
 	( \
 		set -e; \
 		/bin/rm -f bin/kapply; \
-		/bin/rm -f $(MYGOBIN)/kapply; \
+		/bin/rm -f "$(MYGOBIN)/kapply"; \
 		echo "Installing kapply from ."; \
 		make build-with-race-detector; \
 		./hack/testExamplesE2EAgainstKapply.sh .; \
 	)
 
-$(MYGOBIN)/kind:
-	go install sigs.k8s.io/kind@v0.11.0
-
 .PHONY: nuke
-nuke: clean
-	sudo rm -rf $(shell go env GOPATH)/pkg/mod/sigs.k8s.io
+nuke:
+	sudo rm -rf "$(GOPATH)/pkg/mod/sigs.k8s.io"
