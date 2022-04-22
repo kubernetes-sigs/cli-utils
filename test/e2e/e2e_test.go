@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"time"
 
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/format"
 	v1 "k8s.io/api/core/v1"
@@ -46,47 +46,46 @@ var defaultTestTimeout = 5 * time.Minute
 var defaultBeforeTestTimeout = 30 * time.Second
 var defaultAfterTestTimeout = 30 * time.Second
 
-var _ = Describe("Applier", func() {
+var c client.Client
 
-	var c client.Client
+var _ = BeforeSuite(func() {
+	// increase from 4000 to handle long event lists
+	format.MaxLength = 10000
 
-	BeforeSuite(func() {
-		// increase from 4000 to handle long event lists
-		format.MaxLength = 10000
+	cfg, err := ctrl.GetConfig()
+	Expect(err).NotTo(HaveOccurred())
 
-		cfg, err := ctrl.GetConfig()
-		Expect(err).NotTo(HaveOccurred())
+	// Disable client-side throttling.
+	// Recent versions of kind support server-side throttling.
+	cfg.QPS = -1
+	cfg.Burst = -1
 
-		// Disable client-side throttling.
-		// Recent versions of kind support server-side throttling.
-		cfg.QPS = -1
-		cfg.Burst = -1
+	inventoryConfigs[ConfigMapTypeInvConfig] = invconfig.NewConfigMapTypeInvConfig(cfg)
+	inventoryConfigs[CustomTypeInvConfig] = invconfig.NewCustomTypeInvConfig(cfg)
 
-		inventoryConfigs[ConfigMapTypeInvConfig] = invconfig.NewConfigMapTypeInvConfig(cfg)
-		inventoryConfigs[CustomTypeInvConfig] = invconfig.NewCustomTypeInvConfig(cfg)
+	mapper, err := apiutil.NewDynamicRESTMapper(cfg)
+	Expect(err).NotTo(HaveOccurred())
 
-		mapper, err := apiutil.NewDynamicRESTMapper(cfg)
-		Expect(err).NotTo(HaveOccurred())
-
-		c, err = client.New(cfg, client.Options{
-			Scheme: scheme.Scheme,
-			Mapper: mapper,
-		})
-		Expect(err).NotTo(HaveOccurred())
-
-		ctx, cancel := context.WithTimeout(context.Background(), defaultBeforeTestTimeout)
-		defer cancel()
-		e2eutil.CreateInventoryCRD(ctx, c)
-		Expect(ctx.Err()).To(BeNil(), "BeforeSuite context cancelled or timed out")
+	c, err = client.New(cfg, client.Options{
+		Scheme: scheme.Scheme,
+		Mapper: mapper,
 	})
+	Expect(err).NotTo(HaveOccurred())
 
-	AfterSuite(func() {
-		ctx, cancel := context.WithTimeout(context.Background(), defaultAfterTestTimeout)
-		defer cancel()
-		e2eutil.DeleteInventoryCRD(ctx, c)
-		Expect(ctx.Err()).To(BeNil(), "AfterSuite context cancelled or timed out")
-	})
+	ctx, cancel := context.WithTimeout(context.Background(), defaultBeforeTestTimeout)
+	defer cancel()
+	e2eutil.CreateInventoryCRD(ctx, c)
+	Expect(ctx.Err()).To(BeNil(), "BeforeSuite context cancelled or timed out")
+})
 
+var _ = AfterSuite(func() {
+	ctx, cancel := context.WithTimeout(context.Background(), defaultAfterTestTimeout)
+	defer cancel()
+	e2eutil.DeleteInventoryCRD(ctx, c)
+	Expect(ctx.Err()).To(BeNil(), "AfterSuite context cancelled or timed out")
+})
+
+var _ = Describe("E2E", func() {
 	for i := range inventoryConfigTypes {
 		invType := inventoryConfigTypes[i]
 		Context(fmt.Sprintf("Inventory%s", invType), func() {
