@@ -7,7 +7,7 @@ import (
 	"context"
 	"time"
 
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/format"
 	v1 "k8s.io/api/core/v1"
@@ -33,70 +33,67 @@ var defaultTestTimeout = 1 * time.Hour
 var defaultBeforeTestTimeout = 30 * time.Second
 var defaultAfterTestTimeout = 30 * time.Second
 
-var _ = Describe("Applier", func() {
+var c client.Client
+var invConfig invconfig.InventoryConfig
 
-	var c client.Client
-	var invConfig invconfig.InventoryConfig
+var _ = BeforeSuite(func() {
+	// increase from 4000 to handle long event lists
+	format.MaxLength = 10000
 
-	BeforeSuite(func() {
-		// increase from 4000 to handle long event lists
-		format.MaxLength = 10000
+	cfg, err := ctrl.GetConfig()
+	Expect(err).NotTo(HaveOccurred())
 
-		cfg, err := ctrl.GetConfig()
-		Expect(err).NotTo(HaveOccurred())
+	// Disable client-side throttling.
+	// Recent versions of kind support server-side throttling.
+	cfg.QPS = -1
+	cfg.Burst = -1
 
-		// Disable client-side throttling.
-		// Recent versions of kind support server-side throttling.
-		cfg.QPS = -1
-		cfg.Burst = -1
+	invConfig = invconfig.NewCustomTypeInvConfig(cfg)
 
-		invConfig = invconfig.NewCustomTypeInvConfig(cfg)
+	mapper, err := apiutil.NewDynamicRESTMapper(cfg)
+	Expect(err).NotTo(HaveOccurred())
 
-		mapper, err := apiutil.NewDynamicRESTMapper(cfg)
-		Expect(err).NotTo(HaveOccurred())
+	c, err = client.New(cfg, client.Options{
+		Scheme: scheme.Scheme,
+		Mapper: mapper,
+	})
+	Expect(err).NotTo(HaveOccurred())
 
-		c, err = client.New(cfg, client.Options{
-			Scheme: scheme.Scheme,
-			Mapper: mapper,
-		})
-		Expect(err).NotTo(HaveOccurred())
+	ctx, cancel := context.WithTimeout(context.Background(), defaultBeforeTestTimeout)
+	defer cancel()
+	e2eutil.CreateInventoryCRD(ctx, c)
+	Expect(ctx.Err()).To(BeNil(), "BeforeSuite context cancelled or timed out")
+})
 
-		ctx, cancel := context.WithTimeout(context.Background(), defaultBeforeTestTimeout)
-		defer cancel()
-		e2eutil.CreateInventoryCRD(ctx, c)
-		Expect(ctx.Err()).To(BeNil(), "BeforeSuite context cancelled or timed out")
+var _ = AfterSuite(func() {
+	ctx, cancel := context.WithTimeout(context.Background(), defaultAfterTestTimeout)
+	defer cancel()
+	e2eutil.DeleteInventoryCRD(ctx, c)
+	Expect(ctx.Err()).To(BeNil(), "AfterSuite context cancelled or timed out")
+})
+
+var _ = Describe("Stress", func() {
+	var namespace *v1.Namespace
+	var inventoryName string
+	var ctx context.Context
+	var cancel context.CancelFunc
+
+	BeforeEach(func() {
+		ctx, cancel = context.WithTimeout(context.Background(), defaultTestTimeout)
+		inventoryName = e2eutil.RandomString("test-inv-")
+		namespace = e2eutil.CreateRandomNamespace(ctx, c)
 	})
 
-	AfterSuite(func() {
-		ctx, cancel := context.WithTimeout(context.Background(), defaultAfterTestTimeout)
+	AfterEach(func() {
+		Expect(ctx.Err()).To(BeNil(), "test context cancelled or timed out")
+		cancel()
+		ctx, cancel = context.WithTimeout(context.Background(), defaultAfterTestTimeout)
 		defer cancel()
-		e2eutil.DeleteInventoryCRD(ctx, c)
-		Expect(ctx.Err()).To(BeNil(), "AfterSuite context cancelled or timed out")
+		// clean up resources created by the tests
+		e2eutil.DeleteNamespace(ctx, c, namespace)
 	})
 
-	Context("StressTest", func() {
-		var namespace *v1.Namespace
-		var inventoryName string
-		var ctx context.Context
-		var cancel context.CancelFunc
-
-		BeforeEach(func() {
-			ctx, cancel = context.WithTimeout(context.Background(), defaultTestTimeout)
-			inventoryName = e2eutil.RandomString("test-inv-")
-			namespace = e2eutil.CreateRandomNamespace(ctx, c)
-		})
-
-		AfterEach(func() {
-			Expect(ctx.Err()).To(BeNil(), "test context cancelled or timed out")
-			cancel()
-			ctx, cancel = context.WithTimeout(context.Background(), defaultAfterTestTimeout)
-			defer cancel()
-			// clean up resources created by the tests
-			e2eutil.DeleteNamespace(ctx, c, namespace)
-		})
-
-		It("ThousandNamespaces", func() {
-			thousandNamespacesTest(ctx, c, invConfig, inventoryName, namespace.GetName())
-		})
+	It("ThousandNamespaces", func() {
+		thousandNamespacesTest(ctx, c, invConfig, inventoryName, namespace.GetName())
 	})
 })
