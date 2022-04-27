@@ -55,10 +55,14 @@ var _ = BeforeSuite(func() {
 	cfg, err := ctrl.GetConfig()
 	Expect(err).NotTo(HaveOccurred())
 
-	// Disable client-side throttling.
-	// Recent versions of kind support server-side throttling.
-	cfg.QPS = -1
-	cfg.Burst = -1
+	cfg.UserAgent = e2eutil.UserAgent("test/e2e")
+
+	if e2eutil.IsFlowControlEnabled(cfg) {
+		// Disable client-side throttling.
+		klog.V(3).Infof("Client-side throttling disabled")
+		cfg.QPS = -1
+		cfg.Burst = -1
+	}
 
 	inventoryConfigs[ConfigMapTypeInvConfig] = invconfig.NewConfigMapTypeInvConfig(cfg)
 	inventoryConfigs[CustomTypeInvConfig] = invconfig.NewCustomTypeInvConfig(cfg)
