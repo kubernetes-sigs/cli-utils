@@ -19,8 +19,10 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/yaml"
+	"k8s.io/client-go/rest"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/common"
+	"sigs.k8s.io/cli-utils/pkg/flowcontrol"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
 	"sigs.k8s.io/cli-utils/pkg/object/dependson"
 	"sigs.k8s.io/cli-utils/pkg/object/mutation"
@@ -409,4 +411,14 @@ func UnstructuredNamespace(name string) *unstructured.Unstructured {
 	u.SetKind("Namespace")
 	u.SetName(name)
 	return u
+}
+
+func IsFlowControlEnabled(config *rest.Config) bool {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	enabled, err := flowcontrol.IsEnabled(ctx, config)
+	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+	return enabled
 }
