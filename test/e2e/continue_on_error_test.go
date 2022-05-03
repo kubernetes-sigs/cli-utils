@@ -136,15 +136,6 @@ func continueOnErrorTest(ctx context.Context, c client.Client, invConfig invconf
 			},
 		},
 		{
-			// CRD reconcile Skipped.
-			EventType: event.WaitType,
-			WaitEvent: &testutil.ExpWaitEvent{
-				GroupName:  "wait-0",
-				Status:     event.ReconcileSkipped,
-				Identifier: object.UnstructuredToObjMetadata(invalidCrdObj),
-			},
-		},
-		{
 			// Pod1 reconcile Pending.
 			EventType: event.WaitType,
 			WaitEvent: &testutil.ExpWaitEvent{
@@ -154,7 +145,16 @@ func continueOnErrorTest(ctx context.Context, c client.Client, invConfig invconf
 			},
 		},
 		{
-			// Pod1 confirmed Current.
+			// CRD reconcile Skipped.
+			EventType: event.WaitType,
+			WaitEvent: &testutil.ExpWaitEvent{
+				GroupName:  "wait-0",
+				Status:     event.ReconcileSkipped,
+				Identifier: object.UnstructuredToObjMetadata(invalidCrdObj),
+			},
+		},
+		{
+			// Pod1 reconcile Successful.
 			EventType: event.WaitType,
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-0",

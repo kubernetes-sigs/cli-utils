@@ -343,15 +343,7 @@ func TestApplier(t *testing.T) {
 						Type:      event.Started,
 					},
 				},
-				// Secrets before Deployments (see pkg/ordering)
-				{
-					EventType: event.WaitType,
-					WaitEvent: &testutil.ExpWaitEvent{
-						GroupName:  "wait-0",
-						Status:     event.ReconcilePending,
-						Identifier: testutil.ToIdentifier(t, resources["secret"]),
-					},
-				},
+				// Wait events with same status sorted by Identifier (see pkg/testutil)
 				{
 					EventType: event.WaitType,
 					WaitEvent: &testutil.ExpWaitEvent{
@@ -360,7 +352,15 @@ func TestApplier(t *testing.T) {
 						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
 					},
 				},
-				// Deployment before Secret (see statusEvents)
+				{
+					EventType: event.WaitType,
+					WaitEvent: &testutil.ExpWaitEvent{
+						GroupName:  "wait-0",
+						Status:     event.ReconcilePending,
+						Identifier: testutil.ToIdentifier(t, resources["secret"]),
+					},
+				},
+				// Wait events with same status sorted by Identifier (see pkg/testutil)
 				{
 					EventType: event.WaitType,
 					WaitEvent: &testutil.ExpWaitEvent{
@@ -524,15 +524,7 @@ func TestApplier(t *testing.T) {
 						Type:      event.Started,
 					},
 				},
-				// Apply Secrets before Deployments (see ordering.SortableMetas)
-				{
-					EventType: event.WaitType,
-					WaitEvent: &testutil.ExpWaitEvent{
-						GroupName:  "wait-0",
-						Status:     event.ReconcilePending,
-						Identifier: testutil.ToIdentifier(t, resources["secret"]),
-					},
-				},
+				// Wait events with same status sorted by Identifier (see pkg/testutil)
 				{
 					EventType: event.WaitType,
 					WaitEvent: &testutil.ExpWaitEvent{
@@ -541,7 +533,15 @@ func TestApplier(t *testing.T) {
 						Identifier: testutil.ToIdentifier(t, resources["deployment"]),
 					},
 				},
-				// Wait Deployments before Secrets (see testutil.GroupedEventsByID)
+				{
+					EventType: event.WaitType,
+					WaitEvent: &testutil.ExpWaitEvent{
+						GroupName:  "wait-0",
+						Status:     event.ReconcilePending,
+						Identifier: testutil.ToIdentifier(t, resources["secret"]),
+					},
+				},
+				// Wait events with same status sorted by Identifier (see pkg/testutil)
 				{
 					EventType: event.WaitType,
 					WaitEvent: &testutil.ExpWaitEvent{
@@ -730,7 +730,7 @@ func TestApplier(t *testing.T) {
 						Type:      event.Started,
 					},
 				},
-				// Prune Deployments before Secrets (see ordering.SortableMetas)
+				// Wait events with same status sorted by Identifier (see pkg/testutil)
 				{
 					EventType: event.WaitType,
 					WaitEvent: &testutil.ExpWaitEvent{
@@ -747,7 +747,7 @@ func TestApplier(t *testing.T) {
 						Identifier: testutil.ToIdentifier(t, resources["secret"]),
 					},
 				},
-				// Wait Deployments before Secrets (see testutil.GroupedEventsByID)
+				// Wait events with same status sorted by Identifier (see pkg/testutil)
 				{
 					EventType: event.WaitType,
 					WaitEvent: &testutil.ExpWaitEvent{
@@ -1123,6 +1123,7 @@ func TestApplier(t *testing.T) {
 						Type:      event.Started,
 					},
 				},
+				// Wait events sorted Pending > Successful (see pkg/testutil)
 				{
 					EventType: event.WaitType,
 					WaitEvent: &testutil.ExpWaitEvent{
@@ -1214,15 +1215,15 @@ func TestApplier(t *testing.T) {
 						Identifiers: object.ObjMetadataSet{
 							object.UnstructuredToObjMetadata(
 								testutil.Unstructured(t, resources["deployment"], JSONPathSetter{
-									"$.kind", "",
+									"$.metadata.name", "",
 								}),
 							),
 						},
 						Error: testutil.EqualErrorString(validation.NewError(
-							field.Required(field.NewPath("kind"), "kind is required"),
+							field.Required(field.NewPath("metadata", "name"), "name is required"),
 							object.UnstructuredToObjMetadata(
 								testutil.Unstructured(t, resources["deployment"], JSONPathSetter{
-									"$.kind", "",
+									"$.metadata.name", "",
 								}),
 							),
 						).Error()),
@@ -1234,15 +1235,15 @@ func TestApplier(t *testing.T) {
 						Identifiers: object.ObjMetadataSet{
 							object.UnstructuredToObjMetadata(
 								testutil.Unstructured(t, resources["deployment"], JSONPathSetter{
-									"$.metadata.name", "",
+									"$.kind", "",
 								}),
 							),
 						},
 						Error: testutil.EqualErrorString(validation.NewError(
-							field.Required(field.NewPath("metadata", "name"), "name is required"),
+							field.Required(field.NewPath("kind"), "kind is required"),
 							object.UnstructuredToObjMetadata(
 								testutil.Unstructured(t, resources["deployment"], JSONPathSetter{
-									"$.metadata.name", "",
+									"$.kind", "",
 								}),
 							),
 						).Error()),
@@ -1302,7 +1303,7 @@ func TestApplier(t *testing.T) {
 						Type:      event.Started,
 					},
 				},
-				// Secret pending
+				// Wait events sorted Pending > Successful (see pkg/testutil)
 				{
 					EventType: event.WaitType,
 					WaitEvent: &testutil.ExpWaitEvent{
@@ -1311,7 +1312,6 @@ func TestApplier(t *testing.T) {
 						Identifier: testutil.ToIdentifier(t, resources["secret"]),
 					},
 				},
-				// Secret reconciled
 				{
 					EventType: event.WaitType,
 					WaitEvent: &testutil.ExpWaitEvent{
@@ -1802,6 +1802,7 @@ func TestApplierCancel(t *testing.T) {
 						Type:      event.Started,
 					},
 				},
+				// Wait events sorted Pending > Successful (see pkg/testutil)
 				{
 					// Deployment reconcile pending.
 					EventType: event.WaitType,
@@ -1919,6 +1920,9 @@ func TestApplierCancel(t *testing.T) {
 					t.Errorf("Expected status event not received: %#v", e.StatusEvent)
 				}
 			}
+
+			// sort to allow comparison of multiple wait events
+			testutil.SortExpEvents(receivedEvents)
 
 			// Validate the rest of the events
 			testutil.AssertEqual(t, tc.expectedEvents, receivedEvents,

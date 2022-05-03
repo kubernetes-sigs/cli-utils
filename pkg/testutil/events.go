@@ -447,45 +447,41 @@ func (ape GroupedEventsByID) Less(i, j int) bool {
 		return i < j
 	}
 	switch ape[i].EventType {
+	case event.ValidationType:
+		// Validation events are predictable ordered by input object set order.
 	case event.ApplyType:
-		if ape[i].ApplyEvent.GroupName == ape[j].ApplyEvent.GroupName &&
-			ape[i].ApplyEvent.Status == ape[j].ApplyEvent.Status &&
-			ape[i].ApplyEvent.Identifier.GroupKind == ape[j].ApplyEvent.Identifier.GroupKind {
-			// apply events are predictably ordered by GroupKind, due to
-			// ordering.SortableMetas.
-			// So we only need to sort by namespace & name.
-			return ape[i].ApplyEvent.Identifier.String() < ape[j].ApplyEvent.Identifier.String()
-		}
+		// Apply events are are predictably ordered by ordering.SortableMetas.
 	case event.PruneType:
-		if ape[i].PruneEvent.GroupName == ape[j].PruneEvent.GroupName &&
-			ape[i].PruneEvent.Status == ape[j].PruneEvent.Status &&
-			ape[i].PruneEvent.Identifier.GroupKind == ape[j].PruneEvent.Identifier.GroupKind {
-			// prune events are predictably ordered by GroupKind, due to
-			// ordering.SortableMetas (reversed).
-			// So we only need to sort by namespace & name.
-			return ape[i].PruneEvent.Identifier.String() < ape[j].PruneEvent.Identifier.String()
-		}
+		// Prune events are predictably ordered in reverse apply order.
 	case event.DeleteType:
-		if ape[i].DeleteEvent.GroupName == ape[j].DeleteEvent.GroupName &&
-			ape[i].DeleteEvent.Status == ape[j].DeleteEvent.Status &&
-			ape[i].DeleteEvent.Identifier.GroupKind == ape[j].DeleteEvent.Identifier.GroupKind {
-			// delete events are predictably ordered by GroupKind, due to
-			// ordering.SortableMetas (reversed).
-			// So we only need to sort by namespace & name.
-			return ape[i].DeleteEvent.Identifier.String() < ape[j].DeleteEvent.Identifier.String()
-		}
+		// Delete events are predictably ordered in reverse apply order.
 	case event.WaitType:
-		if ape[i].WaitEvent.GroupName == ape[j].WaitEvent.GroupName &&
-			ape[i].WaitEvent.Status == ape[j].WaitEvent.Status &&
-			ape[i].WaitEvent.Status == event.ReconcileSuccessful {
-			// pending, skipped, and timeout operations are predictably ordered
-			// using the order in WaitTask.Ids.
-			// So we only need to sort Reconciled events, which occur in the
-			// order the Waitask receives StatusEvents with Current/NotFound.
+		// Wait events are unpredictably ordered, because the status may
+		// reconcile before or after the WaitTask starts, and status event
+		// order after starting is dependent on remote controller behavior.
+		// So here we sort status groups explicitly:
+		// Pending > Skipped > Successful > Failed > Timeout.
+		// Each status group is then sorted by Identifier:
+		// Group > Kind > Namespace > Name.
+		// Note that the Pending status is always optional.
+		if ape[i].WaitEvent.GroupName == ape[j].WaitEvent.GroupName {
+			if ape[i].WaitEvent.Status != ape[j].WaitEvent.Status {
+				return lessWaitStatus(ape[i].WaitEvent.Status, ape[j].WaitEvent.Status)
+			}
 			return ape[i].WaitEvent.Identifier.String() < ape[j].WaitEvent.Identifier.String()
 		}
-	case event.ValidationType:
-		return ape[i].ValidationEvent.Identifiers.Hash() < ape[j].ValidationEvent.Identifiers.Hash()
 	}
 	return i < j
+}
+
+var waitStatusWeight = map[event.WaitEventStatus]int{
+	event.ReconcilePending:    0,
+	event.ReconcileSkipped:    1,
+	event.ReconcileSuccessful: 2,
+	event.ReconcileFailed:     3,
+	event.ReconcileTimeout:    4,
+}
+
+func lessWaitStatus(x, y event.WaitEventStatus) bool {
+	return waitStatusWeight[x] < waitStatusWeight[y]
 }
