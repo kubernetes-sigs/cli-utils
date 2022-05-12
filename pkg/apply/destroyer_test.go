@@ -311,7 +311,7 @@ func TestDestroyerCancel(t *testing.T) {
 
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
-			poller := newFakePoller(tc.statusEvents)
+			statusWatcher := newFakeWatcher(tc.statusEvents)
 
 			invInfo := tc.invInfo.toWrapped()
 
@@ -319,7 +319,7 @@ func TestDestroyerCancel(t *testing.T) {
 				tc.invInfo,
 				// Add the inventory to the cluster (to allow deletion)
 				append(tc.clusterObjs, inventory.InvInfoToConfigMap(invInfo)),
-				poller,
+				statusWatcher,
 			)
 
 			// Context for Destroyer.Run
@@ -357,7 +357,7 @@ func TestDestroyerCancel(t *testing.T) {
 						e.ActionGroupEvent.Action == event.WaitAction {
 						once.Do(func() {
 							// Start sending status events after waiting starts
-							poller.Start()
+							statusWatcher.Start()
 						})
 					}
 				}

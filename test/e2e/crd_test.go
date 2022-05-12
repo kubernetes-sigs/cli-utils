@@ -103,7 +103,7 @@ func crdTest(ctx context.Context, _ client.Client, invConfig invconfig.Inventory
 			},
 		},
 		{
-			// CRD reconcile Pending .
+			// CRD reconcile Pending
 			EventType: event.WaitType,
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-0",
@@ -167,7 +167,7 @@ func crdTest(ctx context.Context, _ client.Client, invConfig invconfig.Inventory
 			},
 		},
 		{
-			// CR reconcile Pending .
+			// CR reconcile Pending
 			EventType: event.WaitType,
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-1",
@@ -212,7 +212,11 @@ func crdTest(ctx context.Context, _ client.Client, invConfig invconfig.Inventory
 			},
 		},
 	}
-	Expect(testutil.EventsToExpEvents(applierEvents)).To(testutil.Equal(expEvents))
+	receivedEvents := testutil.EventsToExpEvents(applierEvents)
+
+	expEvents, receivedEvents = e2eutil.FilterOptionalEvents(expEvents, receivedEvents)
+
+	Expect(receivedEvents).To(testutil.Equal(expEvents))
 
 	By("destroy the resources, including the crd")
 	destroyer := invConfig.DestroyerFactoryFunc()
@@ -263,7 +267,7 @@ func crdTest(ctx context.Context, _ client.Client, invConfig invconfig.Inventory
 			},
 		},
 		{
-			// CR reconcile Pending.
+			// CR reconcile Pending
 			EventType: event.WaitType,
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-0",
@@ -372,7 +376,11 @@ func crdTest(ctx context.Context, _ client.Client, invConfig invconfig.Inventory
 			},
 		},
 	}
-	Expect(testutil.EventsToExpEvents(destroyerEvents)).To(testutil.Equal(expEvents))
+	receivedEvents = testutil.EventsToExpEvents(destroyerEvents)
+
+	expEvents, receivedEvents = e2eutil.FilterOptionalEvents(expEvents, receivedEvents)
+
+	Expect(receivedEvents).To(testutil.Equal(expEvents))
 }
 
 var crd = []byte(strings.TrimSpace(`

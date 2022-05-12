@@ -50,7 +50,7 @@ func gitVersion() string {
 	cmd.Stderr = &errBuf
 
 	err = cmd.Run()
-	gomega.Expect(err).ToNot(gomega.HaveOccurred(), "STDERR: %s", errBuf.String())
+	gomega.Expect(err).ToNot(gomega.HaveOccurred(), "STDERR:\n%v\nSTDOUT:\n%v", errBuf, outBuf)
 
 	return strings.TrimSpace(outBuf.String())
 }

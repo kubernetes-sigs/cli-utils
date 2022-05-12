@@ -1,0 +1,22 @@
+# Copyright 2022 The Kubernetes Authors.
+# SPDX-License-Identifier: Apache-2.0
+
+# The ThousandDeployments stress test needs to spin up 1,000 pods, so this kind
+# cluster config uses 10 nodes, which each default to allowing 110 pods.
+# 
+# The API-server and other control plane components will be
+# on the control-plane node to make sure the other nodes have enough capacity.
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+- role: control-plane
+- role: worker
+- role: worker
+- role: worker
+- role: worker
+- role: worker
+- role: worker
+- role: worker
+- role: worker
+- role: worker
+- role: worker

@@ -113,7 +113,7 @@ func namespaceFilterTest(ctx context.Context, c client.Client, invConfig invconf
 			},
 		},
 		{
-			// namespace1 reconcile Pending.
+			// namespace1 reconcile Pending
 			EventType: event.WaitType,
 			WaitEvent: &testutil.ExpWaitEvent{
 				GroupName:  "wait-0",
@@ -222,7 +222,11 @@ func namespaceFilterTest(ctx context.Context, c client.Client, invConfig invconf
 			},
 		},
 	}
-	Expect(testutil.EventsToExpEvents(applierEvents)).To(testutil.Equal(expEvents))
+	receivedEvents := testutil.EventsToExpEvents(applierEvents)
+
+	expEvents, receivedEvents = e2eutil.FilterOptionalEvents(expEvents, receivedEvents)
+
+	Expect(receivedEvents).To(testutil.Equal(expEvents))
 
 	By("verify namespace1 created")
 	e2eutil.AssertUnstructuredExists(ctx, c, namespace1Obj)

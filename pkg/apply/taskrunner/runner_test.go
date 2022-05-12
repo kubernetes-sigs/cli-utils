@@ -14,9 +14,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/cli-utils/pkg/apply/cache"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
-	"sigs.k8s.io/cli-utils/pkg/kstatus/polling"
 	pollevent "sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
+	"sigs.k8s.io/cli-utils/pkg/kstatus/watcher"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/testutil"
 )
@@ -276,12 +276,12 @@ func TestBaseRunner(t *testing.T) {
 				taskQueue <- tsk
 			}
 
-			ids := object.ObjMetadataSet{} // unused by fake poller
-			poller := newFakePoller(tc.statusEvents)
+			ids := object.ObjMetadataSet{} // unused by fake statusWatcher
+			statusWatcher := newFakeWatcher(tc.statusEvents)
 			eventChannel := make(chan event.Event)
 			resourceCache := cache.NewResourceCacheMap()
 			taskContext := NewTaskContext(eventChannel, resourceCache)
-			runner := NewTaskStatusRunner(ids, poller)
+			runner := NewTaskStatusRunner(ids, statusWatcher)
 
 			// Use a WaitGroup to make sure changes in the goroutines
 			// are visible to the main goroutine.
@@ -293,7 +293,7 @@ func TestBaseRunner(t *testing.T) {
 				defer wg.Done()
 
 				time.Sleep(tc.statusEventsDelay)
-				poller.Start()
+				statusWatcher.Start()
 			}()
 
 			var events []event.Event
@@ -413,7 +413,7 @@ func TestBaseRunnerCancellation(t *testing.T) {
 				event.ActionGroupType,
 			},
 		},
-		"error from status poller while wait task is running": {
+		"error from status watcher while wait task is running": {
 			tasks: []Task{
 				NewWaitTask("wait", object.ObjMetadataSet{depID}, AllCurrent,
 					20*time.Second, testutil.NewFakeRESTMapper()),
@@ -448,12 +448,12 @@ func TestBaseRunnerCancellation(t *testing.T) {
 				taskQueue <- tsk
 			}
 
-			ids := object.ObjMetadataSet{} // unused by fake poller
-			poller := newFakePoller(tc.statusEvents)
+			ids := object.ObjMetadataSet{} // unused by fake statusWatcher
+			statusWatcher := newFakeWatcher(tc.statusEvents)
 			eventChannel := make(chan event.Event)
 			resourceCache := cache.NewResourceCacheMap()
 			taskContext := NewTaskContext(eventChannel, resourceCache)
-			runner := NewTaskStatusRunner(ids, poller)
+			runner := NewTaskStatusRunner(ids, statusWatcher)
 
 			// Use a WaitGroup to make sure changes in the goroutines
 			// are visible to the main goroutine.
@@ -465,7 +465,7 @@ func TestBaseRunnerCancellation(t *testing.T) {
 				defer wg.Done()
 
 				time.Sleep(tc.statusEventsDelay)
-				poller.Start()
+				statusWatcher.Start()
 			}()
 
 			var events []event.Event
@@ -540,27 +540,29 @@ func (f *fakeApplyTask) Cancel(_ *TaskContext) {}
 
 func (f *fakeApplyTask) StatusUpdate(_ *TaskContext, _ object.ObjMetadata) {}
 
-type fakePoller struct {
+type fakeWatcher struct {
 	start  chan struct{}
 	events []pollevent.Event
 }
 
-func newFakePoller(statusEvents []pollevent.Event) *fakePoller {
-	return &fakePoller{
+func newFakeWatcher(statusEvents []pollevent.Event) *fakeWatcher {
+	return &fakeWatcher{
 		events: statusEvents,
 		start:  make(chan struct{}),
 	}
 }
 
 // Start events being sent on the status channel
-func (f *fakePoller) Start() {
+func (f *fakeWatcher) Start() {
 	close(f.start)
 }
 
-func (f *fakePoller) Poll(ctx context.Context, _ object.ObjMetadataSet, _ polling.PollOptions) <-chan pollevent.Event {
+func (f *fakeWatcher) Watch(ctx context.Context, _ object.ObjMetadataSet, _ watcher.Options) <-chan pollevent.Event {
 	eventChannel := make(chan pollevent.Event)
 	go func() {
 		defer close(eventChannel)
+		// send sync event immediately
+		eventChannel <- pollevent.Event{Type: pollevent.SyncEvent}
 		// wait until started to send the events
 		<-f.start
 		for _, f := range f.events {

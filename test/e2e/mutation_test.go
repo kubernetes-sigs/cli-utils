@@ -226,7 +226,11 @@ func mutationTest(ctx context.Context, c client.Client, invConfig invconfig.Inve
 			},
 		},
 	}
-	Expect(testutil.EventsToExpEvents(applierEvents)).To(testutil.Equal(expEvents))
+	receivedEvents := testutil.EventsToExpEvents(applierEvents)
+
+	expEvents, receivedEvents = e2eutil.FilterOptionalEvents(expEvents, receivedEvents)
+
+	Expect(receivedEvents).To(testutil.Equal(expEvents))
 
 	By("verify podB is created and ready")
 	result := e2eutil.AssertUnstructuredExists(ctx, c, podBObj)
@@ -414,8 +418,11 @@ func mutationTest(ctx context.Context, c client.Client, invConfig invconfig.Inve
 			},
 		},
 	}
+	receivedEvents = testutil.EventsToExpEvents(destroyerEvents)
 
-	Expect(testutil.EventsToExpEvents(destroyerEvents)).To(testutil.Equal(expEvents))
+	expEvents, receivedEvents = e2eutil.FilterOptionalEvents(expEvents, receivedEvents)
+
+	Expect(receivedEvents).To(testutil.Equal(expEvents))
 
 	By("verify podB deleted")
 	e2eutil.AssertUnstructuredDoesNotExist(ctx, c, podBObj)
