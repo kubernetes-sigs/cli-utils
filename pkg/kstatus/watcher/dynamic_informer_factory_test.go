@@ -5,7 +5,7 @@ package watcher
 
 import (
 	"context"
-	"net/http"
+	"fmt"
 	"testing"
 	"time"
 
@@ -54,13 +54,7 @@ func TestResourceNotFoundError(t *testing.T) {
 					// dynamicClient converts Status objects from the apiserver into errors.
 					// So we can just return the right error here to simulate an error from
 					// the apiserver.
-					name := "" // unused by LIST requests
-					// The apisevrer confusingly does not return apierrors.NewNotFound,
-					// which has a nice constant for its error message.
-					// err = apierrors.NewNotFound(exampleGR, name)
-					// Instead it uses apierrors.NewGenericServerResponse, which uses
-					// a hard-coded error message.
-					err = apierrors.NewGenericServerResponse(http.StatusNotFound, "list", exampleGR, name, "unused", -1, false)
+					err = newGenericServerResponse(action, newNotFoundResourceStatusError(action))
 					return true, nil, err
 				})
 			},
@@ -88,13 +82,7 @@ func TestResourceNotFoundError(t *testing.T) {
 					// dynamicClient converts Status objects from the apiserver into errors.
 					// So we can just return the right error here to simulate an error from
 					// the apiserver.
-					name := "" // unused by LIST requests
-					// The apisevrer confusingly does not return apierrors.NewNotFound,
-					// which has a nice constant for its error message.
-					// err = apierrors.NewNotFound(exampleGR, name)
-					// Instead it uses apierrors.NewGenericServerResponse, which uses
-					// a hard-coded error message.
-					err = apierrors.NewGenericServerResponse(http.StatusNotFound, "list", exampleGR, name, "unused", -1, false)
+					err = newGenericServerResponse(action, newNotFoundResourceStatusError(action))
 					return true, nil, err
 				})
 			},
@@ -110,7 +98,67 @@ func TestResourceNotFoundError(t *testing.T) {
 					t.Errorf("Expected typed NotFound error, but got untyped NotFound error: %v", err)
 				default:
 					// If we got this error, the test is probably broken.
-					t.Errorf("Expected untyped NotFound error, but got a different error: %v", err)
+					t.Errorf("Expected typed NotFound error, but got a different error: %v", err)
+				}
+			},
+		},
+		{
+			name: "List resource forbidden error",
+			setup: func(fakeClient *dynamicfake.FakeDynamicClient) {
+				fakeClient.PrependReactor("list", exampleGR.Resource, func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+					listAction := action.(clienttesting.ListAction)
+					if listAction.GetNamespace() != namespace {
+						assert.Fail(t, "Received unexpected LIST namespace: %s", listAction.GetNamespace())
+						return false, nil, nil
+					}
+					// dynamicClient converts Status objects from the apiserver into errors.
+					// So we can just return the right error here to simulate an error from
+					// the apiserver.
+					err = newGenericServerResponse(action, newForbiddenResourceStatusError(action))
+					return true, nil, err
+				})
+			},
+			errorHandler: func(t *testing.T, err error) {
+				switch {
+				case apierrors.IsForbidden(err):
+					// If we got this error, something changed in the apiserver or
+					// client. If the client changed, it might be safe to stop parsing
+					// the error string.
+					t.Errorf("Expected untyped Forbidden error, but got typed Forbidden error: %v", err)
+				case containsForbiddenMessage(err):
+					// This is the expected hack, because the Informer/Reflector
+					// doesn't wrap the error with "%w".
+					t.Logf("Received expected untyped Forbidden error: %v", err)
+				default:
+					// If we got this error, the test is probably broken.
+					t.Errorf("Expected untyped Forbidden error, but got a different error: %v", err)
+				}
+			},
+		},
+		{
+			name: "Watch resource forbidden error",
+			setup: func(fakeClient *dynamicfake.FakeDynamicClient) {
+				fakeClient.PrependWatchReactor(exampleGR.Resource, func(action clienttesting.Action) (handled bool, ret watch.Interface, err error) {
+					// dynamicClient converts Status objects from the apiserver into errors.
+					// So we can just return the right error here to simulate an error from
+					// the apiserver.
+					err = newGenericServerResponse(action, newForbiddenResourceStatusError(action))
+					return true, nil, err
+				})
+			},
+			errorHandler: func(t *testing.T, err error) {
+				switch {
+				case apierrors.IsForbidden(err):
+					// This is the expected behavior, because the
+					// Informer/Reflector DOES wrap watch errors
+					t.Logf("Received expected untyped Forbidden error: %v", err)
+				case containsForbiddenMessage(err):
+					// If this happens, there was a regression.
+					// Watch errors are expected to be wrapped with "%w"
+					t.Errorf("Expected typed Forbidden error, but got untyped Forbidden error: %v", err)
+				default:
+					// If we got this error, the test is probably broken.
+					t.Errorf("Expected typed Forbidden error, but got a different error: %v", err)
 				}
 			},
 		},
@@ -163,4 +211,44 @@ func TestResourceNotFoundError(t *testing.T) {
 			informer.Run(ctx.Done())
 		})
 	}
+}
+
+// newForbiddenResourceStatusError emulates a Forbidden error from the apiserver
+// for a namespace-scoped resource.
+// https://github.com/kubernetes/apiserver/blob/master/pkg/endpoints/handlers/responsewriters/errors.go#L36
+func newForbiddenResourceStatusError(action clienttesting.Action) *apierrors.StatusError {
+	username := "unused"
+	verb := action.GetVerb()
+	resource := action.GetResource().Resource
+	if subresource := action.GetSubresource(); len(subresource) > 0 {
+		resource = resource + "/" + subresource
+	}
+	apiGroup := action.GetResource().Group
+	namespace := action.GetNamespace()
+
+	// https://github.com/kubernetes/apiserver/blob/master/pkg/endpoints/handlers/responsewriters/errors.go#L51
+	err := fmt.Errorf("User %q cannot %s resource %q in API group %q in the namespace %q",
+		username, verb, resource, apiGroup, namespace)
+
+	qualifiedResource := action.GetResource().GroupResource()
+	name := "" // unused by ListAndWatch
+	return apierrors.NewForbidden(qualifiedResource, name, err)
+}
+
+// newNotFoundResourceStatusError emulates a NotFOund error from the apiserver
+// for a resource (not an object).
+func newNotFoundResourceStatusError(action clienttesting.Action) *apierrors.StatusError {
+	qualifiedResource := action.GetResource().GroupResource()
+	name := "" // unused by ListAndWatch
+	return apierrors.NewNotFound(qualifiedResource, name)
+}
+
+// newGenericServerResponse emulates a StatusError from the apiserver.
+func newGenericServerResponse(action clienttesting.Action, statusError *apierrors.StatusError) *apierrors.StatusError {
+	errorCode := int(statusError.ErrStatus.Code)
+	verb := action.GetVerb()
+	qualifiedResource := action.GetResource().GroupResource()
+	name := statusError.ErrStatus.Details.Name
+	// https://github.com/kubernetes/apimachinery/blob/v0.24.0/pkg/api/errors/errors.go#L435
+	return apierrors.NewGenericServerResponse(errorCode, verb, qualifiedResource, name, statusError.Error(), -1, false)
 }

@@ -121,6 +121,9 @@ func (tsr *TaskStatusRunner) Run(
 					statusEvent.Error)
 				if currentTask != nil {
 					currentTask.Cancel(taskContext)
+				} else {
+					// tasks not started yet - abort now
+					return complete(abortReason)
 				}
 				continue
 			}
@@ -207,6 +210,9 @@ func (tsr *TaskStatusRunner) Run(
 			klog.V(7).Infof("Runner aborting: %v", abortReason)
 			if currentTask != nil {
 				currentTask.Cancel(taskContext)
+			} else {
+				// tasks not started yet - abort now
+				return complete(abortReason)
 			}
 		}
 	}
