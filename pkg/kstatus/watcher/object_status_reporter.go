@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"strings"
 	"sync"
 	"time"
 
@@ -92,7 +91,9 @@ type ObjectStatusReporter struct {
 	// ObjectFilter is used to decide which objects to ingore.
 	ObjectFilter ObjectFilter
 
-	// TODO: handle automatic?
+	// RESTScope specifies whether to ListAndWatch resources at the namespace
+	// or cluster (root) level. Using root scope is more efficient, but
+	// namespace scope may require fewer permissions.
 	RESTScope meta.RESTScope
 
 	// lock guards modification of the subsequent stateful fields
@@ -220,9 +221,14 @@ func (w *ObjectStatusReporter) Start(ctx context.Context) <-chan event.Event {
 	return w.funnel.OutputChannel()
 }
 
+// Stop triggers the cancellation of the reporter context, and closure of the
+// event channel without sending an error event.
+func (w *ObjectStatusReporter) Stop() {
+	klog.V(4).Info("Stopping reporter")
+	w.cancel()
+}
+
 // HasSynced returns true if all the started informers have been synced.
-//
-// TODO: provide a callback function, channel, or event to avoid needing to block with a rety loop.
 //
 // Use the following to block waiting for synchronization:
 // synced := cache.WaitForCacheSync(stopCh, informer.HasSynced)
@@ -322,17 +328,6 @@ func (w *ObjectStatusReporter) startInformerNow(
 
 	informer := w.InformerFactory.NewInformer(ctx, mapping, gkn.Namespace)
 
-	// Handler called when ListAndWatch errors.
-	// Custom handler stops the informer if the resource is NotFound (CRD deleted).
-	err = informer.SetWatchErrorHandler(func(r *cache.Reflector, err error) {
-		w.watchErrorHandler(gkn, err)
-	})
-	if err != nil {
-		// Should never happen.
-		// Informer can't have started yet. We just created it.
-		return fmt.Errorf("failed to set error handler on new informer for %v: %v", mapping.Resource, err)
-	}
-
 	w.informerRefs[gkn].SetInformer(informer)
 
 	eventCh := make(chan event.Event)
@@ -342,6 +337,17 @@ func (w *ObjectStatusReporter) startInformerNow(
 	if err != nil {
 		// Reporter already stopped.
 		return fmt.Errorf("informer failed to build event handler: %w", err)
+	}
+
+	// Handler called when ListAndWatch errors.
+	// Custom handler stops the informer if the resource is NotFound (CRD deleted).
+	err = informer.SetWatchErrorHandler(func(r *cache.Reflector, err error) {
+		w.watchErrorHandler(gkn, eventCh, err)
+	})
+	if err != nil {
+		// Should never happen.
+		// Informer can't have started yet. We just created it.
+		return fmt.Errorf("failed to set error handler on new informer for %v: %v", mapping.Resource, err)
 	}
 
 	informer.AddEventHandler(w.eventHandler(ctx, eventCh))
@@ -699,63 +705,59 @@ func (w *ObjectStatusReporter) newStatusCheckTaskFunc(
 }
 
 func (w *ObjectStatusReporter) handleFatalError(eventCh chan<- event.Event, err error) {
+	klog.V(5).Infof("Reporter error: %v", err)
 	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-		klog.V(5).Infof("Watch closed: %v", err)
 		return
 	}
 	eventCh <- event.Event{
 		Type:  event.ErrorEvent,
 		Error: err,
 	}
-	// Terminate the reporter.
-	w.cancel()
+	w.Stop()
 }
 
 // watchErrorHandler logs errors and cancels the informer for this GroupKind
 // if the NotFound error is received, which usually means the CRD was deleted.
 // Based on DefaultWatchErrorHandler from k8s.io/client-go@v0.23.2/tools/cache/reflector.go
-func (w *ObjectStatusReporter) watchErrorHandler(gkn GroupKindNamespace, err error) {
-	// Note: Informers use a stop channel, not a Context, so we don't expect
-	// Canceled or DeadlineExceeded here.
+func (w *ObjectStatusReporter) watchErrorHandler(gkn GroupKindNamespace, eventCh chan<- event.Event, err error) {
 	switch {
+	// Stop channel closed
 	case err == io.EOF:
-		// Stop channel closed
-		klog.V(5).Infof("Watch closed: %v: %v", gkn, err)
-	case err == io.ErrUnexpectedEOF:
-		// Keep retrying
-		klog.V(1).Infof("Watch closed: %v: %v", gkn, err)
-	case errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded):
-		// Context cancelled
-		klog.V(5).Infof("Watch closed: %v: %v", gkn, err)
-	case apierrors.IsResourceExpired(err): // resourceVersion too old
-		// Keep retrying
-		klog.V(5).Infof("Watch closed: %v: %v", gkn, err)
-	case apierrors.IsGone(err): // DEPRECATED
-		// Keep retrying
-		klog.V(5).Infof("Watch closed: %v: %v", gkn, err)
-	case apierrors.IsNotFound(err) || containsNotFoundMessage(err): // CRD deleted or not created
-		// Stop watching this resource
-		klog.V(3).Infof("Watch error: %v: stopping all watchers for this GroupKind: %v", gkn, err)
+		klog.V(5).Infof("ListAndWatch error (termination expected): %v: %v", gkn, err)
 
-		// Stop all informers for this GK
+	// Watch connection closed
+	case err == io.ErrUnexpectedEOF:
+		klog.V(1).Infof("ListAndWatch error (retry expected): %v: %v", gkn, err)
+
+	// Context done
+	case errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded):
+		klog.V(5).Infof("ListAndWatch error (termination expected): %v: %v", gkn, err)
+
+	// resourceVersion too old
+	case apierrors.IsResourceExpired(err):
+		// Keep retrying
+		klog.V(5).Infof("ListAndWatch error (retry expected): %v: %v", gkn, err)
+
+	// Resource unregistered (DEPRECATED, see NotFound)
+	case apierrors.IsGone(err):
+		klog.V(5).Infof("ListAndWatch error (retry expected): %v: %v", gkn, err)
+
+	// Resource not registered
+	case apierrors.IsNotFound(err) || containsNotFoundMessage(err):
+		klog.V(3).Infof("ListAndWatch error (termination expected): %v: stopping all informers for this GroupKind: %v", gkn, err)
 		w.forEachTargetWithGroupKind(gkn.GroupKind(), func(gkn GroupKindNamespace) {
 			w.stopInformer(gkn)
 		})
+
+	// Insufficient permissions
+	case apierrors.IsForbidden(err) || containsForbiddenMessage(err):
+		klog.V(3).Infof("ListAndWatch error (termination expected): %v: stopping all informers: %v", gkn, err)
+		w.handleFatalError(eventCh, err)
+
+	// Unexpected error
 	default:
-		// Keep retrying
-		klog.Warningf("Watch error (will retry): %v: %v", gkn, err)
+		klog.Warningf("ListAndWatch error (retry expected): %v: %v", gkn, err)
 	}
-}
-
-// resourceNotFoundMessage is the condition message for metav1.StatusReasonNotFound.
-const resourceNotFoundMessage = "the server could not find the requested resource"
-
-// containsNotFoundMessage checks if the error string contains the message for
-// StatusReasonNotFound.
-// See k8s.io/apimachinery@v0.23.2/pkg/api/errors/errors.go
-// This is necessary because the Informer doesn't properly wrap errors.
-func containsNotFoundMessage(err error) bool {
-	return strings.Contains(err.Error(), resourceNotFoundMessage)
 }
 
 // informerReference tracks informer lifecycle.

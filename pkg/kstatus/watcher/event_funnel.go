@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 )
 
@@ -37,6 +38,7 @@ func newEventFunnel(ctx context.Context) *eventFunnel {
 	go func() {
 		defer func() {
 			// Don't close counterCh, otherwise AddInputChannel may panic.
+			klog.V(5).Info("Closing funnel")
 			close(funnel.outCh)
 			close(funnel.doneCh)
 		}()
@@ -48,6 +50,7 @@ func newEventFunnel(ctx context.Context) *eventFunnel {
 			select {
 			case delta := <-funnel.counterCh:
 				inputs += delta
+				klog.V(5).Infof("Funnel input channels (%+d): %d", delta, inputs)
 			case <-ctxDoneCh:
 				// Stop waiting for context closure.
 				// Nil channel avoids busy waiting.
