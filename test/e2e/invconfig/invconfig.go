@@ -5,7 +5,6 @@ package invconfig
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -19,7 +18,6 @@ import (
 )
 
 type inventoryFactoryFunc func(name, namespace, id string) *unstructured.Unstructured
-type invWrapperFunc func(*unstructured.Unstructured) inventory.Info
 type applierFactoryFunc func() *apply.Applier
 type destroyerFactoryFunc func() *apply.Destroyer
 type invSizeVerifyFunc func(ctx context.Context, c client.Client, name, namespace, id string, specCount, statusCount int)
@@ -28,9 +26,7 @@ type invNotExistsFunc func(ctx context.Context, c client.Client, name, namespace
 
 type InventoryConfig struct {
 	ClientConfig         *rest.Config
-	Strategy             inventory.Strategy
 	FactoryFunc          inventoryFactoryFunc
-	InvWrapperFunc       invWrapperFunc
 	ApplierFactoryFunc   applierFactoryFunc
 	DestroyerFactoryFunc destroyerFactoryFunc
 	InvSizeVerifyFunc    invSizeVerifyFunc
@@ -39,14 +35,7 @@ type InventoryConfig struct {
 }
 
 func CreateInventoryInfo(invConfig InventoryConfig, inventoryName, namespaceName, inventoryID string) inventory.Info {
-	switch invConfig.Strategy {
-	case inventory.NameStrategy:
-		return invConfig.InvWrapperFunc(invConfig.FactoryFunc(inventoryName, namespaceName, e2eutil.RandomString("inventory-")))
-	case inventory.LabelStrategy:
-		return invConfig.InvWrapperFunc(invConfig.FactoryFunc(e2eutil.RandomString("inventory-"), namespaceName, inventoryID))
-	default:
-		panic(fmt.Errorf("unknown inventory strategy %q", invConfig.Strategy))
-	}
+	return inventory.InfoFromObject(invConfig.FactoryFunc(inventoryName, namespaceName, e2eutil.RandomString("inventory-")))
 }
 
 func newFactory(cfg *rest.Config) util.Factory {

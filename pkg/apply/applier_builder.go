@@ -34,9 +34,8 @@ func (b *ApplierBuilder) Build() (*Applier, error) {
 	}
 	return &Applier{
 		pruner: &prune.Pruner{
-			InvClient: bx.invClient,
-			Client:    bx.client,
-			Mapper:    bx.mapper,
+			Client: bx.client,
+			Mapper: bx.mapper,
 		},
 		statusWatcher: bx.statusWatcher,
 		invClient:     bx.invClient,
@@ -44,6 +43,10 @@ func (b *ApplierBuilder) Build() (*Applier, error) {
 		openAPIGetter: bx.discoClient,
 		mapper:        bx.mapper,
 		infoHelper:    info.NewHelper(bx.mapper, bx.unstructuredClientForMapping),
+		invObjManager: &inventory.ObjectManager{
+			Mapper:        bx.mapper,
+			DynamicClient: bx.client,
+		},
 	}, nil
 }
 

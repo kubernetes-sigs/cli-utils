@@ -29,7 +29,7 @@ const (
 
 var inventoryConfigs = map[string]invconfig.InventoryConfig{}
 var inventoryConfigTypes = []string{
-	ConfigMapTypeInvConfig,
+	// ConfigMapTypeInvConfig,
 	CustomTypeInvConfig,
 }
 

@@ -4,9 +4,9 @@
 package inventory
 
 import (
-	"regexp"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/cli-runtime/pkg/resource"
@@ -50,8 +50,6 @@ var legacyInvObj = &unstructured.Unstructured{
 	},
 }
 
-var localInv = WrapInventoryInfoObj(inventoryObj)
-
 var invInfo = &resource.Info{
 	Namespace: testNamespace,
 	Name:      inventoryObjName,
@@ -71,15 +69,6 @@ var pod1 = &unstructured.Unstructured{
 			"uid":       "uid1",
 		},
 	},
-}
-
-var pod1Info = &resource.Info{
-	Namespace: testNamespace,
-	Name:      pod1Name,
-	Mapping: &meta.RESTMapping{
-		Scope: meta.RESTScopeNamespace,
-	},
-	Object: pod1,
 }
 
 var pod2 = &unstructured.Unstructured{
@@ -111,25 +100,6 @@ var pod3 = &unstructured.Unstructured{
 			"name":      pod3Name,
 			"namespace": testNamespace,
 			"uid":       "uid3",
-		},
-	},
-}
-
-var pod3Info = &resource.Info{
-	Namespace: testNamespace,
-	Name:      pod3Name,
-	Mapping: &meta.RESTMapping{
-		Scope: meta.RESTScopeNamespace,
-	},
-	Object: pod3,
-}
-
-var inventoryNamespace = &unstructured.Unstructured{
-	Object: map[string]interface{}{
-		"apiVersion": "v1",
-		"kind":       "Namespace",
-		"metadata": map[string]interface{}{
-			"name": testNamespace,
 		},
 	},
 }
@@ -234,18 +204,8 @@ func TestRetrieveInventoryLabel(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		actual, err := retrieveInventoryLabel(object.InfoToUnstructured(test.inventoryInfo))
-		if test.isError && err == nil {
-			t.Errorf("Did not receive expected error.\n")
-		}
-		if !test.isError {
-			if err != nil {
-				t.Fatalf("Received unexpected error: %s\n", err)
-			}
-			if test.inventoryLabel != actual {
-				t.Errorf("Expected inventory label (%s), got (%s)\n", test.inventoryLabel, actual)
-			}
-		}
+		actual := Label(object.InfoToUnstructured(test.inventoryInfo))
+		assert.Equal(t, test.inventoryLabel, actual)
 	}
 }
 
@@ -256,11 +216,11 @@ func TestSplitUnstructureds(t *testing.T) {
 		expectedObjs []*unstructured.Unstructured
 		isError      bool
 	}{
-		"No objects returns error": {
+		"No objects is returns nil and no objects": {
 			allObjs:      []*unstructured.Unstructured{},
 			expectedInv:  nil,
 			expectedObjs: []*unstructured.Unstructured{},
-			isError:      true,
+			isError:      false,
 		},
 		"Only inventory object returns inv and no objects": {
 			allObjs:      []*unstructured.Unstructured{inventoryObj},
@@ -268,17 +228,17 @@ func TestSplitUnstructureds(t *testing.T) {
 			expectedObjs: []*unstructured.Unstructured{},
 			isError:      false,
 		},
-		"Inventory object with single object returns inventory and object": {
-			allObjs:      []*unstructured.Unstructured{inventoryObj, pod1},
-			expectedInv:  inventoryObj,
+		"Single object returns nil inventory and object": {
+			allObjs:      []*unstructured.Unstructured{pod1},
+			expectedInv:  nil,
 			expectedObjs: []*unstructured.Unstructured{pod1},
 			isError:      false,
 		},
-		"Multiple non-inventory objects returns error": {
+		"Multiple non-inventory objects returns nil inventory and objs": {
 			allObjs:      []*unstructured.Unstructured{pod1, pod2, pod3},
 			expectedInv:  nil,
 			expectedObjs: []*unstructured.Unstructured{pod1, pod2, pod3},
-			isError:      true,
+			isError:      false,
 		},
 		"Inventory object with multiple others splits correctly": {
 			allObjs:      []*unstructured.Unstructured{pod1, pod2, inventoryObj, pod3},
@@ -316,117 +276,6 @@ func TestSplitUnstructureds(t *testing.T) {
 	}
 }
 
-func TestAddSuffixToName(t *testing.T) {
-	tests := []struct {
-		obj      *unstructured.Unstructured
-		suffix   string
-		expected string
-		isError  bool
-	}{
-		// Nil info should return error.
-		{
-			obj:      nil,
-			suffix:   "",
-			expected: "",
-			isError:  true,
-		},
-		// Empty suffix should return error.
-		{
-			obj:      copyInventoryInfo(),
-			suffix:   "",
-			expected: "",
-			isError:  true,
-		},
-		// Empty suffix should return error.
-		{
-			obj:      copyInventoryInfo(),
-			suffix:   " \t",
-			expected: "",
-			isError:  true,
-		},
-		{
-			obj:      copyInventoryInfo(),
-			suffix:   "hashsuffix",
-			expected: inventoryObjName + "-hashsuffix",
-			isError:  false,
-		},
-	}
-
-	for _, test := range tests {
-		err := addSuffixToName(test.obj, test.suffix)
-		if test.isError {
-			if err == nil {
-				t.Errorf("Should have produced an error, but returned none.")
-			}
-		}
-		if !test.isError {
-			if err != nil {
-				t.Fatalf("Received error when expecting none (%s)\n", err)
-			}
-			actualName := test.obj.GetName()
-			if test.expected != actualName {
-				t.Errorf("Expected name (%s), got (%s)\n", test.expected, actualName)
-			}
-		}
-	}
-}
-
-func TestLegacyInventoryName(t *testing.T) {
-	tests := map[string]struct {
-		obj        *unstructured.Unstructured
-		invName    string // Expected inventory name (if not modified)
-		isModified bool   // Should inventory name be changed
-		isError    bool   // Should an error be thrown
-	}{
-		"Legacy inventory name gets random suffix": {
-			obj:        legacyInvObj,
-			invName:    legacyInvName,
-			isModified: true,
-			isError:    false,
-		},
-		"Non-legacy inventory name does not get modified": {
-			obj:        inventoryObj,
-			invName:    inventoryObjName,
-			isModified: false,
-			isError:    false,
-		},
-	}
-
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			err := fixLegacyInventoryName(tc.obj)
-			if tc.isError {
-				if err == nil {
-					t.Fatalf("Should have produced an error, but returned none.")
-				}
-				return
-			}
-			if !tc.isError && err != nil {
-				t.Fatalf("Received error when expecting none (%s)\n", err)
-			}
-			actualName := tc.obj.GetName()
-			if !tc.isModified {
-				if tc.invName != tc.obj.GetName() {
-					t.Fatalf("expected non-modified name (%s), got (%s)", tc.invName, tc.obj.GetName())
-				}
-				return
-			}
-			matched, err := regexp.MatchString(`inventory-\d{8}`, actualName)
-			if err != nil {
-				t.Errorf("unexpected error parsing inventory name: %s", err)
-			}
-			if !matched {
-				t.Errorf("expected inventory name with random suffix, got (%s)", actualName)
-			}
-		})
-	}
-}
-
 func copyInventoryInfo() *unstructured.Unstructured {
 	return inventoryObj.DeepCopy()
-}
-
-func copyInventory() Info {
-	u := inventoryObj.DeepCopy()
-	return WrapInventoryInfoObj(u)
 }

@@ -25,41 +25,31 @@ const multipleInventoryErrorStr = `Package has multiple inventory object templat
 The package should have one and only one inventory object template.
 `
 
+const namespaceInSetErrorStr = `Inventory use namespace defined in package.
+
+The inventory cannot use a namespace that is defined in the package.
+`
+
 type NoInventoryObjError struct{}
 
-func (e *NoInventoryObjError) Error() string {
+func (g NoInventoryObjError) Error() string {
 	return noInventoryErrorStr
-}
-
-// Is returns true if the specified error is equal to this error.
-// Use errors.Is(error) to recursively check if an error wraps this error.
-func (e *NoInventoryObjError) Is(err error) bool {
-	if err == nil {
-		return false
-	}
-	_, ok := err.(*NoInventoryObjError)
-	return ok
 }
 
 type MultipleInventoryObjError struct {
 	InventoryObjectTemplates object.UnstructuredSet
 }
 
-func (e *MultipleInventoryObjError) Error() string {
+func (g MultipleInventoryObjError) Error() string {
 	return multipleInventoryErrorStr
 }
 
-// Is returns true if the specified error is equal to this error.
-// Use errors.Is(error) to recursively check if an error wraps this error.
-func (e *MultipleInventoryObjError) Is(err error) bool {
-	if err == nil {
-		return false
-	}
-	tErr, ok := err.(*MultipleInventoryObjError)
-	if !ok {
-		return false
-	}
-	return e.InventoryObjectTemplates.Equal(tErr.InventoryObjectTemplates)
+type NamespaceInSet struct {
+	Namespace string
+}
+
+func (g NamespaceInSet) Error() string {
+	return namespaceInSetErrorStr
 }
 
 type PolicyPreventedActuationError struct {

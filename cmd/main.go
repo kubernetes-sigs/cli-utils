@@ -62,7 +62,8 @@ func main() {
 	}
 
 	loader := manifestreader.NewManifestLoader(f)
-	invFactory := inventory.ClusterClientFactory{StatusPolicy: inventory.StatusPolicyNone}
+	// TODO: Add StatusPolicy back to factory.
+	invFactory := inventory.ConfigMapClientFactory{}
 
 	names := []string{"init", "apply", "destroy", "diff", "preview", "status"}
 	subCmds := []*cobra.Command{

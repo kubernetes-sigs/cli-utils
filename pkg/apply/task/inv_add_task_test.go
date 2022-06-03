@@ -4,15 +4,21 @@
 package task
 
 import (
+	"context"
+	"fmt"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"sigs.k8s.io/cli-utils/pkg/apis/actuation"
 	"sigs.k8s.io/cli-utils/pkg/apply/cache"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/object"
+	"sigs.k8s.io/cli-utils/pkg/testutil"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var namespace = "test-namespace"
@@ -31,7 +37,7 @@ var inventoryObj = &unstructured.Unstructured{
 	},
 }
 
-var localInv = inventory.WrapInventoryInfoObj(inventoryObj)
+var inventoryInfo = inventory.InfoFromObject(inventoryObj)
 
 var obj1 = &unstructured.Unstructured{
 	Object: map[string]interface{}{
@@ -72,102 +78,156 @@ func TestInvAddTask(t *testing.T) {
 	id1 := object.UnstructuredToObjMetadata(obj1)
 	id2 := object.UnstructuredToObjMetadata(obj2)
 	id3 := object.UnstructuredToObjMetadata(obj3)
+	ref1 := inventory.ObjectReferenceFromObject(obj1)
+	ref2 := inventory.ObjectReferenceFromObject(obj2)
+	ref3 := inventory.ObjectReferenceFromObject(obj3)
 
 	tests := map[string]struct {
-		initialObjs  object.ObjMetadataSet
-		applyObjs    []*unstructured.Unstructured
-		expectedObjs object.ObjMetadataSet
+		applyObjs          []*unstructured.Unstructured
+		pruneObjs          []*unstructured.Unstructured
+		expectedIds        object.ObjMetadataSet
+		expectedSpecObjs   []actuation.ObjectReference
+		expectedStatusObjs []actuation.ObjectStatus
+		expectedError      error
 	}{
-		"no initial inventory and no apply objects; no merged inventory": {
-			initialObjs:  object.ObjMetadataSet{},
-			applyObjs:    []*unstructured.Unstructured{},
-			expectedObjs: object.ObjMetadataSet{},
+		"no prune objects, no apply objects; no  inventory": {
+			applyObjs:          []*unstructured.Unstructured{},
+			pruneObjs:          []*unstructured.Unstructured{},
+			expectedIds:        object.ObjMetadataSet{},
+			expectedSpecObjs:   []actuation.ObjectReference{},
+			expectedStatusObjs: []actuation.ObjectStatus{},
 		},
-		"no initial inventory, one apply object; one merged inventory": {
-			initialObjs:  object.ObjMetadataSet{},
-			applyObjs:    []*unstructured.Unstructured{obj1},
-			expectedObjs: object.ObjMetadataSet{id1},
+		"no prune objects, one apply object; one merged inventory": {
+			applyObjs:        []*unstructured.Unstructured{obj1},
+			pruneObjs:        []*unstructured.Unstructured{},
+			expectedIds:      object.ObjMetadataSet{id1},
+			expectedSpecObjs: []actuation.ObjectReference{ref1},
+			expectedStatusObjs: []actuation.ObjectStatus{
+				{
+					ObjectReference: ref1,
+					Strategy:        actuation.ActuationStrategyApply,
+					Actuation:       actuation.ActuationPending,
+					Reconcile:       actuation.ReconcilePending,
+				},
+			},
 		},
-		"one initial inventory, no apply object; one merged inventory": {
-			initialObjs:  object.ObjMetadataSet{id2},
-			applyObjs:    []*unstructured.Unstructured{},
-			expectedObjs: object.ObjMetadataSet{id2},
+		"one prune object, no apply object; one merged inventory": {
+			applyObjs:        []*unstructured.Unstructured{},
+			pruneObjs:        []*unstructured.Unstructured{obj2},
+			expectedIds:      object.ObjMetadataSet{id2},
+			expectedSpecObjs: []actuation.ObjectReference{ref2},
+			expectedStatusObjs: []actuation.ObjectStatus{
+				{
+					ObjectReference: ref2,
+					Strategy:        actuation.ActuationStrategyDelete,
+					Actuation:       actuation.ActuationPending,
+					Reconcile:       actuation.ReconcilePending,
+				},
+			},
 		},
-		"one initial inventory, one apply object; one merged inventory": {
-			initialObjs:  object.ObjMetadataSet{id3},
-			applyObjs:    []*unstructured.Unstructured{obj3},
-			expectedObjs: object.ObjMetadataSet{id3},
+		"one prune object, one apply object; one merged inventory": {
+			applyObjs:     []*unstructured.Unstructured{obj3},
+			pruneObjs:     []*unstructured.Unstructured{obj3},
+			expectedIds:   object.ObjMetadataSet{id3},
+			expectedError: fmt.Errorf("apply set and delete set share objects: %v", object.ObjMetadataSet{id3}),
 		},
-		"three initial inventory, two same objects; three merged inventory": {
-			initialObjs:  object.ObjMetadataSet{id1, id2, id3},
-			applyObjs:    []*unstructured.Unstructured{obj2, obj3},
-			expectedObjs: object.ObjMetadataSet{id1, id2, id3},
+		"three prune objects, two same objects; three merged inventory": {
+			applyObjs:        []*unstructured.Unstructured{obj2, obj3},
+			pruneObjs:        []*unstructured.Unstructured{obj1},
+			expectedIds:      object.ObjMetadataSet{id2, id3, id1},
+			expectedSpecObjs: []actuation.ObjectReference{ref2, ref3, ref1},
+			expectedStatusObjs: []actuation.ObjectStatus{
+				{
+					ObjectReference: ref2,
+					Strategy:        actuation.ActuationStrategyApply,
+					Actuation:       actuation.ActuationPending,
+					Reconcile:       actuation.ReconcilePending,
+				},
+				{
+					ObjectReference: ref3,
+					Strategy:        actuation.ActuationStrategyApply,
+					Actuation:       actuation.ActuationPending,
+					Reconcile:       actuation.ReconcilePending,
+				},
+				{
+					ObjectReference: ref1,
+					Strategy:        actuation.ActuationStrategyDelete,
+					Actuation:       actuation.ActuationPending,
+					Reconcile:       actuation.ReconcilePending,
+				},
+			},
 		},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			client := inventory.NewFakeClient(tc.initialObjs)
+			client := &inventory.InMemoryClient{}
 			eventChannel := make(chan event.Event)
 			resourceCache := cache.NewResourceCacheMap()
-			context := taskrunner.NewTaskContext(eventChannel, resourceCache)
+			taskContext := taskrunner.NewTaskContext(eventChannel, resourceCache)
+
+			// initialize inventory reference in context
+			inv := taskContext.InventoryManager().Inventory()
+			inv.SetGroupVersionKind(inventoryObj.GroupVersionKind())
+			inv.SetName(inventoryObj.GetName())
+			inv.SetNamespace(inventoryObj.GetNamespace())
+			inv.SetLabels(inventoryObj.GetLabels())
 
 			task := InvAddTask{
-				TaskName:  taskName,
-				InvClient: client,
-				InvInfo:   nil,
-				Objects:   tc.applyObjs,
+				TaskName:     taskName,
+				InvClient:    client,
+				ApplyObjects: tc.applyObjs,
+				PruneObjects: tc.pruneObjs,
 			}
-			if taskName != task.Name() {
-				t.Errorf("expected task name (%s), got (%s)", taskName, task.Name())
+			assert.Equal(t, taskName, task.Name())
+			testutil.AssertEqual(t, tc.expectedIds, task.Identifiers())
+
+			task.Start(taskContext)
+			result := <-taskContext.TaskChannel()
+			if tc.expectedError != nil {
+				assert.EqualError(t, result.Err, tc.expectedError.Error())
+				return
 			}
-			applyIds := object.UnstructuredSetToObjMetadataSet(tc.applyObjs)
-			if !task.Identifiers().Equal(applyIds) {
-				t.Errorf("expected task ids (%s), got (%s)", applyIds, task.Identifiers())
-			}
-			task.Start(context)
-			result := <-context.TaskChannel()
-			if result.Err != nil {
-				t.Errorf("unexpected error running InvAddTask: %s", result.Err)
-			}
-			actual, _ := client.GetClusterObjs(nil)
-			if !tc.expectedObjs.Equal(actual) {
-				t.Errorf("expected merged inventory (%s), got (%s)", tc.expectedObjs, actual)
-			}
+			assert.NoError(t, result.Err)
+
+			inv, err := client.Load(context.TODO(), inventoryInfo)
+			assert.NoError(t, err)
+			testutil.AssertEqual(t, tc.expectedSpecObjs, inv.Spec.Objects)
+			testutil.AssertEqual(t, tc.expectedStatusObjs, inv.Status.Objects)
 		})
 	}
 }
 
-func TestInventoryNamespaceInSet(t *testing.T) {
+func TestNamespaceInSet(t *testing.T) {
 	inventoryNamespace := createNamespace(namespace)
 
 	tests := map[string]struct {
-		inv       inventory.Info
+		inv       client.Object
 		objects   []*unstructured.Unstructured
 		namespace *unstructured.Unstructured
 	}{
-		"Nil inventory object, no resources returns nil namespace": {
-			inv:       nil,
+		"empty inventory reference, no resources returns nil namespace": {
+			inv:       &unstructured.Unstructured{},
 			objects:   []*unstructured.Unstructured{},
 			namespace: nil,
 		},
 		"Inventory object, but no resources returns nil namespace": {
-			inv:       localInv,
+			inv:       inventoryObj,
 			objects:   []*unstructured.Unstructured{},
 			namespace: nil,
 		},
 		"Inventory object, resources with no namespace returns nil namespace": {
-			inv:       localInv,
+			inv:       inventoryObj,
 			objects:   []*unstructured.Unstructured{obj1, obj2},
 			namespace: nil,
 		},
 		"Inventory object, different namespace returns nil namespace": {
-			inv:       localInv,
+			inv:       inventoryObj,
 			objects:   []*unstructured.Unstructured{createNamespace("foo")},
 			namespace: nil,
 		},
 		"Inventory object, inventory namespace returns inventory namespace": {
-			inv:       localInv,
+			inv:       inventoryObj,
 			objects:   []*unstructured.Unstructured{obj1, inventoryNamespace, obj3},
 			namespace: inventoryNamespace,
 		},
@@ -175,7 +235,7 @@ func TestInventoryNamespaceInSet(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			actualNamespace := inventoryNamespaceInSet(tc.inv, tc.objects)
+			actualNamespace := NamespaceInSet(tc.inv, tc.objects)
 			if tc.namespace != actualNamespace {
 				t.Fatalf("expected namespace (%v), got (%v)", tc.namespace, actualNamespace)
 			}

@@ -14,6 +14,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/apply"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/filter"
+	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/testutil"
 	"sigs.k8s.io/cli-utils/test/e2e/e2eutil"
@@ -26,7 +27,7 @@ func namespaceFilterTest(ctx context.Context, c client.Client, invConfig invconf
 	By("apply resources in order based on depends-on annotation")
 	applier := invConfig.ApplierFactoryFunc()
 
-	inv := invConfig.InvWrapperFunc(invConfig.FactoryFunc(inventoryName, namespaceName, "test"))
+	inv := inventory.InfoFromObject(invConfig.FactoryFunc(inventoryName, namespaceName, "test"))
 
 	namespace1Name := fmt.Sprintf("%s-ns1", namespaceName)
 

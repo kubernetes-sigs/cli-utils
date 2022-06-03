@@ -91,7 +91,7 @@ func TestInventoryPolicyPruneFilter(t *testing.T) {
 			invObj := inventoryObj.DeepCopy()
 			invObj.SetLabels(invIDLabel)
 			filter := InventoryPolicyPruneFilter{
-				Inv:       inventory.WrapInventoryInfoObj(invObj),
+				Inv:       inventory.InfoFromObject(invObj),
 				InvPolicy: tc.policy,
 			}
 			objIDAnnotation := map[string]string{

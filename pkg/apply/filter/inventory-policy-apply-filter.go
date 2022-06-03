@@ -22,7 +22,7 @@ import (
 type InventoryPolicyApplyFilter struct {
 	Client    dynamic.Interface
 	Mapper    meta.RESTMapper
-	Inv       inventory.Info
+	InvInfo   inventory.Info
 	InvPolicy inventory.Policy
 }
 
@@ -47,7 +47,7 @@ func (ipaf InventoryPolicyApplyFilter) Filter(obj *unstructured.Unstructured) er
 		}
 		return NewFatalError(fmt.Errorf("failed to get current object from cluster: %w", err))
 	}
-	_, err = inventory.CanApply(ipaf.Inv, clusterObj, ipaf.InvPolicy)
+	_, err = inventory.CanApply(ipaf.InvInfo, clusterObj, ipaf.InvPolicy)
 	if err != nil {
 		return err
 	}

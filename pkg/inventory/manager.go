@@ -24,17 +24,27 @@ func NewManager() *Manager {
 	}
 }
 
-// Inventory returns the in-memory version of the managed inventory.
+// InventoryReference returns an ObjectReference that references the inventory.
+func (tc *Manager) InventoryReference() actuation.ObjectReference {
+	gvk := tc.inventory.GetObjectKind().GroupVersionKind()
+	return actuation.ObjectReference{
+		Group:     gvk.Group,
+		Kind:      gvk.Kind,
+		Name:      tc.inventory.GetName(),
+		Namespace: tc.inventory.GetNamespace(),
+	}
+}
+
+// Inventory returns the in-memory version of the managed actuation.
 func (tc *Manager) Inventory() *actuation.Inventory {
 	return tc.inventory
 }
 
-// ObjectStatus retrieves the status of an object with the specified ID.
+// actuation.ObjectStatus retrieves the status of an object with the specified ID.
 // The returned status is a pointer and can be updated in-place for efficiency.
 func (tc *Manager) ObjectStatus(id object.ObjMetadata) (*actuation.ObjectStatus, bool) {
-	ref := ObjectReferenceFromObjMetadata(id)
 	for i, objStatus := range tc.inventory.Status.Objects {
-		if objStatus.ObjectReference == ref {
+		if ObjMetadataEqualObjectReference(id, objStatus.ObjectReference) {
 			return &(tc.inventory.Status.Objects[i]), true
 		}
 	}
@@ -43,7 +53,10 @@ func (tc *Manager) ObjectStatus(id object.ObjMetadata) (*actuation.ObjectStatus,
 
 // ObjectsWithActuationStatus retrieves the set of objects with the
 // specified actuation strategy and status.
-func (tc *Manager) ObjectsWithActuationStatus(strategy actuation.ActuationStrategy, status actuation.ActuationStatus) object.ObjMetadataSet {
+func (tc *Manager) ObjectsWithActuationStatus(
+	strategy actuation.ActuationStrategy,
+	status actuation.ActuationStatus,
+) object.ObjMetadataSet {
 	var ids object.ObjMetadataSet
 	for _, objStatus := range tc.inventory.Status.Objects {
 		if objStatus.Strategy == strategy && objStatus.Actuation == status {
@@ -55,7 +68,9 @@ func (tc *Manager) ObjectsWithActuationStatus(strategy actuation.ActuationStrate
 
 // ObjectsWithActuationStatus retrieves the set of objects with the
 // specified reconcile status, regardless of actuation strategy.
-func (tc *Manager) ObjectsWithReconcileStatus(status actuation.ReconcileStatus) object.ObjMetadataSet {
+func (tc *Manager) ObjectsWithReconcileStatus(
+	status actuation.ReconcileStatus,
+) object.ObjMetadataSet {
 	var ids object.ObjMetadataSet
 	for _, objStatus := range tc.inventory.Status.Objects {
 		if objStatus.Reconcile == status {
@@ -65,7 +80,7 @@ func (tc *Manager) ObjectsWithReconcileStatus(status actuation.ReconcileStatus) 
 	return ids
 }
 
-// SetObjectStatus updates or adds an ObjectStatus record to the inventory.
+// SetObjectStatus updates or adds an actuation.ObjectStatus record to the actuation.
 func (tc *Manager) SetObjectStatus(newObjStatus actuation.ObjectStatus) {
 	for i, oldObjStatus := range tc.inventory.Status.Objects {
 		if oldObjStatus.ObjectReference == newObjStatus.ObjectReference {
@@ -219,8 +234,7 @@ func (tc *Manager) AddFailedDelete(id object.ObjMetadata) {
 
 // FailedDeletes returns all the objects that failed to delete
 func (tc *Manager) FailedDeletes() object.ObjMetadataSet {
-	return tc.ObjectsWithActuationStatus(actuation.ActuationStrategyDelete,
-		actuation.ActuationFailed)
+	return tc.ObjectsWithActuationStatus(actuation.ActuationStrategyDelete, actuation.ActuationFailed)
 }
 
 // IsSkippedApply returns true if the object apply was skipped
@@ -270,8 +284,7 @@ func (tc *Manager) AddSkippedDelete(id object.ObjMetadata) {
 
 // SkippedDeletes returns all the objects where deletion was skipped
 func (tc *Manager) SkippedDeletes() object.ObjMetadataSet {
-	return tc.ObjectsWithActuationStatus(actuation.ActuationStrategyDelete,
-		actuation.ActuationSkipped)
+	return tc.ObjectsWithActuationStatus(actuation.ActuationStrategyDelete, actuation.ActuationSkipped)
 }
 
 // IsSuccessfulReconcile returns true if the object is reconciled

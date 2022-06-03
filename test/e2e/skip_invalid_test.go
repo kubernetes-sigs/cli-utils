@@ -30,7 +30,7 @@ func skipInvalidTest(ctx context.Context, c client.Client, invConfig invconfig.I
 	By("apply valid objects and skip invalid objects")
 	applier := invConfig.ApplierFactoryFunc()
 
-	inv := invConfig.InvWrapperFunc(invConfig.FactoryFunc(inventoryName, namespaceName, "test"))
+	inv := inventory.InfoFromObject(invConfig.FactoryFunc(inventoryName, namespaceName, "test"))
 
 	fields := struct{ Namespace string }{Namespace: namespaceName}
 	// valid pod

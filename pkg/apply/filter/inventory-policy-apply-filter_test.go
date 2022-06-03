@@ -102,7 +102,7 @@ func TestInventoryPolicyApplyFilter(t *testing.T) {
 				Client: dynamicfake.NewSimpleDynamicClient(scheme.Scheme, obj),
 				Mapper: testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme,
 					scheme.Scheme.PrioritizedVersionsAllGroups()...),
-				Inv:       inventory.WrapInventoryInfoObj(invObj),
+				InvInfo:   inventory.InfoFromObject(invObj),
 				InvPolicy: tc.policy,
 			}
 			err := filter.Filter(obj)

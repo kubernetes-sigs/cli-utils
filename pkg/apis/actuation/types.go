@@ -8,6 +8,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // Inventory represents the inventory object in memory.
 // Inventory is currently only used for in-memory storage and not serialized to
 // disk or to the API server.

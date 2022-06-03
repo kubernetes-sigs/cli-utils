@@ -10,7 +10,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/apis/actuation"
 )
 
-// Policy defines if an inventory object can take over
+// InventoryPolicy defines if an inventory object can take over
 // objects that belong to another inventory object or don't
 // belong to any inventory object.
 // This is done by determining if the apply/prune operation
@@ -71,7 +71,7 @@ const (
 // OwningInventoryKey is the annotation key indicating the inventory owning an object.
 const OwningInventoryKey = "config.k8s.io/owning-inventory"
 
-// IDMatchStatus represents the result of comparing the
+// inventoryIDMatchStatus represents the result of comparing the
 // id from current inventory info and the inventory-id from a live object.
 //
 //go:generate stringer -type=IDMatchStatus
@@ -83,20 +83,21 @@ const (
 	NoMatch
 )
 
-func IDMatch(inv Info, obj *unstructured.Unstructured) IDMatchStatus {
+func IDMatch(invInfo Info, obj *unstructured.Unstructured) IDMatchStatus {
 	annotations := obj.GetAnnotations()
 	value, found := annotations[OwningInventoryKey]
 	if !found {
 		return Empty
 	}
-	if value == inv.ID() {
+
+	if value == invInfo.ID {
 		return Match
 	}
 	return NoMatch
 }
 
-func CanApply(inv Info, obj *unstructured.Unstructured, policy Policy) (bool, error) {
-	matchStatus := IDMatch(inv, obj)
+func CanApply(invInfo Info, obj *unstructured.Unstructured, policy Policy) (bool, error) {
+	matchStatus := IDMatch(invInfo, obj)
 	switch matchStatus {
 	case Empty:
 		if policy != PolicyMustMatch {
@@ -141,11 +142,58 @@ func CanPrune(inv Info, obj *unstructured.Unstructured, policy Policy) (bool, er
 	}
 }
 
-func AddInventoryIDAnnotation(obj *unstructured.Unstructured, inv Info) {
+// OwningInventoryAnnotation returns the string value of the OwningInventoryKey
+// for the passed object. Returns empty string if not found.
+func OwningInventoryAnnotation(obj *unstructured.Unstructured) string {
+	annotations := obj.GetAnnotations()
+	if annotations == nil {
+		return ""
+	}
+	return annotations[OwningInventoryKey]
+}
+
+// SetOwningInventoryAnnotation updates the string value of the
+// OwningInventoryKey for the passed object.
+func SetOwningInventoryAnnotation(obj *unstructured.Unstructured, id string) {
 	annotations := obj.GetAnnotations()
 	if annotations == nil {
 		annotations = make(map[string]string)
 	}
-	annotations[OwningInventoryKey] = inv.ID()
+	annotations[OwningInventoryKey] = id
 	obj.SetAnnotations(annotations)
+}
+
+// DeleteOwningInventoryAnnotation removes the OwningInventoryKey annotation
+// in the passed object.
+func DeleteOwningInventoryAnnotation(obj *unstructured.Unstructured) {
+	annotations := obj.GetAnnotations()
+	if annotations == nil {
+		return
+	}
+	delete(annotations, OwningInventoryKey)
+	obj.SetAnnotations(annotations)
+}
+
+type OverlapError struct {
+	err error
+}
+
+func (e *OverlapError) Error() string {
+	return e.err.Error()
+}
+
+func NewOverlapError(err error) *OverlapError {
+	return &OverlapError{err: err}
+}
+
+type NeedAdoptionError struct {
+	err error
+}
+
+func (e *NeedAdoptionError) Error() string {
+	return e.err.Error()
+}
+
+func NewNeedAdoptionError(err error) *NeedAdoptionError {
+	return &NeedAdoptionError{err: err}
 }

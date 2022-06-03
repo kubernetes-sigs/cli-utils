@@ -32,11 +32,15 @@ func (b *DestroyerBuilder) Build() (*Destroyer, error) {
 	if err != nil {
 		return nil, err
 	}
+	invObjManager := &inventory.ObjectManager{
+		Mapper:        bx.mapper,
+		DynamicClient: bx.client,
+	}
+
 	return &Destroyer{
 		pruner: &prune.Pruner{
-			InvClient: bx.invClient,
-			Client:    bx.client,
-			Mapper:    bx.mapper,
+			Client: bx.client,
+			Mapper: bx.mapper,
 		},
 		statusWatcher: bx.statusWatcher,
 		invClient:     bx.invClient,
@@ -44,6 +48,7 @@ func (b *DestroyerBuilder) Build() (*Destroyer, error) {
 		client:        bx.client,
 		openAPIGetter: bx.discoClient,
 		infoHelper:    info.NewHelper(bx.mapper, bx.unstructuredClientForMapping),
+		invObjManager: invObjManager,
 	}, nil
 }
 

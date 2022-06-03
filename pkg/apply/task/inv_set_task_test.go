@@ -4,8 +4,10 @@
 package task
 
 import (
+	"context"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/cli-utils/pkg/apply/cache"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
@@ -57,8 +59,8 @@ func TestInvSetTask(t *testing.T) {
 			expectedObjs:  object.ObjMetadataSet{},
 		},
 		"one apply objs, one prune failures; one inventory": {
-			// aritifical use case: applies and prunes are mutually exclusive.
-			// Delete failure overwrites apply success in object status.
+			// aritifical use case: applies and prunes are mutually exclusive
+			// Delete overwrites Apply in Inventory.Status.Objects[].Strategy
 			appliedObjs:   object.ObjMetadataSet{id3},
 			failedDeletes: object.ObjMetadataSet{id3},
 			expectedObjs:  object.ObjMetadataSet{},
@@ -164,18 +166,25 @@ func TestInvSetTask(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			client := inventory.NewFakeClient(object.ObjMetadataSet{})
+			// client := inventory.NewFakeInventoryClient(object.ObjMetadataSet{})
+			client := &inventory.InMemoryClient{}
 			eventChannel := make(chan event.Event)
 			resourceCache := cache.NewResourceCacheMap()
-			context := taskrunner.NewTaskContext(eventChannel, resourceCache)
+			taskContext := taskrunner.NewTaskContext(eventChannel, resourceCache)
+
+			// initialize inventory reference in context
+			inv := taskContext.InventoryManager().Inventory()
+			inv.SetGroupVersionKind(inventoryObj.GroupVersionKind())
+			inv.SetName(inventoryObj.GetName())
+			inv.SetNamespace(inventoryObj.GetNamespace())
+			inv.SetLabels(inventoryObj.GetLabels())
 
 			task := InvSetTask{
 				TaskName:      taskName,
 				InvClient:     client,
-				InvInfo:       nil,
 				PrevInventory: tc.prevInventory,
 			}
-			im := context.InventoryManager()
+			im := taskContext.InventoryManager()
 			for _, applyObj := range tc.appliedObjs {
 				im.AddSuccessfulApply(applyObj, "unusued-uid", int64(0))
 			}
@@ -192,23 +201,28 @@ func TestInvSetTask(t *testing.T) {
 				im.AddSkippedDelete(skippedDelete)
 			}
 			for _, abandonedObj := range tc.abandonedObjs {
-				context.AddAbandonedObject(abandonedObj)
+				taskContext.AddAbandonedObject(abandonedObj)
 			}
 			for _, invalidObj := range tc.invalidObjs {
-				context.AddInvalidObject(invalidObj)
+				taskContext.AddInvalidObject(invalidObj)
 			}
 			if taskName != task.Name() {
 				t.Errorf("expected task name (%s), got (%s)", taskName, task.Name())
 			}
-			task.Start(context)
-			result := <-context.TaskChannel()
-			if result.Err != nil {
-				t.Errorf("unexpected error running InvAddTask: %s", result.Err)
-			}
-			actual, _ := client.GetClusterObjs(nil)
+			task.Start(taskContext)
+			result := <-taskContext.TaskChannel()
+			require.NoError(t, result.Err)
+
+			inv, err := client.Load(context.TODO(), inventoryInfo)
+			require.NoError(t, err)
+			require.NotNil(t, inv)
+
+			actual := inventory.ObjMetadataSetFromObjectReferences(inv.Spec.Objects)
 			testutil.AssertEqual(t, tc.expectedObjs, actual,
-				"Actual cluster objects (%d) do not match expected cluster objects (%d)",
+				"Actual inventory objects (%d) do not match expected inventory objects (%d)",
 				len(actual), len(tc.expectedObjs))
+
+			// TODO: validate status is stored from the inventory
 		})
 	}
 }

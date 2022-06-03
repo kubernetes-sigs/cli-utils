@@ -48,49 +48,68 @@ type Applier struct {
 	openAPIGetter discovery.OpenAPISchemaInterface
 	mapper        meta.RESTMapper
 	infoHelper    info.Helper
+	invObjManager *inventory.ObjectManager
 }
 
 // prepareObjects returns the set of objects to apply and to prune or
 // an error if one occurred.
-func (a *Applier) prepareObjects(localInv inventory.Info, localObjs object.UnstructuredSet,
-	o ApplierOptions) (object.UnstructuredSet, object.UnstructuredSet, error) {
-	if localInv == nil {
-		return nil, nil, fmt.Errorf("the local inventory can't be nil")
-	}
+func (a *Applier) prepareObjects(
+	ctx context.Context,
+	invInfo inventory.Info,
+	localObjs object.UnstructuredSet,
+) (applyObjs, pruneObjs, invObjs object.UnstructuredSet, err error) {
+	// TODO: move to validator
 	if err := inventory.ValidateNoInventory(localObjs); err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
+
+	// Apply all local objects
+	applyObjs = localObjs
+	klog.V(4).Infof("local objects: %d", len(applyObjs))
+
 	// Add the inventory annotation to the resources being applied.
-	for _, localObj := range localObjs {
-		inventory.AddInventoryIDAnnotation(localObj, localInv)
+	for _, applyObj := range applyObjs {
+		inventory.SetOwningInventoryAnnotation(applyObj, invInfo.ID)
 	}
-	// If the inventory uses the Name strategy and an inventory ID is provided,
-	// verify that the existing inventory object (if there is one) has an ID
-	// label that matches.
-	// TODO(seans): This inventory id validation should happen in destroy and status.
-	if localInv.Strategy() == inventory.NameStrategy && localInv.ID() != "" {
-		prevInvObjs, err := a.invClient.GetClusterInventoryObjs(localInv)
-		if err != nil {
-			return nil, nil, err
-		}
-		if len(prevInvObjs) > 1 {
-			panic(fmt.Errorf("found %d inv objects with Name strategy", len(prevInvObjs)))
-		}
-		if len(prevInvObjs) == 1 {
-			invObj := prevInvObjs[0]
-			val := invObj.GetLabels()[common.InventoryLabel]
-			if val != localInv.ID() {
-				return nil, nil, fmt.Errorf("inventory-id of inventory object in cluster doesn't match provided id %q", localInv.ID())
-			}
-		}
+
+	if a.invClient == nil {
+		return nil, nil, nil, fmt.Errorf("missing inventory client")
 	}
-	pruneObjs, err := a.pruner.GetPruneObjs(localInv, localObjs, prune.Options{
-		DryRunStrategy: o.DryRunStrategy,
-	})
+
+	// Load the inventory from storage
+	inv, err := a.invClient.Load(ctx, invInfo)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, fmt.Errorf("failed to load inventory: %w", err)
 	}
-	return localObjs, pruneObjs, nil
+
+	if inv == nil {
+		klog.V(4).Infof("inventory not found: %v", invInfo)
+	} else {
+		if a.invObjManager == nil {
+			return nil, nil, nil, fmt.Errorf("missing inventory object manager")
+		}
+
+		// Get the inventory objects from the cluster (exclude NotFound).
+		invObjs, err = a.invObjManager.GetSpecObjects(ctx, inv)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+	}
+	klog.V(4).Infof("inventory spec objects: %d", len(invObjs))
+
+	// Compute the set of objects to prune (invObjs - applyObjs)
+	applyIds := object.UnstructuredSetToObjMetadataSet(applyObjs)
+	for _, obj := range invObjs {
+		id := object.UnstructuredToObjMetadata(obj)
+		if applyIds.Contains(id) {
+			klog.V(4).Infof("object from inventory found locally - will be applied: %v", id)
+		} else {
+			klog.V(4).Infof("object from inventory not found locally - will be deleted: %v", id)
+			pruneObjs = append(pruneObjs, obj)
+		}
+	}
+
+	return applyObjs, pruneObjs, invObjs, nil
 }
 
 // Run performs the Apply step. This happens asynchronously with updates
@@ -117,7 +136,7 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.Info, objects objec
 		validator.Validate(objects)
 
 		// Decide which objects to apply and which to prune
-		applyObjs, pruneObjs, err := a.prepareObjects(invInfo, objects, options)
+		applyObjs, pruneObjs, _, err := a.prepareObjects(ctx, invInfo, objects)
 		if err != nil {
 			handleError(eventChannel, err)
 			return
@@ -135,7 +154,7 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.Info, objects objec
 			filter.InventoryPolicyApplyFilter{
 				Client:    a.client,
 				Mapper:    a.mapper,
-				Inv:       invInfo,
+				InvInfo:   invInfo,
 				InvPolicy: options.InventoryPolicy,
 			},
 			filter.DependencyFilter{
@@ -217,6 +236,13 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.Info, objects objec
 			handleError(eventChannel, fmt.Errorf("invalid ValidationPolicy: %q", options.ValidationPolicy))
 			return
 		}
+
+		// initialize inventory in the task context
+		inv := taskContext.InventoryManager().Inventory()
+		inv.SetGroupVersionKind(a.invClient.GroupVersionKind())
+		inv.SetName(invInfo.Name)
+		inv.SetNamespace(invInfo.Namespace)
+		inventory.SetInventoryLabel(inv, invInfo.ID)
 
 		// Register invalid objects to be retained in the inventory, if present.
 		for _, id := range vCollector.InvalidIds {
@@ -311,16 +337,15 @@ func handleError(eventChannel chan event.Event, err error) {
 // for the passed non cluster-scoped localObjs, plus the namespace
 // of the passed inventory object. This is used to skip deleting
 // namespaces which have currently applied objects in them.
-func localNamespaces(localInv inventory.Info, localObjs []object.ObjMetadata) sets.String {
+func localNamespaces(invInfo inventory.Info, localObjs []object.ObjMetadata) sets.String {
 	namespaces := sets.NewString()
 	for _, obj := range localObjs {
 		if obj.Namespace != "" {
 			namespaces.Insert(obj.Namespace)
 		}
 	}
-	invNamespace := localInv.Namespace()
-	if invNamespace != "" {
-		namespaces.Insert(invNamespace)
+	if invInfo.Namespace != "" {
+		namespaces.Insert(invInfo.Namespace)
 	}
 	return namespaces
 }

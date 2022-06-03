@@ -38,6 +38,7 @@ type Destroyer struct {
 	client        dynamic.Interface
 	openAPIGetter discovery.OpenAPISchemaInterface
 	infoHelper    info.Helper
+	invObjManager *inventory.ObjectManager
 }
 
 type DestroyerOptions struct {
@@ -71,6 +72,43 @@ func setDestroyerDefaults(o *DestroyerOptions) {
 	}
 }
 
+// prepareObjects returns the set of objects to prune or an error if one occurred.
+func (d *Destroyer) prepareObjects(
+	ctx context.Context,
+	invInfo inventory.Info,
+) (pruneObjs, invObjs object.UnstructuredSet, err error) {
+	// Load the inventory from storage
+	inv, err := d.invClient.Load(ctx, invInfo)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to load inventory: %w", err)
+	}
+	if inv == nil {
+		return nil, nil, fmt.Errorf("inventory not found: %v", invInfo)
+	}
+
+	if d.invObjManager == nil {
+		return nil, nil, fmt.Errorf("missing inventory client")
+	}
+
+	// Get the inventory objects from the cluster (exclude NotFound).
+	invObjs, err = d.invObjManager.GetSpecObjects(ctx, inv)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if d.invObjManager == nil {
+		return nil, nil, fmt.Errorf("missing inventory object manager")
+	}
+
+	// delete all inventory objects (deep copy)
+	pruneObjs = make(object.UnstructuredSet, len(invObjs))
+	for i, obj := range invObjs {
+		pruneObjs[i] = obj.DeepCopy()
+	}
+
+	return pruneObjs, invObjs, nil
+}
+
 // Run performs the destroy step. Passes the inventory object. This
 // happens asynchronously on progress and any errors are reported
 // back on the event channel.
@@ -79,16 +117,13 @@ func (d *Destroyer) Run(ctx context.Context, invInfo inventory.Info, options Des
 	setDestroyerDefaults(&options)
 	go func() {
 		defer close(eventChannel)
-		// Retrieve the objects to be deleted from the cluster. Second parameter is empty
-		// because no local objects returns all inventory objects for deletion.
-		emptyLocalObjs := object.UnstructuredSet{}
-		deleteObjs, err := d.pruner.GetPruneObjs(invInfo, emptyLocalObjs, prune.Options{
-			DryRunStrategy: options.DryRunStrategy,
-		})
+		// Decide which objects to prune
+		deleteObjs, _, err := d.prepareObjects(ctx, invInfo)
 		if err != nil {
 			handleError(eventChannel, err)
 			return
 		}
+		klog.V(4).Infof("calculated %d delete objs", len(deleteObjs))
 
 		// Validate the resources to make sure we catch those problems early
 		// before anything has been updated in the cluster.
@@ -160,6 +195,13 @@ func (d *Destroyer) Run(ctx context.Context, invInfo inventory.Info, options Des
 			handleError(eventChannel, fmt.Errorf("invalid ValidationPolicy: %q", options.ValidationPolicy))
 			return
 		}
+
+		// initialize inventory in the task context
+		inv := taskContext.InventoryManager().Inventory()
+		inv.SetGroupVersionKind(d.invClient.GroupVersionKind())
+		inv.SetName(invInfo.Name)
+		inv.SetNamespace(invInfo.Namespace)
+		inventory.SetInventoryLabel(inv, invInfo.ID)
 
 		// Register invalid objects to be retained in the inventory, if present.
 		for _, id := range vCollector.InvalidIds {

@@ -24,7 +24,7 @@ func dependsOnTest(ctx context.Context, c client.Client, invConfig invconfig.Inv
 	By("apply resources in order based on depends-on annotation")
 	applier := invConfig.ApplierFactoryFunc()
 
-	inv := invConfig.InvWrapperFunc(invConfig.FactoryFunc(inventoryName, namespaceName, "test"))
+	inv := inventory.InfoFromObject(invConfig.FactoryFunc(inventoryName, namespaceName, "test"))
 
 	namespace1Name := fmt.Sprintf("%s-ns1", namespaceName)
 	namespace1Obj := e2eutil.UnstructuredNamespace(namespace1Name)

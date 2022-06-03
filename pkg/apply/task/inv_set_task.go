@@ -4,6 +4,8 @@
 package task
 
 import (
+	"context"
+
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
@@ -17,7 +19,6 @@ import (
 type InvSetTask struct {
 	TaskName      string
 	InvClient     inventory.Client
-	InvInfo       inventory.Info
 	PrevInventory object.ObjMetadataSet
 	DryRun        common.DryRunStrategy
 }
@@ -57,9 +58,10 @@ func (i *InvSetTask) Identifiers() object.ObjMetadataSet {
 func (i *InvSetTask) Start(taskContext *taskrunner.TaskContext) {
 	go func() {
 		klog.V(2).Infof("inventory set task starting (name: %q)", i.Name())
+		// TODO: pipe Context through TaskContext
+		ctx := context.TODO()
 		invObjs := object.ObjMetadataSet{}
 
-		// TODO: Just use InventoryManager.Store()
 		im := taskContext.InventoryManager()
 
 		// If an object applied successfully, keep or add it to the inventory.
@@ -114,11 +116,12 @@ func (i *InvSetTask) Start(taskContext *taskrunner.TaskContext) {
 		klog.V(4).Infof("keep in inventory %d invalid objects", len(invalidObjects))
 		invObjs = invObjs.Union(invalidObjects)
 
-		klog.V(4).Infof("get the apply status for %d objects", len(invObjs))
-		objStatus := taskContext.InventoryManager().Inventory().Status.Objects
-
 		klog.V(4).Infof("set inventory %d total objects", len(invObjs))
-		err := i.InvClient.Replace(i.InvInfo, invObjs, objStatus, i.DryRun)
+		inv := im.Inventory()
+		// TODO: move these inventory updates to the other tasks
+		inv.Spec.Objects = inventory.ObjectReferencesFromObjMetadataSet(invObjs)
+		// TODO: update inventory status?
+		err := i.InvClient.Store(ctx, inv, i.DryRun)
 
 		klog.V(2).Infof("inventory set task completing (name: %q)", i.Name())
 		taskContext.TaskChannel() <- taskrunner.TaskResult{Err: err}

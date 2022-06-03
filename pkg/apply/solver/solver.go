@@ -15,6 +15,7 @@
 package solver
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -158,11 +159,11 @@ func (t *TaskQueueBuilder) Build(taskContext *taskrunner.TaskContext, o Options)
 		// InvAddTask creates the inventory and adds any objects being applied
 		klog.V(2).Infof("adding inventory add task (%d objects)", len(applyObjs))
 		tasks = append(tasks, &task.InvAddTask{
-			TaskName:  "inventory-add-0",
-			InvClient: t.InvClient,
-			InvInfo:   t.invInfo,
-			Objects:   applyObjs,
-			DryRun:    o.DryRunStrategy,
+			TaskName:     "inventory-add-0",
+			InvClient:    t.InvClient,
+			ApplyObjects: applyObjs,
+			PruneObjects: pruneObjs,
+			DryRun:       o.DryRunStrategy,
 		})
 	}
 
@@ -214,11 +215,14 @@ func (t *TaskQueueBuilder) Build(taskContext *taskrunner.TaskContext, o Options)
 	// TODO: add InvSetTask when Destroy=true to retain undeleted objects
 	if !o.Destroy {
 		klog.V(2).Infoln("adding inventory set task")
-		prevInvIds, _ := t.InvClient.GetClusterObjs(t.invInfo)
+		inv, _ := t.InvClient.Load(context.TODO(), t.invInfo)
+		var prevInvIds object.ObjMetadataSet
+		if inv != nil {
+			prevInvIds = inventory.ObjMetadataSetFromObjectReferences(inv.Spec.Objects)
+		}
 		tasks = append(tasks, &task.InvSetTask{
 			TaskName:      "inventory-set-0",
 			InvClient:     t.InvClient,
-			InvInfo:       t.invInfo,
 			PrevInventory: prevInvIds,
 			DryRun:        o.DryRunStrategy,
 		})
@@ -227,7 +231,6 @@ func (t *TaskQueueBuilder) Build(taskContext *taskrunner.TaskContext, o Options)
 		tasks = append(tasks, &task.DeleteInvTask{
 			TaskName:  "delete-inventory-0",
 			InvClient: t.InvClient,
-			InvInfo:   t.invInfo,
 			DryRun:    o.DryRunStrategy,
 		})
 	}

@@ -27,7 +27,7 @@ func inventoryPolicyMustMatchTest(ctx context.Context, c client.Client, invConfi
 	applier := invConfig.ApplierFactoryFunc()
 
 	firstInvName := e2eutil.RandomString("first-inv-")
-	firstInv := invConfig.InvWrapperFunc(invConfig.FactoryFunc(firstInvName, namespaceName, firstInvName))
+	firstInv := inventory.InfoFromObject(invConfig.FactoryFunc(firstInvName, namespaceName, firstInvName))
 	deployment1Obj := e2eutil.WithNamespace(e2eutil.ManifestToUnstructured(deployment1), namespaceName)
 	firstResources := []*unstructured.Unstructured{
 		deployment1Obj,
@@ -40,7 +40,7 @@ func inventoryPolicyMustMatchTest(ctx context.Context, c client.Client, invConfi
 
 	By("Apply second set of resources")
 	secondInvName := e2eutil.RandomString("second-inv-")
-	secondInv := invConfig.InvWrapperFunc(invConfig.FactoryFunc(secondInvName, namespaceName, secondInvName))
+	secondInv := inventory.InfoFromObject(invConfig.FactoryFunc(secondInvName, namespaceName, secondInvName))
 	deployment1Obj = e2eutil.WithNamespace(e2eutil.ManifestToUnstructured(deployment1), namespaceName)
 	secondResources := []*unstructured.Unstructured{
 		e2eutil.WithReplicas(deployment1Obj, 6),
@@ -201,7 +201,7 @@ func inventoryPolicyAdoptIfNoInventoryTest(ctx context.Context, c client.Client,
 	applier := invConfig.ApplierFactoryFunc()
 
 	invName := e2eutil.RandomString("test-inv-")
-	inv := invConfig.InvWrapperFunc(invConfig.FactoryFunc(invName, namespaceName, invName))
+	inv := inventory.InfoFromObject(invConfig.FactoryFunc(invName, namespaceName, invName))
 	deployment1Obj = e2eutil.WithNamespace(e2eutil.ManifestToUnstructured(deployment1), namespaceName)
 	resources := []*unstructured.Unstructured{
 		e2eutil.WithReplicas(deployment1Obj, 6),
@@ -372,7 +372,7 @@ func inventoryPolicyAdoptAllTest(ctx context.Context, c client.Client, invConfig
 	applier := invConfig.ApplierFactoryFunc()
 
 	firstInvName := e2eutil.RandomString("first-inv-")
-	firstInv := invConfig.InvWrapperFunc(invConfig.FactoryFunc(firstInvName, namespaceName, firstInvName))
+	firstInv := inventory.InfoFromObject(invConfig.FactoryFunc(firstInvName, namespaceName, firstInvName))
 	deployment1Obj := e2eutil.WithNamespace(e2eutil.ManifestToUnstructured(deployment1), namespaceName)
 	firstResources := []*unstructured.Unstructured{
 		deployment1Obj,
@@ -385,7 +385,7 @@ func inventoryPolicyAdoptAllTest(ctx context.Context, c client.Client, invConfig
 
 	By("Apply resources")
 	secondInvName := e2eutil.RandomString("test-inv-")
-	secondInv := invConfig.InvWrapperFunc(invConfig.FactoryFunc(secondInvName, namespaceName, secondInvName))
+	secondInv := inventory.InfoFromObject(invConfig.FactoryFunc(secondInvName, namespaceName, secondInvName))
 	deployment1Obj = e2eutil.WithNamespace(e2eutil.ManifestToUnstructured(deployment1), namespaceName)
 	secondResources := []*unstructured.Unstructured{
 		e2eutil.WithReplicas(deployment1Obj, 6),

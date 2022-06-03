@@ -46,5 +46,5 @@ func (f *FakeLoader) ManifestReader(reader io.Reader, _ string) (ManifestReader,
 
 func (f *FakeLoader) InventoryInfo(objs []*unstructured.Unstructured) (inventory.Info, []*unstructured.Unstructured, error) {
 	inv, objs, err := inventory.SplitUnstructureds(objs)
-	return inventory.WrapInventoryInfoObj(inv), objs, err
+	return inventory.InfoFromObject(inv), objs, err
 }

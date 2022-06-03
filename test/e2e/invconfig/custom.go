@@ -16,7 +16,6 @@ import (
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/cli-utils/pkg/apply"
 	"sigs.k8s.io/cli-utils/pkg/common"
-	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/test/e2e/customprovider"
 	"sigs.k8s.io/cli-utils/test/e2e/e2eutil"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -25,9 +24,7 @@ import (
 func NewCustomTypeInvConfig(cfg *rest.Config) InventoryConfig {
 	return InventoryConfig{
 		ClientConfig:         cfg,
-		Strategy:             inventory.NameStrategy,
 		FactoryFunc:          customInventoryManifest,
-		InvWrapperFunc:       customprovider.WrapInventoryInfoObj,
 		ApplierFactoryFunc:   newCustomInvApplierFactory(cfg),
 		DestroyerFactoryFunc: newCustomInvDestroyerFactory(cfg),
 		InvSizeVerifyFunc:    customInvSizeVerifyFunc,

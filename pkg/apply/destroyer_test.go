@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"sigs.k8s.io/cli-utils/pkg/apis/actuation"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	pollevent "sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
@@ -21,7 +23,7 @@ import (
 func TestDestroyerCancel(t *testing.T) {
 	testCases := map[string]struct {
 		// inventory input to destroyer
-		invInfo inventoryInfo
+		invObjs object.ObjMetadataSet
 		// objects in the cluster
 		clusterObjs object.UnstructuredSet
 		// options input to destroyer.Run
@@ -43,13 +45,10 @@ func TestDestroyerCancel(t *testing.T) {
 			expectRunTimeout: true,
 			runTimeout:       2 * time.Second,
 			testTimeout:      30 * time.Second,
-			invInfo: inventoryInfo{
-				name:      "abc-123",
-				namespace: "test",
-				id:        "test",
-				set: object.ObjMetadataSet{
-					testutil.ToIdentifier(t, resources["deployment"]),
-				},
+			invObjs: object.ObjMetadataSet{
+				object.UnstructuredToObjMetadata(
+					testutil.Unstructured(t, resources["deployment"]),
+				),
 			},
 			clusterObjs: object.UnstructuredSet{
 				testutil.Unstructured(t, resources["deployment"], testutil.AddOwningInv(t, "test")),
@@ -166,13 +165,10 @@ func TestDestroyerCancel(t *testing.T) {
 			expectRunTimeout: false,
 			runTimeout:       10 * time.Second,
 			testTimeout:      30 * time.Second,
-			invInfo: inventoryInfo{
-				name:      "abc-123",
-				namespace: "test",
-				id:        "test",
-				set: object.ObjMetadataSet{
-					testutil.ToIdentifier(t, resources["deployment"]),
-				},
+			invObjs: object.ObjMetadataSet{
+				object.UnstructuredToObjMetadata(
+					testutil.Unstructured(t, resources["deployment"]),
+				),
 			},
 			clusterObjs: object.UnstructuredSet{
 				testutil.Unstructured(t, resources["deployment"], testutil.AddOwningInv(t, "test")),
@@ -259,7 +255,6 @@ func TestDestroyerCancel(t *testing.T) {
 						Type:      event.Started,
 					},
 				},
-				// Wait events sorted Pending > Successful (see pkg/testutil)
 				{
 					// Deployment reconcile pending.
 					EventType: event.WaitType,
@@ -313,12 +308,22 @@ func TestDestroyerCancel(t *testing.T) {
 		t.Run(tn, func(t *testing.T) {
 			statusWatcher := newFakeWatcher(tc.statusEvents)
 
-			invInfo := tc.invInfo.toWrapped()
+			inv := &actuation.Inventory{
+				TypeMeta:   invTypeMeta,
+				ObjectMeta: invObjMeta,
+				Spec: actuation.InventorySpec{
+					Objects: inventory.ObjectReferencesFromObjMetadataSet(tc.invObjs),
+				},
+			}
+
+			// Add the inventory to the cluster (for ConfigMap client and to allow deletion)
+			cm, err := inventory.ConfigMapConverter{}.From(inv)
+			require.NoError(t, err)
+			tc.clusterObjs = append(tc.clusterObjs, cm)
 
 			destroyer := newTestDestroyer(t,
-				tc.invInfo,
-				// Add the inventory to the cluster (to allow deletion)
-				append(tc.clusterObjs, inventory.InvInfoToConfigMap(invInfo)),
+				inv,
+				tc.clusterObjs,
 				statusWatcher,
 			)
 
@@ -374,9 +379,6 @@ func TestDestroyerCancel(t *testing.T) {
 					t.Errorf("Expected status event not received: %#v", e)
 				}
 			}
-
-			// sort to allow comparison of multiple wait events
-			testutil.SortExpEvents(receivedEvents)
 
 			// Validate the rest of the events
 			testutil.AssertEqual(t, tc.expectedEvents, receivedEvents,

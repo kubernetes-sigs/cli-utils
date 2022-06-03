@@ -15,10 +15,10 @@ import (
 	"k8s.io/kubectl/pkg/scheme"
 	"sigs.k8s.io/cli-utils/pkg/apis/actuation"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
+	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	pollevent "sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
-	"sigs.k8s.io/cli-utils/pkg/kstatus/watcher"
 	"sigs.k8s.io/cli-utils/pkg/multierror"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/object/validation"
@@ -50,16 +50,6 @@ metadata:
 type: Opaque
 spec:
   foo: bar
-`,
-		"inventory": `
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: test-inventory-obj
-  namespace: test-namespace
-  labels:
-    cli-utils.sigs.k8s.io/inventory-id: test-app-label
-data: {}
 `,
 		"obj1": `
 apiVersion: v1
@@ -93,12 +83,12 @@ func TestApplier(t *testing.T) {
 		// resources input to applier
 		resources object.UnstructuredSet
 		// inventory input to applier
-		invInfo inventoryInfo
+		invObjs object.ObjMetadataSet
 		// objects in the cluster
 		clusterObjs object.UnstructuredSet
 		// options input to applier.Run
 		options ApplierOptions
-		// fake input events from the statusWatcher
+		// fake input events from the status poller
 		statusEvents []pollevent.Event
 		// expected output status events (async)
 		expectedStatusEvents []testutil.ExpEvent
@@ -113,11 +103,6 @@ func TestApplier(t *testing.T) {
 			namespace: "default",
 			resources: object.UnstructuredSet{
 				testutil.Unstructured(t, resources["deployment"]),
-			},
-			invInfo: inventoryInfo{
-				name:      "abc-123",
-				namespace: "default",
-				id:        "test",
 			},
 			clusterObjs: object.UnstructuredSet{},
 			options: ApplierOptions{
@@ -220,11 +205,6 @@ func TestApplier(t *testing.T) {
 			resources: object.UnstructuredSet{
 				testutil.Unstructured(t, resources["deployment"]),
 				testutil.Unstructured(t, resources["secret"]),
-			},
-			invInfo: inventoryInfo{
-				name:      "inv-123",
-				namespace: "default",
-				id:        "test",
 			},
 			clusterObjs: object.UnstructuredSet{},
 			options: ApplierOptions{
@@ -410,16 +390,6 @@ func TestApplier(t *testing.T) {
 				testutil.Unstructured(t, resources["deployment"]),
 				testutil.Unstructured(t, resources["secret"]),
 			},
-			invInfo: inventoryInfo{
-				name:      "inv-123",
-				namespace: "default",
-				id:        "test",
-				set: object.ObjMetadataSet{
-					object.UnstructuredToObjMetadata(
-						testutil.Unstructured(t, resources["deployment"]),
-					),
-				},
-			},
 			clusterObjs: object.UnstructuredSet{
 				testutil.Unstructured(t, resources["deployment"]),
 			},
@@ -588,18 +558,13 @@ func TestApplier(t *testing.T) {
 		"apply no resources and prune all existing": {
 			namespace: "default",
 			resources: object.UnstructuredSet{},
-			invInfo: inventoryInfo{
-				name:      "inv-123",
-				namespace: "default",
-				id:        "test",
-				set: object.ObjMetadataSet{
-					object.UnstructuredToObjMetadata(
-						testutil.Unstructured(t, resources["deployment"]),
-					),
-					object.UnstructuredToObjMetadata(
-						testutil.Unstructured(t, resources["secret"]),
-					),
-				},
+			invObjs: object.ObjMetadataSet{
+				object.UnstructuredToObjMetadata(
+					testutil.Unstructured(t, resources["deployment"]),
+				),
+				object.UnstructuredToObjMetadata(
+					testutil.Unstructured(t, resources["secret"]),
+				),
 			},
 			clusterObjs: object.UnstructuredSet{
 				testutil.Unstructured(t, resources["deployment"], testutil.AddOwningInv(t, "test")),
@@ -796,11 +761,6 @@ func TestApplier(t *testing.T) {
 			resources: object.UnstructuredSet{
 				testutil.Unstructured(t, resources["deployment"]),
 			},
-			invInfo: inventoryInfo{
-				name:      "abc-123",
-				namespace: "default",
-				id:        "test",
-			},
 			clusterObjs: object.UnstructuredSet{
 				testutil.Unstructured(t, resources["deployment"], testutil.AddOwningInv(t, "unmatched")),
 			},
@@ -910,15 +870,10 @@ func TestApplier(t *testing.T) {
 		"resources belonging to a different inventory should not be pruned": {
 			namespace: "default",
 			resources: object.UnstructuredSet{},
-			invInfo: inventoryInfo{
-				name:      "abc-123",
-				namespace: "default",
-				id:        "test",
-				set: object.ObjMetadataSet{
-					object.UnstructuredToObjMetadata(
-						testutil.Unstructured(t, resources["deployment"]),
-					),
-				},
+			invObjs: object.ObjMetadataSet{
+				object.UnstructuredToObjMetadata(
+					testutil.Unstructured(t, resources["deployment"]),
+				),
 			},
 			clusterObjs: object.UnstructuredSet{
 				testutil.Unstructured(t, resources["deployment"], testutil.AddOwningInv(t, "unmatched")),
@@ -1022,15 +977,10 @@ func TestApplier(t *testing.T) {
 		"prune with inventory object annotation matched": {
 			namespace: "default",
 			resources: object.UnstructuredSet{},
-			invInfo: inventoryInfo{
-				name:      "abc-123",
-				namespace: "default",
-				id:        "test",
-				set: object.ObjMetadataSet{
-					object.UnstructuredToObjMetadata(
-						testutil.Unstructured(t, resources["deployment"]),
-					),
-				},
+			invObjs: object.ObjMetadataSet{
+				object.UnstructuredToObjMetadata(
+					testutil.Unstructured(t, resources["deployment"]),
+				),
 			},
 			clusterObjs: object.UnstructuredSet{
 				testutil.Unstructured(t, resources["deployment"], testutil.AddOwningInv(t, "test")),
@@ -1177,11 +1127,6 @@ func TestApplier(t *testing.T) {
 					"$.kind", "",
 				}),
 				testutil.Unstructured(t, resources["secret"]),
-			},
-			invInfo: inventoryInfo{
-				name:      "inv-123",
-				namespace: "default",
-				id:        "test",
 			},
 			clusterObjs: object.UnstructuredSet{},
 			options: ApplierOptions{
@@ -1358,11 +1303,6 @@ func TestApplier(t *testing.T) {
 				}),
 				testutil.Unstructured(t, resources["secret"]),
 			},
-			invInfo: inventoryInfo{
-				name:      "inv-123",
-				namespace: "default",
-				id:        "test",
-			},
 			clusterObjs: object.UnstructuredSet{},
 			options: ApplierOptions{
 				ReconcileTimeout: time.Minute,
@@ -1415,8 +1355,21 @@ func TestApplier(t *testing.T) {
 				validObjs = append(validObjs, obj)
 			}
 
+			inv := &actuation.Inventory{
+				TypeMeta:   invTypeMeta,
+				ObjectMeta: invObjMeta,
+				Spec: actuation.InventorySpec{
+					Objects: inventory.ObjectReferencesFromObjMetadataSet(tc.invObjs),
+				},
+			}
+
+			// Add the inventory to the cluster (for ConfigMap client)
+			cm, err := inventory.ConfigMapConverter{}.From(inv)
+			require.NoError(t, err)
+			tc.clusterObjs = append(tc.clusterObjs, cm)
+
 			applier := newTestApplier(t,
-				tc.invInfo,
+				inv,
 				validObjs,
 				tc.clusterObjs,
 				statusWatcher,
@@ -1431,7 +1384,7 @@ func TestApplier(t *testing.T) {
 			testCtx, testCancel := context.WithTimeout(context.Background(), testTimeout)
 			defer testCancel() // cleanup
 
-			eventChannel := applier.Run(runCtx, tc.invInfo.toWrapped(), tc.resources, tc.options)
+			eventChannel := applier.Run(runCtx, invInfo, tc.resources, tc.options)
 
 			// only start sending events once
 			var once sync.Once
@@ -1510,8 +1463,6 @@ func TestApplierCancel(t *testing.T) {
 	testCases := map[string]struct {
 		// resources input to applier
 		resources object.UnstructuredSet
-		// inventory input to applier
-		invInfo inventoryInfo
 		// objects in the cluster
 		clusterObjs object.UnstructuredSet
 		// options input to applier.Run
@@ -1520,7 +1471,7 @@ func TestApplierCancel(t *testing.T) {
 		runTimeout time.Duration
 		// timeout for the test
 		testTimeout time.Duration
-		// fake input events from the statusWatcher
+		// fake input events from the status poller
 		statusEvents []pollevent.Event
 		// expected output status events (async)
 		expectedStatusEvents []testutil.ExpEvent
@@ -1535,11 +1486,6 @@ func TestApplierCancel(t *testing.T) {
 			testTimeout:      30 * time.Second,
 			resources: object.UnstructuredSet{
 				testutil.Unstructured(t, resources["deployment"]),
-			},
-			invInfo: inventoryInfo{
-				name:      "abc-123",
-				namespace: "test",
-				id:        "test",
 			},
 			clusterObjs: object.UnstructuredSet{},
 			options: ApplierOptions{
@@ -1694,11 +1640,6 @@ func TestApplierCancel(t *testing.T) {
 			resources: object.UnstructuredSet{
 				testutil.Unstructured(t, resources["deployment"]),
 			},
-			invInfo: inventoryInfo{
-				name:      "abc-123",
-				namespace: "test",
-				id:        "test",
-			},
 			clusterObjs: object.UnstructuredSet{},
 			options: ApplierOptions{
 				// EmitStatusEvents required to test event output
@@ -1803,7 +1744,6 @@ func TestApplierCancel(t *testing.T) {
 						Type:      event.Started,
 					},
 				},
-				// Wait events sorted Pending > Successful (see pkg/testutil)
 				{
 					// Deployment reconcile pending.
 					EventType: event.WaitType,
@@ -1857,8 +1797,13 @@ func TestApplierCancel(t *testing.T) {
 		t.Run(tn, func(t *testing.T) {
 			statusWatcher := newFakeWatcher(tc.statusEvents)
 
+			inv := &actuation.Inventory{
+				TypeMeta:   invTypeMeta,
+				ObjectMeta: invObjMeta,
+			}
+
 			applier := newTestApplier(t,
-				tc.invInfo,
+				inv,
 				tc.resources,
 				tc.clusterObjs,
 				statusWatcher,
@@ -1872,7 +1817,7 @@ func TestApplierCancel(t *testing.T) {
 			testCtx, testCancel := context.WithTimeout(context.Background(), tc.testTimeout)
 			defer testCancel() // cleanup
 
-			eventChannel := applier.Run(runCtx, tc.invInfo.toWrapped(), tc.resources, tc.options)
+			eventChannel := applier.Run(runCtx, invInfo, tc.resources, tc.options)
 
 			// only start sending events once
 			var once sync.Once
@@ -1918,12 +1863,9 @@ func TestApplierCancel(t *testing.T) {
 				var removed int
 				receivedEvents, removed = testutil.RemoveEqualEvents(receivedEvents, e)
 				if removed < 1 {
-					t.Errorf("Expected status event not received: %#v", e.StatusEvent)
+					t.Fatalf("Expected status event not received: %#v", e.StatusEvent)
 				}
 			}
-
-			// sort to allow comparison of multiple wait events
-			testutil.SortExpEvents(receivedEvents)
 
 			// Validate the rest of the events
 			testutil.AssertEqual(t, tc.expectedEvents, receivedEvents,
@@ -1941,16 +1883,14 @@ func TestApplierCancel(t *testing.T) {
 	}
 }
 
-func TestReadAndPrepareObjectsNilInv(t *testing.T) {
+//nolint:dogsled // ignore 3 black identifiers in test
+func TestReadAndPrepareObjectsEmptyInv(t *testing.T) {
 	applier := Applier{}
-	_, _, err := applier.prepareObjects(nil, object.UnstructuredSet{}, ApplierOptions{})
+	_, _, _, err := applier.prepareObjects(context.TODO(), inventory.Info{}, object.UnstructuredSet{})
 	assert.Error(t, err)
 }
 
 func TestReadAndPrepareObjects(t *testing.T) {
-	inventoryObj := testutil.Unstructured(t, resources["inventory"])
-	inventory := inventory.WrapInventoryInfoObj(inventoryObj)
-
 	obj1 := testutil.Unstructured(t, resources["obj1"])
 	obj2 := testutil.Unstructured(t, resources["obj2"])
 	clusterScopedObj := testutil.Unstructured(t, resources["clusterScopedObj"])
@@ -1959,109 +1899,106 @@ func TestReadAndPrepareObjects(t *testing.T) {
 		// objects in the cluster
 		clusterObjs object.UnstructuredSet
 		// inventory input to applier
-		invInfo inventoryInfo
-		// resources input to applier
-		resources object.UnstructuredSet
+		invIDs object.ObjMetadataSet
+		// localObjs input to applier
+		localObjs object.UnstructuredSet
 		// expected objects to apply
 		applyObjs object.UnstructuredSet
 		// expected objects to prune
 		pruneObjs object.UnstructuredSet
+		// expected objects in the inventory
+		invObjs object.UnstructuredSet
 		// expected error
 		isError bool
 	}{
 		"objects include inventory": {
-			invInfo: inventoryInfo{
-				name:      inventory.Name(),
-				namespace: inventory.Namespace(),
-				id:        inventory.ID(),
-			},
-			resources: object.UnstructuredSet{inventoryObj},
+			invIDs:    object.ObjMetadataSet{},
+			localObjs: object.UnstructuredSet{inventoryObj},
 			isError:   true,
 		},
 		"empty inventory, empty objects, apply none, prune none": {
-			invInfo: inventoryInfo{
-				name:      inventory.Name(),
-				namespace: inventory.Namespace(),
-				id:        inventory.ID(),
-			},
+			invIDs: object.ObjMetadataSet{},
 		},
 		"one in inventory, empty objects, prune one": {
 			clusterObjs: object.UnstructuredSet{obj1},
-			invInfo: inventoryInfo{
-				name:      inventory.Name(),
-				namespace: inventory.Namespace(),
-				id:        inventory.ID(),
-				set: object.ObjMetadataSet{
-					object.UnstructuredToObjMetadata(obj1),
-				},
+			invIDs: object.ObjMetadataSet{
+				object.UnstructuredToObjMetadata(obj1),
 			},
 			pruneObjs: object.UnstructuredSet{obj1},
+			invObjs:   object.UnstructuredSet{obj1},
 		},
 		"all in inventory, apply all": {
-			invInfo: inventoryInfo{
-				name:      inventory.Name(),
-				namespace: inventory.Namespace(),
-				id:        inventory.ID(),
-				set: object.ObjMetadataSet{
-					object.UnstructuredToObjMetadata(obj1),
-					object.UnstructuredToObjMetadata(clusterScopedObj),
-				},
+			clusterObjs: object.UnstructuredSet{obj1, clusterScopedObj},
+			invIDs: object.ObjMetadataSet{
+				object.UnstructuredToObjMetadata(obj1),
+				object.UnstructuredToObjMetadata(clusterScopedObj),
 			},
-			resources: object.UnstructuredSet{obj1, clusterScopedObj},
+			localObjs: object.UnstructuredSet{obj1, clusterScopedObj},
 			applyObjs: object.UnstructuredSet{obj1, clusterScopedObj},
+			invObjs:   object.UnstructuredSet{obj1, clusterScopedObj},
 		},
 		"disjoint set, apply new, prune old": {
 			clusterObjs: object.UnstructuredSet{obj2},
-			invInfo: inventoryInfo{
-				name:      inventory.Name(),
-				namespace: inventory.Namespace(),
-				id:        inventory.ID(),
-				set: object.ObjMetadataSet{
-					object.UnstructuredToObjMetadata(obj2),
-				},
+			invIDs: object.ObjMetadataSet{
+				object.UnstructuredToObjMetadata(obj2),
 			},
-			resources: object.UnstructuredSet{obj1, clusterScopedObj},
+			localObjs: object.UnstructuredSet{obj1, clusterScopedObj},
 			applyObjs: object.UnstructuredSet{obj1, clusterScopedObj},
 			pruneObjs: object.UnstructuredSet{obj2},
+			invObjs:   object.UnstructuredSet{obj2},
 		},
 		"most in inventory, apply all": {
 			clusterObjs: object.UnstructuredSet{obj2},
-			invInfo: inventoryInfo{
-				name:      inventory.Name(),
-				namespace: inventory.Namespace(),
-				id:        inventory.ID(),
-				set: object.ObjMetadataSet{
-					object.UnstructuredToObjMetadata(obj2),
-				},
+			invIDs: object.ObjMetadataSet{
+				object.UnstructuredToObjMetadata(obj2),
 			},
-			resources: object.UnstructuredSet{obj1, obj2, clusterScopedObj},
+			localObjs: object.UnstructuredSet{obj1, obj2, clusterScopedObj},
 			applyObjs: object.UnstructuredSet{obj1, obj2, clusterScopedObj},
 			pruneObjs: object.UnstructuredSet{},
+			invObjs:   object.UnstructuredSet{obj2},
 		},
 	}
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
+			inv := &actuation.Inventory{
+				TypeMeta:   invTypeMeta,
+				ObjectMeta: invObjMeta,
+				Spec: actuation.InventorySpec{
+					Objects: inventory.ObjectReferencesFromObjMetadataSet(tc.invIDs),
+				},
+			}
+
 			applier := newTestApplier(t,
-				tc.invInfo,
-				tc.resources,
+				inv,
+				tc.localObjs,
 				tc.clusterObjs,
 				// no events needed for prepareObjects
-				watcher.BlindStatusWatcher{},
+				newFakeWatcher([]pollevent.Event{}),
 			)
 
-			applyObjs, pruneObjs, err := applier.prepareObjects(tc.invInfo.toWrapped(), tc.resources, ApplierOptions{})
+			ctx := context.TODO()
+
+			// initialize inventory contents
+			err := applier.invClient.Store(ctx, inv, common.DryRunNone)
+			require.NoError(t, err)
+
+			applyObjs, pruneObjs, invObjs, err := applier.prepareObjects(ctx, invInfo, tc.localObjs)
 			if tc.isError {
-				assert.Error(t, err)
+				require.Error(t, err)
 				return
 			}
 			require.NoError(t, err)
 
-			testutil.AssertEqual(t, applyObjs, tc.applyObjs,
+			testutil.AssertEqual(t, tc.applyObjs, applyObjs,
 				"Actual applied objects (%d) do not match expected applied objects (%d)",
 				len(applyObjs), len(tc.applyObjs))
 
-			testutil.AssertEqual(t, pruneObjs, tc.pruneObjs,
+			testutil.AssertEqual(t, tc.invObjs, invObjs,
+				"Actual inventory objects (%d) do not match expected inventory objects (%d)",
+				len(invObjs), len(tc.invObjs))
+
+			testutil.AssertEqual(t, tc.pruneObjs, pruneObjs,
 				"Actual pruned objects (%d) do not match expected pruned objects (%d)",
 				len(pruneObjs), len(tc.pruneObjs))
 		})

@@ -32,14 +32,13 @@ import (
 // Pruner implements GetPruneObjs to calculate which objects to prune and Prune
 // to delete them.
 type Pruner struct {
-	InvClient inventory.Client
-	Client    dynamic.Interface
-	Mapper    meta.RESTMapper
+	Client dynamic.Interface
+	Mapper meta.RESTMapper
 }
 
 // NewPruner returns a new Pruner.
 // Returns an error if dependency injection fails using the factory.
-func NewPruner(factory util.Factory, invClient inventory.Client) (*Pruner, error) {
+func NewPruner(factory util.Factory) (*Pruner, error) {
 	// Client/Builder fields from the Factory.
 	client, err := factory.DynamicClient()
 	if err != nil {
@@ -50,9 +49,8 @@ func NewPruner(factory util.Factory, invClient inventory.Client) (*Pruner, error
 		return nil, err
 	}
 	return &Pruner{
-		InvClient: invClient,
-		Client:    client,
-		Mapper:    mapper,
+		Client: client,
+		Mapper: mapper,
 	}, nil
 }
 
@@ -200,56 +198,16 @@ func (p *Pruner) removeInventoryAnnotation(obj *unstructured.Unstructured) (*uns
 	// This prevents race conditions when writing to the underlying map.
 	obj = obj.DeepCopy()
 	id := object.UnstructuredToObjMetadata(obj)
-	annotations := obj.GetAnnotations()
-	if annotations != nil {
-		if _, ok := annotations[inventory.OwningInventoryKey]; ok {
-			klog.V(4).Infof("removing annotation (object: %q, annotation: %q)", id, inventory.OwningInventoryKey)
-			delete(annotations, inventory.OwningInventoryKey)
-			obj.SetAnnotations(annotations)
-			namespacedClient, err := p.namespacedClient(id)
-			if err != nil {
-				return obj, err
-			}
-			_, err = namespacedClient.Update(context.TODO(), obj, metav1.UpdateOptions{})
+	if inventory.OwningInventoryAnnotation(obj) != "" {
+		inventory.DeleteOwningInventoryAnnotation(obj)
+		namespacedClient, err := p.namespacedClient(id)
+		if err != nil {
 			return obj, err
 		}
+		_, err = namespacedClient.Update(context.TODO(), obj, metav1.UpdateOptions{})
+		return obj, err
 	}
 	return obj, nil
-}
-
-// GetPruneObjs calculates the set of prune objects, and retrieves them
-// from the cluster. Set of prune objects equals the set of inventory
-// objects minus the set of currently applied objects. Returns an error
-// if one occurs.
-func (p *Pruner) GetPruneObjs(
-	inv inventory.Info,
-	objs object.UnstructuredSet,
-	opts Options,
-) (object.UnstructuredSet, error) {
-	ids := object.UnstructuredSetToObjMetadataSet(objs)
-	invIDs, err := p.InvClient.GetClusterObjs(inv)
-	if err != nil {
-		return nil, err
-	}
-	// only return objects that were in the inventory but not in the object set
-	ids = invIDs.Diff(ids)
-	objs = object.UnstructuredSet{}
-	for _, id := range ids {
-		pruneObj, err := p.getObject(id)
-		if err != nil {
-			if meta.IsNoMatchError(err) {
-				klog.V(4).Infof("skip pruning (object: %q): resource type not registered", id)
-				continue
-			}
-			if apierrors.IsNotFound(err) {
-				klog.V(4).Infof("skip pruning (object: %q): resource not found", id)
-				continue
-			}
-			return nil, err
-		}
-		objs = append(objs, pruneObj)
-	}
-	return objs, nil
 }
 
 func (p *Pruner) getObject(id object.ObjMetadata) (*unstructured.Unstructured, error) {

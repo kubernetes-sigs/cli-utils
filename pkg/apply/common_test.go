@@ -27,55 +27,50 @@ import (
 	"k8s.io/klog/v2"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	"k8s.io/kubectl/pkg/scheme"
+	"sigs.k8s.io/cli-utils/pkg/apis/actuation"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/jsonpath"
 	pollevent "sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/watcher"
 	"sigs.k8s.io/cli-utils/pkg/object"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-type inventoryInfo struct {
-	name      string
-	namespace string
-	id        string
-	set       object.ObjMetadataSet
-}
-
-func (i inventoryInfo) toUnstructured() *unstructured.Unstructured {
-	invMap := make(map[string]interface{})
-	for _, objMeta := range i.set {
-		invMap[objMeta.String()] = ""
-	}
-
-	return &unstructured.Unstructured{
+var (
+	inventoryObj = &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"apiVersion": "v1",
 			"kind":       "ConfigMap",
 			"metadata": map[string]interface{}{
-				"name":      i.name,
-				"namespace": i.namespace,
+				"name":      "test-inventory-obj",
+				"namespace": "test-namespace",
 				"labels": map[string]interface{}{
-					common.InventoryLabel: i.id,
+					common.InventoryLabel: "test",
 				},
 			},
-			"data": invMap,
 		},
 	}
-}
-
-func (i inventoryInfo) toWrapped() inventory.Info {
-	return inventory.WrapInventoryInfoObj(i.toUnstructured())
-}
+	invInfo     = inventory.InfoFromObject(inventoryObj)
+	invTypeMeta = metav1.TypeMeta{
+		APIVersion: inventoryObj.GetAPIVersion(),
+		Kind:       inventoryObj.GetKind(),
+	}
+	invObjMeta = metav1.ObjectMeta{
+		Name:      inventoryObj.GetName(),
+		Namespace: inventoryObj.GetNamespace(),
+		Labels:    inventoryObj.GetLabels(),
+	}
+)
 
 func newTestApplier(
 	t *testing.T,
-	invInfo inventoryInfo,
+	inv *actuation.Inventory,
 	resources object.UnstructuredSet,
 	clusterObjs object.UnstructuredSet,
 	statusWatcher watcher.StatusWatcher,
 ) *Applier {
-	tf := newTestFactory(t, invInfo, resources, clusterObjs)
+	tf := newTestFactory(t, inv, resources, clusterObjs)
 	defer tf.Cleanup()
 
 	infoHelper := &fakeInfoHelper{
@@ -100,7 +95,7 @@ func newTestApplier(
 
 func newTestDestroyer(
 	t *testing.T,
-	invInfo inventoryInfo,
+	invInfo *actuation.Inventory,
 	clusterObjs object.UnstructuredSet,
 	statusWatcher watcher.StatusWatcher,
 ) *Destroyer {
@@ -125,18 +120,19 @@ func newTestInventory(
 ) inventory.Client {
 	// Use an Client with a fakeInfoHelper to allow generating Info
 	// objects that use the FakeRESTClient as the UnstructuredClient.
-	invClient, err := inventory.ClusterClientFactory{StatusPolicy: inventory.StatusPolicyAll}.NewClient(tf)
+	// TODO: add `StatusPolicy: inventory.StatusPolicyAll` to ConfigMapClientFactory
+	invClient, err := inventory.ConfigMapClientFactory{}.NewClient(tf)
 	require.NoError(t, err)
 	return invClient
 }
 
 func newTestFactory(
 	t *testing.T,
-	invInfo inventoryInfo,
+	inv client.Object,
 	resourceSet object.UnstructuredSet,
 	clusterObjs object.UnstructuredSet,
 ) *cmdtesting.TestFactory {
-	tf := cmdtesting.NewTestFactory().WithNamespace(invInfo.namespace)
+	tf := cmdtesting.NewTestFactory().WithNamespace(inv.GetNamespace())
 
 	mapper, err := tf.ToRESTMapper()
 	require.NoError(t, err)
@@ -170,7 +166,7 @@ func newTestFactory(
 	}
 
 	tf.UnstructuredClient = newFakeRESTClient(t, handlers)
-	tf.FakeDynamicClient = fakeDynamicClient(t, mapper, invInfo, objs...)
+	tf.FakeDynamicClient = fakeDynamicClient(t, mapper, inv, objs...)
 
 	return tf
 }
@@ -283,9 +279,9 @@ func (g *genericHandler) handle(t *testing.T, req *http.Request) (*http.Response
 	return nil, false, nil
 }
 
-func newInventoryReactor(invInfo inventoryInfo) *inventoryReactor {
+func newInventoryReactor(inv *unstructured.Unstructured) *inventoryReactor {
 	return &inventoryReactor{
-		inventoryObj: invInfo.toUnstructured(),
+		inventoryObj: inv,
 	}
 }
 
@@ -430,19 +426,21 @@ func (f *fakeInfoHelper) getClient(gv schema.GroupVersion) (resource.RESTClient,
 }
 
 // fakeDynamicClient returns a fake dynamic client.
-func fakeDynamicClient(t *testing.T, mapper meta.RESTMapper, invInfo inventoryInfo, objs ...resourceInfo) *dynamicfake.FakeDynamicClient {
+func fakeDynamicClient(t *testing.T, mapper meta.RESTMapper, inv client.Object, objs ...resourceInfo) *dynamicfake.FakeDynamicClient {
 	fakeClient := dynamicfake.NewSimpleDynamicClient(scheme.Scheme)
 
-	invReactor := newInventoryReactor(invInfo)
+	objMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(inv)
+	require.NoError(t, err)
+
+	invReactor := newInventoryReactor(&unstructured.Unstructured{Object: objMap})
 	invReactor.updateFakeDynamicClient(fakeClient)
 
 	for i := range objs {
 		obj := objs[i]
 		gvk := obj.resource.GroupVersionKind()
 		mapping, err := mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
-		if !assert.NoError(t, err) {
-			t.FailNow()
-		}
+		require.NoError(t, err)
+
 		r := mapping.Resource.Resource
 		fakeClient.PrependReactor("get", r, func(clienttesting.Action) (bool, runtime.Object, error) {
 			if obj.exists {
