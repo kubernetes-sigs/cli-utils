@@ -41,17 +41,14 @@ func thousandNamespacesTest(ctx context.Context, c client.Client, invConfig invc
 
 	resources := []*unstructured.Unstructured{crdObj}
 
-	labelKey := "created-for"
-	labelValue := "stress-test"
-
 	namespaceObjTemplate := e2eutil.ManifestToUnstructured([]byte(namespaceYaml))
-	namespaceObjTemplate.SetLabels(map[string]string{labelKey: labelValue})
+	namespaceObjTemplate.SetLabels(map[string]string{e2eutil.TestIDLabel: inventoryID})
 
 	configMapObjTemplate := e2eutil.ManifestToUnstructured([]byte(configMapYaml))
-	configMapObjTemplate.SetLabels(map[string]string{labelKey: labelValue})
+	configMapObjTemplate.SetLabels(map[string]string{e2eutil.TestIDLabel: inventoryID})
 
 	cronTabObjTemplate := e2eutil.ManifestToUnstructured([]byte(cronTabYaml))
-	cronTabObjTemplate.SetLabels(map[string]string{labelKey: labelValue})
+	cronTabObjTemplate.SetLabels(map[string]string{e2eutil.TestIDLabel: inventoryID})
 
 	objectCount := 1000
 
