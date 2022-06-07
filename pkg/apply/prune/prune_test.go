@@ -184,6 +184,7 @@ var (
 
 func TestPrune(t *testing.T) {
 	tests := map[string]struct {
+		clusterObjs       []*unstructured.Unstructured
 		pruneObjs         []*unstructured.Unstructured
 		pruneFilters      []filter.ValidationFilter
 		options           Options
@@ -193,13 +194,15 @@ func TestPrune(t *testing.T) {
 		expectedAbandoned object.ObjMetadataSet
 	}{
 		"No pruned objects; no prune/delete events": {
+			clusterObjs:    []*unstructured.Unstructured{},
 			pruneObjs:      []*unstructured.Unstructured{},
 			options:        defaultOptions,
 			expectedEvents: nil,
 		},
 		"One successfully pruned object": {
-			pruneObjs: []*unstructured.Unstructured{pod},
-			options:   defaultOptions,
+			clusterObjs: []*unstructured.Unstructured{pod},
+			pruneObjs:   []*unstructured.Unstructured{pod},
+			options:     defaultOptions,
 			expectedEvents: []event.Event{
 				{
 					Type: event.PruneType,
@@ -212,8 +215,9 @@ func TestPrune(t *testing.T) {
 			},
 		},
 		"Multiple successfully pruned object": {
-			pruneObjs: []*unstructured.Unstructured{pod, pdb, namespace},
-			options:   defaultOptions,
+			clusterObjs: []*unstructured.Unstructured{pod, pdb, namespace},
+			pruneObjs:   []*unstructured.Unstructured{pod, pdb, namespace},
+			options:     defaultOptions,
 			expectedEvents: []event.Event{
 				{
 					Type: event.PruneType,
@@ -242,8 +246,9 @@ func TestPrune(t *testing.T) {
 			},
 		},
 		"One successfully deleted object": {
-			pruneObjs: []*unstructured.Unstructured{pod},
-			options:   defaultOptionsDestroy,
+			clusterObjs: []*unstructured.Unstructured{pod},
+			pruneObjs:   []*unstructured.Unstructured{pod},
+			options:     defaultOptionsDestroy,
 			expectedEvents: []event.Event{
 				{
 					Type: event.DeleteType,
@@ -256,8 +261,9 @@ func TestPrune(t *testing.T) {
 			},
 		},
 		"Multiple successfully deleted objects": {
-			pruneObjs: []*unstructured.Unstructured{pod, pdb, namespace},
-			options:   defaultOptionsDestroy,
+			clusterObjs: []*unstructured.Unstructured{pod, pdb, namespace},
+			pruneObjs:   []*unstructured.Unstructured{pod, pdb, namespace},
+			options:     defaultOptionsDestroy,
 			expectedEvents: []event.Event{
 				{
 					Type: event.DeleteType,
@@ -286,8 +292,9 @@ func TestPrune(t *testing.T) {
 			},
 		},
 		"Client dry run still pruned event": {
-			pruneObjs: []*unstructured.Unstructured{pod},
-			options:   clientDryRunOptions,
+			clusterObjs: []*unstructured.Unstructured{pod},
+			pruneObjs:   []*unstructured.Unstructured{pod},
+			options:     clientDryRunOptions,
 			expectedEvents: []event.Event{
 				{
 					Type: event.PruneType,
@@ -300,7 +307,8 @@ func TestPrune(t *testing.T) {
 			},
 		},
 		"Server dry run still deleted event": {
-			pruneObjs: []*unstructured.Unstructured{pod},
+			clusterObjs: []*unstructured.Unstructured{pod},
+			pruneObjs:   []*unstructured.Unstructured{pod},
 			options: Options{
 				DryRunStrategy:    common.DryRunServer,
 				PropagationPolicy: metav1.DeletePropagationBackground,
@@ -318,7 +326,8 @@ func TestPrune(t *testing.T) {
 			},
 		},
 		"UID match means prune skipped": {
-			pruneObjs: []*unstructured.Unstructured{pod},
+			clusterObjs: []*unstructured.Unstructured{pod},
+			pruneObjs:   []*unstructured.Unstructured{pod},
 			pruneFilters: []filter.ValidationFilter{
 				filter.CurrentUIDFilter{
 					// Add pod UID to set of current UIDs
@@ -344,7 +353,8 @@ func TestPrune(t *testing.T) {
 			},
 		},
 		"UID match for only one object one pruned, one skipped": {
-			pruneObjs: []*unstructured.Unstructured{pod, pdb},
+			clusterObjs: []*unstructured.Unstructured{pod, pdb},
+			pruneObjs:   []*unstructured.Unstructured{pod, pdb},
 			pruneFilters: []filter.ValidationFilter{
 				filter.CurrentUIDFilter{
 					// Add pod UID to set of current UIDs
@@ -378,6 +388,10 @@ func TestPrune(t *testing.T) {
 			},
 		},
 		"Prevent delete annotation equals prune skipped": {
+			clusterObjs: []*unstructured.Unstructured{
+				podDeletionPrevention,
+				testutil.Unstructured(t, pdbDeletePreventionManifest),
+			},
 			pruneObjs: []*unstructured.Unstructured{
 				podDeletionPrevention,
 				testutil.Unstructured(t, pdbDeletePreventionManifest),
@@ -422,6 +436,10 @@ func TestPrune(t *testing.T) {
 			},
 		},
 		"Prevent delete annotation equals delete skipped": {
+			clusterObjs: []*unstructured.Unstructured{
+				podDeletionPrevention,
+				testutil.Unstructured(t, pdbDeletePreventionManifest),
+			},
 			pruneObjs: []*unstructured.Unstructured{
 				podDeletionPrevention,
 				testutil.Unstructured(t, pdbDeletePreventionManifest),
@@ -466,6 +484,7 @@ func TestPrune(t *testing.T) {
 			},
 		},
 		"Prevent delete annotation, one skipped, one pruned": {
+			clusterObjs:  []*unstructured.Unstructured{podDeletionPrevention, pod},
 			pruneObjs:    []*unstructured.Unstructured{podDeletionPrevention, pod},
 			pruneFilters: []filter.ValidationFilter{filter.PreventRemoveFilter{}},
 			options:      defaultOptions,
@@ -500,7 +519,8 @@ func TestPrune(t *testing.T) {
 			},
 		},
 		"Namespace prune skipped": {
-			pruneObjs: []*unstructured.Unstructured{namespace},
+			clusterObjs: []*unstructured.Unstructured{namespace},
+			pruneObjs:   []*unstructured.Unstructured{namespace},
 			pruneFilters: []filter.ValidationFilter{
 				filter.LocalNamespacesFilter{
 					LocalNamespaces: sets.NewString(namespace.GetName()),
@@ -524,19 +544,34 @@ func TestPrune(t *testing.T) {
 				object.UnstructuredToObjMetadata(namespace),
 			},
 		},
+		"Deletion of already deleted object": {
+			clusterObjs: []*unstructured.Unstructured{},
+			pruneObjs:   []*unstructured.Unstructured{pod},
+			options:     defaultOptionsDestroy,
+			expectedEvents: []event.Event{
+				{
+					Type: event.DeleteType,
+					DeleteEvent: event.DeleteEvent{
+						Identifier: object.UnstructuredToObjMetadata(pod),
+						Status:     event.DeleteSuccessful,
+						Object:     pod,
+					},
+				},
+			},
+		},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			// Set up the fake dynamic client to recognize all objects, and the RESTMapper.
-			objs := make([]runtime.Object, 0, len(tc.pruneObjs))
-			for _, obj := range tc.pruneObjs {
-				objs = append(objs, obj)
+			clusterObjs := make([]runtime.Object, 0, len(tc.clusterObjs))
+			for _, obj := range tc.clusterObjs {
+				clusterObjs = append(clusterObjs, obj)
 			}
 			pruneIds := object.UnstructuredSetToObjMetadataSet(tc.pruneObjs)
 			po := Pruner{
 				InvClient: inventory.NewFakeClient(pruneIds),
-				Client:    fake.NewSimpleDynamicClient(scheme.Scheme, objs...),
+				Client:    fake.NewSimpleDynamicClient(scheme.Scheme, clusterObjs...),
 				Mapper: testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme,
 					scheme.Scheme.PrioritizedVersionsAllGroups()...),
 			}
