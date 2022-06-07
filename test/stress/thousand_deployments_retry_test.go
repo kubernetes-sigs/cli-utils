@@ -13,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/cli-utils/pkg/apply"
+	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/test/e2e/e2eutil"
@@ -20,12 +21,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// thousandDeploymentsTest tests one pre-existing namespace with 1,000
-// Deployments in it.
+// thousandDeploymentsRetryTest tests one pre-existing namespace with 1,000
+// Deployments in it. The wait timeout is set too short to confirm
+// reconciliation, but the apply/destroy is retried until success.
 //
 // The Deployments themselves are easy to get status on, but with the retrieval
 // of generated resource status (ReplicaSets & Pods), this becomes expensive.
-func thousandDeploymentsTest(ctx context.Context, c client.Client, invConfig invconfig.InventoryConfig, inventoryName, namespaceName string) {
+func thousandDeploymentsRetryTest(ctx context.Context, c client.Client, invConfig invconfig.InventoryConfig, inventoryName, namespaceName string) {
 	By("Apply LOTS of resources")
 	applier := invConfig.ApplierFactoryFunc()
 	inventoryID := fmt.Sprintf("%s-%s", inventoryName, namespaceName)
@@ -59,23 +61,47 @@ func thousandDeploymentsTest(ctx context.Context, c client.Client, invConfig inv
 		e2eutil.DeleteAllUnstructuredIfExists(ctx, c, deploymentObjTemplate)
 	}()
 
-	start := time.Now()
+	startTotal := time.Now()
 
-	applierEvents := e2eutil.RunCollect(applier.Run(ctx, inventoryInfo, resources, apply.ApplierOptions{
-		// SSA reduces GET+PATCH to just PATCH, which is faster
-		ServerSideOptions: common.ServerSideOptions{
-			ServerSideApply: true,
-			ForceConflicts:  true,
-			FieldManager:    "cli-utils.kubernetes.io",
-		},
-		ReconcileTimeout: 30 * time.Minute,
-		EmitStatusEvents: false,
-	}))
+	var applierEvents []event.Event
 
-	duration := time.Since(start)
-	klog.Infof("Applier.Run execution time: %v", duration)
+	maxAttempts := 15
+	reconcileTimeout := 2 * time.Minute
 
-	e2eutil.ExpectNoEventErrors(applierEvents)
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		start := time.Now()
+
+		applierEvents = e2eutil.RunCollect(applier.Run(ctx, inventoryInfo, resources, apply.ApplierOptions{
+			// SSA reduces GET+PATCH to just PATCH, which is faster
+			ServerSideOptions: common.ServerSideOptions{
+				ServerSideApply: true,
+				ForceConflicts:  true,
+				FieldManager:    "cli-utils.kubernetes.io",
+			},
+			ReconcileTimeout: reconcileTimeout,
+			EmitStatusEvents: false,
+		}))
+
+		duration := time.Since(start)
+		klog.Infof("Applier.Run execution time (attempt: %d): %v", attempt, duration)
+
+		e2eutil.ExpectNoEventErrors(applierEvents)
+
+		// Retry if ReconcileTimeout
+		retry := false
+		for _, e := range applierEvents {
+			if e.Type == event.WaitType && e.WaitEvent.Status == event.ReconcileTimeout {
+				retry = true
+			}
+		}
+		if !retry {
+			break
+		}
+	}
+
+	durationTotal := time.Since(startTotal)
+	klog.Infof("Applier.Run total execution time (attempts: %d): %v", maxAttempts, durationTotal)
+
 	e2eutil.ExpectNoReconcileTimeouts(applierEvents)
 
 	By("Verify inventory created")
@@ -87,18 +113,39 @@ func thousandDeploymentsTest(ctx context.Context, c client.Client, invConfig inv
 	By("Destroy LOTS of resources")
 	destroyer := invConfig.DestroyerFactoryFunc()
 
-	start = time.Now()
+	startTotal = time.Now()
 
-	destroyerEvents := e2eutil.RunCollect(destroyer.Run(ctx, inventoryInfo, apply.DestroyerOptions{
-		InventoryPolicy: inventory.PolicyAdoptIfNoInventory,
-		DeleteTimeout:   30 * time.Minute,
-	}))
+	var destroyerEvents []event.Event
 
-	duration = time.Since(start)
-	klog.Infof("Destroyer.Run execution time: %v", duration)
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		start := time.Now()
 
-	e2eutil.ExpectNoEventErrors(destroyerEvents)
-	e2eutil.ExpectNoReconcileTimeouts(destroyerEvents)
+		destroyerEvents = e2eutil.RunCollect(destroyer.Run(ctx, inventoryInfo, apply.DestroyerOptions{
+			InventoryPolicy: inventory.PolicyAdoptIfNoInventory,
+			DeleteTimeout:   reconcileTimeout,
+		}))
+
+		duration := time.Since(start)
+		klog.Infof("Destroyer.Run execution time (attempt: %d): %v", attempt, duration)
+
+		e2eutil.ExpectNoEventErrors(destroyerEvents)
+
+		// Retry if ReconcileTimeout
+		retry := false
+		for _, e := range applierEvents {
+			if e.Type == event.WaitType && e.WaitEvent.Status == event.ReconcileTimeout {
+				retry = true
+			}
+		}
+		if !retry {
+			break
+		}
+	}
+
+	durationTotal = time.Since(startTotal)
+	klog.Infof("Destroyer.Run total execution time (attempts: %d): %v", maxAttempts, durationTotal)
+
+	e2eutil.ExpectNoReconcileTimeouts(applierEvents)
 
 	By("Verify inventory deleted")
 	invConfig.InvNotExistsFunc(ctx, c, inventoryName, namespaceName, inventoryID)

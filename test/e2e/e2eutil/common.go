@@ -14,6 +14,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	"github.com/onsi/gomega/gstruct"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -32,6 +33,8 @@ import (
 	"sigs.k8s.io/cli-utils/test/e2e/customprovider"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+const TestIDLabel = "test-id"
 
 func WithReplicas(obj *unstructured.Unstructured, replicas int) *unstructured.Unstructured {
 	err := unstructured.SetNestedField(obj.Object, int64(replicas), "spec", "replicas")
@@ -270,9 +273,7 @@ func Run(ch <-chan event.Event) error {
 	return err
 }
 
-func RunWithNoErr(ch <-chan event.Event) {
-	RunCollectNoErr(ch)
-}
+var RunWithNoErr = RunCollectNoErr
 
 func RunCollect(ch <-chan event.Event) []event.Event {
 	var events []event.Event
@@ -282,12 +283,69 @@ func RunCollect(ch <-chan event.Event) []event.Event {
 	return events
 }
 
-func RunCollectNoErr(ch <-chan event.Event) []event.Event {
-	events := RunCollect(ch)
-	for _, e := range events {
-		gomega.Expect(e.Type).NotTo(gomega.Equal(event.ErrorType))
+func RunCollectNoErr(ch <-chan event.Event, callerSkip ...int) []event.Event {
+	skip := 0
+	if len(callerSkip) > 0 {
+		skip = callerSkip[0]
 	}
+
+	events := RunCollect(ch)
+	ExpectNoEventErrors(events, skip+1)
+	ExpectNoReconcileTimeouts(events, skip+1)
 	return events
+}
+
+func ExpectNoEventErrors(events []event.Event, callerSkip ...int) {
+	skip := 0
+	if len(callerSkip) > 0 {
+		skip = callerSkip[0]
+	}
+
+	gomega.Expect(events).WithOffset(skip + 1).NotTo(
+		gomega.ContainElement(gstruct.MatchFields(gstruct.IgnoreExtras,
+			gstruct.Fields{
+				"Type": gomega.Equal(event.ErrorType),
+			})))
+	gomega.Expect(events).WithOffset(skip + 1).NotTo(
+		gomega.ContainElement(gstruct.MatchFields(gstruct.IgnoreExtras,
+			gstruct.Fields{
+				"Type": gomega.Equal(event.ApplyType),
+				"ApplyEvent": gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+					"Status": gomega.Equal(event.ApplyFailed),
+				}),
+			})))
+	gomega.Expect(events).WithOffset(skip + 1).NotTo(
+		gomega.ContainElement(gstruct.MatchFields(gstruct.IgnoreExtras,
+			gstruct.Fields{
+				"Type": gomega.Equal(event.PruneType),
+				"PruneEvent": gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+					"Status": gomega.Equal(event.PruneFailed),
+				}),
+			})))
+	gomega.Expect(events).WithOffset(skip + 1).NotTo(
+		gomega.ContainElement(gstruct.MatchFields(gstruct.IgnoreExtras,
+			gstruct.Fields{
+				"Type": gomega.Equal(event.DeleteType),
+				"DeleteEvent": gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+					"Status": gomega.Equal(event.DeleteFailed),
+				}),
+			})))
+}
+
+func ExpectNoReconcileTimeouts(events []event.Event, callerSkip ...int) {
+	skip := 0
+	if len(callerSkip) > 0 {
+		skip = callerSkip[0]
+	}
+
+	gomega.Expect(events).WithOffset(skip + 1).NotTo(
+		gomega.ContainElement(gstruct.MatchFields(gstruct.IgnoreExtras,
+			gstruct.Fields{
+				"Type": gomega.Equal(event.WaitType),
+				"WaitEvent": gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+					"Status": gomega.Equal(event.ReconcileTimeout),
+				}),
+			})))
 }
 
 func ManifestToUnstructured(manifest []byte) *unstructured.Unstructured {

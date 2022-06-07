@@ -101,6 +101,10 @@ var _ = Describe("Stress", func() {
 		thousandDeploymentsTest(ctx, c, invConfig, inventoryName, namespace.GetName())
 	})
 
+	It("ThousandDeploymentsRetry", func() {
+		thousandDeploymentsRetryTest(ctx, c, invConfig, inventoryName, namespace.GetName())
+	})
+
 	It("ThousandNamespaces", func() {
 		thousandNamespacesTest(ctx, c, invConfig, inventoryName, namespace.GetName())
 	})
