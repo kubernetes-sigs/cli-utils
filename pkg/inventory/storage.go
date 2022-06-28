@@ -15,7 +15,9 @@ import (
 	"fmt"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/cli-utils/pkg/apis/actuation"
 	"sigs.k8s.io/cli-utils/pkg/common"
@@ -31,10 +33,19 @@ const legacyInvName = "inventory"
 type Storage interface {
 	// Load retrieves the set of object metadata from the inventory object
 	Load() (object.ObjMetadataSet, error)
-	// Store the set of object metadata in the inventory object
+	// Store the set of object metadata in the inventory object. This will
+	// replace the metadata, spec and status.
 	Store(objs object.ObjMetadataSet, status []actuation.ObjectStatus) error
 	// GetObject returns the object that stores the inventory
 	GetObject() (*unstructured.Unstructured, error)
+	// Apply applies the inventory object. This utility function is used
+	// in InventoryClient.Merge and merges the metadata, spec and status.
+	Apply(dynamic.Interface, meta.RESTMapper, StatusPolicy) error
+	// ApplyWithPrune applies the inventory object with a set of pruneIDs of
+	// objects to be pruned (object.ObjMetadataSet). This function is used in
+	// InventoryClient.Replace. pruneIDs are required for enabling custom logic
+	// handling of multiple ResourceGroup inventories.
+	ApplyWithPrune(dynamic.Interface, meta.RESTMapper, StatusPolicy, object.ObjMetadataSet) error
 }
 
 // StorageFactoryFunc creates the object which implements the Inventory

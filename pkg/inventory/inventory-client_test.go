@@ -393,7 +393,7 @@ func TestReplace(t *testing.T) {
 				t.Fatalf("unexpected error storing inventory objects: %s", err)
 			}
 			// Call replaceInventory with the new set of "localObjs"
-			inv, err = invClient.replaceInventory(inv, tc.localObjs, tc.objStatus)
+			inv, _, err = invClient.replaceInventory(inv, tc.localObjs, tc.objStatus)
 			if err != nil {
 				t.Fatalf("unexpected error received: %s", err)
 			}
