@@ -144,6 +144,13 @@ func (cic *ClusterClient) Merge(localInv Info, objs object.ObjMetadataSet, dryRu
 		return pruneIds, err
 	}
 
+	// Update not required when all objects in inventory are the same and
+	// status does not need to be updated. If status is stored, always update the
+	// inventory to store the latest status.
+	if objs.Equal(clusterObjs) && cic.statusPolicy == StatusPolicyNone {
+		return pruneIds, nil
+	}
+
 	if dryRun.ClientOrServerDryRun() {
 		klog.V(4).Infof("dry-run create inventory object: not created")
 		return pruneIds, nil
@@ -176,13 +183,18 @@ func (cic *ClusterClient) Replace(localInv Info, objs object.ObjMetadataSet, sta
 		return err
 	}
 
-	if !objs.Equal(clusterObjs) {
-		klog.V(4).Infof("replace cluster inventory: %s/%s", clusterInv.GetNamespace(), clusterInv.GetName())
-		klog.V(4).Infof("replace cluster inventory %d objects", len(objs))
+	// Update not required when all objects in inventory are the same and
+	// status does not need to be updated. If status is stored, always update the
+	// inventory to store the latest status.
+	if objs.Equal(clusterObjs) && cic.statusPolicy == StatusPolicyNone {
+		return nil
+	}
 
-		if err := wrappedInv.ApplyWithPrune(cic.dc, cic.mapper, cic.statusPolicy, objs); err != nil {
-			return fmt.Errorf("failed to write updated inventory to cluster: %w", err)
-		}
+	klog.V(4).Infof("replace cluster inventory: %s/%s", clusterInv.GetNamespace(), clusterInv.GetName())
+	klog.V(4).Infof("replace cluster inventory %d objects", len(objs))
+
+	if err := wrappedInv.ApplyWithPrune(cic.dc, cic.mapper, cic.statusPolicy, objs); err != nil {
+		return fmt.Errorf("failed to write updated inventory to cluster: %w", err)
 	}
 
 	return nil
