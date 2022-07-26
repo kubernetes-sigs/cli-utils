@@ -110,9 +110,8 @@ func ValidateNoInventory(objs object.UnstructuredSet) error {
 
 // splitUnstructureds takes a set of unstructured.Unstructured objects and
 // splits it into one set that contains the inventory object templates and
-// another one that contains the remaining resources. If there is no inventory
-// object the first return value is nil. Returns an error if there are
-// more than one inventory objects.
+// another one that contains the remaining resources. Returns an error if there
+// there is no inventory object or more than one inventory objects.
 func SplitUnstructureds(objs object.UnstructuredSet) (*unstructured.Unstructured, object.UnstructuredSet, error) {
 	invs := make(object.UnstructuredSet, 0)
 	resources := make(object.UnstructuredSet, 0)
@@ -125,12 +124,13 @@ func SplitUnstructureds(objs object.UnstructuredSet) (*unstructured.Unstructured
 	}
 	var inv *unstructured.Unstructured
 	var err error
-	if len(invs) == 1 {
+	switch len(invs) {
+	case 0:
+		err = &NoInventoryObjError{}
+	case 1:
 		inv = invs[0]
-	} else if len(invs) > 1 {
-		err = &MultipleInventoryObjError{
-			InventoryObjectTemplates: invs,
-		}
+	default:
+		err = &MultipleInventoryObjError{InventoryObjectTemplates: invs}
 	}
 	return inv, resources, err
 }
