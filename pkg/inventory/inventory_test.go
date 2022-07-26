@@ -256,11 +256,11 @@ func TestSplitUnstructureds(t *testing.T) {
 		expectedObjs []*unstructured.Unstructured
 		isError      bool
 	}{
-		"No objects is returns nil and no objects": {
+		"No objects returns error": {
 			allObjs:      []*unstructured.Unstructured{},
 			expectedInv:  nil,
 			expectedObjs: []*unstructured.Unstructured{},
-			isError:      false,
+			isError:      true,
 		},
 		"Only inventory object returns inv and no objects": {
 			allObjs:      []*unstructured.Unstructured{inventoryObj},
@@ -268,17 +268,17 @@ func TestSplitUnstructureds(t *testing.T) {
 			expectedObjs: []*unstructured.Unstructured{},
 			isError:      false,
 		},
-		"Single object returns nil inventory and object": {
-			allObjs:      []*unstructured.Unstructured{pod1},
-			expectedInv:  nil,
+		"Inventory object with single object returns inventory and object": {
+			allObjs:      []*unstructured.Unstructured{inventoryObj, pod1},
+			expectedInv:  inventoryObj,
 			expectedObjs: []*unstructured.Unstructured{pod1},
 			isError:      false,
 		},
-		"Multiple non-inventory objects returns nil inventory and objs": {
+		"Multiple non-inventory objects returns error": {
 			allObjs:      []*unstructured.Unstructured{pod1, pod2, pod3},
 			expectedInv:  nil,
 			expectedObjs: []*unstructured.Unstructured{pod1, pod2, pod3},
-			isError:      false,
+			isError:      true,
 		},
 		"Inventory object with multiple others splits correctly": {
 			allObjs:      []*unstructured.Unstructured{pod1, pod2, inventoryObj, pod3},

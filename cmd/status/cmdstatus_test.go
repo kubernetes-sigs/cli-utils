@@ -64,6 +64,10 @@ func TestCommand(t *testing.T) {
 		expectedErrMsg string
 		expectedOutput string
 	}{
+		"no inventory template": {
+			input:          "",
+			expectedErrMsg: "Package uninitialized. Please run \"init\" command.",
+		},
 		"no inventory in live state": {
 			input:          inventoryTemplate,
 			expectedOutput: "no resources found in the inventory\n",
