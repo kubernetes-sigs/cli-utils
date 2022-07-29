@@ -4,7 +4,7 @@
 actuation of Kubernetes resource objects by wraping and enahancing
 `kubectl apply` with a more user friendly abstraction.
 
-While the name incidates a focus on CLI utilities, the project has evolved to
+While the name indicates a focus on CLI utilities, the project has evolved to
 encompass a broader scope, including CLI use and server-side use in GitOps
 controllers.
 
@@ -28,11 +28,11 @@ removed from the input set on a subsequent apply.
 
 The current implementation of `kubectl apply --prune` uses labels to identify the
 set of previously applied objects in the prune set calculation. But the use of labels
-has significant downsides. The current `kubectl apply --prune` implemenation is alpha,
+has significant downsides. The current `kubectl apply --prune` implementation is alpha,
 and it is improbable that it will graduate to beta. `cli-utils` attempts to address
 the current `kubectl apply --prune` deficiencies by storing the set of previously
 applied objects in an **inventory** object which is applied to the cluster. The
-reference implimentation uses a `ConfigMap` as an **inventory** object, and references
+reference implementation uses a `ConfigMap` as an **inventory** object, and references
 to the applied objects are stored in the `data` section of the `ConfigMap`.
 
 The following example illustrates a `ConfigMap` resource used as an inventory object:
@@ -66,7 +66,7 @@ is expected to never reconcile (aka Failed).
 
 ### Status Lookup
 
-In addition to performing interpritation of status from an object in-memory,
+In addition to performing interpretation of status from an object in-memory,
 `cli-utils` can also be used to query status from the server, allowing you to
 retrieve the status of previously or concurrently applied objects.
 
@@ -75,7 +75,7 @@ retrieve the status of previously or concurrently applied objects.
 `cli-utils` can be used to compare local object manifests with remote objects
 from the server. These can be compared locally with diff or remotely with
 preview (aka dry-run). This can be useful for discovering drift or previewing
-which changes would be made, if the loal manifests were applied.
+which changes would be made, if the local manifests were applied.
 
 ### Waiting for Reconciliation
 
@@ -84,7 +84,7 @@ status, blocking until the objects have reconciled, failed, or been fully
 deleted.
 
 This functionality is similar to `kubectl delete <resource> <name> --wait`, in
-that is waits for all finalizers to complete, except it also works for creates
+that it waits for all finalizers to complete, except it also works for creates
 and updates.
 
 While there is a `kubectl apply <resource> <name> --wait`, it only waits for
@@ -168,7 +168,7 @@ to seperate into multiple sets, with manual modifications between applies.
 Apply-Time Mutation is configured using the
 `config.kubernetes.io/apply-time-mutation` annotation on the target object to be
 modified. The annotation may specify one or more substitutions. Each
-substitution inncludes a source object, and source field path, and a parget
+substitution includes a source object, and source field path, and a target
 field path, with an optional token. 
 
 If the token is specified, the token is
@@ -228,7 +228,7 @@ interfaces, or creating dependencies between otherwise independent interfaces.
 ### CLI Printers
 
 Since the original intent of `cli-utils` was to contain common code for CLIs,
-and end-to-end testing requires a reference implimentation, a few printers are
+and end-to-end testing requires a reference implementation, a few printers are
 included to translate from the primary event stream into STDOUT text:
 
 1. **Event Printer**: The event printer just prints text to STDOT whenever an
@@ -250,7 +250,7 @@ included to translate from the primary event stream into STDOUT text:
 │   ├── **config**: inventory config bootstrapping
 │   ├── **errors**: error printing
 │   ├── **flowcontrol**: flow control enablement discovery
-│   ├── **inventory**: inventory resource reference implimentation
+│   ├── **inventory**: inventory resource reference implementation
 │   ├── **jsonpath**: utility for using jsonpath to read & write Unstructured object fields
 │   ├── **kstatus**: object status event watcher with ability to reduce status to a single enum
 │   ├── **manifestreader**: bolk resource object manifest reading and parsing
