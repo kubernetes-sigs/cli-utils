@@ -156,7 +156,10 @@ func (r *Runner) RunE(cmd *cobra.Command, args []string) error {
 			InventoryPolicy:   inventoryPolicy,
 		})
 	} else {
-		d, err := apply.NewDestroyer(r.factory, invClient)
+		d, err := apply.NewDestroyerBuilder().
+			WithFactory(r.factory).
+			WithInventoryClient(invClient).
+			Build()
 		if err != nil {
 			return err
 		}

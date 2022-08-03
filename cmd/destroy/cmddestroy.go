@@ -118,7 +118,10 @@ func (r *Runner) RunE(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	d, err := apply.NewDestroyer(r.factory, invClient)
+	d, err := apply.NewDestroyerBuilder().
+		WithFactory(r.factory).
+		WithInventoryClient(invClient).
+		Build()
 	if err != nil {
 		return err
 	}
