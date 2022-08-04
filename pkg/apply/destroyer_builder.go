@@ -1,4 +1,4 @@
-// Copyright 2021 The Kubernetes Authors.
+// Copyright 2022 The Kubernetes Authors.
 // SPDX-License-Identifier: Apache-2.0
 
 package apply
@@ -16,23 +16,23 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/kstatus/watcher"
 )
 
-type ApplierBuilder struct {
+type DestroyerBuilder struct {
 	commonBuilder
 }
 
-// NewApplierBuilder returns a new ApplierBuilder.
-func NewApplierBuilder() *ApplierBuilder {
-	return &ApplierBuilder{
+// NewDestroyerBuilder returns a new DestroyerBuilder.
+func NewDestroyerBuilder() *DestroyerBuilder {
+	return &DestroyerBuilder{
 		// Defaults, if any, go here.
 	}
 }
 
-func (b *ApplierBuilder) Build() (*Applier, error) {
+func (b *DestroyerBuilder) Build() (*Destroyer, error) {
 	bx, err := b.finalize()
 	if err != nil {
 		return nil, err
 	}
-	return &Applier{
+	return &Destroyer{
 		pruner: &prune.Pruner{
 			InvClient: bx.invClient,
 			Client:    bx.client,
@@ -40,49 +40,49 @@ func (b *ApplierBuilder) Build() (*Applier, error) {
 		},
 		statusWatcher: bx.statusWatcher,
 		invClient:     bx.invClient,
+		mapper:        bx.mapper,
 		client:        bx.client,
 		openAPIGetter: bx.discoClient,
-		mapper:        bx.mapper,
 		infoHelper:    info.NewHelper(bx.mapper, bx.unstructuredClientForMapping),
 	}, nil
 }
 
-func (b *ApplierBuilder) WithFactory(factory util.Factory) *ApplierBuilder {
+func (b *DestroyerBuilder) WithFactory(factory util.Factory) *DestroyerBuilder {
 	b.factory = factory
 	return b
 }
 
-func (b *ApplierBuilder) WithInventoryClient(invClient inventory.Client) *ApplierBuilder {
+func (b *DestroyerBuilder) WithInventoryClient(invClient inventory.Client) *DestroyerBuilder {
 	b.invClient = invClient
 	return b
 }
 
-func (b *ApplierBuilder) WithDynamicClient(client dynamic.Interface) *ApplierBuilder {
+func (b *DestroyerBuilder) WithDynamicClient(client dynamic.Interface) *DestroyerBuilder {
 	b.client = client
 	return b
 }
 
-func (b *ApplierBuilder) WithDiscoveryClient(discoClient discovery.CachedDiscoveryInterface) *ApplierBuilder {
+func (b *DestroyerBuilder) WithDiscoveryClient(discoClient discovery.CachedDiscoveryInterface) *DestroyerBuilder {
 	b.discoClient = discoClient
 	return b
 }
 
-func (b *ApplierBuilder) WithRestMapper(mapper meta.RESTMapper) *ApplierBuilder {
+func (b *DestroyerBuilder) WithRestMapper(mapper meta.RESTMapper) *DestroyerBuilder {
 	b.mapper = mapper
 	return b
 }
 
-func (b *ApplierBuilder) WithRestConfig(restConfig *rest.Config) *ApplierBuilder {
+func (b *DestroyerBuilder) WithRestConfig(restConfig *rest.Config) *DestroyerBuilder {
 	b.restConfig = restConfig
 	return b
 }
 
-func (b *ApplierBuilder) WithUnstructuredClientForMapping(unstructuredClientForMapping func(*meta.RESTMapping) (resource.RESTClient, error)) *ApplierBuilder {
+func (b *DestroyerBuilder) WithUnstructuredClientForMapping(unstructuredClientForMapping func(*meta.RESTMapping) (resource.RESTClient, error)) *DestroyerBuilder {
 	b.unstructuredClientForMapping = unstructuredClientForMapping
 	return b
 }
 
-func (b *ApplierBuilder) WithStatusWatcher(statusWatcher watcher.StatusWatcher) *ApplierBuilder {
+func (b *DestroyerBuilder) WithStatusWatcher(statusWatcher watcher.StatusWatcher) *DestroyerBuilder {
 	b.statusWatcher = statusWatcher
 	return b
 }

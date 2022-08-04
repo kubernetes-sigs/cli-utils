@@ -79,7 +79,10 @@ func newDestroyer(invFactory inventory.ClientFactory, cfg *rest.Config) *apply.D
 	invClient, err := invFactory.NewClient(f)
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-	d, err := apply.NewDestroyer(f, invClient)
+	d, err := apply.NewDestroyerBuilder().
+		WithFactory(f).
+		WithInventoryClient(invClient).
+		Build()
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	return d
 }

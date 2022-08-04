@@ -109,7 +109,10 @@ func newTestDestroyer(
 
 	invClient := newTestInventory(t, tf)
 
-	destroyer, err := NewDestroyer(tf, invClient)
+	destroyer, err := NewDestroyerBuilder().
+		WithFactory(tf).
+		WithInventoryClient(invClient).
+		Build()
 	require.NoError(t, err)
 	destroyer.statusWatcher = statusWatcher
 
