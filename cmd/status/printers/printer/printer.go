@@ -9,6 +9,13 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
+// PrintData records data required for printing
+type PrintData struct {
+	Identifiers object.ObjMetadataSet
+	InvNameMap  map[object.ObjMetadata]string
+	StatusSet   map[string]bool
+}
+
 // Printer defines an interface for outputting information about status of
 // resources. Different implementations allow output formats tailored to
 // different use cases.

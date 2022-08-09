@@ -13,6 +13,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/cli-utils/cmd/flagutils"
 	"sigs.k8s.io/cli-utils/cmd/status/printers"
+	"sigs.k8s.io/cli-utils/cmd/status/printers/printer"
 	"sigs.k8s.io/cli-utils/pkg/apply/poller"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
@@ -22,6 +23,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
 	"sigs.k8s.io/cli-utils/pkg/manifestreader"
+	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
 func GetRunner(factory cmdutil.Factory, invFactory inventory.ClientFactory, loader manifestreader.ManifestLoader) *Runner {
@@ -109,6 +111,18 @@ func (r *Runner) runE(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
+	// initialize maps in printData
+	printData := printer.PrintData{
+		InvNameMap: make(map[object.ObjMetadata]string),
+		StatusSet:  make(map[string]bool),
+	}
+	for _, obj := range identifiers {
+		// add to the map for future reference
+		printData.InvNameMap[obj] = inv.Name()
+		// append to identifiers
+		printData.Identifiers = append(printData.Identifiers, obj)
+	}
+
 	statusPoller, err := r.pollerFactoryFunc(r.factory)
 	if err != nil {
 		return err
@@ -120,7 +134,7 @@ func (r *Runner) runE(cmd *cobra.Command, args []string) error {
 		In:     cmd.InOrStdin(),
 		Out:    cmd.OutOrStdout(),
 		ErrOut: cmd.ErrOrStderr(),
-	})
+	}, &printData)
 	if err != nil {
 		return fmt.Errorf("error creating printer: %w", err)
 	}

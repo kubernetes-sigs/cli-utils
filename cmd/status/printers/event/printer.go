@@ -7,23 +7,31 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"sigs.k8s.io/cli-utils/cmd/status/printers/printer"
+	"sigs.k8s.io/cli-utils/pkg/apply/event"
+	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/collector"
 	pollevent "sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/object"
+	"sigs.k8s.io/cli-utils/pkg/print/list"
+	"sigs.k8s.io/cli-utils/pkg/printers/events"
 )
 
 // Printer implements the Printer interface and outputs the resource
 // status information as a list of events as they happen.
 type Printer struct {
+	Formatter list.Formatter
 	IOStreams genericclioptions.IOStreams
+	Data      *printer.PrintData
 }
 
 // NewPrinter returns a new instance of the eventPrinter.
-func NewPrinter(ioStreams genericclioptions.IOStreams) *Printer {
+func NewPrinter(ioStreams genericclioptions.IOStreams, printData *printer.PrintData) *Printer {
 	return &Printer{
+		Formatter: events.NewFormatter(ioStreams, common.DryRunNone),
 		IOStreams: ioStreams,
+		Data:      printData,
 	}
 }
 
@@ -40,7 +48,10 @@ func (ep *Printer) Print(ch <-chan pollevent.Event, identifiers object.ObjMetada
 	// stopping the poller at the correct time.
 	done := coll.ListenWithObserver(ch, collector.ObserverFunc(
 		func(statusCollector *collector.ResourceStatusCollector, e pollevent.Event) {
-			ep.printStatusEvent(e)
+			err := ep.printStatusEvent(e)
+			if err != nil {
+				panic(err)
+			}
 			cancelFunc(statusCollector, e)
 		}),
 	)
@@ -52,25 +63,27 @@ func (ep *Printer) Print(ch <-chan pollevent.Event, identifiers object.ObjMetada
 	return err
 }
 
-func (ep *Printer) printStatusEvent(se pollevent.Event) {
+func (ep *Printer) printStatusEvent(se pollevent.Event) error {
 	switch se.Type {
 	case pollevent.ResourceUpdateEvent:
 		id := se.Resource.Identifier
-		printResourceStatus(id, se, ep.IOStreams)
+		var invName string
+		var ok bool
+		if invName, ok = ep.Data.InvNameMap[id]; !ok {
+			return fmt.Errorf("%s: resource not found", id)
+		}
+		// filter out status that are not assigned
+		statusString := se.Resource.Status.String()
+		if _, ok := ep.Data.StatusSet[strings.ToLower(statusString)]; len(ep.Data.StatusSet) != 0 && !ok {
+			return nil
+		}
+		_, err := fmt.Fprintf(ep.IOStreams.Out, "%s/%s/%s/%s is %s: %s\n", invName,
+			strings.ToLower(id.GroupKind.String()), id.Namespace, id.Name, statusString, se.Resource.Message)
+		return err
 	case pollevent.ErrorEvent:
-		id := se.Resource.Identifier
-		gk := id.GroupKind
-		fmt.Fprintf(ep.IOStreams.Out, "%s error: %s\n", resourceIDToString(gk, id.Name),
-			se.Error.Error())
+		return ep.Formatter.FormatErrorEvent(event.ErrorEvent{
+			Err: se.Error,
+		})
 	}
-}
-
-// resourceIDToString returns the string representation of a GroupKind and a resource name.
-func resourceIDToString(gk schema.GroupKind, name string) string {
-	return fmt.Sprintf("%s/%s", strings.ToLower(gk.String()), name)
-}
-
-func printResourceStatus(id object.ObjMetadata, se pollevent.Event, ioStreams genericclioptions.IOStreams) {
-	fmt.Fprintf(ioStreams.Out, "%s is %s: %s\n", resourceIDToString(id.GroupKind, id.Name),
-		se.Resource.Status.String(), se.Resource.Message)
+	return nil
 }
