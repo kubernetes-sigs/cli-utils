@@ -4,9 +4,12 @@
 package table
 
 import (
+	"fmt"
+	"io"
 	"time"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"sigs.k8s.io/cli-utils/cmd/status/printers/printer"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/collector"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/object"
@@ -22,12 +25,14 @@ const (
 // status information about resources in a table format with in-place updates.
 type Printer struct {
 	IOStreams genericclioptions.IOStreams
+	PrintData *printer.PrintData
 }
 
 // NewPrinter returns a new instance of the tablePrinter.
-func NewPrinter(ioStreams genericclioptions.IOStreams) *Printer {
+func NewPrinter(ioStreams genericclioptions.IOStreams, printData *printer.PrintData) *Printer {
 	return &Printer{
 		IOStreams: ioStreams,
+		PrintData: printData,
 	}
 }
 
@@ -41,7 +46,9 @@ func (t *Printer) Print(ch <-chan event.Event, identifiers object.ObjMetadataSet
 	// Start the goroutine that is responsible for
 	// printing the latest state on a regular cadence.
 	printCompleted := t.runPrintLoop(&CollectorAdapter{
-		collector: coll,
+		collector:  coll,
+		invNameMap: t.PrintData.InvNameMap,
+		statusSet:  t.PrintData.StatusSet,
 	}, stop)
 
 	// Make the collector start listening on the eventChannel.
@@ -65,6 +72,20 @@ func (t *Printer) Print(ch <-chan event.Event, identifiers object.ObjMetadataSet
 	return err
 }
 
+var invNameColumn = table.ColumnDef{
+	ColumnName:   "inventory_name",
+	ColumnHeader: "INVENTORY_NAME",
+	ColumnWidth:  30,
+	PrintResourceFunc: func(w io.Writer, width int, r table.Resource) (int, error) {
+		group := r.(*ResourceInfo).invName
+		if len(group) > width {
+			group = group[:width]
+		}
+		_, err := fmt.Fprint(w, group)
+		return len(group), err
+	},
+}
+
 var columns = []table.ColumnDefinition{
 	table.MustColumn("namespace"),
 	table.MustColumn("resource"),
@@ -72,6 +93,7 @@ var columns = []table.ColumnDefinition{
 	table.MustColumn("conditions"),
 	table.MustColumn("age"),
 	table.MustColumn("message"),
+	invNameColumn,
 }
 
 // Print prints the table of resources with their statuses until the

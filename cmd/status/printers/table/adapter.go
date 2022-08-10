@@ -4,6 +4,8 @@
 package table
 
 import (
+	"strings"
+
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/collector"
 	pe "sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/object"
@@ -14,11 +16,14 @@ import (
 // provides a set of functions that matches the interfaces
 // needed by the BaseTablePrinter.
 type CollectorAdapter struct {
-	collector *collector.ResourceStatusCollector
+	collector  *collector.ResourceStatusCollector
+	invNameMap map[object.ObjMetadata]string
+	statusSet  map[string]bool
 }
 
 type ResourceInfo struct {
 	resourceStatus *pe.ResourceStatus
+	invName        string
 }
 
 func (r *ResourceInfo) Identifier() object.ObjMetadata {
@@ -34,6 +39,7 @@ func (r *ResourceInfo) SubResources() []table.Resource {
 	for _, rs := range r.resourceStatus.GeneratedResources {
 		subResources = append(subResources, &ResourceInfo{
 			resourceStatus: rs,
+			invName:        r.invName,
 		})
 	}
 	return subResources
@@ -56,9 +62,12 @@ func (ca *CollectorAdapter) LatestStatus() *ResourceState {
 	observation := ca.collector.LatestObservation()
 	var resources []table.Resource
 	for _, resourceStatus := range observation.ResourceStatuses {
-		resources = append(resources, &ResourceInfo{
-			resourceStatus: resourceStatus,
-		})
+		if _, ok := ca.statusSet[strings.ToLower(resourceStatus.Status.String())]; len(ca.statusSet) == 0 || ok {
+			resources = append(resources, &ResourceInfo{
+				resourceStatus: resourceStatus,
+				invName:        ca.invNameMap[resourceStatus.Identifier],
+			})
+		}
 	}
 	return &ResourceState{
 		resources: resources,

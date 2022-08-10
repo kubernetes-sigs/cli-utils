@@ -15,7 +15,7 @@ import (
 func CreatePrinter(printerType string, ioStreams genericclioptions.IOStreams, printData *printer.PrintData) (printer.Printer, error) {
 	switch printerType {
 	case "table":
-		return table.NewPrinter(ioStreams), nil
+		return table.NewPrinter(ioStreams, printData), nil
 	default:
 		return event.NewPrinter(ioStreams, printData), nil
 	}
