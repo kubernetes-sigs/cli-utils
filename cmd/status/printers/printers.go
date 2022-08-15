@@ -6,6 +6,7 @@ package printers
 import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"sigs.k8s.io/cli-utils/cmd/status/printers/event"
+	"sigs.k8s.io/cli-utils/cmd/status/printers/json"
 	"sigs.k8s.io/cli-utils/cmd/status/printers/printer"
 	"sigs.k8s.io/cli-utils/cmd/status/printers/table"
 )
@@ -16,6 +17,8 @@ func CreatePrinter(printerType string, ioStreams genericclioptions.IOStreams, pr
 	switch printerType {
 	case "table":
 		return table.NewPrinter(ioStreams, printData), nil
+	case "json":
+		return json.NewPrinter(ioStreams, printData), nil
 	default:
 		return event.NewPrinter(ioStreams, printData), nil
 	}
