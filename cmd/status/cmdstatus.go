@@ -30,7 +30,7 @@ func GetRunner(factory cmdutil.Factory, invFactory inventory.ClientFactory, load
 	r := &Runner{
 		factory:           factory,
 		invFactory:        invFactory,
-		loader:            loader,
+		loader:            NewInventoryLoader(loader),
 		pollerFactoryFunc: pollerFactoryFunc,
 	}
 	c := &cobra.Command{
@@ -59,7 +59,7 @@ type Runner struct {
 	Command    *cobra.Command
 	factory    cmdutil.Factory
 	invFactory inventory.ClientFactory
-	loader     manifestreader.ManifestLoader
+	loader     Loader
 
 	period    time.Duration
 	pollUntil string
@@ -73,25 +73,10 @@ type Runner struct {
 // poller to compute status for each of the resources. One of the printer
 // implementations takes care of printing the output.
 func (r *Runner) runE(cmd *cobra.Command, args []string) error {
-	_, err := common.DemandOneDirectory(args)
+	inv, err := r.loader.GetInvInfo(cmd, args)
 	if err != nil {
 		return err
 	}
-
-	reader, err := r.loader.ManifestReader(cmd.InOrStdin(), flagutils.PathFromArgs(args))
-	if err != nil {
-		return err
-	}
-	objs, err := reader.Read()
-	if err != nil {
-		return err
-	}
-
-	invObj, _, err := inventory.SplitUnstructureds(objs)
-	if err != nil {
-		return err
-	}
-	inv := inventory.WrapInventoryInfoObj(invObj)
 
 	invClient, err := r.invFactory.NewClient(r.factory)
 	if err != nil {
@@ -206,4 +191,41 @@ func allKnownNotifierFunc(cancelFunc context.CancelFunc) collector.ObserverFunc 
 
 func pollerFactoryFunc(f cmdutil.Factory) (poller.Poller, error) {
 	return polling.NewStatusPollerFromFactory(f, polling.Options{})
+}
+
+type Loader interface {
+	GetInvInfo(cmd *cobra.Command, args []string) (inventory.Info, error)
+}
+
+type InventoryLoader struct {
+	Loader manifestreader.ManifestLoader
+}
+
+func NewInventoryLoader(loader manifestreader.ManifestLoader) *InventoryLoader {
+	return &InventoryLoader{
+		Loader: loader,
+	}
+}
+
+func (ir *InventoryLoader) GetInvInfo(cmd *cobra.Command, args []string) (inventory.Info, error) {
+	_, err := common.DemandOneDirectory(args)
+	if err != nil {
+		return nil, err
+	}
+
+	reader, err := ir.Loader.ManifestReader(cmd.InOrStdin(), flagutils.PathFromArgs(args))
+	if err != nil {
+		return nil, err
+	}
+	objs, err := reader.Read()
+	if err != nil {
+		return nil, err
+	}
+
+	invObj, _, err := inventory.SplitUnstructureds(objs)
+	if err != nil {
+		return nil, err
+	}
+	inv := inventory.WrapInventoryInfoObj(invObj)
+	return inv, nil
 }
