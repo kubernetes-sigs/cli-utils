@@ -499,7 +499,7 @@ foo/deployment.apps/default/foo is InProgress: inProgress
 			runner := &Runner{
 				factory:    tf,
 				invFactory: inventory.FakeClientFactory(tc.inventory),
-				loader:     loader,
+				loader:     NewInventoryLoader(loader),
 				pollerFactoryFunc: func(c cmdutil.Factory) (poller.Poller, error) {
 					return &fakePoller{tc.events}, nil
 				},
@@ -541,7 +541,7 @@ foo/deployment.apps/default/foo is InProgress: inProgress
 			runner := &Runner{
 				factory:    tf,
 				invFactory: inventory.FakeClientFactory(tc.inventory),
-				loader:     loader,
+				loader:     NewInventoryLoader(loader),
 				pollerFactoryFunc: func(c cmdutil.Factory) (poller.Poller, error) {
 					return &fakePoller{tc.events}, nil
 				},
