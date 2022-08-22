@@ -17,12 +17,19 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/cli-utils/pkg/apis/actuation"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
+
+var ConfigMapGVK = schema.GroupVersionKind{
+	Group:   "",
+	Kind:    "ConfigMap",
+	Version: "v1",
+}
 
 // WrapInventoryObj takes a passed ConfigMap (as a resource.Info),
 // wraps it with the ConfigMap and upcasts the wrapper as

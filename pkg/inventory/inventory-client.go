@@ -11,6 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/klog/v2"
@@ -44,6 +45,8 @@ type Client interface {
 	GetClusterInventoryInfo(inv Info) (*unstructured.Unstructured, error)
 	// GetClusterInventoryObjs looks up the inventory objects from the cluster.
 	GetClusterInventoryObjs(inv Info) (object.UnstructuredSet, error)
+	// ListClusterInventoryObjs returns a map mapping from inventory name to a list of cluster inventory objects
+	ListClusterInventoryObjs(ctx context.Context) (map[string]object.ObjMetadataSet, error)
 }
 
 // ClusterClient is a concrete implementation of the
@@ -55,6 +58,7 @@ type ClusterClient struct {
 	InventoryFactoryFunc  StorageFactoryFunc
 	invToUnstructuredFunc ToUnstructuredFunc
 	statusPolicy          StatusPolicy
+	gvk                   schema.GroupVersionKind
 }
 
 var _ Client = &ClusterClient{}
@@ -65,6 +69,7 @@ func NewClient(factory cmdutil.Factory,
 	invFunc StorageFactoryFunc,
 	invToUnstructuredFunc ToUnstructuredFunc,
 	statusPolicy StatusPolicy,
+	gvk schema.GroupVersionKind,
 ) (*ClusterClient, error) {
 	dc, err := factory.DynamicClient()
 	if err != nil {
@@ -85,6 +90,7 @@ func NewClient(factory cmdutil.Factory,
 		InventoryFactoryFunc:  invFunc,
 		invToUnstructuredFunc: invToUnstructuredFunc,
 		statusPolicy:          statusPolicy,
+		gvk:                   gvk,
 	}
 	return &clusterClient, nil
 }
@@ -357,6 +363,37 @@ func (cic *ClusterClient) GetClusterInventoryObjs(inv Info) (object.Unstructured
 		panic(fmt.Errorf("unknown inventory strategy: %s", inv.Strategy()))
 	}
 	return clusterInvObjects, err
+}
+
+func (cic *ClusterClient) ListClusterInventoryObjs(ctx context.Context) (map[string]object.ObjMetadataSet, error) {
+	// Define the mapping
+	mapping, err := cic.mapper.RESTMapping(cic.gvk.GroupKind(), cic.gvk.Version)
+	if err != nil {
+		return nil, err
+	}
+
+	// retrieve the list from the cluster
+	clusterInvs, err := cic.dc.Resource(mapping.Resource).List(ctx, metav1.ListOptions{})
+	if err != nil && !apierrors.IsNotFound(err) {
+		return nil, err
+	}
+	if apierrors.IsNotFound(err) {
+		return map[string]object.ObjMetadataSet{}, nil
+	}
+
+	identifiers := make(map[string]object.ObjMetadataSet)
+
+	for i, inv := range clusterInvs.Items {
+		invName := inv.GetName()
+		identifiers[invName] = object.ObjMetadataSet{}
+		wrappedInvObjSlice, err := cic.InventoryFactoryFunc(&clusterInvs.Items[i]).Load()
+		if err != nil {
+			return nil, err
+		}
+		identifiers[invName] = append(identifiers[invName], wrappedInvObjSlice...)
+	}
+
+	return identifiers, nil
 }
 
 // createInventoryObj creates the passed inventory object on the APIServer.

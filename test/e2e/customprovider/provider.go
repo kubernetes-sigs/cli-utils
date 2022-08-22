@@ -113,7 +113,7 @@ type CustomClientFactory struct {
 
 func (CustomClientFactory) NewClient(factory util.Factory) (inventory.Client, error) {
 	return inventory.NewClient(factory,
-		WrapInventoryObj, invToUnstructuredFunc, inventory.StatusPolicyAll)
+		WrapInventoryObj, invToUnstructuredFunc, inventory.StatusPolicyAll, inventory.ConfigMapGVK)
 }
 
 func invToUnstructuredFunc(inv inventory.Info) *unstructured.Unstructured {
