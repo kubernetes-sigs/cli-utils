@@ -83,10 +83,14 @@ func TestCommand(t *testing.T) {
 		expectedOutput string
 	}{
 		"no inventory template": {
+			pollUntil:      "known",
+			printer:        "events",
 			input:          "",
 			expectedErrMsg: "Package uninitialized. Please run \"init\" command.",
 		},
 		"no inventory in live state": {
+			pollUntil:      "known",
+			printer:        "events",
 			input:          inventoryTemplate,
 			expectedOutput: "no resources found in the inventory\n",
 		},
@@ -500,17 +504,19 @@ foo/deployment.apps/default/foo is InProgress: inProgress
 				factory:    tf,
 				invFactory: inventory.FakeClientFactory(tc.inventory),
 				loader:     NewInventoryLoader(loader),
-				pollerFactoryFunc: func(c cmdutil.Factory) (poller.Poller, error) {
+				PollerFactoryFunc: func(c cmdutil.Factory) (poller.Poller, error) {
 					return &fakePoller{tc.events}, nil
 				},
 
 				pollUntil: tc.pollUntil,
 				output:    tc.printer,
 				timeout:   tc.timeout,
+				invType:   Local,
 			}
 
 			cmd := &cobra.Command{
-				RunE: runner.runE,
+				PreRunE: runner.preRunE,
+				RunE:    runner.runE,
 			}
 			cmd.SetIn(strings.NewReader(tc.input))
 			var buf bytes.Buffer
@@ -542,13 +548,14 @@ foo/deployment.apps/default/foo is InProgress: inProgress
 				factory:    tf,
 				invFactory: inventory.FakeClientFactory(tc.inventory),
 				loader:     NewInventoryLoader(loader),
-				pollerFactoryFunc: func(c cmdutil.Factory) (poller.Poller, error) {
+				PollerFactoryFunc: func(c cmdutil.Factory) (poller.Poller, error) {
 					return &fakePoller{tc.events}, nil
 				},
 
 				pollUntil: tc.pollUntil,
 				output:    tc.printer,
 				timeout:   tc.timeout,
+				invType:   Local,
 			}
 
 			cmd := &cobra.Command{
