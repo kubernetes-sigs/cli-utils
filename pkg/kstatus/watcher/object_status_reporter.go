@@ -743,14 +743,14 @@ func (w *ObjectStatusReporter) watchErrorHandler(gkn GroupKindNamespace, eventCh
 		klog.V(5).Infof("ListAndWatch error (retry expected): %v: %v", gkn, err)
 
 	// Resource not registered
-	case apierrors.IsNotFound(err) || containsNotFoundMessage(err):
+	case apierrors.IsNotFound(err):
 		klog.V(3).Infof("ListAndWatch error (termination expected): %v: stopping all informers for this GroupKind: %v", gkn, err)
 		w.forEachTargetWithGroupKind(gkn.GroupKind(), func(gkn GroupKindNamespace) {
 			w.stopInformer(gkn)
 		})
 
 	// Insufficient permissions
-	case apierrors.IsForbidden(err) || containsForbiddenMessage(err):
+	case apierrors.IsForbidden(err):
 		klog.V(3).Infof("ListAndWatch error (termination expected): %v: stopping all informers: %v", gkn, err)
 		w.handleFatalError(eventCh, err)
 

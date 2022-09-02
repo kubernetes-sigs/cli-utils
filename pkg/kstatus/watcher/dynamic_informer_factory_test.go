@@ -61,17 +61,10 @@ func TestResourceNotFoundError(t *testing.T) {
 			errorHandler: func(t *testing.T, err error) {
 				switch {
 				case apierrors.IsNotFound(err):
-					// If we got this error, something changed in the apiserver or
-					// client. If the client changed, it might be safe to stop parsing
-					// the error string.
-					t.Errorf("Expected untyped NotFound error, but got typed NotFound error: %v", err)
-				case containsNotFoundMessage(err):
-					// This is the expected hack, because the Informer/Reflector
-					// doesn't wrap the error with "%w".
-					t.Logf("Received expected untyped NotFound error: %v", err)
+					t.Logf("Received expected typed NotFound error: %v", err)
 				default:
 					// If we got this error, the test is probably broken.
-					t.Errorf("Expected untyped NotFound error, but got a different error: %v", err)
+					t.Errorf("Expected typed NotFound error, but got a different error: %v", err)
 				}
 			},
 		},
@@ -91,11 +84,7 @@ func TestResourceNotFoundError(t *testing.T) {
 				case apierrors.IsNotFound(err):
 					// This is the expected behavior, because the
 					// Informer/Reflector DOES wrap watch errors
-					t.Logf("Received expected untyped NotFound error: %v", err)
-				case containsNotFoundMessage(err):
-					// If this happens, there was a regression.
-					// Watch errors are expected to be wrapped with "%w"
-					t.Errorf("Expected typed NotFound error, but got untyped NotFound error: %v", err)
+					t.Logf("Received expected typed NotFound error: %v", err)
 				default:
 					// If we got this error, the test is probably broken.
 					t.Errorf("Expected typed NotFound error, but got a different error: %v", err)
@@ -121,17 +110,10 @@ func TestResourceNotFoundError(t *testing.T) {
 			errorHandler: func(t *testing.T, err error) {
 				switch {
 				case apierrors.IsForbidden(err):
-					// If we got this error, something changed in the apiserver or
-					// client. If the client changed, it might be safe to stop parsing
-					// the error string.
-					t.Errorf("Expected untyped Forbidden error, but got typed Forbidden error: %v", err)
-				case containsForbiddenMessage(err):
-					// This is the expected hack, because the Informer/Reflector
-					// doesn't wrap the error with "%w".
-					t.Logf("Received expected untyped Forbidden error: %v", err)
+					t.Logf("Received expected typed Forbidden error: %v", err)
 				default:
 					// If we got this error, the test is probably broken.
-					t.Errorf("Expected untyped Forbidden error, but got a different error: %v", err)
+					t.Errorf("Expected typed Forbidden error, but got a different error: %v", err)
 				}
 			},
 		},
@@ -151,11 +133,7 @@ func TestResourceNotFoundError(t *testing.T) {
 				case apierrors.IsForbidden(err):
 					// This is the expected behavior, because the
 					// Informer/Reflector DOES wrap watch errors
-					t.Logf("Received expected untyped Forbidden error: %v", err)
-				case containsForbiddenMessage(err):
-					// If this happens, there was a regression.
-					// Watch errors are expected to be wrapped with "%w"
-					t.Errorf("Expected typed Forbidden error, but got untyped Forbidden error: %v", err)
+					t.Logf("Received expected typed Forbidden error: %v", err)
 				default:
 					// If we got this error, the test is probably broken.
 					t.Errorf("Expected typed Forbidden error, but got a different error: %v", err)
