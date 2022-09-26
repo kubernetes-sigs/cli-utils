@@ -212,7 +212,7 @@ func TestFilterInputFile(t *testing.T) {
 			// If there is a generated file, then read it into actualStr.
 			actualStr := ""
 			if len(actualFiles) != 0 {
-				actualFilename := (actualFiles[0]).Name()
+				actualFilename := actualFiles[0].Name()
 				defer os.Remove(actualFilename)
 				actual, err := os.ReadFile(actualFilename)
 				if err != nil {
