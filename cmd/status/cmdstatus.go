@@ -191,52 +191,48 @@ func (r *Runner) loadInvFromDisk(cmd *cobra.Command, args []string) (*printer.Pr
 }
 
 // Retrieve a list of inventory object from the cluster
-// func (r *Runner) listInvFromCluster(cmd *cobra.Command, args []string) (*printer.PrintData, error) {
-// 	invInfo, err := r.loader.GetInvInfo(cmd, args)
-// 	if err != nil {
-// 		return nil, err
-// 	}
+func (r *Runner) listInvFromCluster(cmd *cobra.Command, args []string) (*printer.PrintData, error) {
+	invInfo, err := r.loader.GetInvInfo(cmd, args)
+	if err != nil {
+		return nil, err
+	}
 
-// 	invClient, err := r.invFactory.NewClient(r.factory)
-// 	if err != nil {
-// 		return nil, err
-// 	}
+	invClient, err := r.invFactory.NewClient(r.factory)
+	if err != nil {
+		return nil, err
+	}
 
-// 	// initialize maps in printData
-// 	printData := printer.PrintData{
-// 		Identifiers: object.ObjMetadataSet{},
-// 		InvNameMap:  make(map[object.ObjMetadata]string),
-// 		StatusSet:   r.statusSet,
-// 	}
+	// initialize maps in printData
+	printData := printer.PrintData{
+		Identifiers: object.ObjMetadataSet{},
+		InvNameMap:  make(map[object.ObjMetadata]string),
+		StatusSet:   r.statusSet,
+	}
 
-// 	// Based on the inventory template manifest we look up the inventory
-// 	// from the live state using the inventory client.
-// 	inv, err := invClient.Load(context.TODO(), invInfo)
-// 	if err != nil {
-// 		return nil, fmt.Errorf("failed to load inventory: %w", err)
-// 	}
+	invs, err := invClient.List(r.ctx, invInfo)
+	if err != nil {
+		return nil, err
+	}
 
-// 	// Get objects from inventory.
-// 	identifiersMap := inventory.ObjMetadataSetFromObjectReferences(inv.Spec.Objects)
-
-// 	for _, identifiers := range identifiersMap {
-// 		// Check if there are targeted inventory names and include the current inventory name
-// 		if _, ok := r.inventoryNameSet[identifiers.Name]; !ok && len(r.inventoryNameSet) != 0 {
-// 			continue
-// 		}
-// 		// Filter objects
-// 		for _, obj := range identifiers {
-// 			// check if the object is under one of the targeted namespaces
-// 			if _, ok := r.namespaceSet[obj.Namespace]; ok || len(r.namespaceSet) == 0 {
-// 				// add to the map for future reference
-// 				printData.InvNameMap[obj] = invName
-// 				// append to identifiers
-// 				printData.Identifiers = append(printData.Identifiers, obj)
-// 			}
-// 		}
-// 	}
-// 	return &printData, nil
-// }
+	for _, inv := range invs {
+		// Check if there are targeted inventory names and include the current inventory name
+		if _, ok := r.inventoryNameSet[inv.Name]; !ok && len(r.inventoryNameSet) != 0 {
+			continue
+		}
+		// Filter objects
+		identifiers := inventory.ObjMetadataSetFromObjectReferences(inv.Spec.Objects)
+		for _, identifier := range identifiers {
+			// check if the object is under one of the targeted namespaces
+			if _, ok := r.namespaceSet[identifier.Namespace]; ok || len(r.namespaceSet) == 0 {
+				// add to the map for future reference
+				printData.InvNameMap[identifier] = inv.Name
+				// append to identifiers
+				printData.Identifiers = append(printData.Identifiers, identifier)
+			}
+		}
+	}
+	return &printData, nil
+}
 
 // runE implements the logic of the command and will delegate to the
 // poller to compute status for each of the resources. One of the printer
@@ -252,7 +248,7 @@ func (r *Runner) runE(cmd *cobra.Command, args []string) error {
 		}
 		printData, err = r.loadInvFromDisk(cmd, args)
 	case Remote:
-		// printData, err = r.listInvFromCluster()
+		printData, err = r.listInvFromCluster(cmd, args)
 	default:
 		return fmt.Errorf("invType must be either local or remote")
 	}
@@ -385,6 +381,10 @@ func (ir *InventoryLoader) GetInvInfo(cmd *cobra.Command, args []string) (invent
 	if err != nil {
 		return inv, err
 	}
+	if invObj == nil {
+		return inv, inventory.NoInventoryObjError{}
+	}
+
 	inv = inventory.InfoFromObject(invObj)
 	return inv, nil
 }

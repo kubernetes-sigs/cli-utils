@@ -38,6 +38,17 @@ func (imc *InMemoryClient) Load(_ context.Context, invInfo Info) (*actuation.Inv
 	return nil, nil
 }
 
+func (imc *InMemoryClient) List(ctx context.Context, invInfo Info) ([]*actuation.Inventory, error) {
+	imc.lazyInit()
+
+	var invs []*actuation.Inventory
+	for _, inv := range imc.store {
+		invs = append(invs, inv)
+	}
+
+	return invs, nil
+}
+
 func (imc *InMemoryClient) Store(_ context.Context, inv *actuation.Inventory, dryRun common.DryRunStrategy) error {
 	if inv == nil {
 		return errors.New("inventory must not be nil")

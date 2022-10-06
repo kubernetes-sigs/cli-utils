@@ -29,6 +29,7 @@ type ClusterClient struct {
 	DynamicClient dynamic.Interface
 	Mapper        meta.RESTMapper
 	Converter     Converter
+	StatusPolicy  StatusPolicy
 }
 
 var _ Client = &ClusterClient{}
@@ -76,6 +77,44 @@ func (cc *ClusterClient) Load(ctx context.Context, invInfo Info) (*actuation.Inv
 	}
 
 	return inv, nil
+}
+
+// List all inventories from the live cluster.
+func (cc *ClusterClient) List(ctx context.Context, invInfo Info) ([]*actuation.Inventory, error) {
+	infoGK := GroupKindFromObjectReference(invInfo.ObjectReference)
+	gvk := cc.GroupVersionKind()
+	gk := gvk.GroupKind()
+	if infoGK != gk {
+		return nil, InvalidInventoryTypeError{
+			Required: gk,
+			Received: infoGK,
+		}
+	}
+
+	// Request exactly the version supported by the Converter.
+	mapping, err := cc.Mapper.RESTMapping(gk, gvk.Version)
+	if err != nil {
+		return nil, err
+	}
+	id := ObjMetadataFromObjectReference(invInfo.ObjectReference)
+	objs, err := cc.listObjects(ctx, id, mapping)
+	if err != nil {
+		return nil, err
+	}
+	if objs == nil {
+		return nil, nil
+	}
+	// klog.V(7).Infof("Existing inventories:\n%s", object.YamlStringer{O: objs})
+	invs := make([]*actuation.Inventory, len(objs))
+	for idx, obj := range objs {
+		obj := obj
+		invs[idx], err = cc.Converter.To(&obj)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert inventory: %w", err)
+		}
+	}
+
+	return invs, nil
 }
 
 // Store the inventory as a ConfigMap.
@@ -171,6 +210,25 @@ func (cc *ClusterClient) getObject(
 	return obj, nil
 }
 
+func (cc *ClusterClient) listObjects(
+	ctx context.Context,
+	id object.ObjMetadata,
+	mapping *meta.RESTMapping,
+) ([]unstructured.Unstructured, error) {
+	klog.V(4).Infof("getting objects from cluster: %v", id)
+	obj, err := cc.DynamicClient.Resource(mapping.Resource).
+		Namespace(id.Namespace).
+		List(ctx, metav1.ListOptions{LabelSelector: common.InventoryLabel})
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to list objects %q: %w", id, err)
+	}
+
+	return obj.Items, nil
+}
+
 func (cc *ClusterClient) createObject(
 	ctx context.Context,
 	obj *unstructured.Unstructured,
@@ -216,7 +274,7 @@ func (cc *ClusterClient) updateObject(
 
 	// // Update the status fields.
 	// statuses, _, _ := unstructured.NestedSlice(obj.UnstructuredContent(), "status")
-	if obj != nil && out != nil {
+	if cc.StatusPolicy == StatusPolicyAll && obj != nil && out != nil {
 		// && len(statuses) > 1 {
 		// Status update requires the latest ResourceVersion.
 		obj.SetResourceVersion(out.GetResourceVersion())

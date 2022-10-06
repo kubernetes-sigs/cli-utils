@@ -18,6 +18,7 @@ type Client interface {
 	Load(context.Context, Info) (*actuation.Inventory, error)
 	Store(context.Context, *actuation.Inventory, common.DryRunStrategy) error
 	Delete(context.Context, Info, common.DryRunStrategy) error
+	List(context.Context, Info) ([]*actuation.Inventory, error)
 }
 
 // Info provides enough information for the Client to uniquely

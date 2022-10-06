@@ -6,6 +6,7 @@ package inventory
 import (
 	"context"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/cli-utils/pkg/apis/actuation"
 	"sigs.k8s.io/cli-utils/pkg/common"
@@ -41,10 +42,28 @@ func (fc *FakeClient) Load(_ context.Context, invInfo Info) (*actuation.Inventor
 		return nil, fc.Err
 	}
 	return &actuation.Inventory{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: invInfo.Name,
+		},
 		Spec: actuation.InventorySpec{
 			Objects: ObjectReferencesFromObjMetadataSet(fc.Objs),
 		},
 	}, nil
+}
+
+func (fc *FakeClient) List(_ context.Context, invInfo Info) ([]*actuation.Inventory, error) {
+	if fc.Err != nil {
+		return nil, fc.Err
+	}
+
+	return []*actuation.Inventory{&actuation.Inventory{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: invInfo.Name,
+		},
+		Spec: actuation.InventorySpec{
+			Objects: ObjectReferencesFromObjMetadataSet(fc.Objs),
+		},
+	}}, nil
 }
 
 // Store the stored cluster inventory objs with the passed inv.Spec.Objects,

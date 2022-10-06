@@ -534,7 +534,7 @@ foo/deployment.apps/default/foo is InProgress: inProgress
 			}
 
 			assert.NoError(t, err)
-			assert.Equal(t, strings.TrimSpace(buf.String()), strings.TrimSpace(tc.expectedOutput))
+			assert.Equal(t, strings.TrimSpace(tc.expectedOutput), strings.TrimSpace(buf.String()))
 		})
 	}
 
