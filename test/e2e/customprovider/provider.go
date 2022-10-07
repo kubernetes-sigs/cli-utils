@@ -109,5 +109,6 @@ func (CustomClientFactory) NewClient(factory util.Factory) (inventory.Client, er
 		DynamicClient: client,
 		Mapper:        mapper,
 		Converter:     CustomConverter{},
+		StatusPolicy:  inventory.StatusPolicyAll,
 	}, nil
 }
