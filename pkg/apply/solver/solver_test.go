@@ -768,6 +768,8 @@ func TestTaskQueueBuilder_ApplyBuild(t *testing.T) {
 				switch typedTask := t.(type) {
 				case *task.ApplyTask:
 					typedTask.Mapper = mapper
+				case *task.InvAddTask:
+					typedTask.Mapper = mapper
 				case *taskrunner.WaitTask:
 					typedTask.Mapper = mapper
 				}
@@ -1121,6 +1123,8 @@ func TestTaskQueueBuilder_ApplyPruneBuild(t *testing.T) {
 			for _, t := range tc.expectedTasks {
 				switch typedTask := t.(type) {
 				case *task.ApplyTask:
+					typedTask.Mapper = mapper
+				case *task.InvAddTask:
 					typedTask.Mapper = mapper
 				case *task.PruneTask:
 					typedTask.Pruner = &prune.Pruner{}
