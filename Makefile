@@ -16,7 +16,7 @@ all: generate license fix vet fmt test lint tidy
 	go install github.com/google/addlicense@v1.0.0
 
 "$(MYGOBIN)/golangci-lint":
-	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.44.2
+	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.50.0
 
 "$(MYGOBIN)/deepcopy-gen":
 	go install k8s.io/code-generator/cmd/deepcopy-gen@v0.23.6
