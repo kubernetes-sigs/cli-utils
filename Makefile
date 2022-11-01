@@ -19,7 +19,7 @@ all: generate license fix vet fmt test lint tidy
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.44.2
 
 "$(MYGOBIN)/deepcopy-gen":
-	go install k8s.io/code-generator/cmd/deepcopy-gen@v0.23.6
+	go install k8s.io/code-generator/cmd/deepcopy-gen@v0.25.3
 
 "$(MYGOBIN)/ginkgo":
 	go install github.com/onsi/ginkgo/v2/ginkgo@v2.1.3
