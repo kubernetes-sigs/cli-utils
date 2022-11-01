@@ -5,7 +5,6 @@ package config
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -19,7 +18,7 @@ import (
 
 // writeFile writes a file under the test directory
 func writeFile(t *testing.T, path string, value []byte) {
-	err := ioutil.WriteFile(path, value, 0600)
+	err := os.WriteFile(path, value, 0600)
 	if !assert.NoError(t, err) {
 		assert.FailNow(t, err.Error())
 	}
@@ -153,7 +152,7 @@ func TestComplete(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			var err error
-			dir, err := ioutil.TempDir("", "test-dir")
+			dir, err := os.MkdirTemp("", "test-dir")
 			if !assert.NoError(t, err) {
 				assert.FailNow(t, err.Error())
 			}
@@ -222,7 +221,7 @@ func TestFindNamespace(t *testing.T) {
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
 			var err error
-			dir, err := ioutil.TempDir("", "test-dir")
+			dir, err := os.MkdirTemp("", "test-dir")
 			if !assert.NoError(t, err) {
 				assert.FailNow(t, err.Error())
 			}

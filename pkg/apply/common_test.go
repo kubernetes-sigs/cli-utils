@@ -7,7 +7,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"regexp"
 	"testing"
@@ -240,20 +240,20 @@ func (g *genericHandler) handle(t *testing.T, req *http.Request) (*http.Response
 
 		if req.URL.Path == singlePath && req.Method == http.MethodGet {
 			if r.exists {
-				bodyRC := ioutil.NopCloser(bytes.NewReader(toJSONBytes(t, r.resource)))
+				bodyRC := io.NopCloser(bytes.NewReader(toJSONBytes(t, r.resource)))
 				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: bodyRC}, true, nil
 			}
 			return &http.Response{StatusCode: http.StatusNotFound, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.StringBody("")}, true, nil
 		}
 
 		if req.URL.Path == singlePath && req.Method == http.MethodPatch {
-			bodyRC := ioutil.NopCloser(bytes.NewReader(toJSONBytes(t, r.resource)))
+			bodyRC := io.NopCloser(bytes.NewReader(toJSONBytes(t, r.resource)))
 			return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: bodyRC}, true, nil
 		}
 
 		if req.URL.Path == singlePath && req.Method == http.MethodDelete {
 			if r.exists {
-				bodyRC := ioutil.NopCloser(bytes.NewReader(toJSONBytes(t, r.resource)))
+				bodyRC := io.NopCloser(bytes.NewReader(toJSONBytes(t, r.resource)))
 				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: bodyRC}, true, nil
 			}
 
@@ -271,12 +271,12 @@ func (g *genericHandler) handle(t *testing.T, req *http.Request) (*http.Response
 					Kind: r.resource.GetKind(),
 				},
 			}
-			bodyRC := ioutil.NopCloser(bytes.NewReader(toJSONBytes(t, result)))
+			bodyRC := io.NopCloser(bytes.NewReader(toJSONBytes(t, result)))
 			return &http.Response{StatusCode: status, Header: cmdtesting.DefaultHeader(), Body: bodyRC}, true, nil
 		}
 
 		if req.URL.Path == allPath && req.Method == http.MethodPost {
-			bodyRC := ioutil.NopCloser(bytes.NewReader(toJSONBytes(t, r.resource)))
+			bodyRC := io.NopCloser(bytes.NewReader(toJSONBytes(t, r.resource)))
 			return &http.Response{StatusCode: http.StatusCreated, Header: cmdtesting.DefaultHeader(), Body: bodyRC}, true, nil
 		}
 	}
@@ -341,7 +341,7 @@ func (n *nsHandler) handle(t *testing.T, req *http.Request) (*http.Response, boo
 				Name: nsName,
 			},
 		}
-		bodyRC := ioutil.NopCloser(bytes.NewReader(toJSONBytes(t, &ns)))
+		bodyRC := io.NopCloser(bytes.NewReader(toJSONBytes(t, &ns)))
 		return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: bodyRC}, true, nil
 	}
 	return nil, false, nil

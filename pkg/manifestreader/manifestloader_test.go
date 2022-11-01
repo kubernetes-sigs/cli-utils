@@ -4,7 +4,7 @@
 package manifestreader
 
 import (
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -50,10 +50,10 @@ func TestMReader_Read(t *testing.T) {
 				t.FailNow()
 			}
 
-			dir, err := ioutil.TempDir("", "reader-test")
+			dir, err := os.MkdirTemp("", "reader-test")
 			assert.NoError(t, err)
 			p := filepath.Join(dir, "dep.yaml")
-			err = ioutil.WriteFile(p, []byte(depManifest), 0600)
+			err = os.WriteFile(p, []byte(depManifest), 0600)
 			assert.NoError(t, err)
 			stringReader := strings.NewReader(depManifest)
 

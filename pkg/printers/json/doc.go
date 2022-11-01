@@ -6,18 +6,18 @@
 // appear as a stream of json objects, each representing a single event.
 //
 // Every event will contain the following properties:
-//  * timestamp: RFC3339-formatted timestamp describing when the event happened.
-//  * type: Describes the type of the operation which the event is related to.
-//    Type values include:
-//    * validation - ValidationEvent
-//    * error - ErrorEvent
-//    * group - ActionGroupEvent
-//    * apply - ApplyEvent
-//    * prune - PruneEvent
-//    * delete - DeleteEvent
-//    * wait - WaitEvent
-//    * status - StatusEvent
-//    * summary - aggregate stats collected by the printer
+//   - timestamp: RFC3339-formatted timestamp describing when the event happened.
+//   - type: Describes the type of the operation which the event is related to.
+//     Type values include:
+//   - validation - ValidationEvent
+//   - error - ErrorEvent
+//   - group - ActionGroupEvent
+//   - apply - ApplyEvent
+//   - prune - PruneEvent
+//   - delete - DeleteEvent
+//   - wait - WaitEvent
+//   - status - StatusEvent
+//   - summary - aggregate stats collected by the printer
 //
 // Validation events correspond to zero or more objects. For these events, the
 // objects field includes a list of object identifiers. These generally fire
@@ -25,10 +25,11 @@
 //
 // Validation events have the following fields:
 // * objects (array of objects) - a list of object identifiers
-//   * group (string, optional) - The object's API group.
-//   * kind (string) - The object's kind.
-//   * name (string) - The object's name.
-//   * namespace (string, optional) - The object's namespace.
+//   - group (string, optional) - The object's API group.
+//   - kind (string) - The object's kind.
+//   - name (string) - The object's name.
+//   - namespace (string, optional) - The object's namespace.
+//
 // * timestamp (string) - ISO-8601 format
 // * type (string) - "validation"
 // * error (string) - a fatal error message specific to these objects
@@ -55,29 +56,29 @@
 // group, kind, name, and namespace fields identify the object.
 //
 // Operation events have the following fields:
-// * group (string, optional) - The object's API group.
-// * kind (string) - The object's kind.
-// * name (string) - The object's name.
-// * namespace (string, optional) - The object's namespace.
-// * status (string) - One of: "Pending", "Successful", "Skipped", "Failed", or
-//                     "Timeout".
-// * timestamp (string) - ISO-8601 format
-// * type (string) - "apply", "prune", "delete", or "wait"
-// * error (string, optional) - A non-fatal error message specific to this object
+//   - group (string, optional) - The object's API group.
+//   - kind (string) - The object's kind.
+//   - name (string) - The object's name.
+//   - namespace (string, optional) - The object's namespace.
+//   - status (string) - One of: "Pending", "Successful", "Skipped", "Failed", or
+//     "Timeout".
+//   - timestamp (string) - ISO-8601 format
+//   - type (string) - "apply", "prune", "delete", or "wait"
+//   - error (string, optional) - A non-fatal error message specific to this object
 //
 // Status types are asynchronous events that correspond to status updates for
 // a specific object.
 //
 // Status events have the following fields:
-// * group (string, optional) - The object's API group.
-// * kind (string) - The object's kind.
-// * name (string) - The object's name.
-// * namespace (string, optional) - The object's namespace.
-// * status (string) - One of: "InProgress", "Failed", "Current", "Terminating",
-//                     "NotFound", or "Unknown".
-// * message (string) - Human readable description of the status.
-// * timestamp (string) - ISO-8601 format
-// * type (string) - "status"
+//   - group (string, optional) - The object's API group.
+//   - kind (string) - The object's kind.
+//   - name (string) - The object's name.
+//   - namespace (string, optional) - The object's namespace.
+//   - status (string) - One of: "InProgress", "Failed", "Current", "Terminating",
+//     "NotFound", or "Unknown".
+//   - message (string) - Human readable description of the status.
+//   - timestamp (string) - ISO-8601 format
+//   - type (string) - "status"
 //
 // Summary types are a meta-event sent by the printer to summarize some stats
 // that have been collected from other events. For these events, the action
@@ -93,5 +94,4 @@
 // * timeout (number, optional) - Number of objects for which the action timed out.
 // * timestamp (string) - ISO-8601 format
 // * type (string) - "summary"
-//
 package json

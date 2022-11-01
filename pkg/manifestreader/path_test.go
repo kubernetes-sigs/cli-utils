@@ -4,7 +4,7 @@
 package manifestreader
 
 import (
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -56,11 +56,11 @@ func TestPathManifestReader_Read(t *testing.T) {
 				t.FailNow()
 			}
 
-			dir, err := ioutil.TempDir("", "path-reader-test")
+			dir, err := os.MkdirTemp("", "path-reader-test")
 			assert.NoError(t, err)
 			for filename, content := range tc.manifests {
 				p := filepath.Join(dir, filename)
-				err := ioutil.WriteFile(p, []byte(content), 0600)
+				err := os.WriteFile(p, []byte(content), 0600)
 				assert.NoError(t, err)
 			}
 

@@ -10,14 +10,14 @@ import (
 
 // AggregateStatus computes the aggregate status for all the resources.
 // The rules are the following:
-// - If any of the resources has the FailedStatus, the aggregate status is also
-//   FailedStatus
-// - If none of the resources have the FailedStatus and at least one is
-//   UnknownStatus, the aggregate status is UnknownStatus
-// - If all the resources have the desired status, the aggregate status is the
-//   desired status.
-// - If none of the first three rules apply, the aggregate status is
-//   InProgressStatus
+//   - If any of the resources has the FailedStatus, the aggregate status is also
+//     FailedStatus
+//   - If none of the resources have the FailedStatus and at least one is
+//     UnknownStatus, the aggregate status is UnknownStatus
+//   - If all the resources have the desired status, the aggregate status is the
+//     desired status.
+//   - If none of the first three rules apply, the aggregate status is
+//     InProgressStatus
 func AggregateStatus(rss []*event.ResourceStatus, desired status.Status) status.Status {
 	if len(rss) == 0 {
 		return desired

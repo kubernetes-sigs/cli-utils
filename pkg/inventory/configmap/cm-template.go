@@ -6,11 +6,10 @@ package configmap
 // Template for ConfigMap inventory object. The following fields
 // must be filled in for this to be valid:
 //
-//  <DATETIME>: The time this is auto-generated
-//  <NAMESPACE>: The namespace to place this inventory object
-//  <RANDOMSUFFIX>: The random suffix added to the end of the name
-//  <INVENTORYID>: The label value to retrieve this inventory object
-//
+//	<DATETIME>: The time this is auto-generated
+//	<NAMESPACE>: The namespace to place this inventory object
+//	<RANDOMSUFFIX>: The random suffix added to the end of the name
+//	<INVENTORYID>: The label value to retrieve this inventory object
 const ConfigMapTemplate = `# NOTE: auto-generated. Some fields should NOT be modified.
 # Date: <DATETIME>
 #

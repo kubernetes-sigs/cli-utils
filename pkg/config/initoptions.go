@@ -122,7 +122,6 @@ func FindNamespace(loader namespaceLoader, dir string) (string, error) {
 // passed directory or an error. This function cleans up paths
 // such as current directory (.), relative directories (..), or
 // multiple separators.
-//
 func NormalizeDir(dirPath string) (string, error) {
 	if !common.IsDir(dirPath) {
 		return "", fmt.Errorf("invalid directory argument: %s", dirPath)

@@ -72,7 +72,7 @@ func (t *Printer) Print(ch <-chan event.Event, _ common.DryRunStrategy, _ bool) 
 }
 
 // columns defines the columns we want to print
-//TODO: We should have the number of columns and their widths be
+// TODO: We should have the number of columns and their widths be
 // dependent on the space available.
 var (
 	actionColumnDef = table.ColumnDef{
