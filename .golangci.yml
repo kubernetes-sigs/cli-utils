@@ -10,7 +10,6 @@ linters:
   disable-all: true
   enable:
     - bodyclose
-    - deadcode
     - depguard
     - dogsled
     - dupl
@@ -31,14 +30,12 @@ linters:
     - misspell
     - nakedret
     - staticcheck
-    - structcheck
     - stylecheck
     - revive
     - typecheck
     - unconvert
     - unparam
     - unused
-    - varcheck
     - whitespace
 
 
