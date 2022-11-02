@@ -24,14 +24,14 @@ var (
 )
 
 var (
-	e1 Edge = Edge{From: o1, To: o2}
-	e2 Edge = Edge{From: o2, To: o3}
-	e3 Edge = Edge{From: o1, To: o3}
-	e4 Edge = Edge{From: o3, To: o4}
-	e5 Edge = Edge{From: o2, To: o4}
-	e6 Edge = Edge{From: o2, To: o1}
-	e7 Edge = Edge{From: o3, To: o1}
-	e8 Edge = Edge{From: o4, To: o5}
+	e1 = Edge{From: o1, To: o2}
+	e2 = Edge{From: o2, To: o3}
+	e3 = Edge{From: o1, To: o3}
+	e4 = Edge{From: o3, To: o4}
+	e5 = Edge{From: o2, To: o4}
+	e6 = Edge{From: o2, To: o1}
+	e7 = Edge{From: o3, To: o1}
+	e8 = Edge{From: o4, To: o5}
 )
 
 func TestObjectGraphSort(t *testing.T) {

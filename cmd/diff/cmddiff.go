@@ -4,7 +4,6 @@
 package diff
 
 import (
-	"io/ioutil"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -104,7 +103,7 @@ func Initialize(o *diff.DiffOptions, f util.Factory, args []string) (func(), err
 func createTempDir() (string, error) {
 	// Create a temporary file with the passed prefix in
 	// the default temporary directory.
-	tmpDir, err := ioutil.TempDir("", tmpDirPrefix)
+	tmpDir, err := os.MkdirTemp("", tmpDirPrefix)
 	if err != nil {
 		return "", err
 	}

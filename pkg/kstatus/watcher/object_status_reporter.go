@@ -48,18 +48,18 @@ func (gkn GroupKindNamespace) GroupKind() schema.GroupKind {
 // network of informers to watch one or more resources (types).
 //
 // Unlike SharedIndexInformer, ObjectStatusReporter...
-// - Reports object status.
-// - Can watch multiple resource types simultaneously.
-// - Specific objects can be ignored for efficiency by specifying an ObjectFilter.
-// - Resolves GroupKinds into Resources at runtime, to pick up newly added
-//   resources.
-// - Starts and Stops individual watches automaically to reduce errors when a
-//   CRD or Namespace is deleted.
-// - Resources can be watched in root-scope mode or namespace-scope mode,
-//   allowing the caller to optimize for efficiency or least-privilege.
-// - Gives unschedulable Pods (and objects that generate them) a 15s grace
-//   period before reporting them as Failed.
-// - Resets the RESTMapper cache automatically when CRDs are modified.
+//   - Reports object status.
+//   - Can watch multiple resource types simultaneously.
+//   - Specific objects can be ignored for efficiency by specifying an ObjectFilter.
+//   - Resolves GroupKinds into Resources at runtime, to pick up newly added
+//     resources.
+//   - Starts and Stops individual watches automaically to reduce errors when a
+//     CRD or Namespace is deleted.
+//   - Resources can be watched in root-scope mode or namespace-scope mode,
+//     allowing the caller to optimize for efficiency or least-privilege.
+//   - Gives unschedulable Pods (and objects that generate them) a 15s grace
+//     period before reporting them as Failed.
+//   - Resets the RESTMapper cache automatically when CRDs are modified.
 //
 // ObjectStatusReporter is NOT repeatable. It will panic if started more than
 // once. If you need a repeatable factory, use DefaultStatusWatcher.

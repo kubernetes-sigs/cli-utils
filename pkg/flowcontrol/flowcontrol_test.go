@@ -6,7 +6,6 @@ package flowcontrol
 import (
 	"bytes"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -37,7 +36,7 @@ func TestIsEnabled(t *testing.T) {
 				return &http.Response{
 					StatusCode: 200,
 					Header:     headers,
-					Body:       ioutil.NopCloser(bytes.NewReader(nil)),
+					Body:       io.NopCloser(bytes.NewReader(nil)),
 				}
 			},
 			expectedEnabled: true,
@@ -49,7 +48,7 @@ func TestIsEnabled(t *testing.T) {
 				return &http.Response{
 					StatusCode: 200,
 					Header:     http.Header{},
-					Body:       ioutil.NopCloser(bytes.NewReader(nil)),
+					Body:       io.NopCloser(bytes.NewReader(nil)),
 				}
 			},
 			expectedEnabled: false,

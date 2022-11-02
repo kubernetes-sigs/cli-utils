@@ -5,7 +5,6 @@ package common
 
 import (
 	"bytes"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -201,7 +200,7 @@ func TestFilterInputFile(t *testing.T) {
 				t.Fatalf("Unexpected error in FilterInputFile: %s", err)
 			}
 			// Retrieve the files from the test filesystem.
-			actualFiles, err := ioutil.ReadDir(tf.GetRootDir())
+			actualFiles, err := os.ReadDir(tf.GetRootDir())
 			if err != nil {
 				t.Fatalf("Error reading test filesystem directory: %s", err)
 			}
@@ -215,7 +214,7 @@ func TestFilterInputFile(t *testing.T) {
 			if len(actualFiles) != 0 {
 				actualFilename := (actualFiles[0]).Name()
 				defer os.Remove(actualFilename)
-				actual, err := ioutil.ReadFile(actualFilename)
+				actual, err := os.ReadFile(actualFilename)
 				if err != nil {
 					t.Fatalf("Error reading created file (%s): %s", actualFilename, err)
 				}

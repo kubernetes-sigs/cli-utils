@@ -54,6 +54,7 @@ func (sc *StatusCollector) LatestStatus() map[object.ObjMetadata]event.StatusEve
 // format on StdOut. As we support other printer implementations
 // this should probably be an interface.
 // This function will block until the channel is closed.
+//
 //nolint:gocyclo
 func (b *BaseListPrinter) Print(ch <-chan event.Event, previewStrategy common.DryRunStrategy, printStatus bool) error {
 	var actionGroups []event.ActionGroup
