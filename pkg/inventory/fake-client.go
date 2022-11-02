@@ -56,7 +56,7 @@ func (fc *FakeClient) List(_ context.Context, invInfo Info) ([]*actuation.Invent
 		return nil, fc.Err
 	}
 
-	return []*actuation.Inventory{&actuation.Inventory{
+	return []*actuation.Inventory{{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: invInfo.Name,
 		},
