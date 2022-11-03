@@ -345,7 +345,7 @@ type fakeReader struct {
 	err                 error
 }
 
-func (f *fakeReader) Get(_ context.Context, _ client.ObjectKey, _ client.Object) error {
+func (f *fakeReader) Get(_ context.Context, _ client.ObjectKey, _ client.Object, opts ...client.GetOption) error {
 	return nil
 }
 

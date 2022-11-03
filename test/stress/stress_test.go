@@ -72,7 +72,10 @@ var _ = BeforeSuite(func() {
 var _ = AfterSuite(func() {
 	ctx, cancel := context.WithTimeout(context.Background(), defaultAfterTestTimeout)
 	defer cancel()
-	e2eutil.DeleteInventoryCRD(ctx, c)
+	if c != nil {
+		// If BeforeSuite() failed, c might be nil. Skip deletion to avoid red herring panic.
+		e2eutil.DeleteInventoryCRD(ctx, c)
+	}
 	Expect(ctx.Err()).To(BeNil(), "AfterSuite context cancelled or timed out")
 })
 

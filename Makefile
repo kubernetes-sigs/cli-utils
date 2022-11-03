@@ -19,16 +19,16 @@ all: generate license fix vet fmt test lint tidy
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.50.0
 
 "$(MYGOBIN)/deepcopy-gen":
-	go install k8s.io/code-generator/cmd/deepcopy-gen@v0.23.6
+	go install k8s.io/code-generator/cmd/deepcopy-gen@v0.25.2
 
 "$(MYGOBIN)/ginkgo":
-	go install github.com/onsi/ginkgo/v2/ginkgo@v2.1.3
+	go install github.com/onsi/ginkgo/v2/ginkgo@v2.2.0
 
 "$(MYGOBIN)/mdrip":
 	go install github.com/monopole/mdrip@v1.0.2
 
 "$(MYGOBIN)/kind":
-	go install sigs.k8s.io/kind@v0.12.0
+	go install sigs.k8s.io/kind@v0.16.0
 
 # The following target intended for reference by a file in
 # https://github.com/kubernetes/test-infra/tree/master/config/jobs/kubernetes-sigs/cli-utils
