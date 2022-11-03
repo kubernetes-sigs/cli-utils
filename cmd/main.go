@@ -62,8 +62,7 @@ func main() {
 	}
 
 	loader := manifestreader.NewManifestLoader(f)
-	// TODO: Add StatusPolicy back to factory.
-	invFactory := inventory.ConfigMapClientFactory{}
+	invFactory := inventory.ConfigMapClientFactory{StatusPolicy: inventory.StatusPolicyNone}
 
 	names := []string{"init", "apply", "destroy", "diff", "preview", "status"}
 	subCmds := []*cobra.Command{

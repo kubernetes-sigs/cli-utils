@@ -120,8 +120,7 @@ func newTestInventory(
 ) inventory.Client {
 	// Use an Client with a fakeInfoHelper to allow generating Info
 	// objects that use the FakeRESTClient as the UnstructuredClient.
-	// TODO: add `StatusPolicy: inventory.StatusPolicyAll` to ConfigMapClientFactory
-	invClient, err := inventory.ConfigMapClientFactory{}.NewClient(tf)
+	invClient, err := inventory.ConfigMapClientFactory{StatusPolicy: inventory.StatusPolicyAll}.NewClient(tf)
 	require.NoError(t, err)
 	return invClient
 }

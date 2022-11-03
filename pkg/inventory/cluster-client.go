@@ -272,10 +272,8 @@ func (cc *ClusterClient) updateObject(
 		return out, fmt.Errorf("failed to update object %q: %w", id, err)
 	}
 
-	// // Update the status fields.
-	// statuses, _, _ := unstructured.NestedSlice(obj.UnstructuredContent(), "status")
+	// Update the status fields if status subresource is present.
 	if cc.StatusPolicy == StatusPolicyAll && obj != nil && out != nil {
-		// && len(statuses) > 1 {
 		// Status update requires the latest ResourceVersion.
 		obj.SetResourceVersion(out.GetResourceVersion())
 		_, err = cc.DynamicClient.Resource(mapping.Resource).

@@ -164,7 +164,7 @@ func (r *Runner) loadInvFromDisk(cmd *cobra.Command, args []string) (*printer.Pr
 
 	// Based on the inventory template manifest we look up the inventory
 	// from the live state using the inventory client.
-	inv, err := invClient.Load(context.TODO(), invInfo)
+	inv, err := invClient.Load(r.ctx, invInfo)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load inventory: %w", err)
 	}

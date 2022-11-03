@@ -9,7 +9,9 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
-type ConfigMapClientFactory struct{}
+type ConfigMapClientFactory struct {
+	StatusPolicy StatusPolicy
+}
 
 var _ ClientFactory = ConfigMapClientFactory{}
 
@@ -27,6 +29,6 @@ func (cmcf ConfigMapClientFactory) NewClient(factory cmdutil.Factory) (Client, e
 	return &ClusterClient{
 		DynamicClient: client,
 		Mapper:        mapper,
-		Converter:     ConfigMapConverter{},
+		Converter:     ConfigMapConverter(cmcf),
 	}, nil
 }

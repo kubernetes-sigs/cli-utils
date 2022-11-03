@@ -4,6 +4,7 @@
 package inventory
 
 import (
+	"encoding/json"
 	"fmt"
 	"sort"
 
@@ -13,7 +14,13 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
+// ConfigMapConverter implements a converter to serialize and deserialze
+// inventory information from unstructured ConfigMaps and Inventory objects.
+// SatusPolicy is stored within the converter as ConfigMaps do not support
+// the status sub-resource and we need to handle the status conversion to
+// the data field.
 type ConfigMapConverter struct {
+	StatusPolicy StatusPolicy
 }
 
 var _ Converter = ConfigMapConverter{}
@@ -27,7 +34,7 @@ func (cmc ConfigMapConverter) GroupVersionKind() schema.GroupVersionKind {
 	}
 }
 
-// To converts from an Unstructured of the supported GVK to an Inventory
+// To converts from an Unstructured ConfigMap to an Inventory.
 func (cmc ConfigMapConverter) To(obj *unstructured.Unstructured) (*actuation.Inventory, error) {
 	inv := &actuation.Inventory{}
 	// Copy TypeMeta
@@ -35,28 +42,31 @@ func (cmc ConfigMapConverter) To(obj *unstructured.Unstructured) (*actuation.Inv
 	// Copy ObjectMeta
 	object.DeepCopyObjectMetaInto(obj, inv)
 
-	// Convert in.Data to out.Spec.Objects
+	// Convert in.Data to out.Spec.Objects.
 	data, _, err := unstructured.NestedStringMap(obj.UnstructuredContent(), "data")
 	if err != nil {
 		return nil, fmt.Errorf("failed to read ConfigMap data: %w", err)
 	}
-	if len(data) > 0 {
-		objs, err := object.FromStringMap(data)
-		if err != nil {
-			return nil, err
-		}
-		inv.Spec.Objects = ObjectReferencesFromObjMetadataSet(objs)
-
-		// Sort objects to reduce chun on update
-		sort.Sort(AlphanumericObjectReferences(inv.Spec.Objects))
+	objs, err := object.FromStringMap(data)
+	if err != nil {
+		return nil, err
 	}
+	inv.Spec.Objects = ObjectReferencesFromObjMetadataSet(objs)
+	// Sort objects to reduce chun on update.
+	sort.Sort(AlphanumericObjectReferences(inv.Spec.Objects))
 
-	// TODO: copy status (not yet serialized)
+	// // Convert in.Data to out.status.objects
+	// var statuses []actuation.ObjectStatus
+	// if len(objs) > 0 {
+
+	// }
+
+	// inv.Status.Objects = statuses
 
 	return inv, nil
 }
 
-// From converts from an Inventory to an Unstructured of the supported GVK
+// From converts from an Inventory to an Unstructured ConfigMap.
 func (cmc ConfigMapConverter) From(inv *actuation.Inventory) (*unstructured.Unstructured, error) {
 	obj := &unstructured.Unstructured{
 		Object: make(map[string]interface{}),
@@ -69,13 +79,48 @@ func (cmc ConfigMapConverter) From(inv *actuation.Inventory) (*unstructured.Unst
 	// Convert in.Spec.Objects to out.Data
 	if len(inv.Spec.Objects) > 0 {
 		ids := ObjMetadataSetFromObjectReferences(inv.Spec.Objects)
-		err := unstructured.SetNestedStringMap(obj.Object, ids.ToStringMap(), "data")
+		var data map[string]string
+		if cmc.StatusPolicy == StatusPolicyAll {
+			data = buildObjMap(ids, inv.Status.Objects)
+		} else {
+			data = ids.ToStringMap()
+		}
+
+		err := unstructured.SetNestedStringMap(obj.Object, data, "data")
 		if err != nil {
 			return obj, fmt.Errorf("failed to update ConfigMap data: %w", err)
 		}
 	}
 
-	// TODO: copy status (not yet serialized)
-
 	return obj, nil
+}
+
+func buildObjMap(objMetas object.ObjMetadataSet, objStatus []actuation.ObjectStatus) map[string]string {
+	objMap := map[string]string{}
+	objStatusMap := map[object.ObjMetadata]actuation.ObjectStatus{}
+	for _, status := range objStatus {
+		objStatusMap[ObjMetadataFromObjectReference(status.ObjectReference)] = status
+	}
+	for _, objMetadata := range objMetas {
+		if status, found := objStatusMap[objMetadata]; found {
+			objMap[objMetadata.String()] = stringFrom(status)
+		} else {
+			// It's possible that the passed in status doesn't any object status
+			objMap[objMetadata.String()] = ""
+		}
+	}
+	return objMap
+}
+
+func stringFrom(status actuation.ObjectStatus) string {
+	tmp := map[string]string{
+		"strategy":  status.Strategy.String(),
+		"actuation": status.Actuation.String(),
+		"reconcile": status.Reconcile.String(),
+	}
+	data, err := json.Marshal(tmp)
+	if err != nil || string(data) == "{}" {
+		return ""
+	}
+	return string(data)
 }
