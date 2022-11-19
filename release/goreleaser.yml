@@ -1,8 +1,24 @@
 # Copyright 2020 The Kubernetes Authors.
 # SPDX-License-Identifier: Apache-2.0
 
+archives:
+- name_template: "{{ .Binary }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+
 builds:
-- skip: true
+- skip: false
+  main: ./cmd
+  id: "kapply"
+  binary: kapply
+  env:
+  - CGO_ENABLED=0
+  goos:
+  - linux
+  - darwin
+  - windows
+  goarch:
+  - amd64
+  - arm64
+
 checksum:
   name_template: 'checksums.txt'
 changelog:
