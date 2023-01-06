@@ -325,7 +325,7 @@ func TestPrune(t *testing.T) {
 				},
 			},
 		},
-		"UID match means prune skipped": {
+		"UID match means prune skipped and object abandoned": {
 			clusterObjs: []*unstructured.Unstructured{pod},
 			pruneObjs:   []*unstructured.Unstructured{pod},
 			pruneFilters: []filter.ValidationFilter{
@@ -351,8 +351,11 @@ func TestPrune(t *testing.T) {
 			expectedSkipped: object.ObjMetadataSet{
 				object.UnstructuredToObjMetadata(pod),
 			},
+			expectedAbandoned: object.ObjMetadataSet{
+				object.UnstructuredToObjMetadata(pod),
+			},
 		},
-		"UID match for only one object one pruned, one skipped": {
+		"UID match for only one object one pruned, one skipped and abandoned": {
 			clusterObjs: []*unstructured.Unstructured{pod, pdb},
 			pruneObjs:   []*unstructured.Unstructured{pod, pdb},
 			pruneFilters: []filter.ValidationFilter{
@@ -384,6 +387,9 @@ func TestPrune(t *testing.T) {
 				},
 			},
 			expectedSkipped: object.ObjMetadataSet{
+				object.UnstructuredToObjMetadata(pod),
+			},
+			expectedAbandoned: object.ObjMetadataSet{
 				object.UnstructuredToObjMetadata(pod),
 			},
 		},

@@ -153,6 +153,17 @@ func (p *Pruner) Prune(
 					}
 				}
 
+				// Remove the object from inventory if it was determined that the object should not be pruned,
+				// because it had recently been applied. This probably means that the object is in the inventory
+				// more than one time with a different group (e.g. kind Ingress and apiGroups networking.k8s.io & extensions)
+				var deleteAfterApplyErr *filter.ApplyPreventedDeletionError
+				if errors.As(filterErr, &deleteAfterApplyErr) {
+					if !opts.DryRunStrategy.ClientOrServerDryRun() {
+						// Register for removal from the inventory.
+						taskContext.AddAbandonedObject(id)
+					}
+				}
+
 				taskContext.SendEvent(eventFactory.CreateSkippedEvent(obj, filterErr))
 				taskContext.InventoryManager().AddSkippedDelete(id)
 				break
