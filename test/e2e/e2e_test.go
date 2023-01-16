@@ -183,6 +183,10 @@ var _ = Describe("E2E", func() {
 					namespaceFilterTest(ctx, c, invConfig, inventoryName, namespace.GetName())
 				})
 
+				It("CurrentUIDFilter", func() {
+					currentUIDFilterTest(ctx, c, invConfig, inventoryName, namespace.GetName())
+				})
+
 				It("PruneRetrievalError", func() {
 					pruneRetrieveErrorTest(ctx, c, invConfig, inventoryName, namespace.GetName())
 				})
