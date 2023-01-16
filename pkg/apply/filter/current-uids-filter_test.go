@@ -13,7 +13,7 @@ import (
 
 func TestCurrentUIDFilter(t *testing.T) {
 	tests := map[string]struct {
-		filterUIDs    sets.String
+		filterUIDs    sets.String // nolint:staticcheck
 		objUID        string
 		expectedError error
 	}{
