@@ -51,8 +51,10 @@ type: Warning
 
 // Note this tests the scenario of "cohabitating" k8s objects (an object available via multiple apiGroups), but having the same UID.
 // As of k8s 1.25 an example of such "cohabitating" kinds is Event which is available via both "v1" and "events.k8s.io/v1".
-// When the user upgrades from one apiGroup to the other:
-// - should not result in object being pruned
+// See the full list of cohabitating resources on the storage level here:
+// - https://github.com/kubernetes/kubernetes/blob/v1.25.0/pkg/kubeapiserver/default_storage_factory_builder.go#L124-L131
+// We test that when the user upgrades their manifest from one cohabitated apiGroup to the other, then:
+// - it should not result in object being pruned
 // - object pruning should be skipped due to CurrentUIDFilter (even though a diff is found)
 // - inventory should not double-track the object i.e. we should hold reference only to the object with the groupKind that was most recently applied
 func currentUIDFilterTest(ctx context.Context, c client.Client, invConfig invconfig.InventoryConfig, inventoryName, namespaceName string) {
