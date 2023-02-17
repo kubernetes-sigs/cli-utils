@@ -70,7 +70,7 @@ metadata:
 spec:
   containers:
   - name: kubernetes-pause
-    image: k8s.gcr.io/pause:2.0
+    image: registry.k8s.io/pause:2.0
 `))
 
 var pod2 = []byte(strings.TrimSpace(`
@@ -81,7 +81,7 @@ metadata:
 spec:
   containers:
   - name: kubernetes-pause
-    image: k8s.gcr.io/pause:2.0
+    image: registry.k8s.io/pause:2.0
 `))
 
 var pod3 = []byte(strings.TrimSpace(`
@@ -92,7 +92,7 @@ metadata:
 spec:
   containers:
   - name: kubernetes-pause
-    image: k8s.gcr.io/pause:2.0
+    image: registry.k8s.io/pause:2.0
 `))
 
 var podATemplate = `
