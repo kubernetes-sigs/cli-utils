@@ -23,7 +23,7 @@ var testNamespace = &unstructured.Unstructured{
 
 func TestLocalNamespacesFilter(t *testing.T) {
 	tests := map[string]struct {
-		localNamespaces sets.String
+		localNamespaces sets.String // nolint:staticcheck
 		namespace       string
 		expectedError   error
 	}{
