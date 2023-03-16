@@ -242,7 +242,8 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.Info, objects objec
 		runner := taskrunner.NewTaskStatusRunner(allIds, statusWatcher)
 		klog.V(4).Infoln("applier running TaskStatusRunner...")
 		err = runner.Run(ctx, taskContext, taskQueue.ToChannel(), taskrunner.Options{
-			EmitStatusEvents: options.EmitStatusEvents,
+			EmitStatusEvents:         options.EmitStatusEvents,
+			WatcherRESTScopeStrategy: options.WatcherRESTScopeStrategy,
 		})
 		if err != nil {
 			handleError(eventChannel, err)
@@ -288,6 +289,10 @@ type ApplierOptions struct {
 
 	// ValidationPolicy defines how to handle invalid objects.
 	ValidationPolicy validation.Policy
+
+	// RESTScopeStrategy specifies which strategy to use when listing and
+	// watching resources. By default, the strategy is selected automatically.
+	WatcherRESTScopeStrategy watcher.RESTScopeStrategy
 }
 
 // setDefaults set the options to the default values if they
