@@ -6,6 +6,7 @@ package e2e
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -67,7 +68,7 @@ var _ = BeforeSuite(func() {
 	inventoryConfigs[ConfigMapTypeInvConfig] = invconfig.NewConfigMapTypeInvConfig(cfg)
 	inventoryConfigs[CustomTypeInvConfig] = invconfig.NewCustomTypeInvConfig(cfg)
 
-	mapper, err := apiutil.NewDynamicRESTMapper(cfg)
+	mapper, err := apiutil.NewDynamicRESTMapper(cfg, http.DefaultClient)
 	Expect(err).NotTo(HaveOccurred())
 
 	c, err = client.New(cfg, client.Options{
