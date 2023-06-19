@@ -92,6 +92,8 @@ test:
 .PHONY: test-e2e
 test-e2e: "$(MYGOBIN)/ginkgo" "$(MYGOBIN)/kind"
 	kind delete cluster --name=cli-utils-e2e && kind create cluster --name=cli-utils-e2e --wait 5m
+	kubectl get ns
+	kubectl get crd
 	"$(MYGOBIN)/ginkgo" -v ./test/e2e/... -- -v 3
 
 .PHONY: test-e2e-focus
