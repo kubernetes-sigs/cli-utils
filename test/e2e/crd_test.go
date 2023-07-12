@@ -362,7 +362,7 @@ func crdTest(ctx context.Context, _ client.Client, invConfig invconfig.Inventory
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
 				Action:    event.InventoryAction,
-				GroupName: "delete-inventory-0",
+				GroupName: "inventory-delete-or-update-0",
 				Type:      event.Started,
 			},
 		},
@@ -371,7 +371,7 @@ func crdTest(ctx context.Context, _ client.Client, invConfig invconfig.Inventory
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
 				Action:    event.InventoryAction,
-				GroupName: "delete-inventory-0",
+				GroupName: "inventory-delete-or-update-0",
 				Type:      event.Finished,
 			},
 		},

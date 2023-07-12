@@ -191,6 +191,10 @@ var _ = Describe("E2E", func() {
 					pruneRetrieveErrorTest(ctx, c, invConfig, inventoryName, namespace.GetName())
 				})
 
+				It("DestroyReconciliationFailure", func() {
+					destroyReconciliationFailureTest(ctx, c, invConfig, inventoryName, namespace.GetName())
+				})
+
 				It("ReconciliationFailure", func() {
 					reconciliationFailed(ctx, invConfig, inventoryName, namespace.GetName())
 				})

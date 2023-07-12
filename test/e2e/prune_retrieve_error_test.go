@@ -384,7 +384,7 @@ func pruneRetrieveErrorTest(ctx context.Context, c client.Client, invConfig invc
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
 				Action:    event.InventoryAction,
-				GroupName: "delete-inventory-0",
+				GroupName: "inventory-delete-or-update-0",
 				Type:      event.Started,
 			},
 		},
@@ -393,7 +393,7 @@ func pruneRetrieveErrorTest(ctx context.Context, c client.Client, invConfig invc
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
 				Action:    event.InventoryAction,
-				GroupName: "delete-inventory-0",
+				GroupName: "inventory-delete-or-update-0",
 				Type:      event.Finished,
 			},
 		},

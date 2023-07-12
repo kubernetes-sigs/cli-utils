@@ -101,6 +101,18 @@ func WithDependsOn(obj *unstructured.Unstructured, dep string) *unstructured.Uns
 	return obj
 }
 
+func WithFinalizer(obj *unstructured.Unstructured, finalizer string) *unstructured.Unstructured {
+	finalizers := obj.GetFinalizers()
+	finalizers = append(finalizers, finalizer)
+	obj.SetFinalizers(finalizers)
+	return obj
+}
+
+func WithoutFinalizers(obj *unstructured.Unstructured) *unstructured.Unstructured {
+	obj.SetFinalizers([]string{})
+	return obj
+}
+
 func DeleteUnstructuredAndWait(ctx context.Context, c client.Client, obj *unstructured.Unstructured) {
 	ref := mutation.ResourceReferenceFromUnstructured(obj)
 
@@ -195,6 +207,21 @@ func AssertUnstructuredExists(ctx context.Context, c client.Client, obj *unstruc
 	}, resultObj)
 	gomega.Expect(err).NotTo(gomega.HaveOccurred(),
 		"expected GET not to error (%s): %s", ref, err)
+	return resultObj
+}
+
+func AssertHasDeletionTimestamp(ctx context.Context, c client.Client, obj *unstructured.Unstructured) *unstructured.Unstructured {
+	ref := mutation.ResourceReferenceFromUnstructured(obj)
+	resultObj := ref.ToUnstructured()
+
+	err := c.Get(ctx, types.NamespacedName{
+		Namespace: obj.GetNamespace(),
+		Name:      obj.GetName(),
+	}, resultObj)
+	gomega.Expect(err).NotTo(gomega.HaveOccurred(),
+		"expected GET not to error (%s): %s", ref, err)
+	gomega.Expect(resultObj.GetDeletionTimestamp().IsZero()).To(gomega.BeFalse(),
+		"expected deletion timestamp to be non-zero (%s)", ref)
 	return resultObj
 }
 

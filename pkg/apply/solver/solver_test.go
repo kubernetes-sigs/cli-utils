@@ -149,7 +149,7 @@ func TestTaskQueueBuilder_ApplyBuild(t *testing.T) {
 					InvInfo:   invInfo,
 					Objects:   object.UnstructuredSet{},
 				},
-				&task.InvSetTask{
+				&task.DeleteOrUpdateInvTask{
 					TaskName:      "inventory-set-0",
 					InvClient:     &inventory.FakeClient{},
 					InvInfo:       invInfo,
@@ -183,7 +183,7 @@ func TestTaskQueueBuilder_ApplyBuild(t *testing.T) {
 					},
 					Condition: taskrunner.AllCurrent,
 				},
-				&task.InvSetTask{
+				&task.DeleteOrUpdateInvTask{
 					TaskName:  "inventory-set-0",
 					InvClient: &inventory.FakeClient{},
 					InvInfo:   invInfo,
@@ -234,7 +234,7 @@ func TestTaskQueueBuilder_ApplyBuild(t *testing.T) {
 					},
 					Condition: taskrunner.AllCurrent,
 				},
-				&task.InvSetTask{
+				&task.DeleteOrUpdateInvTask{
 					TaskName:  "inventory-set-0",
 					InvClient: &inventory.FakeClient{},
 					InvInfo:   invInfo,
@@ -298,7 +298,7 @@ func TestTaskQueueBuilder_ApplyBuild(t *testing.T) {
 					Condition: taskrunner.AllCurrent,
 					Timeout:   1 * time.Minute,
 				},
-				&task.InvSetTask{
+				&task.DeleteOrUpdateInvTask{
 					TaskName:  "inventory-set-0",
 					InvClient: &inventory.FakeClient{},
 					InvInfo:   invInfo,
@@ -356,7 +356,7 @@ func TestTaskQueueBuilder_ApplyBuild(t *testing.T) {
 					},
 					DryRunStrategy: common.DryRunClient,
 				},
-				&task.InvSetTask{
+				&task.DeleteOrUpdateInvTask{
 					TaskName:  "inventory-set-0",
 					InvClient: &inventory.FakeClient{},
 					InvInfo:   invInfo,
@@ -415,7 +415,7 @@ func TestTaskQueueBuilder_ApplyBuild(t *testing.T) {
 					},
 					DryRunStrategy: common.DryRunServer,
 				},
-				&task.InvSetTask{
+				&task.DeleteOrUpdateInvTask{
 					TaskName:  "inventory-set-0",
 					InvClient: &inventory.FakeClient{},
 					InvInfo:   invInfo,
@@ -492,7 +492,7 @@ func TestTaskQueueBuilder_ApplyBuild(t *testing.T) {
 					},
 					Condition: taskrunner.AllCurrent,
 				},
-				&task.InvSetTask{
+				&task.DeleteOrUpdateInvTask{
 					TaskName:  "inventory-set-0",
 					InvClient: &inventory.FakeClient{},
 					InvInfo:   invInfo,
@@ -567,7 +567,7 @@ func TestTaskQueueBuilder_ApplyBuild(t *testing.T) {
 					},
 					DryRunStrategy: common.DryRunClient,
 				},
-				&task.InvSetTask{
+				&task.DeleteOrUpdateInvTask{
 					TaskName:  "inventory-set-0",
 					InvClient: &inventory.FakeClient{},
 					InvInfo:   invInfo,
@@ -653,7 +653,7 @@ func TestTaskQueueBuilder_ApplyBuild(t *testing.T) {
 					},
 					Condition: taskrunner.AllCurrent,
 				},
-				&task.InvSetTask{
+				&task.DeleteOrUpdateInvTask{
 					TaskName:  "inventory-set-0",
 					InvClient: &inventory.FakeClient{},
 					InvInfo:   invInfo,
@@ -737,7 +737,7 @@ func TestTaskQueueBuilder_ApplyBuild(t *testing.T) {
 					},
 					Condition: taskrunner.AllCurrent,
 				},
-				&task.InvSetTask{
+				&task.DeleteOrUpdateInvTask{
 					TaskName:  "inventory-set-0",
 					InvClient: &inventory.FakeClient{},
 					InvInfo:   invInfo,
@@ -862,7 +862,7 @@ func TestTaskQueueBuilder_PruneBuild(t *testing.T) {
 					InvInfo:   invInfo,
 					Objects:   object.UnstructuredSet{},
 				},
-				&task.InvSetTask{
+				&task.DeleteOrUpdateInvTask{
 					TaskName:      "inventory-set-0",
 					InvClient:     &inventory.FakeClient{},
 					InvInfo:       invInfo,
@@ -895,7 +895,7 @@ func TestTaskQueueBuilder_PruneBuild(t *testing.T) {
 					},
 					Condition: taskrunner.AllNotFound,
 				},
-				&task.InvSetTask{
+				&task.DeleteOrUpdateInvTask{
 					TaskName:  "inventory-set-0",
 					InvClient: &inventory.FakeClient{},
 					InvInfo:   invInfo,
@@ -943,7 +943,7 @@ func TestTaskQueueBuilder_PruneBuild(t *testing.T) {
 					},
 					Condition: taskrunner.AllNotFound,
 				},
-				&task.InvSetTask{
+				&task.DeleteOrUpdateInvTask{
 					TaskName:  "inventory-set-0",
 					InvClient: &inventory.FakeClient{},
 					InvInfo:   invInfo,
@@ -1014,7 +1014,7 @@ func TestTaskQueueBuilder_PruneBuild(t *testing.T) {
 					},
 					Condition: taskrunner.AllNotFound,
 				},
-				&task.InvSetTask{
+				&task.DeleteOrUpdateInvTask{
 					TaskName:  "inventory-set-0",
 					InvClient: &inventory.FakeClient{},
 					InvInfo:   invInfo,
@@ -1072,7 +1072,7 @@ func TestTaskQueueBuilder_PruneBuild(t *testing.T) {
 					Condition: taskrunner.AllNotFound,
 					Timeout:   3 * time.Minute,
 				},
-				&task.InvSetTask{
+				&task.DeleteOrUpdateInvTask{
 					TaskName:  "inventory-set-0",
 					InvClient: &inventory.FakeClient{},
 					InvInfo:   invInfo,
@@ -1119,7 +1119,7 @@ func TestTaskQueueBuilder_PruneBuild(t *testing.T) {
 					},
 					DryRunStrategy: common.DryRunServer,
 				},
-				&task.InvSetTask{
+				&task.DeleteOrUpdateInvTask{
 					TaskName:  "inventory-set-0",
 					InvClient: &inventory.FakeClient{},
 					InvInfo:   invInfo,
@@ -1192,7 +1192,7 @@ func TestTaskQueueBuilder_PruneBuild(t *testing.T) {
 					},
 					Condition: taskrunner.AllNotFound,
 				},
-				&task.InvSetTask{
+				&task.DeleteOrUpdateInvTask{
 					TaskName:  "inventory-set-0",
 					InvClient: &inventory.FakeClient{},
 					InvInfo:   invInfo,
@@ -1264,7 +1264,7 @@ func TestTaskQueueBuilder_PruneBuild(t *testing.T) {
 					},
 					DryRunStrategy: common.DryRunClient,
 				},
-				&task.InvSetTask{
+				&task.DeleteOrUpdateInvTask{
 					TaskName:  "inventory-set-0",
 					InvClient: &inventory.FakeClient{},
 					InvInfo:   invInfo,
@@ -1345,7 +1345,7 @@ func TestTaskQueueBuilder_PruneBuild(t *testing.T) {
 					},
 					Condition: taskrunner.AllNotFound,
 				},
-				&task.InvSetTask{
+				&task.DeleteOrUpdateInvTask{
 					TaskName:  "inventory-set-0",
 					InvClient: &inventory.FakeClient{},
 					InvInfo:   invInfo,
@@ -1439,7 +1439,7 @@ func TestTaskQueueBuilder_PruneBuild(t *testing.T) {
 					taskrunner.AllCurrent, 1*time.Second,
 					testutil.NewFakeRESTMapper(),
 				),
-				&task.InvSetTask{
+				&task.DeleteOrUpdateInvTask{
 					TaskName:  "inventory-set-0",
 					InvClient: &inventory.FakeClient{},
 					InvInfo:   invInfo,
@@ -1574,7 +1574,7 @@ func TestTaskQueueBuilder_ApplyPruneBuild(t *testing.T) {
 					},
 					Condition: taskrunner.AllNotFound,
 				},
-				&task.InvSetTask{
+				&task.DeleteOrUpdateInvTask{
 					TaskName:  "inventory-set-0",
 					InvClient: &inventory.FakeClient{},
 					InvInfo:   invInfo,
@@ -1635,7 +1635,7 @@ func TestTaskQueueBuilder_ApplyPruneBuild(t *testing.T) {
 					},
 					Condition: taskrunner.AllCurrent,
 				},
-				&task.InvSetTask{
+				&task.DeleteOrUpdateInvTask{
 					TaskName:  "inventory-set-0",
 					InvClient: &inventory.FakeClient{},
 					InvInfo:   invInfo,
@@ -1709,7 +1709,7 @@ func TestTaskQueueBuilder_ApplyPruneBuild(t *testing.T) {
 					},
 					Condition: taskrunner.AllNotFound,
 				},
-				&task.InvSetTask{
+				&task.DeleteOrUpdateInvTask{
 					TaskName:  "inventory-set-0",
 					InvClient: &inventory.FakeClient{},
 					InvInfo:   invInfo,
@@ -1789,7 +1789,7 @@ func TestTaskQueueBuilder_ApplyPruneBuild(t *testing.T) {
 					},
 					Condition: taskrunner.AllNotFound,
 				},
-				&task.InvSetTask{
+				&task.DeleteOrUpdateInvTask{
 					TaskName:  "inventory-set-0",
 					InvClient: &inventory.FakeClient{},
 					InvInfo:   invInfo,
