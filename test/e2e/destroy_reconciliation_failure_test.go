@@ -61,20 +61,40 @@ func destroyReconciliationFailureTest(ctx context.Context, c client.Client, invC
 
 	options := apply.DestroyerOptions{
 		InventoryPolicy: inventory.PolicyAdoptIfNoInventory,
-		DeleteTimeout:   15 * time.Second, // one pod is expected to be not pruned, so set a shorter timeout
+		DeleteTimeout:   10 * time.Second, // one pod is expected to be not pruned, so set a short timeout
 	}
-	_ = e2eutil.RunCollect(destroyer.Run(ctx, inv, options))
+	// we should be able to run destroy multiple times and continue tracking the
+	// object in the inventory
+	expectedCounts := []struct {
+		specCount   int
+		statusCount int
+	}{
+		{
+			specCount:   1, // one object failed to reconcile, so is retained
+			statusCount: 2, // status for two objects, one deleted successfully
+		},
+		{
+			specCount:   1,
+			statusCount: 1, // only one object in inventory now, still failing to reconcile
+		},
+		{
+			specCount:   1,
+			statusCount: 1,
+		},
+	}
+	for _, ec := range expectedCounts {
+		_ = e2eutil.RunCollect(destroyer.Run(ctx, inv, options))
 
-	By("Verify pod1 is deleted")
-	e2eutil.AssertUnstructuredDoesNotExist(ctx, c, podObject)
+		By("Verify pod1 is deleted")
+		e2eutil.AssertUnstructuredDoesNotExist(ctx, c, podObject)
 
-	By("Verify podWithFinalizerObject is not deleted but has deletion timestamp")
-	podWithFinalizerObject = e2eutil.AssertHasDeletionTimestamp(ctx, c, podWithFinalizerObject)
+		By("Verify podWithFinalizerObject is not deleted but has deletion timestamp")
+		podWithFinalizerObject = e2eutil.AssertHasDeletionTimestamp(ctx, c, podWithFinalizerObject)
 
-	By("Verify inventory")
-	// The inventory should still have the Pod with the finalizer.
-	invConfig.InvSizeVerifyFunc(ctx, c, inventoryName, namespaceName, inventoryID, 0, 2)
-
+		By("Verify inventory")
+		// The inventory should still have the Pod with the finalizer.
+		invConfig.InvSizeVerifyFunc(ctx, c, inventoryName, namespaceName, inventoryID, ec.specCount, ec.statusCount)
+	}
 	// remove the finalizer
 	podWithFinalizerObject = e2eutil.WithoutFinalizers(podWithFinalizerObject)
 	e2eutil.ApplyUnstructured(ctx, c, podWithFinalizerObject)
