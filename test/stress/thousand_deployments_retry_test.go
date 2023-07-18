@@ -46,7 +46,7 @@ func thousandDeploymentsRetryTest(ctx context.Context, c client.Client, invConfi
 		deploymentObj.SetNamespace(namespaceName)
 
 		// change name & selector labels to avoid overlap between deployments
-		name := fmt.Sprintf("nginx-%d", i)
+		name := fmt.Sprintf("pause-%d", i)
 		deploymentObj.SetName(name)
 		err := unstructured.SetNestedField(deploymentObj.Object, name, "spec", "selector", "matchLabels", "app")
 		Expect(err).ToNot(HaveOccurred())

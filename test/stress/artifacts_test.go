@@ -76,19 +76,17 @@ spec:
   replicas: 1
   selector:
     matchLabels:
-      app: nginx
+      app: pause
   template:
     metadata:
       labels:
-        app: nginx
+        app: pause
     spec:
       containers:
-      - name: nginx
-        image: nginx:1.19.6
-        ports:
-        - containerPort: 80
+      - name: kubernetes-pause
+        image: registry.k8s.io/pause:2.0
         resources:
           requests:
-            cpu: 10m
+            cpu: 1m
             memory: 1Mi
 `
