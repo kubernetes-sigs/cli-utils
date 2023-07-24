@@ -169,11 +169,12 @@ func TestInvSetTask(t *testing.T) {
 			resourceCache := cache.NewResourceCacheMap()
 			context := taskrunner.NewTaskContext(eventChannel, resourceCache)
 
-			task := InvSetTask{
+			task := DeleteOrUpdateInvTask{
 				TaskName:      taskName,
 				InvClient:     client,
 				InvInfo:       nil,
 				PrevInventory: tc.prevInventory,
+				Destroy:       false,
 			}
 			im := context.InventoryManager()
 			for _, applyObj := range tc.appliedObjs {

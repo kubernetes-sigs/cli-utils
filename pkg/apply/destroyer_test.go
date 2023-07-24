@@ -292,7 +292,7 @@ func TestDestroyerCancel(t *testing.T) {
 					EventType: event.ActionGroupType,
 					ActionGroupEvent: &testutil.ExpActionGroupEvent{
 						Action:    event.InventoryAction,
-						GroupName: "delete-inventory-0",
+						GroupName: "inventory-delete-or-update-0",
 						Type:      event.Started,
 					},
 				},
@@ -301,7 +301,7 @@ func TestDestroyerCancel(t *testing.T) {
 					EventType: event.ActionGroupType,
 					ActionGroupEvent: &testutil.ExpActionGroupEvent{
 						Action:    event.InventoryAction,
-						GroupName: "delete-inventory-0",
+						GroupName: "inventory-delete-or-update-0",
 						Type:      event.Finished,
 					},
 				},

@@ -269,7 +269,7 @@ func dryRunTest(ctx context.Context, c client.Client, invConfig invconfig.Invent
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
 				Action:    event.InventoryAction,
-				GroupName: "delete-inventory-0",
+				GroupName: "inventory-delete-or-update-0",
 				Type:      event.Started,
 			},
 		},
@@ -278,7 +278,7 @@ func dryRunTest(ctx context.Context, c client.Client, invConfig invconfig.Invent
 			EventType: event.ActionGroupType,
 			ActionGroupEvent: &testutil.ExpActionGroupEvent{
 				Action:    event.InventoryAction,
-				GroupName: "delete-inventory-0",
+				GroupName: "inventory-delete-or-update-0",
 				Type:      event.Finished,
 			},
 		},
