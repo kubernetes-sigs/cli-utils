@@ -29,15 +29,18 @@ func TestInvSetTask(t *testing.T) {
 	idInvalid := object.UnstructuredToObjMetadata(objInvalid)
 
 	tests := map[string]struct {
-		prevInventory  object.ObjMetadataSet
-		appliedObjs    object.ObjMetadataSet
-		failedApplies  object.ObjMetadataSet
-		failedDeletes  object.ObjMetadataSet
-		skippedApplies object.ObjMetadataSet
-		skippedDeletes object.ObjMetadataSet
-		abandonedObjs  object.ObjMetadataSet
-		invalidObjs    object.ObjMetadataSet
-		expectedObjs   object.ObjMetadataSet
+		prevInventory     object.ObjMetadataSet
+		appliedObjs       object.ObjMetadataSet
+		deletedObjs       object.ObjMetadataSet
+		failedApplies     object.ObjMetadataSet
+		failedDeletes     object.ObjMetadataSet
+		skippedApplies    object.ObjMetadataSet
+		skippedDeletes    object.ObjMetadataSet
+		failedReconciles  object.ObjMetadataSet
+		timeoutReconciles object.ObjMetadataSet
+		abandonedObjs     object.ObjMetadataSet
+		invalidObjs       object.ObjMetadataSet
+		expectedObjs      object.ObjMetadataSet
 	}{
 		"no apply objs, no prune failures; no inventory": {
 			expectedObjs: object.ObjMetadataSet{},
@@ -160,6 +163,30 @@ func TestInvSetTask(t *testing.T) {
 			invalidObjs:   object.ObjMetadataSet{idInvalid},
 			expectedObjs:  object.ObjMetadataSet{id3},
 		},
+		"applied object failed to reconcile": {
+			prevInventory:    object.ObjMetadataSet{},
+			appliedObjs:      object.ObjMetadataSet{id3},
+			failedReconciles: object.ObjMetadataSet{id3},
+			expectedObjs:     object.ObjMetadataSet{id3},
+		},
+		"deleted object failed to reconcile": {
+			prevInventory:    object.ObjMetadataSet{id3},
+			deletedObjs:      object.ObjMetadataSet{id3},
+			failedReconciles: object.ObjMetadataSet{id3},
+			expectedObjs:     object.ObjMetadataSet{id3},
+		},
+		"applied object timed out to reconcile": {
+			prevInventory:     object.ObjMetadataSet{},
+			appliedObjs:       object.ObjMetadataSet{id3},
+			timeoutReconciles: object.ObjMetadataSet{id3},
+			expectedObjs:      object.ObjMetadataSet{id3},
+		},
+		"deleted object timed out to reconcile": {
+			prevInventory:     object.ObjMetadataSet{id3},
+			deletedObjs:       object.ObjMetadataSet{id3},
+			timeoutReconciles: object.ObjMetadataSet{id3},
+			expectedObjs:      object.ObjMetadataSet{id3},
+		},
 	}
 
 	for name, tc := range tests {
@@ -180,6 +207,9 @@ func TestInvSetTask(t *testing.T) {
 			for _, applyObj := range tc.appliedObjs {
 				im.AddSuccessfulApply(applyObj, "unusued-uid", int64(0))
 			}
+			for _, deleteObj := range tc.deletedObjs {
+				im.AddSuccessfulDelete(deleteObj, "unused-uid")
+			}
 			for _, applyFailure := range tc.failedApplies {
 				im.AddFailedApply(applyFailure)
 			}
@@ -197,6 +227,16 @@ func TestInvSetTask(t *testing.T) {
 			}
 			for _, invalidObj := range tc.invalidObjs {
 				context.AddInvalidObject(invalidObj)
+			}
+			for _, failedReconcile := range tc.failedReconciles {
+				if err := im.SetFailedReconcile(failedReconcile); err != nil {
+					t.Fatal(err)
+				}
+			}
+			for _, timeoutReconcile := range tc.timeoutReconciles {
+				if err := im.SetTimeoutReconcile(timeoutReconcile); err != nil {
+					t.Fatal(err)
+				}
 			}
 			if taskName != task.Name() {
 				t.Errorf("expected task name (%s), got (%s)", taskName, task.Name())

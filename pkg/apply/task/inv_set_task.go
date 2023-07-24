@@ -131,6 +131,18 @@ func (i *DeleteOrUpdateInvTask) updateInventory(taskContext *taskrunner.TaskCont
 	klog.V(4).Infof("keep in inventory %d skipped prunes", len(pruneSkips))
 	invObjs = invObjs.Union(pruneSkips)
 
+	// If an object failed to reconcile and was previously stored in the inventory,
+	// then keep it in the inventory so it can be waited on next time.
+	reconcileFailures := i.PrevInventory.Intersection(im.FailedReconciles())
+	klog.V(4).Infof("set inventory %d failed reconciles", len(reconcileFailures))
+	invObjs = invObjs.Union(reconcileFailures)
+
+	// If an object timed out reconciling and was previously stored in the inventory,
+	// then keep it in the inventory so it can be waited on next time.
+	reconcileTimeouts := i.PrevInventory.Intersection(im.TimeoutReconciles())
+	klog.V(4).Infof("keep in inventory %d timeout reconciles", len(reconcileTimeouts))
+	invObjs = invObjs.Union(reconcileTimeouts)
+
 	// If an object is abandoned, then remove it from the inventory.
 	abandonedObjects := taskContext.AbandonedObjects()
 	klog.V(4).Infof("remove from inventory %d abandoned objects", len(abandonedObjects))

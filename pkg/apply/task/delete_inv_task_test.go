@@ -8,7 +8,6 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"sigs.k8s.io/cli-utils/pkg/apis/actuation"
 	"sigs.k8s.io/cli-utils/pkg/apply/cache"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
@@ -24,6 +23,7 @@ func TestDeleteInvTask(t *testing.T) {
 	id3 := object.UnstructuredToObjMetadata(obj3)
 	testCases := map[string]struct {
 		prevInventory     object.ObjMetadataSet
+		deletedObjs       object.ObjMetadataSet
 		failedDeletes     object.ObjMetadataSet
 		failedReconciles  object.ObjMetadataSet
 		timeoutReconciles object.ObjMetadataSet
@@ -54,6 +54,7 @@ func TestDeleteInvTask(t *testing.T) {
 		},
 		"inventory is updated instead of deleted in case of reconcile failure": {
 			prevInventory:    object.ObjMetadataSet{id1, id2, id3},
+			deletedObjs:      object.ObjMetadataSet{id1, id2, id3},
 			failedReconciles: object.ObjMetadataSet{id1},
 			err:              nil,
 			isError:          false,
@@ -61,6 +62,7 @@ func TestDeleteInvTask(t *testing.T) {
 		},
 		"inventory is updated instead of deleted in case of reconcile timeout": {
 			prevInventory:     object.ObjMetadataSet{id1, id2, id3},
+			deletedObjs:       object.ObjMetadataSet{id1, id2, id3},
 			timeoutReconciles: object.ObjMetadataSet{id1},
 			err:               nil,
 			isError:           false,
@@ -68,6 +70,7 @@ func TestDeleteInvTask(t *testing.T) {
 		},
 		"inventory is updated instead of deleted in case of pruning/reconcile failure": {
 			prevInventory:    object.ObjMetadataSet{id1, id2, id3},
+			deletedObjs:      object.ObjMetadataSet{id1, id2, id3},
 			failedReconciles: object.ObjMetadataSet{id1},
 			failedDeletes:    object.ObjMetadataSet{id2},
 			err:              nil,
@@ -82,34 +85,20 @@ func TestDeleteInvTask(t *testing.T) {
 			eventChannel := make(chan event.Event)
 			resourceCache := cache.NewResourceCacheMap()
 			context := taskrunner.NewTaskContext(eventChannel, resourceCache)
+			im := context.InventoryManager()
+			for _, deleteObj := range tc.deletedObjs {
+				im.AddSuccessfulDelete(deleteObj, "unused-uid")
+			}
 			for _, failedDelete := range tc.failedDeletes {
-				context.InventoryManager().AddFailedDelete(failedDelete)
+				im.AddFailedDelete(failedDelete)
 			}
 			for _, failedReconcile := range tc.failedReconciles {
-				context.InventoryManager().SetObjectStatus(actuation.ObjectStatus{
-					ObjectReference: actuation.ObjectReference{
-						Group:     failedReconcile.GroupKind.Group,
-						Kind:      failedReconcile.GroupKind.Kind,
-						Name:      failedReconcile.Name,
-						Namespace: failedReconcile.Namespace,
-					},
-				})
-				context.AddInvalidObject(failedReconcile)
-				if err := context.InventoryManager().SetFailedReconcile(failedReconcile); err != nil {
+				if err := im.SetFailedReconcile(failedReconcile); err != nil {
 					t.Fatal(err)
 				}
 			}
 			for _, timeoutReconcile := range tc.timeoutReconciles {
-				context.InventoryManager().SetObjectStatus(actuation.ObjectStatus{
-					ObjectReference: actuation.ObjectReference{
-						Group:     timeoutReconcile.GroupKind.Group,
-						Kind:      timeoutReconcile.GroupKind.Kind,
-						Name:      timeoutReconcile.Name,
-						Namespace: timeoutReconcile.Namespace,
-					},
-				})
-				context.AddInvalidObject(timeoutReconcile)
-				if err := context.InventoryManager().SetTimeoutReconcile(timeoutReconcile); err != nil {
+				if err := im.SetTimeoutReconcile(timeoutReconcile); err != nil {
 					t.Fatal(err)
 				}
 			}
