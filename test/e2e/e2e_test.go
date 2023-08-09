@@ -13,6 +13,7 @@ import (
 	"github.com/onsi/gomega/format"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/scheme"
 	"sigs.k8s.io/cli-utils/test/e2e/e2eutil"
@@ -67,7 +68,9 @@ var _ = BeforeSuite(func() {
 	inventoryConfigs[ConfigMapTypeInvConfig] = invconfig.NewConfigMapTypeInvConfig(cfg)
 	inventoryConfigs[CustomTypeInvConfig] = invconfig.NewCustomTypeInvConfig(cfg)
 
-	mapper, err := apiutil.NewDynamicRESTMapper(cfg)
+	httpClient, err := rest.HTTPClientFor(cfg)
+	Expect(err).NotTo(HaveOccurred())
+	mapper, err := apiutil.NewDynamicRESTMapper(cfg, httpClient)
 	Expect(err).NotTo(HaveOccurred())
 
 	c, err = client.New(cfg, client.Options{

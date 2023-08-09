@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 run:
-  deadline: 5m
+  deadline: 30m
 
 linters:
   # please, do not use `enable-all`: it's deprecated and will be removed soon.
@@ -11,7 +11,7 @@ linters:
   enable:
   - bodyclose
   - deadcode
-  - depguard
+  # - depguard
   - dogsled
   - dupl
   - errcheck

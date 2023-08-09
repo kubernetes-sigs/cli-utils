@@ -8,7 +8,6 @@ import (
 
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/cmd/diff"
 	"k8s.io/kubectl/pkg/cmd/util"
@@ -83,8 +82,6 @@ func Initialize(o *diff.DiffOptions, f util.Factory, args []string) (func(), err
 	if err != nil {
 		return cleanupFunc, err
 	}
-
-	o.DryRunVerifier = resource.NewQueryParamVerifier(o.DynamicClient, f.OpenAPIGetter(), resource.QueryParamDryRun)
 
 	o.CmdNamespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
