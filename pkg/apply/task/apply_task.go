@@ -59,6 +59,7 @@ type ApplyTask struct {
 	Mutators          []mutator.Interface
 	DryRunStrategy    common.DryRunStrategy
 	ServerSideOptions common.ServerSideOptions
+	MarkAsReconciled  bool
 }
 
 // applyOptionsFactoryFunc is a factory function for creating a new
@@ -176,6 +177,14 @@ func (a *ApplyTask) Start(taskContext *taskrunner.TaskContext) {
 					uid := acc.GetUID()
 					gen := acc.GetGeneration()
 					taskContext.InventoryManager().AddSuccessfulApply(id, uid, gen)
+
+					if a.MarkAsReconciled {
+						err := taskContext.InventoryManager().SetSuccessfulReconcile(id)
+						if err != nil {
+							// should never get here as we just applied the object
+							klog.Errorf("Failed to mark object as successful reconcile: %v", err)
+						}
+					}
 				}
 			}
 		}

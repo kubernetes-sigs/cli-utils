@@ -6,6 +6,7 @@ package task
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
+
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/filter"
 	"sigs.k8s.io/cli-utils/pkg/apply/prune"
@@ -27,7 +28,8 @@ type PruneTask struct {
 	PropagationPolicy metav1.DeletionPropagation
 	// True if we are destroying, which deletes the inventory object
 	// as well (possibly) the inventory namespace.
-	Destroy bool
+	Destroy          bool
+	MarkAsReconciled bool
 }
 
 func (p *PruneTask) Name() string {
@@ -69,6 +71,7 @@ func (p *PruneTask) Start(taskContext *taskrunner.TaskContext) {
 				DryRunStrategy:    p.DryRunStrategy,
 				PropagationPolicy: p.PropagationPolicy,
 				Destroy:           p.Destroy,
+				MarkAsReconciled:  p.MarkAsReconciled,
 			},
 		)
 		klog.V(2).Infof("prune task completing (name: %q)", p.Name())

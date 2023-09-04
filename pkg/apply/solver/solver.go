@@ -23,6 +23,7 @@ import (
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/klog/v2"
+
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/filter"
 	"sigs.k8s.io/cli-utils/pkg/apply/info"
@@ -98,6 +99,9 @@ type Options struct {
 	PrunePropagationPolicy metav1.DeletionPropagation
 	PruneTimeout           time.Duration
 	InventoryPolicy        inventory.Policy
+
+	// Set as true to skip wait/reconciliation tasks
+	SkipReconciliation bool
 }
 
 // WithInventory sets the inventory info and returns the builder for chaining.
@@ -179,7 +183,7 @@ func (t *TaskQueueBuilder) Build(taskContext *taskrunner.TaskContext, o Options)
 			tasks = append(tasks,
 				t.newApplyTask(applySet, t.ApplyFilters, t.ApplyMutators, o))
 			// dry-run skips wait tasks
-			if !o.DryRunStrategy.ClientOrServerDryRun() {
+			if !o.DryRunStrategy.ClientOrServerDryRun() && !o.SkipReconciliation {
 				applyIds := object.UnstructuredSetToObjMetadataSet(applySet)
 				tasks = append(tasks,
 					t.newWaitTask(applyIds, taskrunner.AllCurrent, o.ReconcileTimeout))
@@ -203,7 +207,7 @@ func (t *TaskQueueBuilder) Build(taskContext *taskrunner.TaskContext, o Options)
 			tasks = append(tasks,
 				t.newPruneTask(pruneSet, t.PruneFilters, o))
 			// dry-run skips wait tasks
-			if !o.DryRunStrategy.ClientOrServerDryRun() {
+			if !o.DryRunStrategy.ClientOrServerDryRun() && !o.SkipReconciliation {
 				pruneIds := object.UnstructuredSetToObjMetadataSet(pruneSet)
 				tasks = append(tasks,
 					t.newWaitTask(pruneIds, taskrunner.AllNotFound, o.PruneTimeout))
@@ -244,6 +248,7 @@ func (t *TaskQueueBuilder) newApplyTask(applyObjs object.UnstructuredSet,
 		Mutators:          applyMutators,
 		ServerSideOptions: o.ServerSideOptions,
 		DryRunStrategy:    o.DryRunStrategy,
+		MarkAsReconciled:  o.SkipReconciliation,
 		DynamicClient:     t.DynamicClient,
 		OpenAPIGetter:     t.OpenAPIGetter,
 		InfoHelper:        t.InfoHelper,
@@ -283,6 +288,7 @@ func (t *TaskQueueBuilder) newPruneTask(pruneObjs object.UnstructuredSet,
 		Pruner:            t.Pruner,
 		PropagationPolicy: o.PrunePropagationPolicy,
 		DryRunStrategy:    o.DryRunStrategy,
+		MarkAsReconciled:  o.SkipReconciliation,
 		Destroy:           o.Destroy,
 	}
 	t.pruneCounter++

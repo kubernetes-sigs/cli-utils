@@ -22,6 +22,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/cmd/util"
+
 	"sigs.k8s.io/cli-utils/pkg/apply/filter"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
 	"sigs.k8s.io/cli-utils/pkg/common"
@@ -68,6 +69,9 @@ type Options struct {
 	// True if we are destroying, which deletes the inventory object
 	// as well (possibly) the inventory namespace.
 	Destroy bool
+
+	// MarkAsReconciled defines whether objects should be automatically marked as reconciled
+	MarkAsReconciled bool
 }
 
 // Prune deletes the set of passed objects. A prune skip/failure is
@@ -202,6 +206,13 @@ func (p *Pruner) Prune(
 		}
 		taskContext.InventoryManager().AddSuccessfulDelete(id, obj.GetUID())
 		taskContext.SendEvent(eventFactory.CreateSuccessEvent(obj))
+		if opts.MarkAsReconciled {
+			err := taskContext.InventoryManager().SetSuccessfulReconcile(id)
+			if err != nil {
+				// should never get here as we just applied the object
+				klog.Errorf("Failed to mark object as successfully reconcile: %v", err)
+			}
+		}
 	}
 	return nil
 }

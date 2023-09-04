@@ -189,6 +189,7 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.Info, objects objec
 			PrunePropagationPolicy: options.PrunePropagationPolicy,
 			PruneTimeout:           options.PruneTimeout,
 			InventoryPolicy:        options.InventoryPolicy,
+			SkipReconciliation:     options.SkipReconciliation,
 		}
 
 		// Build the ordered set of tasks to execute.
@@ -293,6 +294,9 @@ type ApplierOptions struct {
 	// RESTScopeStrategy specifies which strategy to use when listing and
 	// watching resources. By default, the strategy is selected automatically.
 	WatcherRESTScopeStrategy watcher.RESTScopeStrategy
+
+	// SkipReconciliation defines whether wait/reconciliation tasks should be skipped
+	SkipReconciliation bool
 }
 
 // setDefaults set the options to the default values if they
