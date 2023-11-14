@@ -422,7 +422,7 @@ func podConditions(u *unstructured.Unstructured) (*Result, error) {
 		}, nil
 	case "Failed":
 		return &Result{
-			Status:     CurrentStatus,
+			Status:     FailedStatus,
 			Message:    "Pod has completed, but not successfully",
 			Conditions: []Condition{},
 		}, nil
