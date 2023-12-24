@@ -76,6 +76,19 @@ func TestLookupResource(t *testing.T) {
 			expectErr:          true,
 			expectedErrMessage: context.Canceled.Error(),
 		},
+		"rate would exceed context deadline": {
+			identifier:         deploymentIdentifier,
+			readerErr:          fmt.Errorf("client rate limiter Wait returned an error: %w", fmt.Errorf("rate: Wait(n=1) would exceed context deadline")),
+			expectErr:          true,
+			expectedErrMessage: "client rate limiter Wait returned an error: rate: Wait(n=1) would exceed context deadline",
+		},
+		"rate would exceed context deadline wrapped error": {
+			identifier: deploymentIdentifier,
+			readerErr: fmt.Errorf("wrapped deeper: %w",
+				fmt.Errorf("client rate limiter Wait returned an error: %w", fmt.Errorf("rate: Wait(n=1) would exceed context deadline"))),
+			expectErr:          true,
+			expectedErrMessage: "wrapped deeper: client rate limiter Wait returned an error: rate: Wait(n=1) would exceed context deadline",
+		},
 	}
 
 	for tn, tc := range testCases {
