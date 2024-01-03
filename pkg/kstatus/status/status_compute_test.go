@@ -197,7 +197,7 @@ func TestPodStatus(t *testing.T) {
 		},
 		"podCompletedFailed": {
 			spec:               podCompletedFail,
-			expectedStatus:     CurrentStatus,
+			expectedStatus:     FailedStatus,
 			expectedConditions: []Condition{},
 			absentConditionTypes: []ConditionType{
 				ConditionReconciling,
