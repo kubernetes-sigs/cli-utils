@@ -15,6 +15,9 @@ const (
 	InventoryPolicyStrict     = "strict"
 	InventoryPolicyAdopt      = "adopt"
 	InventoryPolicyForceAdopt = "force-adopt"
+	StatusPolicyFlag          = "status-policy"
+	StatusPolicyAll           = "all"
+	StatusPolicyNone          = "none"
 )
 
 // ConvertPropagationPolicy converts a propagationPolicy described as a
@@ -44,6 +47,19 @@ func ConvertInventoryPolicy(policy string) (inventory.Policy, error) {
 	default:
 		return inventory.PolicyMustMatch, fmt.Errorf(
 			"inventory policy must be one of strict, adopt")
+	}
+}
+
+// ConvertStatusPolicy converts as status policy described as a string to a
+// StatusPolicy type that is passed into the Applier.
+func ConvertStatusPolicy(policy string) (inventory.StatusPolicy, error) {
+	switch policy {
+	case StatusPolicyNone:
+		return inventory.StatusPolicyNone, nil
+	case StatusPolicyAll:
+		return inventory.StatusPolicyAll, nil
+	default:
+		return inventory.StatusPolicyAll, fmt.Errorf("status policy must be one of none, all")
 	}
 }
 
