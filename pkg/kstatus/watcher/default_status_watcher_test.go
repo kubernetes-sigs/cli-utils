@@ -5,6 +5,7 @@ package watcher
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -13,6 +14,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/yaml"
@@ -32,6 +35,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: nginx
+  namespace: ns-1
   generation: 1
 spec:
   replicas: 1
@@ -55,6 +59,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: nginx
+  namespace: ns-1
   generation: 1
 spec:
   replicas: 1
@@ -93,6 +98,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: nginx
+  namespace: ns-1
   generation: 1
 spec:
   replicas: 1
@@ -131,6 +137,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: nginx
+  namespace: ns-1
   generation: 1
 spec:
   replicas: 1
@@ -169,6 +176,7 @@ apiVersion: apps/v1
 kind: ReplicaSet
 metadata:
   name: nginx-1
+  namespace: ns-1
   generation: 1
   labels:
     app: nginx
@@ -184,6 +192,7 @@ apiVersion: apps/v1
 kind: ReplicaSet
 metadata:
   name: nginx-1
+  namespace: ns-1
   generation: 1
   labels:
     app: nginx
@@ -205,6 +214,7 @@ apiVersion: apps/v1
 kind: ReplicaSet
 metadata:
   name: nginx-1
+  namespace: ns-1
   generation: 1
   labels:
     app: nginx
@@ -226,6 +236,7 @@ apiVersion: apps/v1
 kind: ReplicaSet
 metadata:
   name: nginx-1
+  namespace: ns-1
   generation: 1
   labels:
     app: nginx
@@ -248,6 +259,7 @@ kind: Pod
 metadata:
   generation: 1
   name: test
+  namespace: ns-1
   labels:
     app: nginx
 `
@@ -258,6 +270,7 @@ kind: Pod
 metadata:
   generation: 1
   name: test
+  namespace: ns-1
   labels:
     app: nginx
 status:
@@ -299,9 +312,9 @@ func TestDefaultStatusWatcher(t *testing.T) {
 		appsv1.SchemeGroupVersion.WithKind("ReplicaSet"),
 		v1.SchemeGroupVersion.WithKind("Pod"),
 	)
-	deployment1GVR := getGVR(t, fakeMapper, deployment1)
-	replicaset1GVR := getGVR(t, fakeMapper, replicaset1)
-	pod1GVR := getGVR(t, fakeMapper, pod1)
+	deploymentGVR := getGVR(t, fakeMapper, deployment1)
+	replicasetGVR := getGVR(t, fakeMapper, replicaset1)
+	podGVR := getGVR(t, fakeMapper, pod1)
 
 	// namespace2 := "ns-2"
 	// namespace3 := "ns-3"
@@ -310,24 +323,49 @@ func TestDefaultStatusWatcher(t *testing.T) {
 	pod2.SetNamespace("ns-2")
 	pod2.SetName("pod-2")
 	pod2ID := object.UnstructuredToObjMetadata(pod2)
+
 	pod2Current := yamlToUnstructured(t, pod1CurrentYaml)
 	pod2Current.SetNamespace("ns-2")
 	pod2Current.SetName("pod-2")
-	pod2GVR := getGVR(t, fakeMapper, pod2)
 
 	pod3 := pod1.DeepCopy()
 	pod3.SetNamespace("ns-3")
 	pod3.SetName("pod-3")
 	pod3ID := object.UnstructuredToObjMetadata(pod3)
+
 	pod3Current := yamlToUnstructured(t, pod1CurrentYaml)
 	pod3Current.SetNamespace("ns-3")
 	pod3Current.SetName("pod-3")
-	pod3GVR := getGVR(t, fakeMapper, pod3)
+
+	// nodeName is a valid server-side field selector
+	// https://kubernetes.io/docs/concepts/overview/working-with-objects/field-selectors/#supported-fields
+	nodeNameFieldPath := "spec.nodeName"
+	nodeNameFieldPathKeys := strings.Split(nodeNameFieldPath, ".")
+	nodeNameValue := "example-node"
+	require.NoError(t, unstructured.SetNestedField(pod3.Object, nodeNameValue, nodeNameFieldPathKeys...))
+	require.NoError(t, unstructured.SetNestedField(pod3Current.Object, nodeNameValue, nodeNameFieldPathKeys...))
+
+	pod4 := pod1.DeepCopy()
+	pod4.SetNamespace("ns-4")
+	pod4.SetName("pod-4")
+	pod4ID := object.UnstructuredToObjMetadata(pod4)
+
+	labelKey := "example-key-1"
+	labelValue := "example-value-1"
+	pod4Labels := pod4.GetLabels()
+	pod4Labels[labelKey] = labelValue
+	pod4.SetLabels(pod4Labels)
+
+	pod4Current := yamlToUnstructured(t, pod1CurrentYaml)
+	pod4Current.SetNamespace("ns-4")
+	pod4Current.SetName("pod-4")
+	pod4Current.SetLabels(pod4Labels)
 
 	testCases := []struct {
 		name           string
 		ids            object.ObjMetadataSet
 		opts           Options
+		filters        *Filters
 		clusterUpdates []func(*dynamicfake.FakeDynamicClient)
 		expectedEvents []event.Event
 	}{
@@ -341,10 +379,10 @@ func TestDefaultStatusWatcher(t *testing.T) {
 					// Empty cluster before synchronization.
 				},
 				func(fakeClient *dynamicfake.FakeDynamicClient) {
-					require.NoError(t, fakeClient.Tracker().Create(pod1GVR, pod1, pod1.GetNamespace()))
+					require.NoError(t, fakeClient.Tracker().Create(podGVR, pod1, pod1.GetNamespace()))
 				},
 				func(fakeClient *dynamicfake.FakeDynamicClient) {
-					require.NoError(t, fakeClient.Tracker().Update(pod1GVR, pod1Current, pod1Current.GetNamespace()))
+					require.NoError(t, fakeClient.Tracker().Update(podGVR, pod1Current, pod1Current.GetNamespace()))
 				},
 			},
 			expectedEvents: []event.Event{
@@ -381,18 +419,18 @@ func TestDefaultStatusWatcher(t *testing.T) {
 					// Empty cluster before synchronization.
 				},
 				func(fakeClient *dynamicfake.FakeDynamicClient) {
-					require.NoError(t, fakeClient.Tracker().Create(replicaset1GVR, replicaset1, replicaset1.GetNamespace()))
+					require.NoError(t, fakeClient.Tracker().Create(replicasetGVR, replicaset1, replicaset1.GetNamespace()))
 				},
 				func(fakeClient *dynamicfake.FakeDynamicClient) {
-					require.NoError(t, fakeClient.Tracker().Update(replicaset1GVR, replicaset1InProgress1, replicaset1InProgress1.GetNamespace()))
+					require.NoError(t, fakeClient.Tracker().Update(replicasetGVR, replicaset1InProgress1, replicaset1InProgress1.GetNamespace()))
 				},
 				func(fakeClient *dynamicfake.FakeDynamicClient) {
-					require.NoError(t, fakeClient.Tracker().Create(pod1GVR, pod1, pod1.GetNamespace()))
-					require.NoError(t, fakeClient.Tracker().Update(replicaset1GVR, replicaset1InProgress2, replicaset1InProgress2.GetNamespace()))
+					require.NoError(t, fakeClient.Tracker().Create(podGVR, pod1, pod1.GetNamespace()))
+					require.NoError(t, fakeClient.Tracker().Update(replicasetGVR, replicaset1InProgress2, replicaset1InProgress2.GetNamespace()))
 				},
 				func(fakeClient *dynamicfake.FakeDynamicClient) {
-					require.NoError(t, fakeClient.Tracker().Update(pod1GVR, pod1Current, pod1Current.GetNamespace()))
-					require.NoError(t, fakeClient.Tracker().Update(replicaset1GVR, replicaset1Current, replicaset1Current.GetNamespace()))
+					require.NoError(t, fakeClient.Tracker().Update(podGVR, pod1Current, pod1Current.GetNamespace()))
+					require.NoError(t, fakeClient.Tracker().Update(replicasetGVR, replicaset1Current, replicaset1Current.GetNamespace()))
 				},
 			},
 			expectedEvents: []event.Event{
@@ -463,22 +501,22 @@ func TestDefaultStatusWatcher(t *testing.T) {
 					// Empty cluster before synchronization.
 				},
 				func(fakeClient *dynamicfake.FakeDynamicClient) {
-					require.NoError(t, fakeClient.Tracker().Create(deployment1GVR, deployment1, deployment1.GetNamespace()))
+					require.NoError(t, fakeClient.Tracker().Create(deploymentGVR, deployment1, deployment1.GetNamespace()))
 				},
 				func(fakeClient *dynamicfake.FakeDynamicClient) {
-					require.NoError(t, fakeClient.Tracker().Create(replicaset1GVR, replicaset1, replicaset1.GetNamespace()))
-					require.NoError(t, fakeClient.Tracker().Update(replicaset1GVR, replicaset1InProgress1, replicaset1InProgress1.GetNamespace()))
-					require.NoError(t, fakeClient.Tracker().Update(deployment1GVR, deployment1InProgress1, deployment1InProgress1.GetNamespace()))
+					require.NoError(t, fakeClient.Tracker().Create(replicasetGVR, replicaset1, replicaset1.GetNamespace()))
+					require.NoError(t, fakeClient.Tracker().Update(replicasetGVR, replicaset1InProgress1, replicaset1InProgress1.GetNamespace()))
+					require.NoError(t, fakeClient.Tracker().Update(deploymentGVR, deployment1InProgress1, deployment1InProgress1.GetNamespace()))
 				},
 				func(fakeClient *dynamicfake.FakeDynamicClient) {
-					require.NoError(t, fakeClient.Tracker().Create(pod1GVR, pod1, pod1.GetNamespace()))
-					require.NoError(t, fakeClient.Tracker().Update(replicaset1GVR, replicaset1InProgress2, replicaset1InProgress2.GetNamespace()))
-					require.NoError(t, fakeClient.Tracker().Update(deployment1GVR, deployment1InProgress2, deployment1InProgress2.GetNamespace()))
+					require.NoError(t, fakeClient.Tracker().Create(podGVR, pod1, pod1.GetNamespace()))
+					require.NoError(t, fakeClient.Tracker().Update(replicasetGVR, replicaset1InProgress2, replicaset1InProgress2.GetNamespace()))
+					require.NoError(t, fakeClient.Tracker().Update(deploymentGVR, deployment1InProgress2, deployment1InProgress2.GetNamespace()))
 				},
 				func(fakeClient *dynamicfake.FakeDynamicClient) {
-					require.NoError(t, fakeClient.Tracker().Update(pod1GVR, pod1Current, pod1Current.GetNamespace()))
-					require.NoError(t, fakeClient.Tracker().Update(replicaset1GVR, replicaset1Current, replicaset1Current.GetNamespace()))
-					require.NoError(t, fakeClient.Tracker().Update(deployment1GVR, deployment1Current, deployment1Current.GetNamespace()))
+					require.NoError(t, fakeClient.Tracker().Update(podGVR, pod1Current, pod1Current.GetNamespace()))
+					require.NoError(t, fakeClient.Tracker().Update(replicasetGVR, replicaset1Current, replicaset1Current.GetNamespace()))
+					require.NoError(t, fakeClient.Tracker().Update(deploymentGVR, deployment1Current, deployment1Current.GetNamespace()))
 				},
 			},
 			expectedEvents: []event.Event{
@@ -573,14 +611,14 @@ func TestDefaultStatusWatcher(t *testing.T) {
 					// Empty cluster before synchronization.
 				},
 				func(fakeClient *dynamicfake.FakeDynamicClient) {
-					require.NoError(t, fakeClient.Tracker().Create(pod1GVR, pod1Current, pod1Current.GetNamespace()))
-					require.NoError(t, fakeClient.Tracker().Create(replicaset1GVR, replicaset1Current, replicaset1Current.GetNamespace()))
-					require.NoError(t, fakeClient.Tracker().Create(deployment1GVR, deployment1Current, deployment1Current.GetNamespace()))
+					require.NoError(t, fakeClient.Tracker().Create(podGVR, pod1Current, pod1Current.GetNamespace()))
+					require.NoError(t, fakeClient.Tracker().Create(replicasetGVR, replicaset1Current, replicaset1Current.GetNamespace()))
+					require.NoError(t, fakeClient.Tracker().Create(deploymentGVR, deployment1Current, deployment1Current.GetNamespace()))
 				},
 				func(fakeClient *dynamicfake.FakeDynamicClient) {
-					require.NoError(t, fakeClient.Tracker().Delete(pod1GVR, pod1Current.GetNamespace(), pod1Current.GetName()))
-					require.NoError(t, fakeClient.Tracker().Delete(replicaset1GVR, replicaset1Current.GetNamespace(), replicaset1Current.GetName()))
-					require.NoError(t, fakeClient.Tracker().Delete(deployment1GVR, deployment1Current.GetNamespace(), deployment1Current.GetName()))
+					require.NoError(t, fakeClient.Tracker().Delete(podGVR, pod1Current.GetNamespace(), pod1Current.GetName()))
+					require.NoError(t, fakeClient.Tracker().Delete(replicasetGVR, replicaset1Current.GetNamespace(), replicaset1Current.GetName()))
+					require.NoError(t, fakeClient.Tracker().Delete(deploymentGVR, deployment1Current.GetNamespace(), deployment1Current.GetName()))
 				},
 			},
 			expectedEvents: []event.Event{
@@ -637,16 +675,16 @@ func TestDefaultStatusWatcher(t *testing.T) {
 					// Empty cluster before synchronization.
 				},
 				func(fakeClient *dynamicfake.FakeDynamicClient) {
-					require.NoError(t, fakeClient.Tracker().Create(pod2GVR, pod2, pod2.GetNamespace()))
+					require.NoError(t, fakeClient.Tracker().Create(podGVR, pod2, pod2.GetNamespace()))
 				},
 				func(fakeClient *dynamicfake.FakeDynamicClient) {
-					require.NoError(t, fakeClient.Tracker().Create(pod3GVR, pod3, pod3.GetNamespace()))
+					require.NoError(t, fakeClient.Tracker().Create(podGVR, pod3, pod3.GetNamespace()))
 				},
 				func(fakeClient *dynamicfake.FakeDynamicClient) {
-					require.NoError(t, fakeClient.Tracker().Update(pod2GVR, pod2Current, pod2Current.GetNamespace()))
+					require.NoError(t, fakeClient.Tracker().Update(podGVR, pod2Current, pod2Current.GetNamespace()))
 				},
 				func(fakeClient *dynamicfake.FakeDynamicClient) {
-					require.NoError(t, fakeClient.Tracker().Update(pod3GVR, pod3Current, pod3Current.GetNamespace()))
+					require.NoError(t, fakeClient.Tracker().Update(podGVR, pod3Current, pod3Current.GetNamespace()))
 				},
 			},
 			expectedEvents: []event.Event{
@@ -705,16 +743,16 @@ func TestDefaultStatusWatcher(t *testing.T) {
 					// Empty cluster before synchronization.
 				},
 				func(fakeClient *dynamicfake.FakeDynamicClient) {
-					require.NoError(t, fakeClient.Tracker().Create(pod2GVR, pod2, pod2.GetNamespace()))
+					require.NoError(t, fakeClient.Tracker().Create(podGVR, pod2, pod2.GetNamespace()))
 				},
 				func(fakeClient *dynamicfake.FakeDynamicClient) {
-					require.NoError(t, fakeClient.Tracker().Create(pod3GVR, pod3, pod3.GetNamespace()))
+					require.NoError(t, fakeClient.Tracker().Create(podGVR, pod3, pod3.GetNamespace()))
 				},
 				func(fakeClient *dynamicfake.FakeDynamicClient) {
-					require.NoError(t, fakeClient.Tracker().Update(pod2GVR, pod2Current, pod2Current.GetNamespace()))
+					require.NoError(t, fakeClient.Tracker().Update(podGVR, pod2Current, pod2Current.GetNamespace()))
 				},
 				func(fakeClient *dynamicfake.FakeDynamicClient) {
-					require.NoError(t, fakeClient.Tracker().Update(pod3GVR, pod3Current, pod3Current.GetNamespace()))
+					require.NoError(t, fakeClient.Tracker().Update(podGVR, pod3Current, pod3Current.GetNamespace()))
 				},
 			},
 			expectedEvents: []event.Event{
@@ -773,16 +811,16 @@ func TestDefaultStatusWatcher(t *testing.T) {
 					// Empty cluster before synchronization.
 				},
 				func(fakeClient *dynamicfake.FakeDynamicClient) {
-					require.NoError(t, fakeClient.Tracker().Create(pod2GVR, pod2, pod2.GetNamespace()))
+					require.NoError(t, fakeClient.Tracker().Create(podGVR, pod2, pod2.GetNamespace()))
 				},
 				func(fakeClient *dynamicfake.FakeDynamicClient) {
-					require.NoError(t, fakeClient.Tracker().Create(pod3GVR, pod3, pod3.GetNamespace()))
+					require.NoError(t, fakeClient.Tracker().Create(podGVR, pod3, pod3.GetNamespace()))
 				},
 				func(fakeClient *dynamicfake.FakeDynamicClient) {
-					require.NoError(t, fakeClient.Tracker().Update(pod2GVR, pod2Current, pod2Current.GetNamespace()))
+					require.NoError(t, fakeClient.Tracker().Update(podGVR, pod2Current, pod2Current.GetNamespace()))
 				},
 				func(fakeClient *dynamicfake.FakeDynamicClient) {
-					require.NoError(t, fakeClient.Tracker().Update(pod3GVR, pod3Current, pod3Current.GetNamespace()))
+					require.NoError(t, fakeClient.Tracker().Update(podGVR, pod3Current, pod3Current.GetNamespace()))
 				},
 			},
 			expectedEvents: []event.Event{
@@ -827,6 +865,108 @@ func TestDefaultStatusWatcher(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "pod creation with label selector",
+			ids: object.ObjMetadataSet{
+				pod1ID, // no label
+				pod4ID, // label match
+			},
+			filters: &Filters{
+				Labels: labels.SelectorFromSet(labels.Set{
+					labelKey: labelValue,
+				}),
+			},
+			// FakeDynamicClient doesn't implement watch restrictions (labels or fields),
+			// so we have to fake a label selector by not sending those cluster updates.
+			// TODO: Update FakeDynamicClient (client-go) to support watch restrictions.
+			clusterUpdates: []func(fakeClient *dynamicfake.FakeDynamicClient){
+				func(fakeClient *dynamicfake.FakeDynamicClient) {
+					// Empty cluster before synchronization.
+				},
+				func(fakeClient *dynamicfake.FakeDynamicClient) {
+					// 	require.NoError(t, fakeClient.Tracker().Create(podGVR, pod1, pod1.GetNamespace()))
+					require.NoError(t, fakeClient.Tracker().Create(podGVR, pod4, pod4.GetNamespace()))
+				},
+				func(fakeClient *dynamicfake.FakeDynamicClient) {
+					// 	require.NoError(t, fakeClient.Tracker().Update(podGVR, pod1Current, pod1Current.GetNamespace()))
+					require.NoError(t, fakeClient.Tracker().Update(podGVR, pod4Current, pod4Current.GetNamespace()))
+				},
+			},
+			expectedEvents: []event.Event{
+				{
+					Type: event.SyncEvent,
+				},
+				{
+					Resource: &event.ResourceStatus{
+						Identifier:         pod4ID,
+						Status:             status.InProgressStatus,
+						Resource:           pod4,
+						Message:            "Pod phase not available",
+						GeneratedResources: nil,
+					},
+				},
+				{
+					Resource: &event.ResourceStatus{
+						Identifier:         pod4ID,
+						Status:             status.CurrentStatus,
+						Resource:           pod4Current,
+						Message:            "Pod is Ready",
+						GeneratedResources: nil,
+					},
+				},
+			},
+		},
+		{
+			name: "pod creation with field selector",
+			ids: object.ObjMetadataSet{
+				pod1ID, // no annotation
+				pod3ID, // annotation match
+			},
+			filters: &Filters{
+				Fields: fields.SelectorFromSet(fields.Set{
+					nodeNameFieldPath: nodeNameValue,
+				}),
+			},
+			// FakeDynamicClient doesn't implement watch restrictions (labels or fields),
+			// so we have to fake a label selector by not sending those cluster updates.
+			// TODO: Update FakeDynamicClient (client-go) to support watch restrictions.
+			clusterUpdates: []func(fakeClient *dynamicfake.FakeDynamicClient){
+				func(fakeClient *dynamicfake.FakeDynamicClient) {
+					// Empty cluster before synchronization.
+				},
+				func(fakeClient *dynamicfake.FakeDynamicClient) {
+					// require.NoError(t, fakeClient.Tracker().Create(podGVR, pod1, pod1.GetNamespace()))
+					require.NoError(t, fakeClient.Tracker().Create(podGVR, pod3, pod3.GetNamespace()))
+				},
+				func(fakeClient *dynamicfake.FakeDynamicClient) {
+					// require.NoError(t, fakeClient.Tracker().Update(podGVR, pod1Current, pod1Current.GetNamespace()))
+					require.NoError(t, fakeClient.Tracker().Update(podGVR, pod3Current, pod3Current.GetNamespace()))
+				},
+			},
+			expectedEvents: []event.Event{
+				{
+					Type: event.SyncEvent,
+				},
+				{
+					Resource: &event.ResourceStatus{
+						Identifier:         pod3ID,
+						Status:             status.InProgressStatus,
+						Resource:           pod3,
+						Message:            "Pod phase not available",
+						GeneratedResources: nil,
+					},
+				},
+				{
+					Resource: &event.ResourceStatus{
+						Identifier:         pod3ID,
+						Status:             status.CurrentStatus,
+						Resource:           pod3Current,
+						Message:            "Pod is Ready",
+						GeneratedResources: nil,
+					},
+				},
+			},
+		},
 	}
 
 	testTimeout := 10 * time.Second
@@ -851,6 +991,9 @@ func TestDefaultStatusWatcher(t *testing.T) {
 			})
 
 			statusWatcher := NewDefaultStatusWatcher(fakeClient, fakeMapper)
+			if tc.filters != nil {
+				statusWatcher.Filters = tc.filters
+			}
 			eventCh := statusWatcher.Watch(ctx, tc.ids, tc.opts)
 
 			nextCh := make(chan struct{})
@@ -858,12 +1001,12 @@ func TestDefaultStatusWatcher(t *testing.T) {
 
 			// Synchronize event consumption and production for predictable test results.
 			go func() {
-				for _, update := range tc.clusterUpdates {
-					<-nextCh
-					update(fakeClient)
-				}
-				// Wait for final event to be handled
+				// Wait for start event
 				<-nextCh
+				for _, update := range tc.clusterUpdates {
+					update(fakeClient)
+					<-nextCh
+				}
 				// Stop the watcher
 				cancel()
 			}()
