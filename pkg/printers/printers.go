@@ -4,7 +4,7 @@
 package printers
 
 import (
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/print/list"
 	"sigs.k8s.io/cli-utils/pkg/printers/events"
@@ -19,7 +19,7 @@ const (
 	JSONPrinter   = "json"
 )
 
-func GetPrinter(printerType string, ioStreams genericclioptions.IOStreams) printer.Printer {
+func GetPrinter(printerType string, ioStreams genericiooptions.IOStreams) printer.Printer {
 	switch printerType { //nolint:gocritic
 	case TablePrinter:
 		return &table.Printer{

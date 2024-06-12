@@ -7,7 +7,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/cmd/diff"
 	"k8s.io/kubectl/pkg/cmd/util"
@@ -20,7 +20,7 @@ const tmpDirPrefix = "diff-cmd"
 // NewCommand returns cobra command to implement client-side diff of package
 // directory. For each local config file, get the resource in the cluster
 // and diff the local config resource against the resource in the cluster.
-func NewCommand(f util.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+func NewCommand(f util.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
 	options := diff.NewDiffOptions(ioStreams)
 	cmd := &cobra.Command{
 		Use:                   "diff (DIRECTORY | STDIN)",

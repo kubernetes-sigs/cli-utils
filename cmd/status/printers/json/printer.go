@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"sigs.k8s.io/cli-utils/cmd/status/printers/printer"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/common"
@@ -24,12 +24,12 @@ import (
 // status information as a list of events as they happen.
 type Printer struct {
 	Formatter list.Formatter
-	IOStreams genericclioptions.IOStreams
+	IOStreams genericiooptions.IOStreams
 	Data      *printer.PrintData
 }
 
 // NewPrinter returns a new instance of the eventPrinter.
-func NewPrinter(ioStreams genericclioptions.IOStreams, printData *printer.PrintData) *Printer {
+func NewPrinter(ioStreams genericiooptions.IOStreams, printData *printer.PrintData) *Printer {
 	return &Printer{
 		Formatter: jsonprinter.NewFormatter(ioStreams, common.DryRunNone),
 		IOStreams: ioStreams,

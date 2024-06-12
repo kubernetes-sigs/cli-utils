@@ -7,6 +7,11 @@ import (
 	"context"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+	// Using gopkg.in/yaml.v3 instead of sigs.k8s.io/yaml on purpose.
+	// yaml.v3 correctly parses ints:
+	// https://github.com/kubernetes-sigs/yaml/issues/45
+	"gopkg.in/yaml.v3"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -18,13 +23,6 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/apply/cache"
 	ktestutil "sigs.k8s.io/cli-utils/pkg/kstatus/polling/testutil"
 	"sigs.k8s.io/cli-utils/pkg/object"
-
-	// Using gopkg.in/yaml.v3 instead of sigs.k8s.io/yaml on purpose.
-	// yaml.v3 correctly parses ints:
-	// https://github.com/kubernetes-sigs/yaml/issues/45
-	"gopkg.in/yaml.v3"
-
-	"github.com/stretchr/testify/require"
 )
 
 var expectedReason = "object contained annotation: config.kubernetes.io/apply-time-mutation"

@@ -7,14 +7,13 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/spyzhov/ajson"
 	// Using gopkg.in/yaml.v3 instead of sigs.k8s.io/yaml on purpose.
 	// yaml.v3 correctly parses ints:
 	// https://github.com/kubernetes-sigs/yaml/issues/45
 	// yaml.v3 Node is also used as input to yqlib.
 	"gopkg.in/yaml.v3"
 	"k8s.io/klog/v2"
-
-	"github.com/spyzhov/ajson"
 )
 
 // Get evaluates the JSONPath expression to extract values from the input map.

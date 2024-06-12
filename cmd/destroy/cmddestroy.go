@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"sigs.k8s.io/cli-utils/cmd/flagutils"
@@ -23,7 +23,7 @@ import (
 
 // GetRunner creates and returns the Runner which stores the cobra command.
 func GetRunner(factory cmdutil.Factory, invFactory inventory.ClientFactory,
-	loader manifestreader.ManifestLoader, ioStreams genericclioptions.IOStreams) *Runner {
+	loader manifestreader.ManifestLoader, ioStreams genericiooptions.IOStreams) *Runner {
 	r := &Runner{
 		ioStreams:  ioStreams,
 		factory:    factory,
@@ -57,14 +57,14 @@ func GetRunner(factory cmdutil.Factory, invFactory inventory.ClientFactory,
 
 // Command creates the Runner, returning the cobra command associated with it.
 func Command(f cmdutil.Factory, invFactory inventory.ClientFactory, loader manifestreader.ManifestLoader,
-	ioStreams genericclioptions.IOStreams) *cobra.Command {
+	ioStreams genericiooptions.IOStreams) *cobra.Command {
 	return GetRunner(f, invFactory, loader, ioStreams).Command
 }
 
 // Runner encapsulates data necessary to run the destroy command.
 type Runner struct {
 	Command    *cobra.Command
-	ioStreams  genericclioptions.IOStreams
+	ioStreams  genericiooptions.IOStreams
 	factory    cmdutil.Factory
 	invFactory inventory.ClientFactory
 	loader     manifestreader.ManifestLoader

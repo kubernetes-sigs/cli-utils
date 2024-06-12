@@ -4,7 +4,7 @@
 package printers
 
 import (
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"sigs.k8s.io/cli-utils/cmd/status/printers/event"
 	"sigs.k8s.io/cli-utils/cmd/status/printers/json"
 	"sigs.k8s.io/cli-utils/cmd/status/printers/printer"
@@ -13,7 +13,7 @@ import (
 
 // CreatePrinter return an implementation of the Printer interface. The
 // actual implementation is based on the printerType requested.
-func CreatePrinter(printerType string, ioStreams genericclioptions.IOStreams, printData *printer.PrintData) (printer.Printer, error) {
+func CreatePrinter(printerType string, ioStreams genericiooptions.IOStreams, printData *printer.PrintData) (printer.Printer, error) {
 	switch printerType {
 	case "table":
 		return table.NewPrinter(ioStreams, printData), nil

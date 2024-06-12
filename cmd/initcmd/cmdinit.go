@@ -5,7 +5,7 @@ package initcmd
 
 import (
 	"github.com/spf13/cobra"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"sigs.k8s.io/cli-utils/pkg/config"
@@ -19,7 +19,7 @@ type InitRunner struct {
 
 // GetInitRunner builds and returns the InitRunner. Connects the InitOptions.Run
 // to the cobra command.
-func GetInitRunner(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *InitRunner {
+func GetInitRunner(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *InitRunner {
 	io := config.NewInitOptions(f, ioStreams)
 	cmd := &cobra.Command{
 		Use:                   "init DIRECTORY",
@@ -42,6 +42,6 @@ func GetInitRunner(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *In
 }
 
 // NewCmdInit returns the cobra command for the init command.
-func NewCmdInit(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdInit(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
 	return GetInitRunner(f, ioStreams).Command
 }
