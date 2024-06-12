@@ -73,10 +73,7 @@ func Initialize(o *diff.DiffOptions, f util.Factory, args []string) (func(), err
 	}
 	o.FilenameOptions = filenameFlags.ToOptions()
 
-	o.OpenAPISchema, err = f.OpenAPISchema()
-	if err != nil {
-		return cleanupFunc, err
-	}
+	o.OpenAPIGetter = f
 
 	o.DynamicClient, err = f.DynamicClient()
 	if err != nil {
