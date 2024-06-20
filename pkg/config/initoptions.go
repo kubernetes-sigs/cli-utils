@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/cli-utils/pkg/common"
@@ -31,7 +31,7 @@ const (
 type InitOptions struct {
 	factory cmdutil.Factory
 
-	ioStreams genericclioptions.IOStreams
+	ioStreams genericiooptions.IOStreams
 	// Template string; must be a valid k8s resource.
 	Template string
 	// Package directory argument; must be valid directory.
@@ -42,7 +42,7 @@ type InitOptions struct {
 	InventoryID string
 }
 
-func NewInitOptions(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *InitOptions {
+func NewInitOptions(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *InitOptions {
 	return &InitOptions{
 		factory:   f,
 		ioStreams: ioStreams,

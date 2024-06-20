@@ -8,7 +8,7 @@ import (
 	"io"
 	"time"
 
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	printcommon "sigs.k8s.io/cli-utils/pkg/print/common"
@@ -16,7 +16,7 @@ import (
 )
 
 type Printer struct {
-	IOStreams genericclioptions.IOStreams
+	IOStreams genericiooptions.IOStreams
 }
 
 func (t *Printer) Print(ch <-chan event.Event, _ common.DryRunStrategy, _ bool) error {

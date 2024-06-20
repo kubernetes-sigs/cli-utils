@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/object"
@@ -17,7 +17,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/print/stats"
 )
 
-func NewFormatter(ioStreams genericclioptions.IOStreams,
+func NewFormatter(ioStreams genericiooptions.IOStreams,
 	_ common.DryRunStrategy) list.Formatter {
 	return &formatter{
 		ioStreams: ioStreams,
@@ -25,7 +25,7 @@ func NewFormatter(ioStreams genericclioptions.IOStreams,
 }
 
 type formatter struct {
-	ioStreams genericclioptions.IOStreams
+	ioStreams genericiooptions.IOStreams
 }
 
 func (ef *formatter) FormatValidationEvent(ve event.ValidationEvent) error {

@@ -13,6 +13,11 @@ import (
 
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
+
+	// This is here rather than in the libraries because of
+	// https://github.com/kubernetes-sigs/kustomize/issues/2060
+	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	"k8s.io/client-go/rest"
 	"k8s.io/component-base/cli"
 	"k8s.io/klog/v2"
@@ -26,10 +31,6 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/flowcontrol"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/manifestreader"
-
-	// This is here rather than in the libraries because of
-	// https://github.com/kubernetes-sigs/kustomize/issues/2060
-	_ "k8s.io/client-go/plugin/pkg/client/auth"
 )
 
 func main() {
@@ -55,7 +56,7 @@ func main() {
 	// Update ConfigFlags before subcommands run that talk to the server.
 	preRunE := newConfigFilerPreRunE(f, kubeConfigFlags)
 
-	ioStreams := genericclioptions.IOStreams{
+	ioStreams := genericiooptions.IOStreams{
 		In:     os.Stdin,
 		Out:    os.Stdout,
 		ErrOut: os.Stderr,

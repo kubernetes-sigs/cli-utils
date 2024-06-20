@@ -4,13 +4,13 @@
 package events
 
 import (
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/print/list"
 	"sigs.k8s.io/cli-utils/pkg/printers/printer"
 )
 
-func NewPrinter(ioStreams genericclioptions.IOStreams) printer.Printer {
+func NewPrinter(ioStreams genericiooptions.IOStreams) printer.Printer {
 	return &list.BaseListPrinter{
 		FormatterFactory: func(previewStrategy common.DryRunStrategy) list.Formatter {
 			return NewFormatter(ioStreams, previewStrategy)

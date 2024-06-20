@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/slice"
 	"sigs.k8s.io/cli-utils/cmd/flagutils"
@@ -260,7 +260,7 @@ func (r *Runner) runE(cmd *cobra.Command, args []string) error {
 
 	// Fetch a printer implementation based on the desired output format as
 	// specified in the output flag.
-	printer, err := printers.CreatePrinter(r.output, genericclioptions.IOStreams{
+	printer, err := printers.CreatePrinter(r.output, genericiooptions.IOStreams{
 		In:     cmd.InOrStdin(),
 		Out:    cmd.OutOrStdout(),
 		ErrOut: cmd.ErrOrStderr(),

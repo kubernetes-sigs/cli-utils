@@ -9,7 +9,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	pe "sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/print/common"
@@ -44,7 +44,7 @@ type Resource interface {
 // The printer will print to the Out stream defined in IOStreams,
 // and will print into the format defined by the Column definitions.
 type BaseTablePrinter struct {
-	IOStreams genericclioptions.IOStreams
+	IOStreams genericiooptions.IOStreams
 	Columns   []ColumnDefinition
 }
 

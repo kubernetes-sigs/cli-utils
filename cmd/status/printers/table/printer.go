@@ -8,7 +8,7 @@ import (
 	"io"
 	"time"
 
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"sigs.k8s.io/cli-utils/cmd/status/printers/printer"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/collector"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
@@ -24,12 +24,12 @@ const (
 // Printer is an implementation of the Printer interface that outputs
 // status information about resources in a table format with in-place updates.
 type Printer struct {
-	IOStreams genericclioptions.IOStreams
+	IOStreams genericiooptions.IOStreams
 	PrintData *printer.PrintData
 }
 
 // NewPrinter returns a new instance of the tablePrinter.
-func NewPrinter(ioStreams genericclioptions.IOStreams, printData *printer.PrintData) *Printer {
+func NewPrinter(ioStreams genericiooptions.IOStreams, printData *printer.PrintData) *Printer {
 	return &Printer{
 		IOStreams: ioStreams,
 		PrintData: printData,
