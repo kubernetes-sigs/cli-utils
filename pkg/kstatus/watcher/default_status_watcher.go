@@ -13,6 +13,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
+
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/clusterreader"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/engine"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
@@ -98,6 +99,11 @@ func (w *DefaultStatusWatcher) Watch(ctx context.Context, ids object.ObjMetadata
 		return handleFatalError(fmt.Errorf("invalid RESTScopeStrategy: %v", strategy))
 	}
 
+	var objectFilter ObjectFilter = &AllowListObjectFilter{AllowList: ids}
+	if opts.UseCustomObjectFilter {
+		objectFilter = opts.ObjectFilter
+	}
+
 	informer := &ObjectStatusReporter{
 		InformerFactory: &DynamicInformerFactory{
 			Client:       w.DynamicClient,
@@ -109,7 +115,7 @@ func (w *DefaultStatusWatcher) Watch(ctx context.Context, ids object.ObjMetadata
 		StatusReader:  w.StatusReader,
 		ClusterReader: w.ClusterReader,
 		Targets:       targets,
-		ObjectFilter:  &AllowListObjectFilter{AllowList: ids},
+		ObjectFilter:  objectFilter,
 		RESTScope:     scope,
 	}
 	return informer.Start(ctx)

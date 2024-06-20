@@ -19,6 +19,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
+
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/engine"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
@@ -446,7 +447,7 @@ func (w *ObjectStatusReporter) eventHandler(
 			panic(fmt.Sprintf("AddFunc received unexpected object type %T", iobj))
 		}
 		id := object.UnstructuredToObjMetadata(obj)
-		if w.ObjectFilter.Filter(obj) {
+		if w.ObjectFilter != nil && w.ObjectFilter.Filter(obj) {
 			klog.V(7).Infof("Watch Event Skipped: AddFunc: %s", id)
 			return
 		}
@@ -495,7 +496,7 @@ func (w *ObjectStatusReporter) eventHandler(
 			panic(fmt.Sprintf("UpdateFunc received unexpected object type %T", iobj))
 		}
 		id := object.UnstructuredToObjMetadata(obj)
-		if w.ObjectFilter.Filter(obj) {
+		if w.ObjectFilter != nil && w.ObjectFilter.Filter(obj) {
 			klog.V(7).Infof("UpdateFunc: Watch Event Skipped: %s", id)
 			return
 		}
@@ -549,7 +550,7 @@ func (w *ObjectStatusReporter) eventHandler(
 			panic(fmt.Sprintf("DeleteFunc received unexpected object type %T", iobj))
 		}
 		id := object.UnstructuredToObjMetadata(obj)
-		if w.ObjectFilter.Filter(obj) {
+		if w.ObjectFilter != nil && w.ObjectFilter.Filter(obj) {
 			klog.V(7).Infof("DeleteFunc: Watch Event Skipped: %s", id)
 			return
 		}

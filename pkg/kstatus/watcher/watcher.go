@@ -26,6 +26,13 @@ type Options struct {
 	// RESTScopeStrategy specifies which strategy to use when listing and
 	// watching resources. By default, the strategy is selected automatically.
 	RESTScopeStrategy RESTScopeStrategy
+
+	// ObjectFilter is used to filter objects on the client side.
+	ObjectFilter ObjectFilter
+
+	// UseCustomObjectFilter controls whether custom ObjectFilter provided in options
+	// should be used instead of the default one.
+	UseCustomObjectFilter bool
 }
 
 //go:generate stringer -type=RESTScopeStrategy -linecomment
