@@ -1,6 +1,6 @@
 module sigs.k8s.io/cli-utils
 
-go 1.22.4
+go 1.22.0
 
 require (
 	github.com/google/go-cmp v0.6.0
