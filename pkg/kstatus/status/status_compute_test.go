@@ -1269,6 +1269,85 @@ func TestJobStatus(t *testing.T) {
 	}
 }
 
+var hpaNoStatus = `
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: test
+  namespace: qual
+  generation: 1
+`
+
+var hpaCurrentStatus = `
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: test
+  namespace: qual
+  generation: 1
+status:
+  conditions:
+  - type: AbleToScale
+    status: "True"
+  - type: ScalingActive
+    status: "True"
+`
+
+var hpaScalingLimitedStatus = `
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: test
+  namespace: qual
+  generation: 1
+status:
+  conditions:
+  - type: AbleToScale
+    status: "True"
+  - type: ScalingActive
+    status: "True"
+  - type: ScalingLimited
+    status: "True"
+`
+
+func TestHPAStatus(t *testing.T) {
+	testCases := map[string]testSpec{
+		"hpaNoStatus": {
+			spec:               hpaNoStatus,
+			expectedStatus:     UnknownStatus,
+			expectedConditions: []Condition{},
+			absentConditionTypes: []ConditionType{
+				ConditionStalled,
+				ConditionReconciling,
+			},
+		},
+		"hpaCurrentStatus": {
+			spec:               hpaCurrentStatus,
+			expectedStatus:     CurrentStatus,
+			expectedConditions: []Condition{},
+			absentConditionTypes: []ConditionType{
+				ConditionStalled,
+				ConditionReconciling,
+			},
+		},
+		"hpaScalingLimitedStatus": {
+			spec:               hpaScalingLimitedStatus,
+			expectedStatus:     FailedStatus,
+			expectedConditions: []Condition{},
+			absentConditionTypes: []ConditionType{
+				ConditionReconciling,
+			},
+		},
+	}
+
+	for tn, tc := range testCases {
+		tc := tc
+		t.Run(tn, func(t *testing.T) {
+			runStatusTest(t, tc)
+		})
+	}
+}
+
 var cronjobNoStatus = `
 apiVersion: batch/v1
 kind: CronJob

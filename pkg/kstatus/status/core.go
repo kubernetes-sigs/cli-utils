@@ -20,21 +20,22 @@ type GetConditionsFn func(*unstructured.Unstructured) (*Result, error)
 // legacyTypes defines the mapping from GroupKind to a function that can
 // compute the status for the given resource.
 var legacyTypes = map[string]GetConditionsFn{
-	"Service":                    serviceConditions,
-	"Pod":                        podConditions,
-	"Secret":                     alwaysReady,
-	"PersistentVolumeClaim":      pvcConditions,
-	"apps/StatefulSet":           stsConditions,
-	"apps/DaemonSet":             daemonsetConditions,
-	"extensions/DaemonSet":       daemonsetConditions,
-	"apps/Deployment":            deploymentConditions,
-	"extensions/Deployment":      deploymentConditions,
-	"apps/ReplicaSet":            replicasetConditions,
-	"extensions/ReplicaSet":      replicasetConditions,
-	"policy/PodDisruptionBudget": pdbConditions,
-	"batch/CronJob":              alwaysReady,
-	"ConfigMap":                  alwaysReady,
-	"batch/Job":                  jobConditions,
+	"Service":                             serviceConditions,
+	"Pod":                                 podConditions,
+	"Secret":                              alwaysReady,
+	"PersistentVolumeClaim":               pvcConditions,
+	"apps/StatefulSet":                    stsConditions,
+	"apps/DaemonSet":                      daemonsetConditions,
+	"extensions/DaemonSet":                daemonsetConditions,
+	"apps/Deployment":                     deploymentConditions,
+	"extensions/Deployment":               deploymentConditions,
+	"apps/ReplicaSet":                     replicasetConditions,
+	"extensions/ReplicaSet":               replicasetConditions,
+	"policy/PodDisruptionBudget":          pdbConditions,
+	"batch/CronJob":                       alwaysReady,
+	"ConfigMap":                           alwaysReady,
+	"batch/Job":                           jobConditions,
+	"autoscaling/HorizontalPodAutoscaler": hpaConditions,
 	"apiextensions.k8s.io/CustomResourceDefinition": crdConditions,
 }
 
@@ -70,6 +71,58 @@ func alwaysReady(u *unstructured.Unstructured) (*Result, error) {
 	return &Result{
 		Status:     CurrentStatus,
 		Message:    "Resource is always ready",
+		Conditions: []Condition{},
+	}, nil
+}
+
+func hpaConditions(u *unstructured.Unstructured) (*Result, error) {
+	obj := u.UnstructuredContent()
+
+	type expectedStatus struct {
+		status   corev1.ConditionStatus
+		optional bool
+	}
+
+	expectedConds := map[string]expectedStatus{
+		"AbleToScale":    {corev1.ConditionTrue, false},
+		"ScalingActive":  {corev1.ConditionTrue, false},
+		"ScalingLimited": {corev1.ConditionFalse, true},
+	}
+
+	objc, err := GetObjectWithConditions(obj)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, cond := range objc.Status.Conditions {
+		expected, has := expectedConds[cond.Type]
+		if has {
+			if expected.status != cond.Status {
+				return newFailedStatus(cond.Reason, cond.Message), nil
+			}
+			delete(expectedConds, cond.Type)
+		}
+	}
+
+	missingConds := make([]string, 0)
+
+	for cond, status := range expectedConds {
+		if !status.optional {
+			missingConds = append(missingConds, cond)
+		}
+	}
+
+	if len(missingConds) > 0 {
+		return &Result{
+			Status:     UnknownStatus,
+			Message:    fmt.Sprintf("Missing conditions: %s", strings.Join(missingConds, ",")),
+			Conditions: []Condition{},
+		}, nil
+	}
+
+	return &Result{
+		Status:     CurrentStatus,
+		Message:    fmt.Sprintf("HorizontalPodAutoscaler is current. Replicas: %d", GetIntField(obj, ".status.currentReplicas", 0)),
 		Conditions: []Condition{},
 	}, nil
 }
