@@ -41,6 +41,16 @@ const (
 	// PreventDeletion is the value used with LifecycleDeletionAnnotation
 	// to prevent deleting a resource.
 	PreventDeletion = "detach"
+
+	// LifecycleMutationAnnotation is the lifecycle annotation key for the mutation operation.
+	LifecycleMutationAnnotation = "client.lifecycle.config.k8s.io/mutation"
+
+	// IgnoreMutation is the value used with LifecycleMutationAnnotation to
+	// prevent mutating a resource.
+	IgnoreMutation = "ignore"
+
+	// IgnoreMutationPatchAnnotation is the annotation key for the mutation patch.
+	IgnoreMutationPatchAnnotation = "client.lifecycle.config.k8s.io/mutation-patch"
 )
 
 // RandomStr returns an eight-digit (with leading zeros) string of a
