@@ -64,26 +64,6 @@ func (a *Applier) prepareObjects(localInv inventory.Info, localObjs object.Unstr
 	for _, localObj := range localObjs {
 		inventory.AddInventoryIDAnnotation(localObj, localInv)
 	}
-	// If the inventory uses the Name strategy and an inventory ID is provided,
-	// verify that the existing inventory object (if there is one) has an ID
-	// label that matches.
-	// TODO(seans): This inventory id validation should happen in destroy and status.
-	if localInv.Strategy() == inventory.NameStrategy && localInv.ID() != "" {
-		prevInvObjs, err := a.invClient.GetClusterInventoryObjs(localInv)
-		if err != nil {
-			return nil, nil, err
-		}
-		if len(prevInvObjs) > 1 {
-			panic(fmt.Errorf("found %d inv objects with Name strategy", len(prevInvObjs)))
-		}
-		if len(prevInvObjs) == 1 {
-			invObj := prevInvObjs[0]
-			val := invObj.GetLabels()[common.InventoryLabel]
-			if val != localInv.ID() {
-				return nil, nil, fmt.Errorf("inventory-id of inventory object in cluster doesn't match provided id %q", localInv.ID())
-			}
-		}
-	}
 	pruneObjs, err := a.pruner.GetPruneObjs(localInv, localObjs, prune.Options{
 		DryRunStrategy: o.DryRunStrategy,
 	})

@@ -803,6 +803,8 @@ func TestTaskQueueBuilder_ApplyBuild(t *testing.T) {
 					typedTask.Mapper = mapper
 				case *taskrunner.WaitTask:
 					typedTask.Mapper = mapper
+				case *task.InvAddTask:
+					typedTask.Mapper = mapper
 				}
 			}
 
@@ -1477,6 +1479,8 @@ func TestTaskQueueBuilder_PruneBuild(t *testing.T) {
 					typedTask.Pruner = &prune.Pruner{}
 				case *taskrunner.WaitTask:
 					typedTask.Mapper = mapper
+				case *task.InvAddTask:
+					typedTask.Mapper = mapper
 				}
 			}
 
@@ -1830,6 +1834,8 @@ func TestTaskQueueBuilder_ApplyPruneBuild(t *testing.T) {
 				case *task.PruneTask:
 					typedTask.Pruner = &prune.Pruner{}
 				case *taskrunner.WaitTask:
+					typedTask.Mapper = mapper
+				case *task.InvAddTask:
 					typedTask.Mapper = mapper
 				}
 			}

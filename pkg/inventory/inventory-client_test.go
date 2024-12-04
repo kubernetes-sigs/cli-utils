@@ -10,10 +10,8 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/resource"
 	clienttesting "k8s.io/client-go/testing"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
@@ -97,7 +95,7 @@ func TestGetClusterInventoryInfo(t *testing.T) {
 			if tc.inv != nil {
 				inv = storeObjsInInventory(tc.inv, tc.localObjs, tc.objStatus)
 			}
-			clusterInv, err := invClient.GetClusterInventoryInfo(WrapInventoryInfoObj(inv))
+			clusterInv, err := invClient.getClusterInventoryInfo(WrapInventoryInfoObj(inv))
 			if tc.isError {
 				if err == nil {
 					t.Fatalf("expected error but received none")
@@ -528,46 +526,6 @@ func TestDeleteInventoryObj(t *testing.T) {
 				}
 			})
 		}
-	}
-}
-
-func TestApplyInventoryNamespace(t *testing.T) {
-	testCases := map[string]struct {
-		statusPolicy   StatusPolicy
-		namespace      *unstructured.Unstructured
-		dryRunStrategy common.DryRunStrategy
-		reactorError   error
-	}{
-		"inventory namespace doesn't exist": {
-			namespace:      inventoryNamespace,
-			dryRunStrategy: common.DryRunNone,
-			reactorError:   nil,
-		},
-		"inventory namespace already exist": {
-			namespace:      inventoryNamespace,
-			dryRunStrategy: common.DryRunNone,
-			reactorError: errors.NewAlreadyExists(schema.GroupResource{
-				Group:    "",
-				Resource: "namespaces",
-			}, testNamespace),
-		},
-	}
-
-	for tn, tc := range testCases {
-		t.Run(tn, func(t *testing.T) {
-			tf := cmdtesting.NewTestFactory().WithNamespace(testNamespace)
-			defer tf.Cleanup()
-
-			tf.FakeDynamicClient.PrependReactor("create", "namespaces", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
-				return true, nil, tc.reactorError
-			})
-
-			invClient, err := NewClient(tf,
-				WrapInventoryObj, InvInfoToConfigMap, tc.statusPolicy, ConfigMapGVK)
-			require.NoError(t, err)
-			err = invClient.ApplyInventoryNamespace(tc.namespace, tc.dryRunStrategy)
-			assert.NoError(t, err)
-		})
 	}
 }
 

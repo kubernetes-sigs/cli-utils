@@ -47,5 +47,7 @@ func applyWithExistingInvTest(ctx context.Context, c client.Client, invConfig in
 
 	By("Verify that we get the correct error")
 	Expect(err).To(HaveOccurred())
-	Expect(err.Error()).To(ContainSubstring("inventory-id of inventory object in cluster doesn't match provided id"))
+	Expect(err.Error()).To(ContainSubstring(
+		fmt.Sprintf("inventory-id of inventory object %s/%s in cluster doesn't match provided id",
+			namespaceName, inventoryName)))
 }
