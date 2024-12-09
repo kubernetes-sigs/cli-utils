@@ -7,6 +7,9 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+	clienttesting "k8s.io/client-go/testing"
+	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	"sigs.k8s.io/cli-utils/pkg/apply/cache"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
@@ -66,17 +69,30 @@ var obj3 = &unstructured.Unstructured{
 	},
 }
 
+var nsObj = &unstructured.Unstructured{
+	Object: map[string]interface{}{
+		"apiVersion": "v1",
+		"kind":       "Namespace",
+		"metadata": map[string]interface{}{
+			"name": namespace,
+		},
+	},
+}
+
 const taskName = "test-inventory-task"
 
 func TestInvAddTask(t *testing.T) {
 	id1 := object.UnstructuredToObjMetadata(obj1)
 	id2 := object.UnstructuredToObjMetadata(obj2)
 	id3 := object.UnstructuredToObjMetadata(obj3)
+	idNs := object.UnstructuredToObjMetadata(nsObj)
 
 	tests := map[string]struct {
-		initialObjs  object.ObjMetadataSet
-		applyObjs    []*unstructured.Unstructured
-		expectedObjs object.ObjMetadataSet
+		initialObjs           object.ObjMetadataSet
+		applyObjs             []*unstructured.Unstructured
+		expectedObjs          object.ObjMetadataSet
+		reactorError          error
+		expectCreateNamespace bool
 	}{
 		"no initial inventory and no apply objects; no merged inventory": {
 			initialObjs:  object.ObjMetadataSet{},
@@ -103,6 +119,12 @@ func TestInvAddTask(t *testing.T) {
 			applyObjs:    []*unstructured.Unstructured{obj2, obj3},
 			expectedObjs: object.ObjMetadataSet{id1, id2, id3},
 		},
+		"namespace of inventory inside inventory": {
+			initialObjs:           object.ObjMetadataSet{},
+			applyObjs:             []*unstructured.Unstructured{nsObj},
+			expectedObjs:          object.ObjMetadataSet{idNs},
+			expectCreateNamespace: true,
+		},
 	}
 
 	for name, tc := range tests {
@@ -111,12 +133,27 @@ func TestInvAddTask(t *testing.T) {
 			eventChannel := make(chan event.Event)
 			resourceCache := cache.NewResourceCacheMap()
 			context := taskrunner.NewTaskContext(eventChannel, resourceCache)
+			tf := cmdtesting.NewTestFactory().WithNamespace(namespace)
+			defer tf.Cleanup()
+
+			createdNamespace := false
+			tf.FakeDynamicClient.PrependReactor("create", "namespaces", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+				createdNamespace = true
+				return true, nil, tc.reactorError
+			})
+
+			mapper, err := tf.ToRESTMapper()
+			if err != nil {
+				t.Fatal(err)
+			}
 
 			task := InvAddTask{
-				TaskName:  taskName,
-				InvClient: client,
-				InvInfo:   nil,
-				Objects:   tc.applyObjs,
+				TaskName:      taskName,
+				InvClient:     client,
+				InvInfo:       localInv,
+				Objects:       tc.applyObjs,
+				DynamicClient: tf.FakeDynamicClient,
+				Mapper:        mapper,
 			}
 			if taskName != task.Name() {
 				t.Errorf("expected task name (%s), got (%s)", taskName, task.Name())
@@ -133,6 +170,9 @@ func TestInvAddTask(t *testing.T) {
 			actual, _ := client.GetClusterObjs(nil)
 			if !tc.expectedObjs.Equal(actual) {
 				t.Errorf("expected merged inventory (%s), got (%s)", tc.expectedObjs, actual)
+			}
+			if createdNamespace != tc.expectCreateNamespace {
+				t.Errorf("expected create namespace %v, got %v", tc.expectCreateNamespace, createdNamespace)
 			}
 		})
 	}

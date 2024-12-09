@@ -158,11 +158,13 @@ func (t *TaskQueueBuilder) Build(taskContext *taskrunner.TaskContext, o Options)
 		// InvAddTask creates the inventory and adds any objects being applied
 		klog.V(2).Infof("adding inventory add task (%d objects)", len(applyObjs))
 		tasks = append(tasks, &task.InvAddTask{
-			TaskName:  "inventory-add-0",
-			InvClient: t.InvClient,
-			InvInfo:   t.invInfo,
-			Objects:   applyObjs,
-			DryRun:    o.DryRunStrategy,
+			TaskName:      "inventory-add-0",
+			InvClient:     t.InvClient,
+			DynamicClient: t.DynamicClient,
+			Mapper:        t.Mapper,
+			InvInfo:       t.invInfo,
+			Objects:       applyObjs,
+			DryRun:        o.DryRunStrategy,
 		})
 	}
 
