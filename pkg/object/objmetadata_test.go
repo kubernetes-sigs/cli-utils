@@ -102,6 +102,30 @@ func TestParseObjMetadata(t *testing.T) {
 			inventory: &ObjMetadata{},
 			isError:   true,
 		},
+		"RBAC with underscores": {
+			invStr: "test-namespace_leader_locking_kube_scheduler___rbac.authorization.k8s.io_RoleBinding",
+			inventory: &ObjMetadata{
+				Namespace: "test-namespace",
+				Name:      "leader_locking_kube_scheduler:",
+				GroupKind: schema.GroupKind{
+					Group: rbacv1.GroupName,
+					Kind:  "RoleBinding",
+				},
+			},
+			isError: false,
+		},
+		"Non-RBAC with underscores": {
+			invStr: "test-namespace_leader_locking_kube_scheduler_apps_Deployment",
+			inventory: &ObjMetadata{
+				Namespace: "test-namespace",
+				Name:      "leader_locking_kube_scheduler",
+				GroupKind: schema.GroupKind{
+					Group: "apps",
+					Kind:  "Deployment",
+				},
+			},
+			isError: true,
+		},
 	}
 
 	for tn, tc := range tests {
