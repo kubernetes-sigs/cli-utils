@@ -409,7 +409,7 @@ func TestReplace(t *testing.T) {
 				t.Fatalf("unexpected error received: %s", err)
 			}
 			if diff := cmp.Diff(data, tc.data); diff != "" {
-				t.Fatalf(diff)
+				t.Fatal(diff)
 			}
 		})
 	}
