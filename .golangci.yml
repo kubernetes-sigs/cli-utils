@@ -14,7 +14,7 @@ linters:
     - dogsled
     - dupl
     - errcheck
-    - exportloopref
+    - copyloopvar
     - gochecknoinits
     - goconst
     - gocritic
@@ -46,6 +46,8 @@ linters-settings:
     line-length: 170
   gocyclo:
     min-complexity: 30
+  copyloopvar:
+    check-alias: true
 
 issues:
   # List of regexps of issue texts to exclude, empty list by default.

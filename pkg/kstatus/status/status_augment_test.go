@@ -132,7 +132,6 @@ func TestAugmentConditions(t *testing.T) {
 	}
 
 	for tn, tc := range testCases {
-		tc := tc
 		t.Run(tn, func(t *testing.T) {
 			u := y2u(t, tc.manifest)
 			addConditions(t, u, tc.withConditions)
