@@ -574,9 +574,9 @@ func TestPrune(t *testing.T) {
 			for _, obj := range tc.clusterObjs {
 				clusterObjs = append(clusterObjs, obj)
 			}
-			pruneIds := object.UnstructuredSetToObjMetadataSet(tc.pruneObjs)
+			pruneIDs := object.UnstructuredSetToObjMetadataSet(tc.pruneObjs)
 			po := Pruner{
-				InvClient: inventory.NewFakeClient(pruneIds),
+				InvClient: inventory.NewFakeClient(pruneIDs),
 				Client:    fake.NewSimpleDynamicClient(scheme.Scheme, clusterObjs...),
 				Mapper: testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme,
 					scheme.Scheme.PrioritizedVersionsAllGroups()...),
@@ -620,21 +620,21 @@ func TestPrune(t *testing.T) {
 			for _, id := range tc.expectedFailed {
 				assert.Truef(t, im.IsFailedDelete(id), "Prune() should mark object as failed: %s", id)
 			}
-			for _, id := range pruneIds.Diff(tc.expectedFailed) {
+			for _, id := range pruneIDs.Diff(tc.expectedFailed) {
 				assert.Falsef(t, im.IsFailedDelete(id), "Prune() should NOT mark object as failed: %s", id)
 			}
 			// validate record of skipped prunes
 			for _, id := range tc.expectedSkipped {
 				assert.Truef(t, im.IsSkippedDelete(id), "Prune() should mark object as skipped: %s", id)
 			}
-			for _, id := range pruneIds.Diff(tc.expectedSkipped) {
+			for _, id := range pruneIDs.Diff(tc.expectedSkipped) {
 				assert.Falsef(t, im.IsSkippedDelete(id), "Prune() should NOT mark object as skipped: %s", id)
 			}
 			// validate record of abandoned objects
 			for _, id := range tc.expectedAbandoned {
 				assert.Truef(t, taskContext.IsAbandonedObject(id), "Prune() should mark object as abandoned: %s", id)
 			}
-			for _, id := range pruneIds.Diff(tc.expectedAbandoned) {
+			for _, id := range pruneIDs.Diff(tc.expectedAbandoned) {
 				assert.Falsef(t, taskContext.IsAbandonedObject(id), "Prune() should NOT mark object as abandoned: %s", id)
 			}
 		})
@@ -761,9 +761,9 @@ func TestPruneWithErrors(t *testing.T) {
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			pruneIds := object.UnstructuredSetToObjMetadataSet(tc.pruneObjs)
+			pruneIDs := object.UnstructuredSetToObjMetadataSet(tc.pruneObjs)
 			po := Pruner{
-				InvClient: inventory.NewFakeClient(pruneIds),
+				InvClient: inventory.NewFakeClient(pruneIDs),
 				// Set up the fake dynamic client to recognize all objects, and the RESTMapper.
 				Client: &fakeDynamicClient{
 					resourceInterface: &failureNamespaceClient{},
@@ -867,10 +867,10 @@ func TestGetPruneObjs(t *testing.T) {
 			if len(tc.expectedObjs) != len(actualObjs) {
 				t.Fatalf("expected %d prune objs, got %d", len(tc.expectedObjs), len(actualObjs))
 			}
-			actualIds := object.UnstructuredSetToObjMetadataSet(actualObjs)
-			expectedIds := object.UnstructuredSetToObjMetadataSet(tc.expectedObjs)
-			if !object.ObjMetadataSetEquals(expectedIds, actualIds) {
-				t.Errorf("expected prune objects (%v), got (%v)", expectedIds, actualIds)
+			actualIDs := object.UnstructuredSetToObjMetadataSet(actualObjs)
+			expectedIDs := object.UnstructuredSetToObjMetadataSet(tc.expectedObjs)
+			if !object.ObjMetadataSetEquals(expectedIDs, actualIDs) {
+				t.Errorf("expected prune objects (%v), got (%v)", expectedIDs, actualIDs)
 			}
 		})
 	}

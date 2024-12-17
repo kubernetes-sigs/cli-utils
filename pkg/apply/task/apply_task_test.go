@@ -492,7 +492,7 @@ func TestApplyTaskWithError(t *testing.T) {
 				assert.Equal(t, tc.expectedEvents[i].ApplyEvent.Error.Error(), e.ApplyEvent.Error.Error())
 			}
 
-			applyIds := object.UnstructuredSetToObjMetadataSet(tc.objs)
+			applyIDs := object.UnstructuredSetToObjMetadataSet(tc.objs)
 
 			im := taskContext.InventoryManager()
 
@@ -500,14 +500,14 @@ func TestApplyTaskWithError(t *testing.T) {
 			for _, id := range tc.expectedFailed {
 				assert.Truef(t, im.IsFailedApply(id), "ApplyTask should mark object as failed: %s", id)
 			}
-			for _, id := range applyIds.Diff(tc.expectedFailed) {
+			for _, id := range applyIDs.Diff(tc.expectedFailed) {
 				assert.Falsef(t, im.IsFailedApply(id), "ApplyTask should NOT mark object as failed: %s", id)
 			}
 			// validate record of skipped prunes
 			for _, id := range tc.expectedSkipped {
 				assert.Truef(t, im.IsSkippedApply(id), "ApplyTask should mark object as skipped: %s", id)
 			}
-			for _, id := range applyIds.Diff(tc.expectedSkipped) {
+			for _, id := range applyIDs.Diff(tc.expectedSkipped) {
 				assert.Falsef(t, im.IsSkippedApply(id), "ApplyTask should NOT mark object as skipped: %s", id)
 			}
 		})

@@ -12,7 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
-	. "sigs.k8s.io/cli-utils/pkg/object"
+	. "sigs.k8s.io/cli-utils/pkg/object" //nolint:revive
 	"sigs.k8s.io/cli-utils/pkg/testutil"
 )
 

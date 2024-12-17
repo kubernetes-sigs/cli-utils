@@ -56,7 +56,7 @@ type WaitTask struct {
 	// TaskName allows providing a name for the task.
 	TaskName string
 	// Ids is the full list of resources that we are waiting for.
-	Ids object.ObjMetadataSet
+	Ids object.ObjMetadataSet //nolint:revive
 	// Condition defines the status we want all resources to reach
 	Condition Condition
 	// Timeout defines how long we are willing to wait for the condition

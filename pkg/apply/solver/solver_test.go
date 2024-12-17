@@ -808,8 +808,8 @@ func TestTaskQueueBuilder_ApplyBuild(t *testing.T) {
 				}
 			}
 
-			applyIds := object.UnstructuredSetToObjMetadataSet(tc.applyObjs)
-			fakeInvClient := inventory.NewFakeClient(applyIds)
+			applyIDs := object.UnstructuredSetToObjMetadataSet(tc.applyObjs)
+			fakeInvClient := inventory.NewFakeClient(applyIDs)
 			vCollector := &validation.Collector{}
 			tqb := TaskQueueBuilder{
 				Pruner:    pruner,
@@ -1484,8 +1484,8 @@ func TestTaskQueueBuilder_PruneBuild(t *testing.T) {
 				}
 			}
 
-			pruneIds := object.UnstructuredSetToObjMetadataSet(tc.pruneObjs)
-			fakeInvClient := inventory.NewFakeClient(pruneIds)
+			pruneIDs := object.UnstructuredSetToObjMetadataSet(tc.pruneObjs)
+			fakeInvClient := inventory.NewFakeClient(pruneIDs)
 			vCollector := &validation.Collector{}
 			tqb := TaskQueueBuilder{
 				Pruner:    pruner,

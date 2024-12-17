@@ -176,13 +176,13 @@ func (d *Destroyer) Run(ctx context.Context, invInfo inventory.Info, options Des
 		}
 		// Create a new TaskStatusRunner to execute the taskQueue.
 		klog.V(4).Infoln("destroyer building TaskStatusRunner...")
-		deleteIds := object.UnstructuredSetToObjMetadataSet(deleteObjs)
+		deleteIDs := object.UnstructuredSetToObjMetadataSet(deleteObjs)
 		statusWatcher := d.statusWatcher
 		// Disable watcher for dry runs
 		if opts.DryRunStrategy.ClientOrServerDryRun() {
 			statusWatcher = watcher.BlindStatusWatcher{}
 		}
-		runner := taskrunner.NewTaskStatusRunner(deleteIds, statusWatcher)
+		runner := taskrunner.NewTaskStatusRunner(deleteIDs, statusWatcher)
 		klog.V(4).Infoln("destroyer running TaskStatusRunner...")
 		err = runner.Run(ctx, taskContext, taskQueue.ToChannel(), taskrunner.Options{
 			EmitStatusEvents: options.EmitStatusEvents,
