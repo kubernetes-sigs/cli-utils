@@ -142,7 +142,7 @@ func (d *Destroyer) Run(ctx context.Context, invInfo inventory.Info, options Des
 			Build(taskContext, opts)
 
 		klog.V(4).Infof("validation errors: %d", len(vCollector.Errors))
-		klog.V(4).Infof("invalid objects: %d", len(vCollector.InvalidIds))
+		klog.V(4).Infof("invalid objects: %d", len(vCollector.InvalidIDs))
 
 		// Handle validation errors
 		switch options.ValidationPolicy {
@@ -162,7 +162,7 @@ func (d *Destroyer) Run(ctx context.Context, invInfo inventory.Info, options Des
 		}
 
 		// Register invalid objects to be retained in the inventory, if present.
-		for _, id := range vCollector.InvalidIds {
+		for _, id := range vCollector.InvalidIDs {
 			taskContext.AddInvalidObject(id)
 		}
 

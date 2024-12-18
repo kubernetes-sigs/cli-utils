@@ -14,14 +14,14 @@ import (
 // extracting the IDs of the invalid objects.
 type Collector struct {
 	Errors     []error
-	InvalidIds object.ObjMetadataSet //nolint:revive
+	InvalidIDs object.ObjMetadataSet
 }
 
 // Collect unwraps MultiErrors, adds them to Errors, extracts invalid object
-// IDs from validation.Error, and adds them to InvalidIds.
+// IDs from validation.Error, and adds them to InvalidIDs.
 func (c *Collector) Collect(err error) {
 	errs := multierror.Unwrap(err)
-	c.InvalidIds = c.InvalidIds.Union(extractInvalidIDs(errs))
+	c.InvalidIDs = c.InvalidIDs.Union(extractInvalidIDs(errs))
 	c.Errors = append(c.Errors, errs...)
 }
 
@@ -31,11 +31,11 @@ func (c *Collector) ToError() error {
 }
 
 // FilterInvalidObjects returns a set of objects that does not contain any
-// invalid objects, based on the collected InvalidIds.
+// invalid objects, based on the collected InvalidIDs.
 func (c *Collector) FilterInvalidObjects(objs object.UnstructuredSet) object.UnstructuredSet {
 	var diff object.UnstructuredSet
 	for _, obj := range objs {
-		if !c.InvalidIds.Contains(object.UnstructuredToObjMetadata(obj)) {
+		if !c.InvalidIDs.Contains(object.UnstructuredToObjMetadata(obj)) {
 			diff = append(diff, obj)
 		}
 	}
@@ -43,9 +43,9 @@ func (c *Collector) FilterInvalidObjects(objs object.UnstructuredSet) object.Uns
 }
 
 // FilterInvalidIds returns a set of object ID that does not contain any
-// invalid IDs, based on the collected InvalidIds.
+// invalid IDs, based on the collected InvalidIDs.
 func (c *Collector) FilterInvalidIds(ids object.ObjMetadataSet) object.ObjMetadataSet { //nolint:revive
-	return ids.Diff(c.InvalidIds)
+	return ids.Diff(c.InvalidIDs)
 }
 
 // extractInvalidIDs extracts invalid object IDs from a list of possible
