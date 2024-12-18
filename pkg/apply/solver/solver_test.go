@@ -1869,7 +1869,7 @@ func TestTaskQueueBuilder_ApplyPruneBuild(t *testing.T) {
 	}
 }
 
-// waitTaskComparer allows comparion of WaitTasks, ignoring private fields.
+// waitTaskComparer allows comparison of WaitTasks, ignoring private fields.
 func waitTaskComparer() cmp.Option {
 	return cmp.Comparer(func(x, y *taskrunner.WaitTask) bool {
 		if x == nil {
@@ -1886,7 +1886,7 @@ func waitTaskComparer() cmp.Option {
 	})
 }
 
-// fakeClientComparer allows comparion of inventory.FakeClient, ignoring objs.
+// fakeClientComparer allows comparison of inventory.FakeClient, ignoring objs.
 func fakeClientComparer() cmp.Option {
 	return cmp.Comparer(func(x, y *inventory.FakeClient) bool {
 		if x == nil {
@@ -1899,7 +1899,7 @@ func fakeClientComparer() cmp.Option {
 	})
 }
 
-// inventoryInfoComparer allows comparion of inventory.Info, ignoring impl.
+// inventoryInfoComparer allows comparison of inventory.Info, ignoring impl.
 func inventoryInfoComparer() cmp.Option {
 	return cmp.Comparer(func(x, y inventory.Info) bool {
 		return x.ID() == y.ID() &&
