@@ -388,9 +388,9 @@ func (f *fakeReader) List(_ context.Context, list client.ObjectList, opts ...cli
 			}
 		}
 		end := start + listOpts.Limit
-		max := int64(len(results))
-		if end > max {
-			end = max
+		maxResult := int64(len(results))
+		if end > maxResult {
+			end = maxResult
 		} else {
 			// set continue if more results are available
 			uList.SetContinue(strconv.FormatInt(end, 10))

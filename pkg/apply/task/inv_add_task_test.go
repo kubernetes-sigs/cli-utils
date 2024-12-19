@@ -158,9 +158,9 @@ func TestInvAddTask(t *testing.T) {
 			if taskName != task.Name() {
 				t.Errorf("expected task name (%s), got (%s)", taskName, task.Name())
 			}
-			applyIds := object.UnstructuredSetToObjMetadataSet(tc.applyObjs)
-			if !task.Identifiers().Equal(applyIds) {
-				t.Errorf("expected task ids (%s), got (%s)", applyIds, task.Identifiers())
+			applyIDs := object.UnstructuredSetToObjMetadataSet(tc.applyObjs)
+			if !task.Identifiers().Equal(applyIDs) {
+				t.Errorf("expected task ids (%s), got (%s)", applyIDs, task.Identifiers())
 			}
 			task.Start(context)
 			result := <-context.TaskChannel()

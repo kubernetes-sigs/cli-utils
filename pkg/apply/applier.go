@@ -179,7 +179,7 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.Info, objects objec
 			Build(taskContext, opts)
 
 		klog.V(4).Infof("validation errors: %d", len(vCollector.Errors))
-		klog.V(4).Infof("invalid objects: %d", len(vCollector.InvalidIds))
+		klog.V(4).Infof("invalid objects: %d", len(vCollector.InvalidIDs))
 
 		// Handle validation errors
 		switch options.ValidationPolicy {
@@ -199,7 +199,7 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.Info, objects objec
 		}
 
 		// Register invalid objects to be retained in the inventory, if present.
-		for _, id := range vCollector.InvalidIds {
+		for _, id := range vCollector.InvalidIDs {
 			taskContext.AddInvalidObject(id)
 		}
 
@@ -213,13 +213,13 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.Info, objects objec
 		}
 		// Create a new TaskStatusRunner to execute the taskQueue.
 		klog.V(4).Infoln("applier building TaskStatusRunner...")
-		allIds := object.UnstructuredSetToObjMetadataSet(append(applyObjs, pruneObjs...))
+		allIDs := object.UnstructuredSetToObjMetadataSet(append(applyObjs, pruneObjs...))
 		statusWatcher := a.statusWatcher
 		// Disable watcher for dry runs
 		if opts.DryRunStrategy.ClientOrServerDryRun() {
 			statusWatcher = watcher.BlindStatusWatcher{}
 		}
-		runner := taskrunner.NewTaskStatusRunner(allIds, statusWatcher)
+		runner := taskrunner.NewTaskStatusRunner(allIDs, statusWatcher)
 		klog.V(4).Infoln("applier running TaskStatusRunner...")
 		err = runner.Run(ctx, taskContext, taskQueue.ToChannel(), taskrunner.Options{
 			EmitStatusEvents:         options.EmitStatusEvents,

@@ -157,8 +157,7 @@ func TestCollectorEventProcessing(t *testing.T) {
 				if e.Resource != nil {
 					latestEventByIdentifier[e.Resource.Identifier] = e
 				}
-				ev := e
-				latestEvent = &ev
+				latestEvent = &e
 				eventCh <- e
 			}
 			// Give the collector some time to process the event.

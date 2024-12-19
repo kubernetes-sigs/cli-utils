@@ -12,7 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
-	. "sigs.k8s.io/cli-utils/pkg/object"
+	"sigs.k8s.io/cli-utils/pkg/object"
 	"sigs.k8s.io/cli-utils/pkg/testutil"
 )
 
@@ -84,11 +84,11 @@ metadata:
 func TestUnstructuredToObjMeta(t *testing.T) {
 	tests := map[string]struct {
 		obj      *unstructured.Unstructured
-		expected ObjMetadata
+		expected object.ObjMetadata
 	}{
 		"test RBAC translation": {
 			obj: testutil.Unstructured(t, rbac),
-			expected: ObjMetadata{
+			expected: object.ObjMetadata{
 				Name: "test-cluster-role",
 				GroupKind: schema.GroupKind{
 					Group: "rbac.authorization.k8s.io",
@@ -98,7 +98,7 @@ func TestUnstructuredToObjMeta(t *testing.T) {
 		},
 		"test CRD translation": {
 			obj: testutil.Unstructured(t, testCRD),
-			expected: ObjMetadata{
+			expected: object.ObjMetadata{
 				Name: "test-crd",
 				GroupKind: schema.GroupKind{
 					Group: "apiextensions.k8s.io",
@@ -108,7 +108,7 @@ func TestUnstructuredToObjMeta(t *testing.T) {
 		},
 		"test pod translation": {
 			obj: testutil.Unstructured(t, testPod),
-			expected: ObjMetadata{
+			expected: object.ObjMetadata{
 				Name:      "test-pod",
 				Namespace: "test-namespace",
 				GroupKind: schema.GroupKind{
@@ -121,7 +121,7 @@ func TestUnstructuredToObjMeta(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			actual := UnstructuredToObjMetadata(tc.obj)
+			actual := object.UnstructuredToObjMetadata(tc.obj)
 			if tc.expected != actual {
 				t.Errorf("expected ObjMetadata (%s), got (%s)", tc.expected, actual)
 			}
@@ -154,7 +154,7 @@ func TestIsKindNamespace(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			actual := IsKindNamespace(tc.obj)
+			actual := object.IsKindNamespace(tc.obj)
 			if tc.isKindNamespace != actual {
 				t.Errorf("expected IsKindNamespace (%t), got (%t) for (%s)",
 					tc.isKindNamespace, actual, tc.obj)
@@ -188,7 +188,7 @@ func TestIsCRD(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			actual := IsCRD(tc.obj)
+			actual := object.IsCRD(tc.obj)
 			if tc.isCRD != actual {
 				t.Errorf("expected IsCRD (%t), got (%t) for (%s)", tc.isCRD, actual, tc.obj)
 			}
@@ -225,7 +225,7 @@ func TestIsNamespaced(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			actual := IsNamespaced(tc.obj)
+			actual := object.IsNamespaced(tc.obj)
 			if tc.isNamespaced != actual {
 				t.Errorf("expected namespaced (%t), got (%t) for (%s)",
 					tc.isNamespaced, actual, tc.obj)
@@ -259,7 +259,7 @@ func TestGetCRDGroupKind(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			actualGroupKind, actualIsCRD := GetCRDGroupKind(tc.obj)
+			actualGroupKind, actualIsCRD := object.GetCRDGroupKind(tc.obj)
 			if tc.isCRD != actualIsCRD {
 				t.Errorf("expected IsCRD (%t), got (%t) for (%s)", tc.isCRD, actualIsCRD, tc.obj)
 			}
@@ -284,7 +284,7 @@ func TestLookupResourceScope(t *testing.T) {
 		},
 		"CR not found in the RESTMapper or the provided CRDs": {
 			resource: testutil.Unstructured(t, testCR),
-			expectedErr: &UnknownTypeError{
+			expectedErr: &object.UnknownTypeError{
 				GroupVersionKind: schema.GroupVersionKind{
 					Group:   "example.com",
 					Version: "v1",
@@ -297,7 +297,7 @@ func TestLookupResourceScope(t *testing.T) {
 			crds: []*unstructured.Unstructured{
 				testutil.Unstructured(t, testCRDv2),
 			},
-			expectedErr: &UnknownTypeError{
+			expectedErr: &object.UnknownTypeError{
 				GroupVersionKind: schema.GroupVersionKind{
 					Group:   "example.com",
 					Version: "v1",
@@ -322,7 +322,7 @@ func TestLookupResourceScope(t *testing.T) {
 			mapper, err := tf.ToRESTMapper()
 			require.NoError(t, err)
 
-			scope, err := LookupResourceScope(tc.resource, tc.crds, mapper)
+			scope, err := object.LookupResourceScope(tc.resource, tc.crds, mapper)
 
 			if tc.expectedErr != nil {
 				require.Equal(t, tc.expectedErr, err)

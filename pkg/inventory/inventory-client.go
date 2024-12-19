@@ -96,11 +96,11 @@ func NewClient(factory cmdutil.Factory,
 // objects if an inventory object does not exist. Returns an error if one
 // occurred.
 func (cic *ClusterClient) Merge(localInv Info, objs object.ObjMetadataSet, dryRun common.DryRunStrategy) (object.ObjMetadataSet, error) {
-	pruneIds := object.ObjMetadataSet{}
+	pruneIDs := object.ObjMetadataSet{}
 	invObj := cic.invToUnstructuredFunc(localInv)
 	clusterInv, err := cic.getClusterInventoryInfo(localInv)
 	if err != nil {
-		return pruneIds, err
+		return pruneIDs, err
 	}
 
 	// Inventory does not exist on the cluster.
@@ -128,34 +128,34 @@ func (cic *ClusterClient) Merge(localInv Info, objs object.ObjMetadataSet, dryRu
 	// Update existing cluster inventory with merged union of objects
 	clusterObjs, err := cic.GetClusterObjs(localInv)
 	if err != nil {
-		return pruneIds, err
+		return pruneIDs, err
 	}
-	pruneIds = clusterObjs.Diff(objs)
+	pruneIDs = clusterObjs.Diff(objs)
 	unionObjs := clusterObjs.Union(objs)
 	var status []actuation.ObjectStatus
 	if cic.statusPolicy == StatusPolicyAll {
-		status = getObjStatus(pruneIds, unionObjs)
+		status = getObjStatus(pruneIDs, unionObjs)
 	}
-	klog.V(4).Infof("num objects to prune: %d", len(pruneIds))
+	klog.V(4).Infof("num objects to prune: %d", len(pruneIDs))
 	klog.V(4).Infof("num merged objects to store in inventory: %d", len(unionObjs))
 	wrappedInv := cic.InventoryFactoryFunc(clusterInv)
 	if err = wrappedInv.Store(unionObjs, status); err != nil {
-		return pruneIds, err
+		return pruneIDs, err
 	}
 
 	// Update not required when all objects in inventory are the same and
 	// status does not need to be updated. If status is stored, always update the
 	// inventory to store the latest status.
 	if objs.Equal(clusterObjs) && cic.statusPolicy == StatusPolicyNone {
-		return pruneIds, nil
+		return pruneIDs, nil
 	}
 
 	if dryRun.ClientOrServerDryRun() {
 		klog.V(4).Infof("dry-run create inventory object: not created")
-		return pruneIds, nil
+		return pruneIDs, nil
 	}
 	err = wrappedInv.Apply(cic.dc, cic.mapper, cic.statusPolicy)
-	return pruneIds, err
+	return pruneIDs, err
 }
 
 // Replace stores the passed objects in the cluster inventory object, or
@@ -451,9 +451,9 @@ func (cic *ClusterClient) getMapping(obj *unstructured.Unstructured) (*meta.REST
 
 // getObjStatus returns the list of object status
 // at the beginning of an apply process.
-func getObjStatus(pruneIds, unionIds []object.ObjMetadata) []actuation.ObjectStatus {
+func getObjStatus(pruneIDs, unionIDs []object.ObjMetadata) []actuation.ObjectStatus {
 	status := []actuation.ObjectStatus{}
-	for _, obj := range unionIds {
+	for _, obj := range unionIDs {
 		status = append(status,
 			actuation.ObjectStatus{
 				ObjectReference: ObjectReferenceFromObjMetadata(obj),
@@ -462,7 +462,7 @@ func getObjStatus(pruneIds, unionIds []object.ObjMetadata) []actuation.ObjectSta
 				Reconcile:       actuation.ReconcilePending,
 			})
 	}
-	for _, obj := range pruneIds {
+	for _, obj := range pruneIDs {
 		status = append(status,
 			actuation.ObjectStatus{
 				ObjectReference: ObjectReferenceFromObjMetadata(obj),

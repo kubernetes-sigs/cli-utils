@@ -142,7 +142,7 @@ func (d *Destroyer) Run(ctx context.Context, invInfo inventory.Info, options Des
 			Build(taskContext, opts)
 
 		klog.V(4).Infof("validation errors: %d", len(vCollector.Errors))
-		klog.V(4).Infof("invalid objects: %d", len(vCollector.InvalidIds))
+		klog.V(4).Infof("invalid objects: %d", len(vCollector.InvalidIDs))
 
 		// Handle validation errors
 		switch options.ValidationPolicy {
@@ -162,7 +162,7 @@ func (d *Destroyer) Run(ctx context.Context, invInfo inventory.Info, options Des
 		}
 
 		// Register invalid objects to be retained in the inventory, if present.
-		for _, id := range vCollector.InvalidIds {
+		for _, id := range vCollector.InvalidIDs {
 			taskContext.AddInvalidObject(id)
 		}
 
@@ -176,13 +176,13 @@ func (d *Destroyer) Run(ctx context.Context, invInfo inventory.Info, options Des
 		}
 		// Create a new TaskStatusRunner to execute the taskQueue.
 		klog.V(4).Infoln("destroyer building TaskStatusRunner...")
-		deleteIds := object.UnstructuredSetToObjMetadataSet(deleteObjs)
+		deleteIDs := object.UnstructuredSetToObjMetadataSet(deleteObjs)
 		statusWatcher := d.statusWatcher
 		// Disable watcher for dry runs
 		if opts.DryRunStrategy.ClientOrServerDryRun() {
 			statusWatcher = watcher.BlindStatusWatcher{}
 		}
-		runner := taskrunner.NewTaskStatusRunner(deleteIds, statusWatcher)
+		runner := taskrunner.NewTaskStatusRunner(deleteIDs, statusWatcher)
 		klog.V(4).Infoln("destroyer running TaskStatusRunner...")
 		err = runner.Run(ctx, taskContext, taskQueue.ToChannel(), taskrunner.Options{
 			EmitStatusEvents: options.EmitStatusEvents,

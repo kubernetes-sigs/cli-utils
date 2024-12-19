@@ -249,7 +249,6 @@ func TestPodStatus(t *testing.T) {
 	}
 
 	for tn, tc := range testCases {
-		tc := tc
 		t.Run(tn, func(t *testing.T) {
 			runStatusTest(t, tc)
 		})
@@ -300,7 +299,6 @@ func TestPVCStatus(t *testing.T) {
 	}
 
 	for tn, tc := range testCases {
-		tc := tc
 		t.Run(tn, func(t *testing.T) {
 			runStatusTest(t, tc)
 		})
@@ -462,7 +460,6 @@ func TestStsStatus(t *testing.T) {
 	}
 
 	for tn, tc := range testCases {
-		tc := tc
 		t.Run(tn, func(t *testing.T) {
 			runStatusTest(t, tc)
 		})
@@ -624,7 +621,6 @@ func TestDaemonsetStatus(t *testing.T) {
 	}
 
 	for tn, tc := range testCases {
-		tc := tc
 		t.Run(tn, func(t *testing.T) {
 			runStatusTest(t, tc)
 		})
@@ -784,7 +780,6 @@ func TestDeploymentStatus(t *testing.T) {
 	}
 
 	for tn, tc := range testCases {
-		tc := tc
 		t.Run(tn, func(t *testing.T) {
 			runStatusTest(t, tc)
 		})
@@ -961,7 +956,6 @@ func TestReplicasetStatus(t *testing.T) {
 	}
 
 	for tn, tc := range testCases {
-		tc := tc
 		t.Run(tn, func(t *testing.T) {
 			runStatusTest(t, tc)
 		})
@@ -1016,7 +1010,6 @@ func TestPDBStatus(t *testing.T) {
 	}
 
 	for tn, tc := range testCases {
-		tc := tc
 		t.Run(tn, func(t *testing.T) {
 			runStatusTest(t, tc)
 		})
@@ -1144,7 +1137,6 @@ func TestCRDGenericStatus(t *testing.T) {
 	}
 
 	for tn, tc := range testCases {
-		tc := tc
 		t.Run(tn, func(t *testing.T) {
 			runStatusTest(t, tc)
 		})
@@ -1262,7 +1254,6 @@ func TestJobStatus(t *testing.T) {
 	}
 
 	for tn, tc := range testCases {
-		tc := tc
 		t.Run(tn, func(t *testing.T) {
 			runStatusTest(t, tc)
 		})
@@ -1311,7 +1302,6 @@ func TestCronJobStatus(t *testing.T) {
 	}
 
 	for tn, tc := range testCases {
-		tc := tc
 		t.Run(tn, func(t *testing.T) {
 			runStatusTest(t, tc)
 		})
@@ -1404,7 +1394,6 @@ func TestServiceStatus(t *testing.T) {
 	}
 
 	for tn, tc := range testCases {
-		tc := tc
 		t.Run(tn, func(t *testing.T) {
 			runStatusTest(t, tc)
 		})
@@ -1516,7 +1505,6 @@ func TestCRDStatus(t *testing.T) {
 	}
 
 	for tn, tc := range testCases {
-		tc := tc
 		t.Run(tn, func(t *testing.T) {
 			runStatusTest(t, tc)
 		})

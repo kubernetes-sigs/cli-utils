@@ -1629,7 +1629,7 @@ func containsEdge(edges []Edge, edge Edge) bool {
 	return false
 }
 
-// waitTaskComparer allows comparion of WaitTasks, ignoring private fields.
+// waitTaskComparer allows comparison of WaitTasks, ignoring private fields.
 func graphComparer() cmp.Option {
 	return cmp.Comparer(func(x, y *Graph) bool {
 		if x == nil {

@@ -79,7 +79,7 @@ func (t *BaseTablePrinter) PrintTable(rs ResourceStates,
 				panic(err)
 			}
 			remainingSpace := column.Width() - written
-			t.printOrDie(strings.Repeat(" ", remainingSpace))
+			t.printOrDie("%s", strings.Repeat(" ", remainingSpace))
 			if i == len(t.Columns)-1 {
 				t.printOrDie("\n")
 				linePrintCount++
@@ -105,9 +105,9 @@ func (t *BaseTablePrinter) printSubTable(resources []Resource,
 			availableWidth := column.Width()
 			if column.Name() == "resource" {
 				if j < len(resources)-1 {
-					t.printOrDie(prefix + `├─ `)
+					t.printOrDie("%s", prefix+`├─ `)
 				} else {
-					t.printOrDie(prefix + `└─ `)
+					t.printOrDie("%s", prefix+`└─ `)
 				}
 				availableWidth -= utf8.RuneCountInString(prefix) + 3
 			}
@@ -117,7 +117,7 @@ func (t *BaseTablePrinter) printSubTable(resources []Resource,
 				panic(err)
 			}
 			remainingSpace := availableWidth - written
-			t.printOrDie(strings.Repeat(" ", remainingSpace))
+			t.printOrDie("%s", strings.Repeat(" ", remainingSpace))
 			if i == len(t.Columns)-1 {
 				t.printOrDie("\n")
 				linePrintCount++

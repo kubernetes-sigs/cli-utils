@@ -182,9 +182,9 @@ func (t *TaskQueueBuilder) Build(taskContext *taskrunner.TaskContext, o Options)
 				t.newApplyTask(applySet, t.ApplyFilters, t.ApplyMutators, o))
 			// dry-run skips wait tasks
 			if !o.DryRunStrategy.ClientOrServerDryRun() {
-				applyIds := object.UnstructuredSetToObjMetadataSet(applySet)
+				applyIDs := object.UnstructuredSetToObjMetadataSet(applySet)
 				tasks = append(tasks,
-					t.newWaitTask(applyIds, taskrunner.AllCurrent, o.ReconcileTimeout))
+					t.newWaitTask(applyIDs, taskrunner.AllCurrent, o.ReconcileTimeout))
 			}
 		}
 	}
@@ -206,14 +206,14 @@ func (t *TaskQueueBuilder) Build(taskContext *taskrunner.TaskContext, o Options)
 				t.newPruneTask(pruneSet, t.PruneFilters, o))
 			// dry-run skips wait tasks
 			if !o.DryRunStrategy.ClientOrServerDryRun() {
-				pruneIds := object.UnstructuredSetToObjMetadataSet(pruneSet)
+				pruneIDs := object.UnstructuredSetToObjMetadataSet(pruneSet)
 				tasks = append(tasks,
-					t.newWaitTask(pruneIds, taskrunner.AllNotFound, o.PruneTimeout))
+					t.newWaitTask(pruneIDs, taskrunner.AllNotFound, o.PruneTimeout))
 			}
 		}
 	}
 
-	prevInvIds, _ := t.InvClient.GetClusterObjs(t.invInfo)
+	prevInvIDs, _ := t.InvClient.GetClusterObjs(t.invInfo)
 	klog.V(2).Infoln("adding delete/update inventory task")
 	var taskName string
 	if o.Destroy {
@@ -225,7 +225,7 @@ func (t *TaskQueueBuilder) Build(taskContext *taskrunner.TaskContext, o Options)
 		TaskName:      taskName,
 		InvClient:     t.InvClient,
 		InvInfo:       t.invInfo,
-		PrevInventory: prevInvIds,
+		PrevInventory: prevInvIDs,
 		DryRun:        o.DryRunStrategy,
 		Destroy:       o.Destroy,
 	})
@@ -257,13 +257,13 @@ func (t *TaskQueueBuilder) newApplyTask(applyObjs object.UnstructuredSet,
 
 // AppendWaitTask appends a task to wait on the passed objects to the task queue.
 // Returns a pointer to the Builder to chain function calls.
-func (t *TaskQueueBuilder) newWaitTask(waitIds object.ObjMetadataSet, condition taskrunner.Condition,
+func (t *TaskQueueBuilder) newWaitTask(waitIDs object.ObjMetadataSet, condition taskrunner.Condition,
 	waitTimeout time.Duration) taskrunner.Task {
-	waitIds = t.Collector.FilterInvalidIds(waitIds)
+	waitIDs = t.Collector.FilterInvalidIds(waitIDs)
 	klog.V(2).Infoln("adding wait task")
 	task := taskrunner.NewWaitTask(
 		fmt.Sprintf("wait-%d", t.waitCounter),
-		waitIds,
+		waitIDs,
 		condition,
 		waitTimeout,
 		t.Mapper,
