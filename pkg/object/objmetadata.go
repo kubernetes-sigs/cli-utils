@@ -93,7 +93,15 @@ func ParseObjMetadata(s string) (ObjMetadata, error) {
 	name = strings.ReplaceAll(name, colonTranscoded, ":")
 	// Check that there are no extra fields by search for fieldSeparator.
 	if strings.Contains(name, fieldSeparator) {
-		return NilObjMetadata, fmt.Errorf("too many fields within: %s", s)
+		// RBAC resources only need to satisfy Path Segment requirements
+		// This can lead to extra field separators in resource name
+		groupkind := schema.GroupKind{
+			Group: group,
+			Kind:  kind,
+		}
+		if _, exists := RBACGroupKind[groupkind]; !exists {
+			return NilObjMetadata, fmt.Errorf("too many fields within: %s", s)
+		}
 	}
 	// Create the ObjMetadata object from the four parsed fields.
 	id := ObjMetadata{
