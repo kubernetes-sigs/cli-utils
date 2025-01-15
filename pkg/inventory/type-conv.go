@@ -30,3 +30,19 @@ func ObjMetadataFromObjectReference(ref actuation.ObjectReference) object.ObjMet
 		Namespace: ref.Namespace,
 	}
 }
+
+func ObjectReferenceListFromObjMetadataSet(ids []object.ObjMetadata) []actuation.ObjectReference {
+	var refs []actuation.ObjectReference
+	for _, ref := range ids {
+		refs = append(refs, ObjectReferenceFromObjMetadata(ref))
+	}
+	return refs
+}
+
+func ObjMetadataSetFromObjectReferenceList(refs []actuation.ObjectReference) object.ObjMetadataSet {
+	var ids object.ObjMetadataSet
+	for _, ref := range refs {
+		ids = append(ids, ObjMetadataFromObjectReference(ref))
+	}
+	return ids
+}

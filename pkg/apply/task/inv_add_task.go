@@ -18,6 +18,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
+	"sigs.k8s.io/cli-utils/pkg/inventory2"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
@@ -30,12 +31,13 @@ var (
 // before the actual object is applied.
 type InvAddTask struct {
 	TaskName      string
-	InvClient     inventory.Client
+	InvClient     inventory2.Client
 	DynamicClient dynamic.Interface
 	Mapper        meta.RESTMapper
 	InvInfo       inventory.Info
 	Objects       object.UnstructuredSet
 	DryRun        common.DryRunStrategy
+	StatusPolicy  inventory.StatusPolicy
 }
 
 func (i *InvAddTask) Name() string {
@@ -71,9 +73,41 @@ func (i *InvAddTask) Start(taskContext *taskrunner.TaskContext) {
 		}
 		klog.V(4).Infof("merging %d local objects into inventory", len(i.Objects))
 		currentObjs := object.UnstructuredSetToObjMetadataSet(i.Objects)
-		_, err := i.InvClient.Merge(i.InvInfo, currentObjs, i.DryRun)
+		err := i.extendInventory(currentObjs)
 		i.sendTaskResult(taskContext, err)
 	}()
+}
+
+// extendInventory adds the specified objects to the inventory, if not already
+// present.
+func (i *InvAddTask) extendInventory(objs object.ObjMetadataSet) error {
+	if len(objs) == 0 {
+		return nil
+	}
+	id := inventory2.ID{
+		Name:      i.InvInfo.Name(),
+		Namespace: i.InvInfo.Namespace(),
+	}
+	inv, err := i.InvClient.Get(context.TODO(), id)
+	if err != nil {
+		return fmt.Errorf("getting inventory: %w")
+	}
+
+	oldObjs := inventory.ObjMetadataSetFromObjectReferenceList(inv.Spec.Objects)
+	newObjs := oldObjs.Union(objs)
+	inv.Spec.Objects = inventory.ObjectReferenceListFromObjMetadataSet(newObjs)
+
+	if err = i.InvClient.Update(context.TODO(), inv, i.updateOptionList()...); err != nil {
+		return fmt.Errorf("updating inventory: %w")
+	}
+	return nil
+}
+
+func (i *InvAddTask) updateOptionList() []inventory2.UpdateOption {
+	return []inventory2.UpdateOption{
+		inventory2.WithDryRun(i.DryRun),
+		inventory2.WithStatus(i.StatusPolicy),
+	}
 }
 
 // Cancel is not supported by the InvAddTask.
