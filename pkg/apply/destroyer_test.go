@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
-	"sigs.k8s.io/cli-utils/pkg/inventory"
 	pollevent "sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
 	"sigs.k8s.io/cli-utils/pkg/object"
@@ -314,15 +313,13 @@ func TestDestroyerCancel(t *testing.T) {
 		t.Run(tn, func(t *testing.T) {
 			statusWatcher := newFakeWatcher(tc.statusEvents)
 
-			invInfo, err := tc.invInfo.toWrapped()
-			require.NoError(t, err)
-			cm, err := inventory.InvInfoToConfigMap(invInfo)
+			invInfo, err := tc.invInfo.toInfo()
 			require.NoError(t, err)
 
 			destroyer := newTestDestroyer(t,
 				tc.invInfo,
 				// Add the inventory to the cluster (to allow deletion)
-				append(tc.clusterObjs, cm),
+				append(tc.clusterObjs, tc.invInfo.toUnstructured()),
 				statusWatcher,
 			)
 
