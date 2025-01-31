@@ -14,6 +14,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/util"
+	"sigs.k8s.io/cli-utils/pkg/apis/actuation"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/apply/taskrunner"
 	"sigs.k8s.io/cli-utils/pkg/common"
@@ -30,10 +31,10 @@ var (
 // before the actual object is applied.
 type InvAddTask struct {
 	TaskName      string
-	InvClient     inventory.Client
+	Inventory     inventory.Inventory
+	InvClient     inventory.WriteClient
 	DynamicClient dynamic.Interface
 	Mapper        meta.RESTMapper
-	InvInfo       inventory.Info
 	Objects       object.UnstructuredSet
 	DryRun        common.DryRunStrategy
 }
@@ -60,8 +61,9 @@ func (i *InvAddTask) Start(taskContext *taskrunner.TaskContext) {
 			return
 		}
 		// If the inventory is namespaced, ensure the namespace exists
-		if i.InvInfo.Namespace() != "" {
-			if invNamespace := inventoryNamespaceInSet(i.InvInfo, i.Objects); invNamespace != nil {
+		invInfo := i.Inventory.Info()
+		if invInfo.GetNamespace() != "" {
+			if invNamespace := inventoryNamespaceInSet(invInfo, i.Objects); invNamespace != nil {
 				if err := i.createNamespace(taskContext.Context(), invNamespace, i.DryRun); err != nil {
 					err = fmt.Errorf("failed to create inventory namespace: %w", err)
 					i.sendTaskResult(taskContext, err)
@@ -71,7 +73,18 @@ func (i *InvAddTask) Start(taskContext *taskrunner.TaskContext) {
 		}
 		klog.V(4).Infof("merging %d local objects into inventory", len(i.Objects))
 		currentObjs := object.UnstructuredSetToObjMetadataSet(i.Objects)
-		_, err := i.InvClient.Merge(taskContext.Context(), i.InvInfo, currentObjs, i.DryRun)
+		inventoryObjs := i.Inventory.GetObjectRefs()
+		unionObjs := inventoryObjs.Union(currentObjs)
+		pruneObjs := inventoryObjs.Diff(currentObjs)
+
+		i.Inventory.SetObjectRefs(unionObjs)
+		i.Inventory.SetObjectStatuses(i.getObjStatus(pruneObjs, unionObjs))
+
+		var err error
+		if !i.DryRun.ClientOrServerDryRun() {
+			err = i.InvClient.CreateOrUpdate(taskContext.Context(), i.Inventory, inventory.UpdateOptions{})
+		}
+
 		i.sendTaskResult(taskContext, err)
 	}()
 }
@@ -89,12 +102,12 @@ func inventoryNamespaceInSet(inv inventory.Info, objs object.UnstructuredSet) *u
 	if inv == nil {
 		return nil
 	}
-	invNamespace := inv.Namespace()
+	invNamespace := inv.GetNamespace()
 
 	for _, obj := range objs {
 		gvk := obj.GetObjectKind().GroupVersionKind()
 		if gvk == namespaceGVKv1 && obj.GetName() == invNamespace {
-			inventory.AddInventoryIDAnnotation(obj, inv)
+			inventory.AddInventoryIDAnnotation(obj, inv.GetID())
 			return obj
 		}
 	}
@@ -135,4 +148,28 @@ func (i *InvAddTask) sendTaskResult(taskContext *taskrunner.TaskContext, err err
 	taskContext.TaskChannel() <- taskrunner.TaskResult{
 		Err: err,
 	}
+}
+
+// getObjStatus returns the list of object status
+// at the beginning of an apply process.
+func (i *InvAddTask) getObjStatus(pruneIDs, unionIDs []object.ObjMetadata) []actuation.ObjectStatus {
+	var status []actuation.ObjectStatus
+	pruneMap := make(map[object.ObjMetadata]bool)
+	for _, obj := range pruneIDs {
+		pruneMap[obj] = true
+	}
+	for _, obj := range unionIDs {
+		strategy := actuation.ActuationStrategyApply
+		if isPruneObj, ok := pruneMap[obj]; ok && isPruneObj {
+			strategy = actuation.ActuationStrategyDelete
+		}
+		status = append(status,
+			actuation.ObjectStatus{
+				ObjectReference: inventory.ObjectReferenceFromObjMetadata(obj),
+				Strategy:        strategy,
+				Actuation:       actuation.ActuationPending,
+				Reconcile:       actuation.ReconcilePending,
+			})
+	}
+	return status
 }

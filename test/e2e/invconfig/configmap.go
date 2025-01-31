@@ -19,7 +19,6 @@ import (
 func NewConfigMapTypeInvConfig(cfg *rest.Config) InventoryConfig {
 	return InventoryConfig{
 		ClientConfig: cfg,
-		Strategy:     inventory.LabelStrategy,
 		FactoryFunc:  cmInventoryManifest,
 		InvWrapperFunc: func(obj *unstructured.Unstructured) inventory.Info {
 			info, err := inventory.ConfigMapToInventoryInfo(obj)
