@@ -148,12 +148,13 @@ func TestInvAddTask(t *testing.T) {
 			}
 
 			task := InvAddTask{
-				TaskName:      taskName,
-				InvClient:     client,
-				InvInfo:       localInv,
-				Objects:       tc.applyObjs,
-				DynamicClient: tf.FakeDynamicClient,
-				Mapper:        mapper,
+				TaskName:         taskName,
+				InvClient:        client,
+				InvInfo:          localInv,
+				ClusterInventory: client.Inv,
+				Objects:          tc.applyObjs,
+				DynamicClient:    tf.FakeDynamicClient,
+				Mapper:           mapper,
 			}
 			if taskName != task.Name() {
 				t.Errorf("expected task name (%s), got (%s)", taskName, task.Name())
@@ -167,8 +168,8 @@ func TestInvAddTask(t *testing.T) {
 			if result.Err != nil {
 				t.Errorf("unexpected error running InvAddTask: %s", result.Err)
 			}
-			actual, _ := client.GetClusterObjs(t.Context(), nil)
-			if !tc.expectedObjs.Equal(actual) {
+			actual, _ := client.Get(t.Context(), nil, inventory.GetOptions{})
+			if !tc.expectedObjs.Equal(actual.Objects()) {
 				t.Errorf("expected merged inventory (%s), got (%s)", tc.expectedObjs, actual)
 			}
 			if createdNamespace != tc.expectCreateNamespace {

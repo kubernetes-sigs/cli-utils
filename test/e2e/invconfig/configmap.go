@@ -32,18 +32,14 @@ func NewConfigMapTypeInvConfig(cfg *rest.Config) InventoryConfig {
 func newDefaultInvApplierFactory(cfg *rest.Config) applierFactoryFunc {
 	cfgPtrCopy := cfg
 	return func() *apply.Applier {
-		return newApplier(inventory.ClusterClientFactory{
-			StatusPolicy: inventory.StatusPolicyAll,
-		}, cfgPtrCopy)
+		return newApplier(inventory.ClusterClientFactory{}, inventory.StatusPolicyNone, cfgPtrCopy)
 	}
 }
 
 func newDefaultInvDestroyerFactory(cfg *rest.Config) destroyerFactoryFunc {
 	cfgPtrCopy := cfg
 	return func() *apply.Destroyer {
-		return newDestroyer(inventory.ClusterClientFactory{
-			StatusPolicy: inventory.StatusPolicyAll,
-		}, cfgPtrCopy)
+		return newDestroyer(inventory.ClusterClientFactory{}, inventory.StatusPolicyNone, cfgPtrCopy)
 	}
 }
 

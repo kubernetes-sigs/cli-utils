@@ -122,18 +122,11 @@ metadata:
 
 // Returns a inventory object with the inventory set from
 // the passed "children".
-func createInventoryInfo(children ...*unstructured.Unstructured) inventory.Info {
+func createInventoryInfo(children ...*unstructured.Unstructured) inventory.Inventory {
 	inventoryObjCopy := inventoryObj.DeepCopy()
 	wrappedInv := inventory.WrapInventoryObj(inventoryObjCopy)
-	objs := object.UnstructuredSetToObjMetadataSet(children)
-	if err := wrappedInv.Store(objs, nil); err != nil {
-		return nil
-	}
-	obj, err := wrappedInv.GetObject()
-	if err != nil {
-		return nil
-	}
-	return inventory.WrapInventoryInfoObj(obj)
+	wrappedInv.SetObjects(object.UnstructuredSetToObjMetadataSet(children))
+	return wrappedInv
 }
 
 // podDeletionPrevention object contains the "on-remove:keep" lifecycle directive.

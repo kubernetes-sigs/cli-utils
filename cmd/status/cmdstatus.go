@@ -164,10 +164,12 @@ func (r *Runner) loadInvFromDisk(cmd *cobra.Command, args []string) (*printer.Pr
 
 	// Based on the inventory template manifest we look up the inventory
 	// from the live state using the inventory client.
-	identifiers, err := invClient.GetClusterObjs(cmd.Context(), inv)
+	clusterInventory, err := invClient.Get(cmd.Context(), inv, inventory.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
+
+	identifiers := clusterInventory.Objects()
 
 	printData := printer.PrintData{
 		Identifiers: object.ObjMetadataSet{},
@@ -201,9 +203,14 @@ func (r *Runner) listInvFromCluster() (*printer.PrintData, error) {
 		StatusSet:   r.statusSet,
 	}
 
-	identifiersMap, err := invClient.ListClusterInventoryObjs(r.ctx)
+	inventories, err := invClient.List(r.ctx, inventory.ListOptions{})
 	if err != nil {
 		return nil, err
+	}
+
+	identifiersMap := make(map[string]object.ObjMetadataSet)
+	for _, inv := range inventories {
+		identifiersMap[inv.ID()] = inv.Objects()
 	}
 
 	for invName, identifiers := range identifiersMap {
