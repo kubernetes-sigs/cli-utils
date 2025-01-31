@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -52,9 +53,9 @@ type Applier struct {
 
 // prepareObjects returns the set of objects to apply and to prune or
 // an error if one occurred.
-func (a *Applier) prepareObjects(localInv inventory.Info, localObjs object.UnstructuredSet,
+func (a *Applier) prepareObjects(clusterInv inventory.Inventory, localObjs object.UnstructuredSet,
 	o ApplierOptions) (object.UnstructuredSet, object.UnstructuredSet, error) {
-	if localInv == nil {
+	if clusterInv == nil {
 		return nil, nil, fmt.Errorf("the local inventory can't be nil")
 	}
 	if err := inventory.ValidateNoInventory(localObjs); err != nil {
@@ -62,9 +63,9 @@ func (a *Applier) prepareObjects(localInv inventory.Info, localObjs object.Unstr
 	}
 	// Add the inventory annotation to the resources being applied.
 	for _, localObj := range localObjs {
-		inventory.AddInventoryIDAnnotation(localObj, localInv)
+		inventory.AddInventoryIDAnnotation(localObj, clusterInv.ID())
 	}
-	pruneObjs, err := a.pruner.GetPruneObjs(localInv, localObjs, prune.Options{
+	pruneObjs, err := a.pruner.GetPruneObjs(clusterInv, localObjs, prune.Options{
 		DryRunStrategy: o.DryRunStrategy,
 	})
 	if err != nil {
@@ -96,8 +97,20 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.Info, objects objec
 		}
 		validator.Validate(objects)
 
+		clusterInventory, err := a.invClient.Get(ctx, invInfo, inventory.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			clusterInventory = invInfo.InitialInventory()
+		} else if err != nil {
+			handleError(eventChannel, err)
+			return
+		}
+		if clusterInventory.ID() != invInfo.ID() {
+			handleError(eventChannel, fmt.Errorf("inventory-id of inventory object %s/%s in cluster doesn't match provided id %q",
+				invInfo.Namespace(), invInfo.Name(), invInfo.ID()))
+		}
+
 		// Decide which objects to apply and which to prune
-		applyObjs, pruneObjs, err := a.prepareObjects(invInfo, objects, options)
+		applyObjs, pruneObjs, err := a.prepareObjects(clusterInventory, objects, options)
 		if err != nil {
 			handleError(eventChannel, err)
 			return
@@ -154,6 +167,7 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.Info, objects objec
 			OpenAPIGetter: a.openAPIGetter,
 			InfoHelper:    a.infoHelper,
 			Mapper:        a.mapper,
+			Inventory:     clusterInventory,
 			InvClient:     a.invClient,
 			Collector:     vCollector,
 			ApplyFilters:  applyFilters,

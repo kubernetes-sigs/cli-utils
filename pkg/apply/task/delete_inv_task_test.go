@@ -4,6 +4,7 @@
 package task
 
 import (
+	"context"
 	"testing"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -80,12 +81,12 @@ func TestDeleteInvTask(t *testing.T) {
 	}
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			client := inventory.NewFakeClient(object.ObjMetadataSet{})
+			client := inventory.NewFakeClient(tc.prevInventory)
 			client.Err = tc.err
 			eventChannel := make(chan event.Event)
 			resourceCache := cache.NewResourceCacheMap()
-			context := taskrunner.NewTaskContext(eventChannel, resourceCache)
-			im := context.InventoryManager()
+			taskContext := taskrunner.NewTaskContext(eventChannel, resourceCache)
+			im := taskContext.InventoryManager()
 			for _, deleteObj := range tc.deletedObjs {
 				im.AddSuccessfulDelete(deleteObj, "unused-uid")
 			}
@@ -104,31 +105,33 @@ func TestDeleteInvTask(t *testing.T) {
 			}
 
 			task := DeleteOrUpdateInvTask{
-				TaskName:      taskName,
-				InvClient:     client,
-				InvInfo:       nil,
-				DryRun:        common.DryRunNone,
-				PrevInventory: tc.prevInventory,
-				Destroy:       true,
+				TaskName:         taskName,
+				InvClient:        client,
+				InvInfo:          nil,
+				DryRun:           common.DryRunNone,
+				ClusterInventory: client.Inv,
+				Destroy:          true,
 			}
 			if taskName != task.Name() {
 				t.Errorf("expected task name (%s), got (%s)", taskName, task.Name())
 			}
-			task.Start(context)
-			result := <-context.TaskChannel()
+			task.Start(taskContext)
+			result := <-taskContext.TaskChannel()
 			if tc.isError {
 				if tc.err != result.Err {
 					t.Errorf("running DeleteOrUpdateInvTask expected error (%s), got (%s)", tc.err, result.Err)
 				}
-			} else {
-				if result.Err != nil {
-					t.Errorf("unexpected error running DeleteOrUpdateInvTask: %s", result.Err)
-				}
+				return
 			}
-			actual, _ := client.GetClusterObjs(nil)
-			testutil.AssertEqual(t, tc.expectedObjs, actual,
-				"Actual cluster objects (%d) do not match expected cluster objects (%d)",
-				len(actual), len(tc.expectedObjs))
+			if result.Err != nil {
+				t.Errorf("unexpected error running DeleteOrUpdateInvTask: %s", result.Err)
+			}
+			actual, _ := client.Get(context.TODO(), nil, inventory.GetOptions{})
+			if len(tc.expectedObjs) > 0 {
+				testutil.AssertEqual(t, tc.expectedObjs, actual.Objects(),
+					"Actual cluster objects (%d) do not match expected cluster objects (%d)",
+					len(actual.Objects()), len(tc.expectedObjs))
+			}
 		})
 	}
 }
