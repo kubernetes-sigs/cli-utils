@@ -30,10 +30,10 @@ var (
 // before the actual object is applied.
 type InvAddTask struct {
 	TaskName      string
-	InvClient     inventory.Client
+	Inventory     inventory.Inventory
+	InvClient     inventory.WriteClient
 	DynamicClient dynamic.Interface
 	Mapper        meta.RESTMapper
-	InvInfo       inventory.Info
 	Objects       object.UnstructuredSet
 	DryRun        common.DryRunStrategy
 }
@@ -60,8 +60,8 @@ func (i *InvAddTask) Start(taskContext *taskrunner.TaskContext) {
 			return
 		}
 		// If the inventory is namespaced, ensure the namespace exists
-		if i.InvInfo.Namespace() != "" {
-			if invNamespace := inventoryNamespaceInSet(i.InvInfo, i.Objects); invNamespace != nil {
+		if i.Inventory.Namespace() != "" {
+			if invNamespace := inventoryNamespaceInSet(i.Inventory, i.Objects); invNamespace != nil {
 				if err := i.createNamespace(taskContext.Context(), invNamespace, i.DryRun); err != nil {
 					err = fmt.Errorf("failed to create inventory namespace: %w", err)
 					i.sendTaskResult(taskContext, err)
@@ -71,7 +71,16 @@ func (i *InvAddTask) Start(taskContext *taskrunner.TaskContext) {
 		}
 		klog.V(4).Infof("merging %d local objects into inventory", len(i.Objects))
 		currentObjs := object.UnstructuredSetToObjMetadataSet(i.Objects)
-		_, err := i.InvClient.Merge(taskContext.Context(), i.InvInfo, currentObjs, i.DryRun)
+		inventoryObjs := i.Inventory.ObjectRefs()
+		unionObjs := inventoryObjs.Union(currentObjs)
+
+		i.Inventory.SetObjectRefs(unionObjs)
+
+		var err error
+		if !i.DryRun.ClientOrServerDryRun() {
+			err = i.InvClient.CreateOrUpdate(taskContext.Context(), i.Inventory, inventory.UpdateOptions{})
+		}
+
 		i.sendTaskResult(taskContext, err)
 	}()
 }
@@ -94,7 +103,7 @@ func inventoryNamespaceInSet(inv inventory.Info, objs object.UnstructuredSet) *u
 	for _, obj := range objs {
 		gvk := obj.GetObjectKind().GroupVersionKind()
 		if gvk == namespaceGVKv1 && obj.GetName() == invNamespace {
-			inventory.AddInventoryIDAnnotation(obj, inv)
+			inventory.AddInventoryIDAnnotation(obj, inv.ID())
 			return obj
 		}
 	}

@@ -95,13 +95,13 @@ type Runner struct {
 	timeout   time.Duration
 	output    string
 
-	invType          string
-	inventoryNames   string
-	inventoryNameSet map[string]bool
-	namespaces       string
-	namespaceSet     map[string]bool
-	statuses         string
-	statusSet        map[string]bool
+	invType        string
+	inventoryNames string
+	inventoryIDSet map[string]bool
+	namespaces     string
+	namespaceSet   map[string]bool
+	statuses       string
+	statusSet      map[string]bool
 
 	PollerFactoryFunc func(cmdutil.Factory) (poller.Poller, error)
 }
@@ -124,9 +124,9 @@ func (r *Runner) preRunE(*cobra.Command, []string) error {
 	}
 
 	if r.inventoryNames != "" {
-		r.inventoryNameSet = make(map[string]bool)
+		r.inventoryIDSet = make(map[string]bool)
 		for _, name := range strings.Split(r.inventoryNames, ",") {
-			r.inventoryNameSet[name] = true
+			r.inventoryIDSet[name] = true
 		}
 	}
 
@@ -164,14 +164,16 @@ func (r *Runner) loadInvFromDisk(cmd *cobra.Command, args []string) (*printer.Pr
 
 	// Based on the inventory template manifest we look up the inventory
 	// from the live state using the inventory client.
-	identifiers, err := invClient.GetClusterObjs(cmd.Context(), inv)
+	clusterInventory, err := invClient.Get(cmd.Context(), inv, inventory.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
 
+	identifiers := clusterInventory.ObjectRefs()
+
 	printData := printer.PrintData{
 		Identifiers: object.ObjMetadataSet{},
-		InvNameMap:  make(map[object.ObjMetadata]string),
+		InvIDMap:    make(map[object.ObjMetadata]fmt.Stringer),
 		StatusSet:   r.statusSet,
 	}
 
@@ -179,7 +181,7 @@ func (r *Runner) loadInvFromDisk(cmd *cobra.Command, args []string) (*printer.Pr
 		// check if the object is under one of the targeted namespaces
 		if _, ok := r.namespaceSet[obj.Namespace]; ok || len(r.namespaceSet) == 0 {
 			// add to the map for future reference
-			printData.InvNameMap[obj] = inv.Name()
+			printData.InvIDMap[obj] = inv.ID()
 			// append to identifiers
 			printData.Identifiers = append(printData.Identifiers, obj)
 		}
@@ -197,18 +199,23 @@ func (r *Runner) listInvFromCluster() (*printer.PrintData, error) {
 	// initialize maps in printData
 	printData := printer.PrintData{
 		Identifiers: object.ObjMetadataSet{},
-		InvNameMap:  make(map[object.ObjMetadata]string),
+		InvIDMap:    make(map[object.ObjMetadata]fmt.Stringer),
 		StatusSet:   r.statusSet,
 	}
 
-	identifiersMap, err := invClient.ListClusterInventoryObjs(r.ctx)
+	inventories, err := invClient.List(r.ctx, inventory.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
 
-	for invName, identifiers := range identifiersMap {
+	identifiersMap := make(map[inventory.ID]object.ObjMetadataSet)
+	for _, inv := range inventories {
+		identifiersMap[inv.ID()] = inv.ObjectRefs()
+	}
+
+	for invID, identifiers := range identifiersMap {
 		// Check if there are targeted inventory names and include the current inventory name
-		if _, ok := r.inventoryNameSet[invName]; !ok && len(r.inventoryNameSet) != 0 {
+		if _, ok := r.inventoryIDSet[invID.String()]; !ok && len(r.inventoryIDSet) != 0 {
 			continue
 		}
 		// Filter objects
@@ -216,7 +223,7 @@ func (r *Runner) listInvFromCluster() (*printer.PrintData, error) {
 			// check if the object is under one of the targeted namespaces
 			if _, ok := r.namespaceSet[obj.Namespace]; ok || len(r.namespaceSet) == 0 {
 				// add to the map for future reference
-				printData.InvNameMap[obj] = invName
+				printData.InvIDMap[obj] = invID
 				// append to identifiers
 				printData.Identifiers = append(printData.Identifiers, obj)
 			}

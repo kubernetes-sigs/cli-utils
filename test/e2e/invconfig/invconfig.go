@@ -5,7 +5,6 @@ package invconfig
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -14,7 +13,6 @@ import (
 	"k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/cli-utils/pkg/apply"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
-	"sigs.k8s.io/cli-utils/test/e2e/e2eutil"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -28,7 +26,6 @@ type invNotExistsFunc func(ctx context.Context, c client.Client, name, namespace
 
 type InventoryConfig struct {
 	ClientConfig         *rest.Config
-	Strategy             inventory.Strategy
 	FactoryFunc          inventoryFactoryFunc
 	InvWrapperFunc       invWrapperFunc
 	ApplierFactoryFunc   applierFactoryFunc
@@ -39,14 +36,7 @@ type InventoryConfig struct {
 }
 
 func CreateInventoryInfo(invConfig InventoryConfig, inventoryName, namespaceName, inventoryID string) inventory.Info {
-	switch invConfig.Strategy {
-	case inventory.NameStrategy:
-		return invConfig.InvWrapperFunc(invConfig.FactoryFunc(inventoryName, namespaceName, e2eutil.RandomString("inventory-")))
-	case inventory.LabelStrategy:
-		return invConfig.InvWrapperFunc(invConfig.FactoryFunc(e2eutil.RandomString("inventory-"), namespaceName, inventoryID))
-	default:
-		panic(fmt.Errorf("unknown inventory strategy %q", invConfig.Strategy))
-	}
+	return invConfig.InvWrapperFunc(invConfig.FactoryFunc(inventoryName, namespaceName, inventoryID))
 }
 
 func newFactory(cfg *rest.Config) util.Factory {
@@ -61,7 +51,7 @@ func newFactory(cfg *rest.Config) util.Factory {
 	return util.NewFactory(matchVersionKubeConfigFlags)
 }
 
-func newApplier(invFactory inventory.ClientFactory, cfg *rest.Config) *apply.Applier {
+func newApplier(invFactory inventory.ClientFactory, statusPolicy inventory.StatusPolicy, cfg *rest.Config) *apply.Applier {
 	f := newFactory(cfg)
 	invClient, err := invFactory.NewClient(f)
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -69,12 +59,13 @@ func newApplier(invFactory inventory.ClientFactory, cfg *rest.Config) *apply.App
 	a, err := apply.NewApplierBuilder().
 		WithFactory(f).
 		WithInventoryClient(invClient).
+		WithStatusPolicy(statusPolicy).
 		Build()
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	return a
 }
 
-func newDestroyer(invFactory inventory.ClientFactory, cfg *rest.Config) *apply.Destroyer {
+func newDestroyer(invFactory inventory.ClientFactory, statusPolicy inventory.StatusPolicy, cfg *rest.Config) *apply.Destroyer {
 	f := newFactory(cfg)
 	invClient, err := invFactory.NewClient(f)
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -82,6 +73,7 @@ func newDestroyer(invFactory inventory.ClientFactory, cfg *rest.Config) *apply.D
 	d, err := apply.NewDestroyerBuilder().
 		WithFactory(f).
 		WithInventoryClient(invClient).
+		WithStatusPolicy(statusPolicy).
 		Build()
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	return d

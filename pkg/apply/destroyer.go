@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/discovery"
@@ -38,6 +39,7 @@ type Destroyer struct {
 	client        dynamic.Interface
 	openAPIGetter discovery.OpenAPISchemaInterface
 	infoHelper    info.Helper
+	statusPolicy  inventory.StatusPolicy
 }
 
 type DestroyerOptions struct {
@@ -79,10 +81,23 @@ func (d *Destroyer) Run(ctx context.Context, invInfo inventory.Info, options Des
 	setDestroyerDefaults(&options)
 	go func() {
 		defer close(eventChannel)
+		inv, err := d.invClient.Get(ctx, invInfo, inventory.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			inv = invInfo.NewEmptyInventory()
+		} else if err != nil {
+			handleError(eventChannel, err)
+			return
+		}
+		if inv.ID() != invInfo.ID() {
+			handleError(eventChannel, fmt.Errorf("expected inventory object to have inventory-id %q but got %q",
+				invInfo.ID(), inv.ID()))
+			return
+		}
+
 		// Retrieve the objects to be deleted from the cluster. Second parameter is empty
 		// because no local objects returns all inventory objects for deletion.
 		emptyLocalObjs := object.UnstructuredSet{}
-		deleteObjs, err := d.pruner.GetPruneObjs(ctx, invInfo, emptyLocalObjs, prune.Options{
+		deleteObjs, err := d.pruner.GetPruneObjs(ctx, inv, emptyLocalObjs, prune.Options{
 			DryRunStrategy: options.DryRunStrategy,
 		})
 		if err != nil {
@@ -123,8 +138,10 @@ func (d *Destroyer) Run(ctx context.Context, invInfo inventory.Info, options Des
 			InfoHelper:    d.infoHelper,
 			Mapper:        d.mapper,
 			InvClient:     d.invClient,
+			Inventory:     inv,
 			Collector:     vCollector,
 			PruneFilters:  deleteFilters,
+			StatusPolicy:  d.statusPolicy,
 		}
 		opts := solver.Options{
 			Destroy:                true,
@@ -138,7 +155,6 @@ func (d *Destroyer) Run(ctx context.Context, invInfo inventory.Info, options Des
 		// Build the ordered set of tasks to execute.
 		taskQueue := taskBuilder.
 			WithPruneObjects(deleteObjs).
-			WithInventory(invInfo).
 			Build(taskContext, opts)
 
 		klog.V(4).Infof("validation errors: %d", len(vCollector.Errors))

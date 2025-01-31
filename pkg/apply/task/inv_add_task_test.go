@@ -19,15 +19,13 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
-var namespace = "test-namespace"
-
 var inventoryObj = &unstructured.Unstructured{
 	Object: map[string]interface{}{
 		"apiVersion": "v1",
 		"kind":       "ConfigMap",
 		"metadata": map[string]interface{}{
-			"name":      "test-inventory-obj",
-			"namespace": namespace,
+			"name":      inventory.TestInventoryName,
+			"namespace": inventory.TestInventoryNamespace,
 			"labels": map[string]interface{}{
 				common.InventoryLabel: "test-app-label",
 			},
@@ -41,7 +39,7 @@ var obj1 = &unstructured.Unstructured{
 		"kind":       "Pod",
 		"metadata": map[string]interface{}{
 			"name":      "obj1",
-			"namespace": namespace,
+			"namespace": inventory.TestInventoryNamespace,
 		},
 	},
 }
@@ -52,7 +50,7 @@ var obj2 = &unstructured.Unstructured{
 		"kind":       "Job",
 		"metadata": map[string]interface{}{
 			"name":      "obj2",
-			"namespace": namespace,
+			"namespace": inventory.TestInventoryNamespace,
 		},
 	},
 }
@@ -73,7 +71,7 @@ var nsObj = &unstructured.Unstructured{
 		"apiVersion": "v1",
 		"kind":       "Namespace",
 		"metadata": map[string]interface{}{
-			"name": namespace,
+			"name": inventory.TestInventoryNamespace,
 		},
 	},
 }
@@ -81,8 +79,6 @@ var nsObj = &unstructured.Unstructured{
 const taskName = "test-inventory-task"
 
 func TestInvAddTask(t *testing.T) {
-	localInv, err := inventory.ConfigMapToInventoryInfo(inventoryObj)
-	require.NoError(t, err)
 	id1 := object.UnstructuredToObjMetadata(obj1)
 	id2 := object.UnstructuredToObjMetadata(obj2)
 	id3 := object.UnstructuredToObjMetadata(obj3)
@@ -134,7 +130,7 @@ func TestInvAddTask(t *testing.T) {
 			eventChannel := make(chan event.Event)
 			resourceCache := cache.NewResourceCacheMap()
 			taskContext := taskrunner.NewTaskContext(t.Context(), eventChannel, resourceCache)
-			tf := cmdtesting.NewTestFactory().WithNamespace(namespace)
+			tf := cmdtesting.NewTestFactory().WithNamespace(inventory.TestInventoryNamespace)
 			defer tf.Cleanup()
 
 			createdNamespace := false
@@ -151,7 +147,7 @@ func TestInvAddTask(t *testing.T) {
 			task := InvAddTask{
 				TaskName:      taskName,
 				InvClient:     client,
-				InvInfo:       localInv,
+				Inventory:     client.Inv,
 				Objects:       tc.applyObjs,
 				DynamicClient: tf.FakeDynamicClient,
 				Mapper:        mapper,
@@ -168,8 +164,9 @@ func TestInvAddTask(t *testing.T) {
 			if result.Err != nil {
 				t.Errorf("unexpected error running InvAddTask: %s", result.Err)
 			}
-			actual, _ := client.GetClusterObjs(t.Context(), nil)
-			if !tc.expectedObjs.Equal(actual) {
+			// argument doesn't matter for fake client, it always returns cached obj
+			actual, _ := client.Get(t.Context(), nil, inventory.GetOptions{})
+			if !tc.expectedObjs.Equal(actual.ObjectRefs()) {
 				t.Errorf("expected merged inventory (%s), got (%s)", tc.expectedObjs, actual)
 			}
 			if createdNamespace != tc.expectCreateNamespace {
@@ -180,12 +177,12 @@ func TestInvAddTask(t *testing.T) {
 }
 
 func TestInventoryNamespaceInSet(t *testing.T) {
-	localInv, err := inventory.ConfigMapToInventoryInfo(inventoryObj)
+	localInv, err := inventory.ConfigMapToInventoryObj(inventoryObj)
 	require.NoError(t, err)
-	inventoryNamespace := createNamespace(namespace)
+	inventoryNamespace := createNamespace(inventory.TestInventoryNamespace)
 
 	tests := map[string]struct {
-		inv       inventory.Info
+		inv       inventory.Inventory
 		objects   []*unstructured.Unstructured
 		namespace *unstructured.Unstructured
 	}{

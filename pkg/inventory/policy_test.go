@@ -24,12 +24,12 @@ func (i *fakeInventoryInfo) Namespace() string {
 	return ""
 }
 
-func (i *fakeInventoryInfo) ID() string {
-	return i.id
+func (i *fakeInventoryInfo) ID() ID {
+	return ID(i.id)
 }
 
-func (i *fakeInventoryInfo) Strategy() Strategy {
-	return NameStrategy
+func (i *fakeInventoryInfo) NewEmptyInventory() Inventory {
+	panic("unimplemented")
 }
 
 func testObjectWithAnnotation(key, val string) *unstructured.Unstructured {
