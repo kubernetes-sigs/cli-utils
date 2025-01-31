@@ -11,6 +11,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	pollevent "sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
@@ -22,7 +24,7 @@ import (
 func TestDestroyerCancel(t *testing.T) {
 	testCases := map[string]struct {
 		// inventory input to destroyer
-		invInfo inventoryInfo
+		invObj *unstructured.Unstructured
 		// objects in the cluster
 		clusterObjs object.UnstructuredSet
 		// options input to destroyer.Run
@@ -44,14 +46,15 @@ func TestDestroyerCancel(t *testing.T) {
 			expectRunTimeout: true,
 			runTimeout:       2 * time.Second,
 			testTimeout:      30 * time.Second,
-			invInfo: inventoryInfo{
-				name:      "abc-123",
-				namespace: "test",
-				id:        "test",
-				set: object.ObjMetadataSet{
+			invObj: newInventoryObj(
+				inventory.NewSingleObjectInfo("test", types.NamespacedName{
+					Name:      "abc-123",
+					Namespace: "test",
+				}),
+				object.ObjMetadataSet{
 					testutil.ToIdentifier(t, resources["deployment"]),
 				},
-			},
+			),
 			clusterObjs: object.UnstructuredSet{
 				testutil.Unstructured(t, resources["deployment"], testutil.AddOwningInv(t, "test")),
 			},
@@ -167,14 +170,15 @@ func TestDestroyerCancel(t *testing.T) {
 			expectRunTimeout: false,
 			runTimeout:       10 * time.Second,
 			testTimeout:      30 * time.Second,
-			invInfo: inventoryInfo{
-				name:      "abc-123",
-				namespace: "test",
-				id:        "test",
-				set: object.ObjMetadataSet{
+			invObj: newInventoryObj(
+				inventory.NewSingleObjectInfo("test", types.NamespacedName{
+					Name:      "abc-123",
+					Namespace: "test",
+				}),
+				object.ObjMetadataSet{
 					testutil.ToIdentifier(t, resources["deployment"]),
 				},
-			},
+			),
 			clusterObjs: object.UnstructuredSet{
 				testutil.Unstructured(t, resources["deployment"], testutil.AddOwningInv(t, "test")),
 			},
@@ -314,15 +318,13 @@ func TestDestroyerCancel(t *testing.T) {
 		t.Run(tn, func(t *testing.T) {
 			statusWatcher := newFakeWatcher(tc.statusEvents)
 
-			invInfo, err := tc.invInfo.toWrapped()
-			require.NoError(t, err)
-			cm, err := inventory.InvInfoToConfigMap(invInfo)
+			invInfo, err := inventory.ConfigMapToInventoryInfo(tc.invObj)
 			require.NoError(t, err)
 
 			destroyer := newTestDestroyer(t,
-				tc.invInfo,
+				tc.invObj,
 				// Add the inventory to the cluster (to allow deletion)
-				append(tc.clusterObjs, cm),
+				append(tc.clusterObjs, tc.invObj),
 				statusWatcher,
 			)
 

@@ -7,7 +7,6 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/cli-runtime/pkg/resource"
@@ -140,7 +139,7 @@ func TestFindInventoryObj(t *testing.T) {
 			name:   "",
 		},
 		"Only inventory object is true": {
-			infos:  []*unstructured.Unstructured{copyInventoryInfo()},
+			infos:  []*unstructured.Unstructured{emptyInventoryObject()},
 			exists: true,
 			name:   inventoryObjName,
 		},
@@ -155,7 +154,7 @@ func TestFindInventoryObj(t *testing.T) {
 			name:   "",
 		},
 		"Inventory object with multiple others is true": {
-			infos:  []*unstructured.Unstructured{pod1, pod2, copyInventoryInfo(), pod3},
+			infos:  []*unstructured.Unstructured{pod1, pod2, emptyInventoryObject(), pod3},
 			exists: true,
 			name:   inventoryObjName,
 		},
@@ -321,20 +320,20 @@ func TestAddSuffixToName(t *testing.T) {
 		},
 		// Empty suffix should return error.
 		{
-			obj:      copyInventoryInfo(),
+			obj:      emptyInventoryObject(),
 			suffix:   "",
 			expected: "",
 			isError:  true,
 		},
 		// Empty suffix should return error.
 		{
-			obj:      copyInventoryInfo(),
+			obj:      emptyInventoryObject(),
 			suffix:   " \t",
 			expected: "",
 			isError:  true,
 		},
 		{
-			obj:      copyInventoryInfo(),
+			obj:      emptyInventoryObject(),
 			suffix:   "hashsuffix",
 			expected: inventoryObjName + "-hashsuffix",
 			isError:  false,
@@ -411,13 +410,6 @@ func TestLegacyInventoryName(t *testing.T) {
 	}
 }
 
-func copyInventoryInfo() *unstructured.Unstructured {
+func emptyInventoryObject() *unstructured.Unstructured {
 	return inventoryObj.DeepCopy()
-}
-
-func copyInventory(t *testing.T) Info {
-	u := inventoryObj.DeepCopy()
-	invInfoObj, err := ConfigMapToInventoryInfo(u)
-	require.NoError(t, err)
-	return invInfoObj
 }
