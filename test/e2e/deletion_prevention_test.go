@@ -65,11 +65,11 @@ func deletionPreventionTest(ctx context.Context, c client.Client, invConfig invc
 	obj = e2eutil.AssertUnstructuredExists(ctx, c, e2eutil.WithNamespace(e2eutil.ManifestToUnstructured(deployment1), namespaceName))
 	Expect(obj.GetAnnotations()[inventory.OwningInventoryKey]).To(Equal(inventoryInfo.ID()))
 
-	By("Verify pod1 still exits and does not have the config.k8s.io/owning-inventory annotation")
+	By("Verify pod1 still exits and has the config.k8s.io/owning-inventory annotation")
 	obj = e2eutil.AssertUnstructuredExists(ctx, c, e2eutil.WithNamespace(e2eutil.ManifestToUnstructured(pod1), namespaceName))
 	Expect(obj.GetAnnotations()[inventory.OwningInventoryKey]).To(Equal(inventoryInfo.ID()))
 
-	By("Verify pod2 still exits and does not have the config.k8s.io/owning-inventory annotation")
+	By("Verify pod2 still exits and has the config.k8s.io/owning-inventory annotation")
 	obj = e2eutil.AssertUnstructuredExists(ctx, c, e2eutil.WithNamespace(e2eutil.ManifestToUnstructured(pod2), namespaceName))
 	Expect(obj.GetAnnotations()[inventory.OwningInventoryKey]).To(Equal(inventoryInfo.ID()))
 
