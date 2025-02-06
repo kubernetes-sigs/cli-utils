@@ -10,7 +10,7 @@ export PATH := $(MYGOBIN):$(PATH)
 all: generate license fix vet fmt test lint tidy
 
 "$(MYGOBIN)/stringer":
-	go install golang.org/x/tools/cmd/stringer@v0.12.0
+	go install golang.org/x/tools/cmd/stringer@v0.29.0
 
 "$(MYGOBIN)/addlicense":
 	go install github.com/google/addlicense@v1.0.0
