@@ -4,6 +4,7 @@
 package task
 
 import (
+	"context"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -132,7 +133,7 @@ func TestInvAddTask(t *testing.T) {
 			client := inventory.NewFakeClient(tc.initialObjs)
 			eventChannel := make(chan event.Event)
 			resourceCache := cache.NewResourceCacheMap()
-			context := taskrunner.NewTaskContext(eventChannel, resourceCache)
+			taskContext := taskrunner.NewTaskContext(eventChannel, resourceCache)
 			tf := cmdtesting.NewTestFactory().WithNamespace(namespace)
 			defer tf.Cleanup()
 
@@ -148,12 +149,13 @@ func TestInvAddTask(t *testing.T) {
 			}
 
 			task := InvAddTask{
-				TaskName:      taskName,
-				InvClient:     client,
-				InvInfo:       localInv,
-				Objects:       tc.applyObjs,
-				DynamicClient: tf.FakeDynamicClient,
-				Mapper:        mapper,
+				TaskName:         taskName,
+				InvClient:        client,
+				InvInfo:          localInv,
+				ClusterInventory: client.Inv,
+				Objects:          tc.applyObjs,
+				DynamicClient:    tf.FakeDynamicClient,
+				Mapper:           mapper,
 			}
 			if taskName != task.Name() {
 				t.Errorf("expected task name (%s), got (%s)", taskName, task.Name())
@@ -162,13 +164,13 @@ func TestInvAddTask(t *testing.T) {
 			if !task.Identifiers().Equal(applyIDs) {
 				t.Errorf("expected task ids (%s), got (%s)", applyIDs, task.Identifiers())
 			}
-			task.Start(context)
-			result := <-context.TaskChannel()
+			task.Start(taskContext)
+			result := <-taskContext.TaskChannel()
 			if result.Err != nil {
 				t.Errorf("unexpected error running InvAddTask: %s", result.Err)
 			}
-			actual, _ := client.GetClusterObjs(nil)
-			if !tc.expectedObjs.Equal(actual) {
+			actual, _ := client.Get(context.TODO(), nil, inventory.GetOptions{})
+			if !tc.expectedObjs.Equal(actual.Objects()) {
 				t.Errorf("expected merged inventory (%s), got (%s)", tc.expectedObjs, actual)
 			}
 			if createdNamespace != tc.expectCreateNamespace {

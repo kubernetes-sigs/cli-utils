@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/discovery"
@@ -79,10 +80,22 @@ func (d *Destroyer) Run(ctx context.Context, invInfo inventory.Info, options Des
 	setDestroyerDefaults(&options)
 	go func() {
 		defer close(eventChannel)
+		clusterInventory, err := d.invClient.Get(ctx, invInfo, inventory.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			clusterInventory = invInfo.InitialInventory()
+		} else if err != nil {
+			handleError(eventChannel, err)
+			return
+		}
+		if clusterInventory.ID() != invInfo.ID() {
+			handleError(eventChannel, fmt.Errorf("inventory-id of inventory object %s/%s in cluster doesn't match provided id %q",
+				invInfo.Namespace(), invInfo.Name(), invInfo.ID()))
+		}
+
 		// Retrieve the objects to be deleted from the cluster. Second parameter is empty
 		// because no local objects returns all inventory objects for deletion.
 		emptyLocalObjs := object.UnstructuredSet{}
-		deleteObjs, err := d.pruner.GetPruneObjs(invInfo, emptyLocalObjs, prune.Options{
+		deleteObjs, err := d.pruner.GetPruneObjs(clusterInventory, emptyLocalObjs, prune.Options{
 			DryRunStrategy: options.DryRunStrategy,
 		})
 		if err != nil {
@@ -123,6 +136,7 @@ func (d *Destroyer) Run(ctx context.Context, invInfo inventory.Info, options Des
 			InfoHelper:    d.infoHelper,
 			Mapper:        d.mapper,
 			InvClient:     d.invClient,
+			Inventory:     clusterInventory,
 			Collector:     vCollector,
 			PruneFilters:  deleteFilters,
 		}
