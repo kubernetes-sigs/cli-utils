@@ -73,7 +73,7 @@ func TestPreventDeleteAnnotation(t *testing.T) {
 			filter := PreventRemoveFilter{}
 			obj := defaultObj.DeepCopy()
 			obj.SetAnnotations(tc.annotations)
-			err := filter.Filter(obj)
+			err := filter.Filter(t.Context(), obj)
 			testutil.AssertEqual(t, tc.expectedError, err)
 		})
 	}

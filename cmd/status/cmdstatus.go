@@ -164,7 +164,7 @@ func (r *Runner) loadInvFromDisk(cmd *cobra.Command, args []string) (*printer.Pr
 
 	// Based on the inventory template manifest we look up the inventory
 	// from the live state using the inventory client.
-	identifiers, err := invClient.GetClusterObjs(inv)
+	identifiers, err := invClient.GetClusterObjs(cmd.Context(), inv)
 	if err != nil {
 		return nil, err
 	}

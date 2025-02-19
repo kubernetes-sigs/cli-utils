@@ -236,14 +236,14 @@ func (i InventoryCustomType) GetObject() (*unstructured.Unstructured, error) {
 
 // Apply is an Inventory interface function implemented to apply the inventory
 // object.
-func (i InventoryCustomType) Apply(dc dynamic.Interface, mapper meta.RESTMapper, _ inventory.StatusPolicy) error {
+func (i InventoryCustomType) Apply(ctx context.Context, dc dynamic.Interface, mapper meta.RESTMapper, _ inventory.StatusPolicy) error {
 	invInfo, namespacedClient, err := i.getNamespacedClient(dc, mapper)
 	if err != nil {
 		return err
 	}
 
 	// Get cluster object, if exsists.
-	clusterObj, err := namespacedClient.Get(context.TODO(), invInfo.GetName(), metav1.GetOptions{})
+	clusterObj, err := namespacedClient.Get(ctx, invInfo.GetName(), metav1.GetOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
@@ -252,10 +252,10 @@ func (i InventoryCustomType) Apply(dc dynamic.Interface, mapper meta.RESTMapper,
 
 	if clusterObj == nil {
 		// Create cluster inventory object, if it does not exist on cluster.
-		appliedObj, err = namespacedClient.Create(context.TODO(), invInfo, metav1.CreateOptions{})
+		appliedObj, err = namespacedClient.Create(ctx, invInfo, metav1.CreateOptions{})
 	} else {
 		// Update the cluster inventory object instead.
-		appliedObj, err = namespacedClient.Update(context.TODO(), invInfo, metav1.UpdateOptions{})
+		appliedObj, err = namespacedClient.Update(ctx, invInfo, metav1.UpdateOptions{})
 	}
 	if err != nil {
 		return err
@@ -263,25 +263,25 @@ func (i InventoryCustomType) Apply(dc dynamic.Interface, mapper meta.RESTMapper,
 
 	// Update status.
 	invInfo.SetResourceVersion(appliedObj.GetResourceVersion())
-	_, err = namespacedClient.UpdateStatus(context.TODO(), invInfo, metav1.UpdateOptions{})
+	_, err = namespacedClient.UpdateStatus(ctx, invInfo, metav1.UpdateOptions{})
 	return err
 }
 
-func (i InventoryCustomType) ApplyWithPrune(dc dynamic.Interface, mapper meta.RESTMapper, _ inventory.StatusPolicy, _ object.ObjMetadataSet) error {
+func (i InventoryCustomType) ApplyWithPrune(ctx context.Context, dc dynamic.Interface, mapper meta.RESTMapper, _ inventory.StatusPolicy, _ object.ObjMetadataSet) error {
 	invInfo, namespacedClient, err := i.getNamespacedClient(dc, mapper)
 	if err != nil {
 		return err
 	}
 
 	// Update the cluster inventory object.
-	appliedObj, err := namespacedClient.Update(context.TODO(), invInfo, metav1.UpdateOptions{})
+	appliedObj, err := namespacedClient.Update(ctx, invInfo, metav1.UpdateOptions{})
 	if err != nil {
 		return err
 	}
 
 	// Update status.
 	invInfo.SetResourceVersion(appliedObj.GetResourceVersion())
-	_, err = namespacedClient.UpdateStatus(context.TODO(), invInfo, metav1.UpdateOptions{})
+	_, err = namespacedClient.UpdateStatus(ctx, invInfo, metav1.UpdateOptions{})
 	return err
 }
 

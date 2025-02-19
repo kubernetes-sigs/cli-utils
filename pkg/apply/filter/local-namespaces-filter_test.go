@@ -51,7 +51,7 @@ func TestLocalNamespacesFilter(t *testing.T) {
 			}
 			obj := testNamespace.DeepCopy()
 			obj.SetName(tc.namespace)
-			err := filter.Filter(obj)
+			err := filter.Filter(t.Context(), obj)
 			testutil.AssertEqual(t, tc.expectedError, err)
 		})
 	}

@@ -585,7 +585,7 @@ func TestMutate(t *testing.T) {
 				}
 			}()
 
-			mutated, reason, err := mutator.Mutate(context.TODO(), tc.target)
+			mutated, reason, err := mutator.Mutate(t.Context(), tc.target)
 			if tc.errMsg != "" {
 				require.EqualError(t, err, tc.errMsg)
 			} else {

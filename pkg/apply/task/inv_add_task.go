@@ -62,7 +62,7 @@ func (i *InvAddTask) Start(taskContext *taskrunner.TaskContext) {
 		// If the inventory is namespaced, ensure the namespace exists
 		if i.InvInfo.Namespace() != "" {
 			if invNamespace := inventoryNamespaceInSet(i.InvInfo, i.Objects); invNamespace != nil {
-				if err := i.createNamespace(context.TODO(), invNamespace, i.DryRun); err != nil {
+				if err := i.createNamespace(taskContext.Context(), invNamespace, i.DryRun); err != nil {
 					err = fmt.Errorf("failed to create inventory namespace: %w", err)
 					i.sendTaskResult(taskContext, err)
 					return
@@ -71,7 +71,7 @@ func (i *InvAddTask) Start(taskContext *taskrunner.TaskContext) {
 		}
 		klog.V(4).Infof("merging %d local objects into inventory", len(i.Objects))
 		currentObjs := object.UnstructuredSetToObjMetadataSet(i.Objects)
-		_, err := i.InvClient.Merge(i.InvInfo, currentObjs, i.DryRun)
+		_, err := i.InvClient.Merge(taskContext.Context(), i.InvInfo, currentObjs, i.DryRun)
 		i.sendTaskResult(taskContext, err)
 	}()
 }

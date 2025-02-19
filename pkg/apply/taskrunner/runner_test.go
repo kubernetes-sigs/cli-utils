@@ -280,7 +280,7 @@ func TestBaseRunner(t *testing.T) {
 			statusWatcher := newFakeWatcher(tc.statusEvents)
 			eventChannel := make(chan event.Event)
 			resourceCache := cache.NewResourceCacheMap()
-			taskContext := NewTaskContext(eventChannel, resourceCache)
+			taskContext := NewTaskContext(t.Context(), eventChannel, resourceCache)
 			runner := NewTaskStatusRunner(ids, statusWatcher)
 
 			// Use a WaitGroup to make sure changes in the goroutines
@@ -452,7 +452,7 @@ func TestBaseRunnerCancellation(t *testing.T) {
 			statusWatcher := newFakeWatcher(tc.statusEvents)
 			eventChannel := make(chan event.Event)
 			resourceCache := cache.NewResourceCacheMap()
-			taskContext := NewTaskContext(eventChannel, resourceCache)
+			taskContext := NewTaskContext(t.Context(), eventChannel, resourceCache)
 			runner := NewTaskStatusRunner(ids, statusWatcher)
 
 			// Use a WaitGroup to make sure changes in the goroutines

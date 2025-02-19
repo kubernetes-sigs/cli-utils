@@ -27,17 +27,17 @@ type Client interface {
 	// GetClusterObjs returns the set of previously applied objects as ObjMetadata,
 	// or an error if one occurred. This set of previously applied object references
 	// is stored in the inventory objects living in the cluster.
-	GetClusterObjs(inv Info) (object.ObjMetadataSet, error)
+	GetClusterObjs(ctx context.Context, inv Info) (object.ObjMetadataSet, error)
 	// Merge applies the union of the passed objects with the currently
 	// stored objects in the inventory object. Returns the set of
 	// objects which are not in the passed objects (objects to be pruned).
 	// Otherwise, returns an error if one happened.
-	Merge(inv Info, objs object.ObjMetadataSet, dryRun common.DryRunStrategy) (object.ObjMetadataSet, error)
+	Merge(ctx context.Context, inv Info, objs object.ObjMetadataSet, dryRun common.DryRunStrategy) (object.ObjMetadataSet, error)
 	// Replace replaces the set of objects stored in the inventory
 	// object with the passed set of objects, or an error if one occurs.
-	Replace(inv Info, objs object.ObjMetadataSet, status []actuation.ObjectStatus, dryRun common.DryRunStrategy) error
+	Replace(ctx context.Context, inv Info, objs object.ObjMetadataSet, status []actuation.ObjectStatus, dryRun common.DryRunStrategy) error
 	// DeleteInventoryObj deletes the passed inventory object from the APIServer.
-	DeleteInventoryObj(inv Info, dryRun common.DryRunStrategy) error
+	DeleteInventoryObj(ctx context.Context, inv Info, dryRun common.DryRunStrategy) error
 	// ListClusterInventoryObjs returns a map mapping from inventory name to a list of cluster inventory objects
 	ListClusterInventoryObjs(ctx context.Context) (map[string]object.ObjMetadataSet, error)
 }
@@ -95,10 +95,10 @@ func NewClient(factory cmdutil.Factory,
 // to prune. Creates the initial cluster inventory object storing the passed
 // objects if an inventory object does not exist. Returns an error if one
 // occurred.
-func (cic *ClusterClient) Merge(localInv Info, objs object.ObjMetadataSet, dryRun common.DryRunStrategy) (object.ObjMetadataSet, error) {
+func (cic *ClusterClient) Merge(ctx context.Context, localInv Info, objs object.ObjMetadataSet, dryRun common.DryRunStrategy) (object.ObjMetadataSet, error) {
 	pruneIDs := object.ObjMetadataSet{}
 	invObj := cic.invToUnstructuredFunc(localInv)
-	clusterInv, err := cic.getClusterInventoryInfo(localInv)
+	clusterInv, err := cic.getClusterInventoryInfo(ctx, localInv)
 	if err != nil {
 		return pruneIDs, err
 	}
@@ -121,12 +121,12 @@ func (cic *ClusterClient) Merge(localInv Info, objs object.ObjMetadataSet, dryRu
 			return nil, nil
 		}
 
-		err = inv.Apply(cic.dc, cic.mapper, cic.statusPolicy)
+		err = inv.Apply(ctx, cic.dc, cic.mapper, cic.statusPolicy)
 		return nil, err
 	}
 
 	// Update existing cluster inventory with merged union of objects
-	clusterObjs, err := cic.GetClusterObjs(localInv)
+	clusterObjs, err := cic.GetClusterObjs(ctx, localInv)
 	if err != nil {
 		return pruneIDs, err
 	}
@@ -154,25 +154,25 @@ func (cic *ClusterClient) Merge(localInv Info, objs object.ObjMetadataSet, dryRu
 		klog.V(4).Infof("dry-run create inventory object: not created")
 		return pruneIDs, nil
 	}
-	err = wrappedInv.Apply(cic.dc, cic.mapper, cic.statusPolicy)
+	err = wrappedInv.Apply(ctx, cic.dc, cic.mapper, cic.statusPolicy)
 	return pruneIDs, err
 }
 
 // Replace stores the passed objects in the cluster inventory object, or
 // an error if one occurred.
-func (cic *ClusterClient) Replace(localInv Info, objs object.ObjMetadataSet, status []actuation.ObjectStatus,
+func (cic *ClusterClient) Replace(ctx context.Context, localInv Info, objs object.ObjMetadataSet, status []actuation.ObjectStatus,
 	dryRun common.DryRunStrategy) error {
 	// Skip entire function for dry-run.
 	if dryRun.ClientOrServerDryRun() {
 		klog.V(4).Infoln("dry-run replace inventory object: not applied")
 		return nil
 	}
-	clusterInv, err := cic.getClusterInventoryInfo(localInv)
+	clusterInv, err := cic.getClusterInventoryInfo(ctx, localInv)
 	if err != nil {
 		return fmt.Errorf("failed to read inventory from cluster: %w", err)
 	}
 
-	clusterObjs, err := cic.GetClusterObjs(localInv)
+	clusterObjs, err := cic.GetClusterObjs(ctx, localInv)
 	if err != nil {
 		return fmt.Errorf("failed to read inventory objects from cluster: %w", err)
 	}
@@ -192,7 +192,7 @@ func (cic *ClusterClient) Replace(localInv Info, objs object.ObjMetadataSet, sta
 	klog.V(4).Infof("replace cluster inventory: %s/%s", clusterInv.GetNamespace(), clusterInv.GetName())
 	klog.V(4).Infof("replace cluster inventory %d objects", len(objs))
 
-	if err := wrappedInv.ApplyWithPrune(cic.dc, cic.mapper, cic.statusPolicy, objs); err != nil {
+	if err := wrappedInv.ApplyWithPrune(ctx, cic.dc, cic.mapper, cic.statusPolicy, objs); err != nil {
 		return fmt.Errorf("failed to write updated inventory to cluster: %w", err)
 	}
 
@@ -218,27 +218,27 @@ func (cic *ClusterClient) replaceInventory(inv *unstructured.Unstructured, objs 
 }
 
 // DeleteInventoryObj deletes the inventory object from the cluster.
-func (cic *ClusterClient) DeleteInventoryObj(localInv Info, dryRun common.DryRunStrategy) error {
+func (cic *ClusterClient) DeleteInventoryObj(ctx context.Context, localInv Info, dryRun common.DryRunStrategy) error {
 	if localInv == nil {
 		return fmt.Errorf("retrieving cluster inventory object with nil local inventory")
 	}
 	switch localInv.Strategy() {
 	case NameStrategy:
-		return cic.deleteInventoryObjByName(cic.invToUnstructuredFunc(localInv), dryRun)
+		return cic.deleteInventoryObjByName(ctx, cic.invToUnstructuredFunc(localInv), dryRun)
 	case LabelStrategy:
-		return cic.deleteInventoryObjsByLabel(localInv, dryRun)
+		return cic.deleteInventoryObjsByLabel(ctx, localInv, dryRun)
 	default:
 		panic(fmt.Errorf("unknown inventory strategy: %s", localInv.Strategy()))
 	}
 }
 
-func (cic *ClusterClient) deleteInventoryObjsByLabel(inv Info, dryRun common.DryRunStrategy) error {
-	clusterInvObjs, err := cic.getClusterInventoryObjsByLabel(inv)
+func (cic *ClusterClient) deleteInventoryObjsByLabel(ctx context.Context, inv Info, dryRun common.DryRunStrategy) error {
+	clusterInvObjs, err := cic.getClusterInventoryObjsByLabel(ctx, inv)
 	if err != nil {
 		return err
 	}
 	for _, invObj := range clusterInvObjs {
-		if err := cic.deleteInventoryObjByName(invObj, dryRun); err != nil {
+		if err := cic.deleteInventoryObjByName(ctx, invObj, dryRun); err != nil {
 			return err
 		}
 	}
@@ -247,9 +247,9 @@ func (cic *ClusterClient) deleteInventoryObjsByLabel(inv Info, dryRun common.Dry
 
 // GetClusterObjs returns the objects stored in the cluster inventory object, or
 // an error if one occurred.
-func (cic *ClusterClient) GetClusterObjs(localInv Info) (object.ObjMetadataSet, error) {
+func (cic *ClusterClient) GetClusterObjs(ctx context.Context, localInv Info) (object.ObjMetadataSet, error) {
 	var objs object.ObjMetadataSet
-	clusterInv, err := cic.getClusterInventoryInfo(localInv)
+	clusterInv, err := cic.getClusterInventoryInfo(ctx, localInv)
 	if err != nil {
 		return objs, fmt.Errorf("failed to read inventory from cluster: %w", err)
 	}
@@ -270,8 +270,8 @@ func (cic *ClusterClient) GetClusterObjs(localInv Info) (object.ObjMetadataSet, 
 //
 // TODO(seans3): Remove the special case code to merge multiple cluster inventory
 // objects once we've determined that this case is no longer possible.
-func (cic *ClusterClient) getClusterInventoryInfo(inv Info) (*unstructured.Unstructured, error) {
-	clusterInvObjects, err := cic.getClusterInventoryObjs(inv)
+func (cic *ClusterClient) getClusterInventoryInfo(ctx context.Context, inv Info) (*unstructured.Unstructured, error) {
+	clusterInvObjects, err := cic.getClusterInventoryObjs(ctx, inv)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read inventory objects from cluster: %w", err)
 	}
@@ -285,7 +285,7 @@ func (cic *ClusterClient) getClusterInventoryInfo(inv Info) (*unstructured.Unstr
 	return clusterInv, nil
 }
 
-func (cic *ClusterClient) getClusterInventoryObjsByLabel(inv Info) (object.UnstructuredSet, error) {
+func (cic *ClusterClient) getClusterInventoryObjsByLabel(ctx context.Context, inv Info) (object.UnstructuredSet, error) {
 	localInv := cic.invToUnstructuredFunc(inv)
 	if localInv == nil {
 		return nil, fmt.Errorf("retrieving cluster inventory object with nil local inventory")
@@ -304,7 +304,7 @@ func (cic *ClusterClient) getClusterInventoryObjsByLabel(inv Info) (object.Unstr
 	labelSelector := fmt.Sprintf("%s=%s", common.InventoryLabel, label)
 	klog.V(4).Infof("inventory object fetch by label (group: %q, namespace: %q, selector: %q)", groupResource, namespace, labelSelector)
 
-	uList, err := cic.dc.Resource(mapping.Resource).Namespace(namespace).List(context.TODO(), metav1.ListOptions{
+	uList, err := cic.dc.Resource(mapping.Resource).Namespace(namespace).List(ctx, metav1.ListOptions{
 		LabelSelector: labelSelector,
 	})
 	if err != nil {
@@ -317,7 +317,7 @@ func (cic *ClusterClient) getClusterInventoryObjsByLabel(inv Info) (object.Unstr
 	return invList, nil
 }
 
-func (cic *ClusterClient) getClusterInventoryObjsByName(inv Info) (object.UnstructuredSet, error) {
+func (cic *ClusterClient) getClusterInventoryObjsByName(ctx context.Context, inv Info) (object.UnstructuredSet, error) {
 	localInv := cic.invToUnstructuredFunc(inv)
 	if localInv == nil {
 		return nil, fmt.Errorf("retrieving cluster inventory object with nil local inventory")
@@ -330,7 +330,7 @@ func (cic *ClusterClient) getClusterInventoryObjsByName(inv Info) (object.Unstru
 
 	klog.V(4).Infof("inventory object fetch by name (namespace: %q, name: %q)", inv.Namespace(), inv.Name())
 	clusterInv, err := cic.dc.Resource(mapping.Resource).Namespace(inv.Namespace()).
-		Get(context.TODO(), inv.Name(), metav1.GetOptions{})
+		Get(ctx, inv.Name(), metav1.GetOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
 		return nil, err
 	}
@@ -348,7 +348,7 @@ func (cic *ClusterClient) getClusterInventoryObjsByName(inv Info) (object.Unstru
 	return object.UnstructuredSet{clusterInv}, nil
 }
 
-func (cic *ClusterClient) getClusterInventoryObjs(inv Info) (object.UnstructuredSet, error) {
+func (cic *ClusterClient) getClusterInventoryObjs(ctx context.Context, inv Info) (object.UnstructuredSet, error) {
 	if inv == nil {
 		return nil, fmt.Errorf("inventoryInfo must be specified")
 	}
@@ -357,9 +357,9 @@ func (cic *ClusterClient) getClusterInventoryObjs(inv Info) (object.Unstructured
 	var err error
 	switch inv.Strategy() {
 	case NameStrategy:
-		clusterInvObjects, err = cic.getClusterInventoryObjsByName(inv)
+		clusterInvObjects, err = cic.getClusterInventoryObjsByName(ctx, inv)
 	case LabelStrategy:
-		clusterInvObjects, err = cic.getClusterInventoryObjsByLabel(inv)
+		clusterInvObjects, err = cic.getClusterInventoryObjsByLabel(ctx, inv)
 	default:
 		panic(fmt.Errorf("unknown inventory strategy: %s", inv.Strategy()))
 	}
@@ -399,7 +399,7 @@ func (cic *ClusterClient) ListClusterInventoryObjs(ctx context.Context) (map[str
 
 // deleteInventoryObjByName deletes the passed inventory object from the APIServer, or
 // an error if one occurs.
-func (cic *ClusterClient) deleteInventoryObjByName(obj *unstructured.Unstructured, dryRun common.DryRunStrategy) error {
+func (cic *ClusterClient) deleteInventoryObjByName(ctx context.Context, obj *unstructured.Unstructured, dryRun common.DryRunStrategy) error {
 	if dryRun.ClientOrServerDryRun() {
 		klog.V(4).Infof("dry-run delete inventory object: not deleted")
 		return nil
@@ -415,7 +415,7 @@ func (cic *ClusterClient) deleteInventoryObjByName(obj *unstructured.Unstructure
 
 	klog.V(4).Infof("deleting inventory object: %s/%s", obj.GetNamespace(), obj.GetName())
 	return cic.dc.Resource(mapping.Resource).Namespace(obj.GetNamespace()).
-		Delete(context.TODO(), obj.GetName(), metav1.DeleteOptions{})
+		Delete(ctx, obj.GetName(), metav1.DeleteOptions{})
 }
 
 // getMapping returns the RESTMapping for the provided resource.

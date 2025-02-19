@@ -529,7 +529,7 @@ func TestDependencyFilter(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			taskContext := taskrunner.NewTaskContext(nil, nil)
+			taskContext := taskrunner.NewTaskContext(t.Context(), nil, nil)
 			tc.contextSetup(taskContext)
 
 			filter := DependencyFilter{
@@ -542,7 +542,7 @@ func TestDependencyFilter(t *testing.T) {
 			obj.SetName(tc.id.Name)
 			obj.SetNamespace(tc.id.Namespace)
 
-			err := filter.Filter(obj)
+			err := filter.Filter(t.Context(), obj)
 			testutil.AssertEqual(t, tc.expectedError, err)
 		})
 	}

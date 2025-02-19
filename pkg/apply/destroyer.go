@@ -82,7 +82,7 @@ func (d *Destroyer) Run(ctx context.Context, invInfo inventory.Info, options Des
 		// Retrieve the objects to be deleted from the cluster. Second parameter is empty
 		// because no local objects returns all inventory objects for deletion.
 		emptyLocalObjs := object.UnstructuredSet{}
-		deleteObjs, err := d.pruner.GetPruneObjs(invInfo, emptyLocalObjs, prune.Options{
+		deleteObjs, err := d.pruner.GetPruneObjs(ctx, invInfo, emptyLocalObjs, prune.Options{
 			DryRunStrategy: options.DryRunStrategy,
 		})
 		if err != nil {
@@ -101,7 +101,7 @@ func (d *Destroyer) Run(ctx context.Context, invInfo inventory.Info, options Des
 
 		// Build a TaskContext for passing info between tasks
 		resourceCache := cache.NewResourceCacheMap()
-		taskContext := taskrunner.NewTaskContext(eventChannel, resourceCache)
+		taskContext := taskrunner.NewTaskContext(ctx, eventChannel, resourceCache)
 
 		klog.V(4).Infoln("destroyer building task queue...")
 		deleteFilters := []filter.ValidationFilter{

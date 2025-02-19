@@ -99,7 +99,7 @@ func TestInventoryPolicyPruneFilter(t *testing.T) {
 			}
 			obj := defaultObj.DeepCopy()
 			obj.SetAnnotations(objIDAnnotation)
-			err := filter.Filter(obj)
+			err := filter.Filter(t.Context(), obj)
 			testutil.AssertEqual(t, tc.expectedError, err)
 		})
 	}

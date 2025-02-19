@@ -153,7 +153,7 @@ func TestCollector_ConditionMet(t *testing.T) {
 				resourceCache.Load(tc.cacheContents...)
 			}
 
-			taskContext := NewTaskContext(nil, resourceCache)
+			taskContext := NewTaskContext(t.Context(), nil, resourceCache)
 
 			if tc.appliedGen != nil {
 				for id, gen := range tc.appliedGen {

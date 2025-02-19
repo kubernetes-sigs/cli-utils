@@ -94,7 +94,7 @@ func TestGetClusterInventoryInfo(t *testing.T) {
 			if tc.inv != nil {
 				inv = storeObjsInInventory(tc.inv, tc.localObjs, tc.objStatus)
 			}
-			clusterInv, err := invClient.getClusterInventoryInfo(WrapInventoryInfoObj(inv))
+			clusterInv, err := invClient.getClusterInventoryInfo(t.Context(), WrapInventoryInfoObj(inv))
 			if tc.isError {
 				if err == nil {
 					t.Fatalf("expected error but received none")
@@ -202,7 +202,7 @@ func TestMerge(t *testing.T) {
 				require.NoError(t, err)
 
 				// Call "Merge" to create the union of clusterObjs and localObjs.
-				pruneObjs, err := invClient.Merge(tc.localInv, tc.localObjs, drs)
+				pruneObjs, err := invClient.Merge(t.Context(), tc.localInv, tc.localObjs, drs)
 				if tc.isError {
 					if err == nil {
 						t.Fatalf("expected error but received none")
@@ -289,11 +289,11 @@ func TestReplace(t *testing.T) {
 	invClient, err := NewClient(tf,
 		WrapInventoryObj, InvInfoToConfigMap, StatusPolicyAll, ConfigMapGVK)
 	require.NoError(t, err)
-	err = invClient.Replace(copyInventory(), object.ObjMetadataSet{}, nil, common.DryRunClient)
+	err = invClient.Replace(t.Context(), copyInventory(), object.ObjMetadataSet{}, nil, common.DryRunClient)
 	if err != nil {
 		t.Fatalf("unexpected error received: %s", err)
 	}
-	err = invClient.Replace(copyInventory(), object.ObjMetadataSet{}, nil, common.DryRunServer)
+	err = invClient.Replace(t.Context(), copyInventory(), object.ObjMetadataSet{}, nil, common.DryRunServer)
 	if err != nil {
 		t.Fatalf("unexpected error received: %s", err)
 	}
@@ -375,7 +375,7 @@ func TestGetClusterObjs(t *testing.T) {
 			invClient, err := NewClient(tf,
 				WrapInventoryObj, InvInfoToConfigMap, tc.statusPolicy, ConfigMapGVK)
 			require.NoError(t, err)
-			clusterObjs, err := invClient.GetClusterObjs(tc.localInv)
+			clusterObjs, err := invClient.GetClusterObjs(t.Context(), tc.localInv)
 			if tc.isError {
 				if err == nil {
 					t.Fatalf("expected error but received none")
@@ -442,7 +442,7 @@ func TestDeleteInventoryObj(t *testing.T) {
 				if inv != nil {
 					inv = storeObjsInInventory(tc.inv, tc.localObjs, tc.objStatus)
 				}
-				err = invClient.deleteInventoryObjByName(inv, drs)
+				err = invClient.deleteInventoryObjByName(t.Context(), inv, drs)
 				if err != nil {
 					t.Fatalf("unexpected error received: %s", err)
 				}
