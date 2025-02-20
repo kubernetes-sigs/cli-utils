@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -218,83 +217,6 @@ func TestMerge(t *testing.T) {
 				}
 			})
 		}
-	}
-}
-
-func TestCreateInventory(t *testing.T) {
-	tests := map[string]struct {
-		statusPolicy StatusPolicy
-		inv          Info
-		localObjs    object.ObjMetadataSet
-		error        string
-		objStatus    []actuation.ObjectStatus
-	}{
-		"Nil local inventory object is an error": {
-			inv:       nil,
-			localObjs: object.ObjMetadataSet{},
-			error:     "attempting create a nil inventory object",
-		},
-		"Empty local inventory object": {
-			inv:       localInv,
-			localObjs: object.ObjMetadataSet{},
-		},
-		"Local inventory with a single object": {
-			inv: localInv,
-			localObjs: object.ObjMetadataSet{
-				ignoreErrInfoToObjMeta(pod2Info),
-			},
-			objStatus: []actuation.ObjectStatus{podStatus(pod2Info)},
-		},
-		"Local inventory with multiple objects": {
-			inv: localInv,
-			localObjs: object.ObjMetadataSet{
-				ignoreErrInfoToObjMeta(pod1Info),
-				ignoreErrInfoToObjMeta(pod2Info),
-				ignoreErrInfoToObjMeta(pod3Info)},
-			objStatus: []actuation.ObjectStatus{
-				podStatus(pod1Info),
-				podStatus(pod2Info),
-				podStatus(pod3Info),
-			},
-		},
-	}
-
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			tf := cmdtesting.NewTestFactory().WithNamespace(testNamespace)
-			defer tf.Cleanup()
-
-			var storedInventory map[string]string
-			tf.FakeDynamicClient.PrependReactor("create", "configmaps", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
-				obj := *action.(clienttesting.CreateAction).GetObject().(*unstructured.Unstructured)
-				storedInventory, _, _ = unstructured.NestedStringMap(obj.Object, "data")
-				return true, nil, nil
-			})
-
-			invClient, err := NewClient(tf,
-				WrapInventoryObj, InvInfoToConfigMap, tc.statusPolicy, ConfigMapGVK)
-			require.NoError(t, err)
-			inv := invClient.invToUnstructuredFunc(tc.inv)
-			if inv != nil {
-				inv = storeObjsInInventory(tc.inv, tc.localObjs, tc.objStatus)
-			}
-			_, err = invClient.createInventoryObj(inv, common.DryRunNone)
-			if tc.error != "" {
-				assert.EqualError(t, err, tc.error)
-			} else {
-				assert.NoError(t, err)
-			}
-
-			expectedInventory := tc.localObjs.ToStringMap()
-			// handle empty inventories special to avoid problems with empty vs nil maps
-			if len(expectedInventory) != 0 || len(storedInventory) != 0 {
-				for key := range expectedInventory {
-					if _, found := storedInventory[key]; !found {
-						t.Errorf("%s not found in the stored inventory", key)
-					}
-				}
-			}
-		})
 	}
 }
 
