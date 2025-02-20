@@ -397,32 +397,6 @@ func (cic *ClusterClient) ListClusterInventoryObjs(ctx context.Context) (map[str
 	return identifiers, nil
 }
 
-// createInventoryObj creates the passed inventory object on the APIServer.
-func (cic *ClusterClient) createInventoryObj(obj *unstructured.Unstructured, dryRun common.DryRunStrategy) (*unstructured.Unstructured, error) {
-	if dryRun.ClientOrServerDryRun() {
-		klog.V(4).Infof("dry-run create inventory object: not created")
-		return obj.DeepCopy(), nil
-	}
-	if obj == nil {
-		return nil, fmt.Errorf("attempting create a nil inventory object")
-	}
-	// Default inventory name gets random suffix. Fixes problem where legacy
-	// inventory templates within same namespace will collide on name.
-	err := fixLegacyInventoryName(obj)
-	if err != nil {
-		return nil, err
-	}
-
-	mapping, err := cic.getMapping(obj)
-	if err != nil {
-		return nil, err
-	}
-
-	klog.V(4).Infof("creating inventory object: %s/%s", obj.GetNamespace(), obj.GetName())
-	return cic.dc.Resource(mapping.Resource).Namespace(obj.GetNamespace()).
-		Create(context.TODO(), obj, metav1.CreateOptions{})
-}
-
 // deleteInventoryObjByName deletes the passed inventory object from the APIServer, or
 // an error if one occurs.
 func (cic *ClusterClient) deleteInventoryObjByName(obj *unstructured.Unstructured, dryRun common.DryRunStrategy) error {
