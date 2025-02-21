@@ -817,7 +817,7 @@ func TestTaskQueueBuilder_ApplyBuild(t *testing.T) {
 				InvClient: fakeInvClient,
 				Collector: vCollector,
 			}
-			taskContext := taskrunner.NewTaskContext(nil, nil)
+			taskContext := taskrunner.NewTaskContext(t.Context(), nil, nil)
 			tq := tqb.WithInventory(invInfo).
 				WithApplyObjects(tc.applyObjs).
 				Build(taskContext, tc.options)
@@ -1493,7 +1493,7 @@ func TestTaskQueueBuilder_PruneBuild(t *testing.T) {
 				InvClient: fakeInvClient,
 				Collector: vCollector,
 			}
-			taskContext := taskrunner.NewTaskContext(nil, nil)
+			taskContext := taskrunner.NewTaskContext(t.Context(), nil, nil)
 			tq := tqb.WithInventory(invInfo).
 				WithPruneObjects(tc.pruneObjs).
 				Build(taskContext, tc.options)
@@ -1848,7 +1848,7 @@ func TestTaskQueueBuilder_ApplyPruneBuild(t *testing.T) {
 				InvClient: fakeInvClient,
 				Collector: vCollector,
 			}
-			taskContext := taskrunner.NewTaskContext(nil, nil)
+			taskContext := taskrunner.NewTaskContext(t.Context(), nil, nil)
 			tq := tqb.WithInventory(invInfo).
 				WithApplyObjects(tc.applyObjs).
 				WithPruneObjects(tc.pruneObjs).

@@ -48,7 +48,7 @@ func TestCurrentUIDFilter(t *testing.T) {
 			}
 			obj := defaultObj.DeepCopy()
 			obj.SetUID(types.UID(tc.objUID))
-			err := filter.Filter(obj)
+			err := filter.Filter(t.Context(), obj)
 			testutil.AssertEqual(t, tc.expectedError, err)
 		})
 	}

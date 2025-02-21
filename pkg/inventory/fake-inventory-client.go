@@ -40,7 +40,7 @@ func NewFakeClient(initObjs object.ObjMetadataSet) *FakeClient {
 }
 
 // GetClusterObjs returns currently stored set of objects.
-func (fic *FakeClient) GetClusterObjs(Info) (object.ObjMetadataSet, error) {
+func (fic *FakeClient) GetClusterObjs(context.Context, Info) (object.ObjMetadataSet, error) {
 	if fic.Err != nil {
 		return object.ObjMetadataSet{}, fic.Err
 	}
@@ -50,7 +50,7 @@ func (fic *FakeClient) GetClusterObjs(Info) (object.ObjMetadataSet, error) {
 // Merge stores the passed objects with the current stored cluster inventory
 // objects. Returns the set difference of the current set of objects minus
 // the passed set of objects, or an error if one is set up.
-func (fic *FakeClient) Merge(_ Info, objs object.ObjMetadataSet, _ common.DryRunStrategy) (object.ObjMetadataSet, error) {
+func (fic *FakeClient) Merge(_ context.Context, _ Info, objs object.ObjMetadataSet, _ common.DryRunStrategy) (object.ObjMetadataSet, error) {
 	if fic.Err != nil {
 		return object.ObjMetadataSet{}, fic.Err
 	}
@@ -61,7 +61,7 @@ func (fic *FakeClient) Merge(_ Info, objs object.ObjMetadataSet, _ common.DryRun
 
 // Replace the stored cluster inventory objs with the passed obj, or an
 // error if one is set up.
-func (fic *FakeClient) Replace(_ Info, objs object.ObjMetadataSet, status []actuation.ObjectStatus,
+func (fic *FakeClient) Replace(_ context.Context, _ Info, objs object.ObjMetadataSet, status []actuation.ObjectStatus,
 	_ common.DryRunStrategy) error {
 	if fic.Err != nil {
 		return fic.Err
@@ -72,7 +72,7 @@ func (fic *FakeClient) Replace(_ Info, objs object.ObjMetadataSet, status []actu
 }
 
 // DeleteInventoryObj returns an error if one is forced; does nothing otherwise.
-func (fic *FakeClient) DeleteInventoryObj(Info, common.DryRunStrategy) error {
+func (fic *FakeClient) DeleteInventoryObj(context.Context, Info, common.DryRunStrategy) error {
 	if fic.Err != nil {
 		return fic.Err
 	}

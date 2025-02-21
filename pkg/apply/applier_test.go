@@ -1943,7 +1943,7 @@ func TestApplierCancel(t *testing.T) {
 
 func TestReadAndPrepareObjectsNilInv(t *testing.T) {
 	applier := Applier{}
-	_, _, err := applier.prepareObjects(nil, object.UnstructuredSet{}, ApplierOptions{})
+	_, _, err := applier.prepareObjects(t.Context(), nil, object.UnstructuredSet{}, ApplierOptions{})
 	assert.Error(t, err)
 }
 
@@ -2050,7 +2050,7 @@ func TestReadAndPrepareObjects(t *testing.T) {
 				watcher.BlindStatusWatcher{},
 			)
 
-			applyObjs, pruneObjs, err := applier.prepareObjects(tc.invInfo.toWrapped(), tc.resources, ApplierOptions{})
+			applyObjs, pruneObjs, err := applier.prepareObjects(t.Context(), tc.invInfo.toWrapped(), tc.resources, ApplierOptions{})
 			if tc.isError {
 				assert.Error(t, err)
 				return

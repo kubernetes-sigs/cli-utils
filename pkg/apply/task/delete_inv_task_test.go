@@ -4,6 +4,7 @@
 package task
 
 import (
+	"context"
 	"testing"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -84,8 +85,8 @@ func TestDeleteInvTask(t *testing.T) {
 			client.Err = tc.err
 			eventChannel := make(chan event.Event)
 			resourceCache := cache.NewResourceCacheMap()
-			context := taskrunner.NewTaskContext(eventChannel, resourceCache)
-			im := context.InventoryManager()
+			taskContext := taskrunner.NewTaskContext(t.Context(), eventChannel, resourceCache)
+			im := taskContext.InventoryManager()
 			for _, deleteObj := range tc.deletedObjs {
 				im.AddSuccessfulDelete(deleteObj, "unused-uid")
 			}
@@ -114,8 +115,8 @@ func TestDeleteInvTask(t *testing.T) {
 			if taskName != task.Name() {
 				t.Errorf("expected task name (%s), got (%s)", taskName, task.Name())
 			}
-			task.Start(context)
-			result := <-context.TaskChannel()
+			task.Start(taskContext)
+			result := <-taskContext.TaskChannel()
 			if tc.isError {
 				if tc.err != result.Err {
 					t.Errorf("running DeleteOrUpdateInvTask expected error (%s), got (%s)", tc.err, result.Err)
@@ -125,7 +126,7 @@ func TestDeleteInvTask(t *testing.T) {
 					t.Errorf("unexpected error running DeleteOrUpdateInvTask: %s", result.Err)
 				}
 			}
-			actual, _ := client.GetClusterObjs(nil)
+			actual, _ := client.GetClusterObjs(context.Background(), nil)
 			testutil.AssertEqual(t, tc.expectedObjs, actual,
 				"Actual cluster objects (%d) do not match expected cluster objects (%d)",
 				len(actual), len(tc.expectedObjs))

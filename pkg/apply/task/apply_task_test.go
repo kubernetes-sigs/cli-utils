@@ -81,7 +81,7 @@ func TestApplyTask_BasicAppliedObjects(t *testing.T) {
 			eventChannel := make(chan event.Event)
 			defer close(eventChannel)
 			resourceCache := cache.NewResourceCacheMap()
-			taskContext := taskrunner.NewTaskContext(eventChannel, resourceCache)
+			taskContext := taskrunner.NewTaskContext(t.Context(), eventChannel, resourceCache)
 
 			objs := toUnstructureds(tc.applied)
 
@@ -173,7 +173,7 @@ func TestApplyTask_FetchGeneration(t *testing.T) {
 			eventChannel := make(chan event.Event)
 			defer close(eventChannel)
 			resourceCache := cache.NewResourceCacheMap()
-			taskContext := taskrunner.NewTaskContext(eventChannel, resourceCache)
+			taskContext := taskrunner.NewTaskContext(t.Context(), eventChannel, resourceCache)
 
 			objs := toUnstructureds(tc.rss)
 
@@ -286,7 +286,7 @@ func TestApplyTask_DryRun(t *testing.T) {
 			t.Run(tn, func(t *testing.T) {
 				eventChannel := make(chan event.Event)
 				resourceCache := cache.NewResourceCacheMap()
-				taskContext := taskrunner.NewTaskContext(eventChannel, resourceCache)
+				taskContext := taskrunner.NewTaskContext(t.Context(), eventChannel, resourceCache)
 
 				restMapper := testutil.NewFakeRESTMapper(schema.GroupVersionKind{
 					Group:   "apps",
@@ -435,7 +435,7 @@ func TestApplyTaskWithError(t *testing.T) {
 		t.Run(tn, func(t *testing.T) {
 			eventChannel := make(chan event.Event)
 			resourceCache := cache.NewResourceCacheMap()
-			taskContext := taskrunner.NewTaskContext(eventChannel, resourceCache)
+			taskContext := taskrunner.NewTaskContext(t.Context(), eventChannel, resourceCache)
 
 			restMapper := testutil.NewFakeRESTMapper(schema.GroupVersionKind{
 				Group:   "apps",

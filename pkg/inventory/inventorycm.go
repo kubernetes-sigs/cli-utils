@@ -134,14 +134,14 @@ func (icm *ConfigMap) GetObject() (*unstructured.Unstructured, error) {
 
 // Apply is an Storage interface function implemented to apply the inventory
 // object. StatusPolicy is not needed since ConfigMaps do not have a status subresource.
-func (icm *ConfigMap) Apply(dc dynamic.Interface, mapper meta.RESTMapper, _ StatusPolicy) error {
+func (icm *ConfigMap) Apply(ctx context.Context, dc dynamic.Interface, mapper meta.RESTMapper, _ StatusPolicy) error {
 	invInfo, namespacedClient, err := icm.getNamespacedClient(dc, mapper)
 	if err != nil {
 		return err
 	}
 
 	// Get cluster object, if exsists.
-	clusterObj, err := namespacedClient.Get(context.TODO(), invInfo.GetName(), metav1.GetOptions{})
+	clusterObj, err := namespacedClient.Get(ctx, invInfo.GetName(), metav1.GetOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
@@ -149,19 +149,19 @@ func (icm *ConfigMap) Apply(dc dynamic.Interface, mapper meta.RESTMapper, _ Stat
 	// Create cluster inventory object, if it does not exist on cluster.
 	if clusterObj == nil {
 		klog.V(4).Infof("creating inventory object: %s/%s", invInfo.GetNamespace(), invInfo.GetName())
-		_, err = namespacedClient.Create(context.TODO(), invInfo, metav1.CreateOptions{})
+		_, err = namespacedClient.Create(ctx, invInfo, metav1.CreateOptions{})
 		return err
 	}
 
 	// Update the cluster inventory object instead.
 	klog.V(4).Infof("updating inventory object: %s/%s", invInfo.GetNamespace(), invInfo.GetName())
-	_, err = namespacedClient.Update(context.TODO(), invInfo, metav1.UpdateOptions{})
+	_, err = namespacedClient.Update(ctx, invInfo, metav1.UpdateOptions{})
 	return err
 }
 
 // ApplyWithPrune is a Storage interface function implemented to apply the inventory object with a list of objects
 // to be pruned. StatusPolicy is not needed since ConfigMaps do not have a status subresource.
-func (icm *ConfigMap) ApplyWithPrune(dc dynamic.Interface, mapper meta.RESTMapper, _ StatusPolicy, _ object.ObjMetadataSet) error {
+func (icm *ConfigMap) ApplyWithPrune(ctx context.Context, dc dynamic.Interface, mapper meta.RESTMapper, _ StatusPolicy, _ object.ObjMetadataSet) error {
 	invInfo, namespacedClient, err := icm.getNamespacedClient(dc, mapper)
 	if err != nil {
 		return err
@@ -169,7 +169,7 @@ func (icm *ConfigMap) ApplyWithPrune(dc dynamic.Interface, mapper meta.RESTMappe
 
 	// Update the cluster inventory object.
 	klog.V(4).Infof("updating inventory object: %s/%s", invInfo.GetNamespace(), invInfo.GetName())
-	_, err = namespacedClient.Update(context.TODO(), invInfo, metav1.UpdateOptions{})
+	_, err = namespacedClient.Update(ctx, invInfo, metav1.UpdateOptions{})
 	return err
 }
 

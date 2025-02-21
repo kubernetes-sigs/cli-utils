@@ -85,7 +85,7 @@ func TestWaitTask_CompleteEventually(t *testing.T) {
 
 	eventChannel := make(chan event.Event)
 	resourceCache := cache.NewResourceCacheMap()
-	taskContext := NewTaskContext(eventChannel, resourceCache)
+	taskContext := NewTaskContext(t.Context(), eventChannel, resourceCache)
 	defer close(eventChannel)
 
 	// Update metadata on successfully applied objects
@@ -273,7 +273,7 @@ func TestWaitTask_Timeout(t *testing.T) {
 
 	eventChannel := make(chan event.Event)
 	resourceCache := cache.NewResourceCacheMap()
-	taskContext := NewTaskContext(eventChannel, resourceCache)
+	taskContext := NewTaskContext(t.Context(), eventChannel, resourceCache)
 	defer close(eventChannel)
 
 	// Update metadata on successfully applied objects
@@ -438,7 +438,7 @@ func TestWaitTask_StartAndComplete(t *testing.T) {
 
 	eventChannel := make(chan event.Event)
 	resourceCache := cache.NewResourceCacheMap()
-	taskContext := NewTaskContext(eventChannel, resourceCache)
+	taskContext := NewTaskContext(t.Context(), eventChannel, resourceCache)
 	defer close(eventChannel)
 
 	// Update metadata on successfully applied objects
@@ -523,7 +523,7 @@ func TestWaitTask_Cancel(t *testing.T) {
 
 	eventChannel := make(chan event.Event)
 	resourceCache := cache.NewResourceCacheMap()
-	taskContext := NewTaskContext(eventChannel, resourceCache)
+	taskContext := NewTaskContext(t.Context(), eventChannel, resourceCache)
 	defer close(eventChannel)
 
 	// Update metadata on successfully applied objects
@@ -611,7 +611,7 @@ func TestWaitTask_SingleTaskResult(t *testing.T) {
 	// buffer events, because they're sent by StatusUpdate
 	eventChannel := make(chan event.Event, 10)
 	resourceCache := cache.NewResourceCacheMap()
-	taskContext := NewTaskContext(eventChannel, resourceCache)
+	taskContext := NewTaskContext(t.Context(), eventChannel, resourceCache)
 	defer close(eventChannel)
 
 	// Update metadata on successfully applied objects
@@ -1115,7 +1115,7 @@ func TestWaitTask_Failed(t *testing.T) {
 
 			eventChannel := make(chan event.Event)
 			resourceCache := cache.NewResourceCacheMap()
-			taskContext := NewTaskContext(eventChannel, resourceCache)
+			taskContext := NewTaskContext(t.Context(), eventChannel, resourceCache)
 			defer close(eventChannel)
 
 			tc.configureTaskContextFunc(taskContext)
@@ -1365,7 +1365,7 @@ func TestWaitTask_UIDChanged(t *testing.T) {
 
 			eventChannel := make(chan event.Event)
 			resourceCache := cache.NewResourceCacheMap()
-			taskContext := NewTaskContext(eventChannel, resourceCache)
+			taskContext := NewTaskContext(t.Context(), eventChannel, resourceCache)
 			defer close(eventChannel)
 
 			tc.configureTaskContextFunc(taskContext)

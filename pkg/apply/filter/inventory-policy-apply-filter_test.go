@@ -105,7 +105,7 @@ func TestInventoryPolicyApplyFilter(t *testing.T) {
 				Inv:       inventory.WrapInventoryInfoObj(invObj),
 				InvPolicy: tc.policy,
 			}
-			err := filter.Filter(obj)
+			err := filter.Filter(t.Context(), obj)
 			testutil.AssertEqual(t, tc.expectedError, err)
 		})
 	}

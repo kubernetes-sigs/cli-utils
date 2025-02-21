@@ -52,7 +52,7 @@ type Applier struct {
 
 // prepareObjects returns the set of objects to apply and to prune or
 // an error if one occurred.
-func (a *Applier) prepareObjects(localInv inventory.Info, localObjs object.UnstructuredSet,
+func (a *Applier) prepareObjects(ctx context.Context, localInv inventory.Info, localObjs object.UnstructuredSet,
 	o ApplierOptions) (object.UnstructuredSet, object.UnstructuredSet, error) {
 	if localInv == nil {
 		return nil, nil, fmt.Errorf("the local inventory can't be nil")
@@ -64,7 +64,7 @@ func (a *Applier) prepareObjects(localInv inventory.Info, localObjs object.Unstr
 	for _, localObj := range localObjs {
 		inventory.AddInventoryIDAnnotation(localObj, localInv)
 	}
-	pruneObjs, err := a.pruner.GetPruneObjs(localInv, localObjs, prune.Options{
+	pruneObjs, err := a.pruner.GetPruneObjs(ctx, localInv, localObjs, prune.Options{
 		DryRunStrategy: o.DryRunStrategy,
 	})
 	if err != nil {
@@ -97,7 +97,7 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.Info, objects objec
 		validator.Validate(objects)
 
 		// Decide which objects to apply and which to prune
-		applyObjs, pruneObjs, err := a.prepareObjects(invInfo, objects, options)
+		applyObjs, pruneObjs, err := a.prepareObjects(ctx, invInfo, objects, options)
 		if err != nil {
 			handleError(eventChannel, err)
 			return
@@ -106,7 +106,7 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.Info, objects objec
 
 		// Build a TaskContext for passing info between tasks
 		resourceCache := cache.NewResourceCacheMap()
-		taskContext := taskrunner.NewTaskContext(eventChannel, resourceCache)
+		taskContext := taskrunner.NewTaskContext(ctx, eventChannel, resourceCache)
 
 		// Fetch the queue (channel) of tasks that should be executed.
 		klog.V(4).Infoln("applier building task queue...")

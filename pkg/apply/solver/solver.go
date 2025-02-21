@@ -213,7 +213,7 @@ func (t *TaskQueueBuilder) Build(taskContext *taskrunner.TaskContext, o Options)
 		}
 	}
 
-	prevInvIDs, _ := t.InvClient.GetClusterObjs(t.invInfo)
+	prevInvIDs, _ := t.InvClient.GetClusterObjs(taskContext.Context(), t.invInfo)
 	klog.V(2).Infoln("adding delete/update inventory task")
 	var taskName string
 	if o.Destroy {
@@ -278,7 +278,7 @@ func (t *TaskQueueBuilder) newPruneTask(pruneObjs object.UnstructuredSet,
 	pruneFilters []filter.ValidationFilter, o Options) taskrunner.Task {
 	pruneObjs = t.Collector.FilterInvalidObjects(pruneObjs)
 	klog.V(2).Infof("adding prune task (%d objects)", len(pruneObjs))
-	task := &task.PruneTask{
+	pruneTask := &task.PruneTask{
 		TaskName:          fmt.Sprintf("prune-%d", t.pruneCounter),
 		Objects:           pruneObjs,
 		Filters:           pruneFilters,
@@ -288,5 +288,5 @@ func (t *TaskQueueBuilder) newPruneTask(pruneObjs object.UnstructuredSet,
 		Destroy:           o.Destroy,
 	}
 	t.pruneCounter++
-	return task
+	return pruneTask
 }

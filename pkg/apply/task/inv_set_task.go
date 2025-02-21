@@ -4,6 +4,8 @@
 package task
 
 import (
+	"context"
+
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
@@ -49,7 +51,7 @@ func (i *DeleteOrUpdateInvTask) Start(taskContext *taskrunner.TaskContext) {
 	go func() {
 		var err error
 		if i.Destroy && i.destroySuccessful(taskContext) {
-			err = i.deleteInventory()
+			err = i.deleteInventory(taskContext.Context())
 		} else {
 			err = i.updateInventory(taskContext)
 		}
@@ -158,16 +160,16 @@ func (i *DeleteOrUpdateInvTask) updateInventory(taskContext *taskrunner.TaskCont
 	objStatus := taskContext.InventoryManager().Inventory().Status.Objects
 
 	klog.V(4).Infof("set inventory %d total objects", len(invObjs))
-	err := i.InvClient.Replace(i.InvInfo, invObjs, objStatus, i.DryRun)
+	err := i.InvClient.Replace(taskContext.Context(), i.InvInfo, invObjs, objStatus, i.DryRun)
 
 	klog.V(2).Infof("inventory set task completing (name: %q)", i.TaskName)
 	return err
 }
 
 // deleteInventory deletes the inventory object from the cluster.
-func (i *DeleteOrUpdateInvTask) deleteInventory() error {
+func (i *DeleteOrUpdateInvTask) deleteInventory(ctx context.Context) error {
 	klog.V(2).Infof("delete inventory task starting (name: %q)", i.Name())
-	err := i.InvClient.DeleteInventoryObj(i.InvInfo, i.DryRun)
+	err := i.InvClient.DeleteInventoryObj(ctx, i.InvInfo, i.DryRun)
 	// Not found is not error, since this means it was already deleted.
 	if apierrors.IsNotFound(err) {
 		err = nil

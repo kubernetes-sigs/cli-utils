@@ -585,12 +585,12 @@ func TestPrune(t *testing.T) {
 			// the events that can be put on it.
 			eventChannel := make(chan event.Event, len(tc.pruneObjs)+1)
 			resourceCache := cache.NewResourceCacheMap()
-			taskContext := taskrunner.NewTaskContext(eventChannel, resourceCache)
+			taskContext := taskrunner.NewTaskContext(t.Context(), eventChannel, resourceCache)
 			taskName := "test-0"
 			err := func() error {
 				defer close(eventChannel)
 				// Run the prune and validate.
-				return po.Prune(tc.pruneObjs, tc.pruneFilters, taskContext, taskName, tc.options)
+				return po.Prune(taskContext, tc.pruneObjs, tc.pruneFilters, taskName, tc.options)
 			}()
 
 			if err != nil {
@@ -676,16 +676,16 @@ func TestPruneDeletionPrevention(t *testing.T) {
 			// the events that can be put on it.
 			eventChannel := make(chan event.Event, 2)
 			resourceCache := cache.NewResourceCacheMap()
-			taskContext := taskrunner.NewTaskContext(eventChannel, resourceCache)
+			taskContext := taskrunner.NewTaskContext(t.Context(), eventChannel, resourceCache)
 			err := func() error {
 				defer close(eventChannel)
 				// Run the prune and validate.
-				return po.Prune([]*unstructured.Unstructured{tc.pruneObj}, []filter.ValidationFilter{filter.PreventRemoveFilter{}}, taskContext, "test-0", tc.options)
+				return po.Prune(taskContext, []*unstructured.Unstructured{tc.pruneObj}, []filter.ValidationFilter{filter.PreventRemoveFilter{}}, "test-0", tc.options)
 			}()
 			require.NoError(t, err)
 
 			// verify that the object no longer has the annotation
-			obj, err := po.getObject(pruneID)
+			obj, err := po.getObject(t.Context(), pruneID)
 			require.NoError(t, err)
 
 			for annotation := range obj.GetAnnotations() {
@@ -775,7 +775,7 @@ func TestPruneWithErrors(t *testing.T) {
 			// the events that can be put on it.
 			eventChannel := make(chan event.Event, len(tc.pruneObjs))
 			resourceCache := cache.NewResourceCacheMap()
-			taskContext := taskrunner.NewTaskContext(eventChannel, resourceCache)
+			taskContext := taskrunner.NewTaskContext(t.Context(), eventChannel, resourceCache)
 			err := func() error {
 				defer close(eventChannel)
 				var opts Options
@@ -785,7 +785,7 @@ func TestPruneWithErrors(t *testing.T) {
 					opts = defaultOptions
 				}
 				// Run the prune and validate.
-				return po.Prune(tc.pruneObjs, []filter.ValidationFilter{}, taskContext, "test-0", opts)
+				return po.Prune(taskContext, tc.pruneObjs, []filter.ValidationFilter{}, "test-0", opts)
 			}()
 			if err != nil {
 				t.Fatalf("Unexpected error during Prune(): %#v", err)
@@ -860,7 +860,7 @@ func TestGetPruneObjs(t *testing.T) {
 					scheme.Scheme.PrioritizedVersionsAllGroups()...),
 			}
 			currentInventory := createInventoryInfo(tc.prevInventory...)
-			actualObjs, err := po.GetPruneObjs(currentInventory, tc.localObjs, Options{})
+			actualObjs, err := po.GetPruneObjs(t.Context(), currentInventory, tc.localObjs, Options{})
 			if err != nil {
 				t.Fatalf("unexpected error %s returned", err)
 			}
@@ -882,7 +882,7 @@ func TestGetObject_NoMatchError(t *testing.T) {
 		Mapper: testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme,
 			scheme.Scheme.PrioritizedVersionsAllGroups()...),
 	}
-	_, err := po.getObject(testutil.ToIdentifier(t, crontabCRManifest))
+	_, err := po.getObject(t.Context(), testutil.ToIdentifier(t, crontabCRManifest))
 	if err == nil {
 		t.Fatalf("expected GetObject() to return a NoKindMatchError, got nil")
 	}
@@ -898,7 +898,7 @@ func TestGetObject_NotFoundError(t *testing.T) {
 			scheme.Scheme.PrioritizedVersionsAllGroups()...),
 	}
 	id := object.UnstructuredToObjMetadata(pdb)
-	_, err := po.getObject(id)
+	_, err := po.getObject(t.Context(), id)
 	if err == nil {
 		t.Fatalf("expected GetObject() to return a NotFound error, got nil")
 	}
@@ -915,7 +915,7 @@ func TestHandleDeletePrevention(t *testing.T) {
 			scheme.Scheme.PrioritizedVersionsAllGroups()...),
 	}
 	var err error
-	obj, err = po.removeInventoryAnnotation(obj)
+	obj, err = po.removeInventoryAnnotation(t.Context(), obj)
 	if err != nil {
 		t.Fatalf("unexpected error %s returned", err)
 	}
@@ -928,7 +928,7 @@ func TestHandleDeletePrevention(t *testing.T) {
 	}
 
 	// Get the object from the cluster
-	obj, err = po.getObject(testutil.ToIdentifier(t, pdbDeletePreventionManifest))
+	obj, err = po.getObject(t.Context(), testutil.ToIdentifier(t, pdbDeletePreventionManifest))
 	if err != nil {
 		t.Fatalf("unexpected error %s returned", err)
 	}
@@ -978,8 +978,8 @@ func TestPrune_PropagationPolicy(t *testing.T) {
 
 			eventChannel := make(chan event.Event, 1)
 			resourceCache := cache.NewResourceCacheMap()
-			taskContext := taskrunner.NewTaskContext(eventChannel, resourceCache)
-			err := po.Prune([]*unstructured.Unstructured{pdb}, []filter.ValidationFilter{}, taskContext, "test-0", Options{
+			taskContext := taskrunner.NewTaskContext(t.Context(), eventChannel, resourceCache)
+			err := po.Prune(taskContext, []*unstructured.Unstructured{pdb}, []filter.ValidationFilter{}, "test-0", Options{
 				PropagationPolicy: tc.propagationPolicy,
 			})
 			assert.NoError(t, err)

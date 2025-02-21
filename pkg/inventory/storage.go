@@ -12,6 +12,7 @@
 package inventory
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -40,12 +41,12 @@ type Storage interface {
 	GetObject() (*unstructured.Unstructured, error)
 	// Apply applies the inventory object. This utility function is used
 	// in InventoryClient.Merge and merges the metadata, spec and status.
-	Apply(dynamic.Interface, meta.RESTMapper, StatusPolicy) error
+	Apply(context.Context, dynamic.Interface, meta.RESTMapper, StatusPolicy) error
 	// ApplyWithPrune applies the inventory object with a set of pruneIDs of
 	// objects to be pruned (object.ObjMetadataSet). This function is used in
 	// InventoryClient.Replace. pruneIDs are required for enabling custom logic
 	// handling of multiple ResourceGroup inventories.
-	ApplyWithPrune(dynamic.Interface, meta.RESTMapper, StatusPolicy, object.ObjMetadataSet) error
+	ApplyWithPrune(context.Context, dynamic.Interface, meta.RESTMapper, StatusPolicy, object.ObjMetadataSet) error
 }
 
 // StorageFactoryFunc creates the object which implements the Inventory

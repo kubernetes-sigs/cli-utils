@@ -132,7 +132,7 @@ func TestInvAddTask(t *testing.T) {
 			client := inventory.NewFakeClient(tc.initialObjs)
 			eventChannel := make(chan event.Event)
 			resourceCache := cache.NewResourceCacheMap()
-			context := taskrunner.NewTaskContext(eventChannel, resourceCache)
+			taskContext := taskrunner.NewTaskContext(t.Context(), eventChannel, resourceCache)
 			tf := cmdtesting.NewTestFactory().WithNamespace(namespace)
 			defer tf.Cleanup()
 
@@ -162,12 +162,12 @@ func TestInvAddTask(t *testing.T) {
 			if !task.Identifiers().Equal(applyIDs) {
 				t.Errorf("expected task ids (%s), got (%s)", applyIDs, task.Identifiers())
 			}
-			task.Start(context)
-			result := <-context.TaskChannel()
+			task.Start(taskContext)
+			result := <-taskContext.TaskChannel()
 			if result.Err != nil {
 				t.Errorf("unexpected error running InvAddTask: %s", result.Err)
 			}
-			actual, _ := client.GetClusterObjs(nil)
+			actual, _ := client.GetClusterObjs(t.Context(), nil)
 			if !tc.expectedObjs.Equal(actual) {
 				t.Errorf("expected merged inventory (%s), got (%s)", tc.expectedObjs, actual)
 			}
