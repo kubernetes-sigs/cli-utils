@@ -29,13 +29,14 @@ var (
 // into the cluster. The InvAddTask should add/merge inventory references
 // before the actual object is applied.
 type InvAddTask struct {
-	TaskName      string
-	InvClient     inventory.Client
-	DynamicClient dynamic.Interface
-	Mapper        meta.RESTMapper
-	InvInfo       inventory.Info
-	Objects       object.UnstructuredSet
-	DryRun        common.DryRunStrategy
+	TaskName         string
+	ClusterInventory inventory.Inventory
+	InvClient        inventory.WriteClient
+	DynamicClient    dynamic.Interface
+	Mapper           meta.RESTMapper
+	InvInfo          inventory.Info
+	Objects          object.UnstructuredSet
+	DryRun           common.DryRunStrategy
 }
 
 func (i *InvAddTask) Name() string {
@@ -71,7 +72,16 @@ func (i *InvAddTask) Start(taskContext *taskrunner.TaskContext) {
 		}
 		klog.V(4).Infof("merging %d local objects into inventory", len(i.Objects))
 		currentObjs := object.UnstructuredSetToObjMetadataSet(i.Objects)
-		_, err := i.InvClient.Merge(taskContext.Context(), i.InvInfo, currentObjs, i.DryRun)
+		inventoryObjs := i.ClusterInventory.Objects()
+		unionObjs := inventoryObjs.Union(currentObjs)
+
+		i.ClusterInventory.SetObjects(unionObjs)
+
+		var err error
+		if !i.DryRun.ClientOrServerDryRun() {
+			err = i.InvClient.CreateOrUpdate(taskContext.Context(), i.ClusterInventory, inventory.UpdateOptions{})
+		}
+
 		i.sendTaskResult(taskContext, err)
 	}()
 }
@@ -94,7 +104,7 @@ func inventoryNamespaceInSet(inv inventory.Info, objs object.UnstructuredSet) *u
 	for _, obj := range objs {
 		gvk := obj.GetObjectKind().GroupVersionKind()
 		if gvk == namespaceGVKv1 && obj.GetName() == invNamespace {
-			inventory.AddInventoryIDAnnotation(obj, inv)
+			inventory.AddInventoryIDAnnotation(obj, inv.ID())
 			return obj
 		}
 	}

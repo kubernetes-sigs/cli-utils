@@ -61,7 +61,7 @@ func newFactory(cfg *rest.Config) util.Factory {
 	return util.NewFactory(matchVersionKubeConfigFlags)
 }
 
-func newApplier(invFactory inventory.ClientFactory, cfg *rest.Config) *apply.Applier {
+func newApplier(invFactory inventory.ClientFactory, statusPolicy inventory.StatusPolicy, cfg *rest.Config) *apply.Applier {
 	f := newFactory(cfg)
 	invClient, err := invFactory.NewClient(f)
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -69,12 +69,13 @@ func newApplier(invFactory inventory.ClientFactory, cfg *rest.Config) *apply.App
 	a, err := apply.NewApplierBuilder().
 		WithFactory(f).
 		WithInventoryClient(invClient).
+		WithStatusPolicy(statusPolicy).
 		Build()
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	return a
 }
 
-func newDestroyer(invFactory inventory.ClientFactory, cfg *rest.Config) *apply.Destroyer {
+func newDestroyer(invFactory inventory.ClientFactory, statusPolicy inventory.StatusPolicy, cfg *rest.Config) *apply.Destroyer {
 	f := newFactory(cfg)
 	invClient, err := invFactory.NewClient(f)
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -82,6 +83,7 @@ func newDestroyer(invFactory inventory.ClientFactory, cfg *rest.Config) *apply.D
 	d, err := apply.NewDestroyerBuilder().
 		WithFactory(f).
 		WithInventoryClient(invClient).
+		WithStatusPolicy(statusPolicy).
 		Build()
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	return d

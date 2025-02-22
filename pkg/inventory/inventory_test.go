@@ -415,8 +415,3 @@ func TestLegacyInventoryName(t *testing.T) {
 func copyInventoryInfo() *unstructured.Unstructured {
 	return inventoryObj.DeepCopy()
 }
-
-func copyInventory() Info {
-	u := inventoryObj.DeepCopy()
-	return WrapInventoryInfoObj(u)
-}

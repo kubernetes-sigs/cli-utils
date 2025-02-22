@@ -116,7 +116,7 @@ func newInvObject(name, namespace, inventoryID string) *unstructured.Unstructure
 					common.InventoryLabel: inventoryID,
 				},
 			},
-			"data": map[string]string{},
+			"data": map[string]interface{}{},
 		},
 	}
 }
@@ -130,8 +130,8 @@ func TestTaskQueueBuilder_ApplyBuild(t *testing.T) {
 		inventoryInfoComparer(),
 	)
 
-	invInfo := inventory.WrapInventoryInfoObj(newInvObject(
-		"abc-123", "default", "test"))
+	uObj := newInvObject("abc-123", "default", "test")
+	invInfo := inventory.WrapInventoryInfoObj(uObj)
 
 	testCases := map[string]struct {
 		applyObjs      []*unstructured.Unstructured
@@ -150,10 +150,9 @@ func TestTaskQueueBuilder_ApplyBuild(t *testing.T) {
 					Objects:   object.UnstructuredSet{},
 				},
 				&task.DeleteOrUpdateInvTask{
-					TaskName:      "inventory-set-0",
-					InvClient:     &inventory.FakeClient{},
-					InvInfo:       invInfo,
-					PrevInventory: object.ObjMetadataSet{},
+					TaskName:  "inventory-set-0",
+					InvClient: &inventory.FakeClient{},
+					InvInfo:   invInfo,
 				},
 			},
 		},
@@ -187,9 +186,6 @@ func TestTaskQueueBuilder_ApplyBuild(t *testing.T) {
 					TaskName:  "inventory-set-0",
 					InvClient: &inventory.FakeClient{},
 					InvInfo:   invInfo,
-					PrevInventory: object.ObjMetadataSet{
-						testutil.ToIdentifier(t, resources["deployment"]),
-					},
 				},
 			},
 			expectedStatus: []actuation.ObjectStatus{
@@ -238,10 +234,6 @@ func TestTaskQueueBuilder_ApplyBuild(t *testing.T) {
 					TaskName:  "inventory-set-0",
 					InvClient: &inventory.FakeClient{},
 					InvInfo:   invInfo,
-					PrevInventory: object.ObjMetadataSet{
-						testutil.ToIdentifier(t, resources["deployment"]),
-						testutil.ToIdentifier(t, resources["secret"]),
-					},
 				},
 			},
 			expectedStatus: []actuation.ObjectStatus{
@@ -302,10 +294,6 @@ func TestTaskQueueBuilder_ApplyBuild(t *testing.T) {
 					TaskName:  "inventory-set-0",
 					InvClient: &inventory.FakeClient{},
 					InvInfo:   invInfo,
-					PrevInventory: object.ObjMetadataSet{
-						testutil.ToIdentifier(t, resources["secret"]),
-						testutil.ToIdentifier(t, resources["deployment"]),
-					},
 				},
 			},
 			expectedStatus: []actuation.ObjectStatus{
@@ -360,11 +348,7 @@ func TestTaskQueueBuilder_ApplyBuild(t *testing.T) {
 					TaskName:  "inventory-set-0",
 					InvClient: &inventory.FakeClient{},
 					InvInfo:   invInfo,
-					PrevInventory: object.ObjMetadataSet{
-						testutil.ToIdentifier(t, resources["deployment"]),
-						testutil.ToIdentifier(t, resources["secret"]),
-					},
-					DryRun: common.DryRunClient,
+					DryRun:    common.DryRunClient,
 				},
 			},
 			expectedStatus: []actuation.ObjectStatus{
@@ -419,11 +403,7 @@ func TestTaskQueueBuilder_ApplyBuild(t *testing.T) {
 					TaskName:  "inventory-set-0",
 					InvClient: &inventory.FakeClient{},
 					InvInfo:   invInfo,
-					PrevInventory: object.ObjMetadataSet{
-						testutil.ToIdentifier(t, resources["pod"]),
-						testutil.ToIdentifier(t, resources["default-pod"]),
-					},
-					DryRun: common.DryRunServer,
+					DryRun:    common.DryRunServer,
 				},
 			},
 			expectedStatus: []actuation.ObjectStatus{
@@ -496,11 +476,6 @@ func TestTaskQueueBuilder_ApplyBuild(t *testing.T) {
 					TaskName:  "inventory-set-0",
 					InvClient: &inventory.FakeClient{},
 					InvInfo:   invInfo,
-					PrevInventory: object.ObjMetadataSet{
-						testutil.ToIdentifier(t, resources["crontab1"]),
-						testutil.ToIdentifier(t, resources["crd"]),
-						testutil.ToIdentifier(t, resources["crontab2"]),
-					},
 				},
 			},
 			expectedStatus: []actuation.ObjectStatus{
@@ -571,12 +546,7 @@ func TestTaskQueueBuilder_ApplyBuild(t *testing.T) {
 					TaskName:  "inventory-set-0",
 					InvClient: &inventory.FakeClient{},
 					InvInfo:   invInfo,
-					PrevInventory: object.ObjMetadataSet{
-						testutil.ToIdentifier(t, resources["crontab1"]),
-						testutil.ToIdentifier(t, resources["crd"]),
-						testutil.ToIdentifier(t, resources["crontab2"]),
-					},
-					DryRun: common.DryRunClient,
+					DryRun:    common.DryRunClient,
 				},
 			},
 			expectedStatus: []actuation.ObjectStatus{
@@ -657,11 +627,6 @@ func TestTaskQueueBuilder_ApplyBuild(t *testing.T) {
 					TaskName:  "inventory-set-0",
 					InvClient: &inventory.FakeClient{},
 					InvInfo:   invInfo,
-					PrevInventory: object.ObjMetadataSet{
-						testutil.ToIdentifier(t, resources["namespace"]),
-						testutil.ToIdentifier(t, resources["pod"]),
-						testutil.ToIdentifier(t, resources["secret"]),
-					},
 				},
 			},
 			expectedStatus: []actuation.ObjectStatus{
@@ -741,10 +706,6 @@ func TestTaskQueueBuilder_ApplyBuild(t *testing.T) {
 					TaskName:  "inventory-set-0",
 					InvClient: &inventory.FakeClient{},
 					InvInfo:   invInfo,
-					PrevInventory: object.ObjMetadataSet{
-						testutil.ToIdentifier(t, resources["deployment"]),
-						testutil.ToIdentifier(t, resources["secret"]),
-					},
 				},
 			},
 			expectedStatus: []actuation.ObjectStatus{
@@ -796,6 +757,9 @@ func TestTaskQueueBuilder_ApplyBuild(t *testing.T) {
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
 			mapper := testutil.NewFakeRESTMapper()
+			clusterInventory := &inventory.UnstructuredInventory{
+				ClusterObj: uObj,
+			}
 			// inject mapper for equality comparison
 			for _, t := range tc.expectedTasks {
 				switch typedTask := t.(type) {
@@ -805,6 +769,9 @@ func TestTaskQueueBuilder_ApplyBuild(t *testing.T) {
 					typedTask.Mapper = mapper
 				case *task.InvAddTask:
 					typedTask.Mapper = mapper
+					typedTask.ClusterInventory = clusterInventory
+				case *task.DeleteOrUpdateInvTask:
+					typedTask.ClusterInventory = clusterInventory
 				}
 			}
 
@@ -814,6 +781,7 @@ func TestTaskQueueBuilder_ApplyBuild(t *testing.T) {
 			tqb := TaskQueueBuilder{
 				Pruner:    pruner,
 				Mapper:    mapper,
+				Inventory: clusterInventory,
 				InvClient: fakeInvClient,
 				Collector: vCollector,
 			}
@@ -829,7 +797,7 @@ func TestTaskQueueBuilder_ApplyBuild(t *testing.T) {
 			assert.NoError(t, err)
 			asserter.Equal(t, tc.expectedTasks, tq.tasks)
 
-			actualStatus := taskContext.InventoryManager().Inventory().Status.Objects
+			actualStatus := taskContext.InventoryManager().Inventory().ObjStatuses
 			testutil.AssertEqual(t, tc.expectedStatus, actualStatus)
 		})
 	}
@@ -844,8 +812,8 @@ func TestTaskQueueBuilder_PruneBuild(t *testing.T) {
 		inventoryInfoComparer(),
 	)
 
-	invInfo := inventory.WrapInventoryInfoObj(newInvObject(
-		"abc-123", "default", "test"))
+	uObj := newInvObject("abc-123", "default", "test")
+	invInfo := inventory.WrapInventoryInfoObj(uObj)
 
 	testCases := map[string]struct {
 		pruneObjs      []*unstructured.Unstructured
@@ -865,10 +833,9 @@ func TestTaskQueueBuilder_PruneBuild(t *testing.T) {
 					Objects:   object.UnstructuredSet{},
 				},
 				&task.DeleteOrUpdateInvTask{
-					TaskName:      "inventory-set-0",
-					InvClient:     &inventory.FakeClient{},
-					InvInfo:       invInfo,
-					PrevInventory: object.ObjMetadataSet{},
+					TaskName:  "inventory-set-0",
+					InvClient: &inventory.FakeClient{},
+					InvInfo:   invInfo,
 				},
 			},
 		},
@@ -901,9 +868,6 @@ func TestTaskQueueBuilder_PruneBuild(t *testing.T) {
 					TaskName:  "inventory-set-0",
 					InvClient: &inventory.FakeClient{},
 					InvInfo:   invInfo,
-					PrevInventory: object.ObjMetadataSet{
-						testutil.ToIdentifier(t, resources["default-pod"]),
-					},
 				},
 			},
 			expectedStatus: []actuation.ObjectStatus{
@@ -949,10 +913,6 @@ func TestTaskQueueBuilder_PruneBuild(t *testing.T) {
 					TaskName:  "inventory-set-0",
 					InvClient: &inventory.FakeClient{},
 					InvInfo:   invInfo,
-					PrevInventory: object.ObjMetadataSet{
-						testutil.ToIdentifier(t, resources["default-pod"]),
-						testutil.ToIdentifier(t, resources["pod"]),
-					},
 				},
 			},
 			expectedStatus: []actuation.ObjectStatus{
@@ -1020,10 +980,6 @@ func TestTaskQueueBuilder_PruneBuild(t *testing.T) {
 					TaskName:  "inventory-set-0",
 					InvClient: &inventory.FakeClient{},
 					InvInfo:   invInfo,
-					PrevInventory: object.ObjMetadataSet{
-						testutil.ToIdentifier(t, resources["pod"]),
-						testutil.ToIdentifier(t, resources["secret"]),
-					},
 				},
 			},
 			expectedStatus: []actuation.ObjectStatus{
@@ -1078,9 +1034,6 @@ func TestTaskQueueBuilder_PruneBuild(t *testing.T) {
 					TaskName:  "inventory-set-0",
 					InvClient: &inventory.FakeClient{},
 					InvInfo:   invInfo,
-					PrevInventory: object.ObjMetadataSet{
-						testutil.ToIdentifier(t, resources["pod"]),
-					},
 				},
 			},
 			expectedStatus: []actuation.ObjectStatus{
@@ -1125,11 +1078,7 @@ func TestTaskQueueBuilder_PruneBuild(t *testing.T) {
 					TaskName:  "inventory-set-0",
 					InvClient: &inventory.FakeClient{},
 					InvInfo:   invInfo,
-					PrevInventory: object.ObjMetadataSet{
-						testutil.ToIdentifier(t, resources["pod"]),
-						testutil.ToIdentifier(t, resources["default-pod"]),
-					},
-					DryRun: common.DryRunServer,
+					DryRun:    common.DryRunServer,
 				},
 			},
 			expectedStatus: []actuation.ObjectStatus{
@@ -1198,11 +1147,6 @@ func TestTaskQueueBuilder_PruneBuild(t *testing.T) {
 					TaskName:  "inventory-set-0",
 					InvClient: &inventory.FakeClient{},
 					InvInfo:   invInfo,
-					PrevInventory: object.ObjMetadataSet{
-						testutil.ToIdentifier(t, resources["crontab1"]),
-						testutil.ToIdentifier(t, resources["crd"]),
-						testutil.ToIdentifier(t, resources["crontab2"]),
-					},
 				},
 			},
 			expectedStatus: []actuation.ObjectStatus{
@@ -1270,12 +1214,7 @@ func TestTaskQueueBuilder_PruneBuild(t *testing.T) {
 					TaskName:  "inventory-set-0",
 					InvClient: &inventory.FakeClient{},
 					InvInfo:   invInfo,
-					PrevInventory: object.ObjMetadataSet{
-						testutil.ToIdentifier(t, resources["crontab1"]),
-						testutil.ToIdentifier(t, resources["crd"]),
-						testutil.ToIdentifier(t, resources["crontab2"]),
-					},
-					DryRun: common.DryRunClient,
+					DryRun:    common.DryRunClient,
 				},
 			},
 			expectedStatus: []actuation.ObjectStatus{
@@ -1351,11 +1290,6 @@ func TestTaskQueueBuilder_PruneBuild(t *testing.T) {
 					TaskName:  "inventory-set-0",
 					InvClient: &inventory.FakeClient{},
 					InvInfo:   invInfo,
-					PrevInventory: object.ObjMetadataSet{
-						testutil.ToIdentifier(t, resources["namespace"]),
-						testutil.ToIdentifier(t, resources["pod"]),
-						testutil.ToIdentifier(t, resources["secret"]),
-					},
 				},
 			},
 			expectedStatus: []actuation.ObjectStatus{
@@ -1445,9 +1379,6 @@ func TestTaskQueueBuilder_PruneBuild(t *testing.T) {
 					TaskName:  "inventory-set-0",
 					InvClient: &inventory.FakeClient{},
 					InvInfo:   invInfo,
-					PrevInventory: object.ObjMetadataSet{
-						testutil.ToIdentifier(t, resources["pod"]),
-					},
 				},
 			},
 			expectedError: validation.NewError(
@@ -1472,6 +1403,9 @@ func TestTaskQueueBuilder_PruneBuild(t *testing.T) {
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
 			mapper := testutil.NewFakeRESTMapper()
+			clusterInventory := &inventory.UnstructuredInventory{
+				ClusterObj: uObj,
+			}
 			// inject mapper & pruner for equality comparison
 			for _, t := range tc.expectedTasks {
 				switch typedTask := t.(type) {
@@ -1481,6 +1415,9 @@ func TestTaskQueueBuilder_PruneBuild(t *testing.T) {
 					typedTask.Mapper = mapper
 				case *task.InvAddTask:
 					typedTask.Mapper = mapper
+					typedTask.ClusterInventory = clusterInventory
+				case *task.DeleteOrUpdateInvTask:
+					typedTask.ClusterInventory = clusterInventory
 				}
 			}
 
@@ -1491,6 +1428,7 @@ func TestTaskQueueBuilder_PruneBuild(t *testing.T) {
 				Pruner:    pruner,
 				Mapper:    mapper,
 				InvClient: fakeInvClient,
+				Inventory: clusterInventory,
 				Collector: vCollector,
 			}
 			taskContext := taskrunner.NewTaskContext(t.Context(), nil, nil)
@@ -1505,7 +1443,7 @@ func TestTaskQueueBuilder_PruneBuild(t *testing.T) {
 			assert.NoError(t, err)
 			asserter.Equal(t, tc.expectedTasks, tq.tasks)
 
-			actualStatus := taskContext.InventoryManager().Inventory().Status.Objects
+			actualStatus := taskContext.InventoryManager().Inventory().ObjStatuses
 			testutil.AssertEqual(t, tc.expectedStatus, actualStatus)
 		})
 	}
@@ -1520,8 +1458,8 @@ func TestTaskQueueBuilder_ApplyPruneBuild(t *testing.T) {
 		inventoryInfoComparer(),
 	)
 
-	invInfo := inventory.WrapInventoryInfoObj(newInvObject(
-		"abc-123", "default", "test"))
+	uObj := newInvObject("abc-123", "default", "test")
+	invInfo := inventory.WrapInventoryInfoObj(uObj)
 
 	testCases := map[string]struct {
 		inventoryIDs   object.ObjMetadataSet
@@ -1582,9 +1520,6 @@ func TestTaskQueueBuilder_ApplyPruneBuild(t *testing.T) {
 					TaskName:  "inventory-set-0",
 					InvClient: &inventory.FakeClient{},
 					InvInfo:   invInfo,
-					PrevInventory: object.ObjMetadataSet{
-						testutil.ToIdentifier(t, resources["secret"]),
-					},
 				},
 			},
 			expectedStatus: []actuation.ObjectStatus{
@@ -1643,9 +1578,6 @@ func TestTaskQueueBuilder_ApplyPruneBuild(t *testing.T) {
 					TaskName:  "inventory-set-0",
 					InvClient: &inventory.FakeClient{},
 					InvInfo:   invInfo,
-					PrevInventory: object.ObjMetadataSet{
-						testutil.ToIdentifier(t, resources["secret"]),
-					},
 				},
 			},
 			expectedStatus: []actuation.ObjectStatus{
@@ -1717,9 +1649,6 @@ func TestTaskQueueBuilder_ApplyPruneBuild(t *testing.T) {
 					TaskName:  "inventory-set-0",
 					InvClient: &inventory.FakeClient{},
 					InvInfo:   invInfo,
-					PrevInventory: object.ObjMetadataSet{
-						testutil.ToIdentifier(t, resources["secret"]),
-					},
 				},
 			},
 			expectedStatus: []actuation.ObjectStatus{
@@ -1797,9 +1726,6 @@ func TestTaskQueueBuilder_ApplyPruneBuild(t *testing.T) {
 					TaskName:  "inventory-set-0",
 					InvClient: &inventory.FakeClient{},
 					InvInfo:   invInfo,
-					PrevInventory: object.ObjMetadataSet{
-						testutil.ToIdentifier(t, resources["secret"]),
-					},
 				},
 			},
 			expectedStatus: []actuation.ObjectStatus{
@@ -1826,6 +1752,9 @@ func TestTaskQueueBuilder_ApplyPruneBuild(t *testing.T) {
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
 			mapper := testutil.NewFakeRESTMapper()
+			clusterInventory := &inventory.UnstructuredInventory{
+				ClusterObj: uObj,
+			}
 			// inject mapper & pruner for equality comparison
 			for _, t := range tc.expectedTasks {
 				switch typedTask := t.(type) {
@@ -1837,6 +1766,9 @@ func TestTaskQueueBuilder_ApplyPruneBuild(t *testing.T) {
 					typedTask.Mapper = mapper
 				case *task.InvAddTask:
 					typedTask.Mapper = mapper
+					typedTask.ClusterInventory = clusterInventory
+				case *task.DeleteOrUpdateInvTask:
+					typedTask.ClusterInventory = clusterInventory
 				}
 			}
 
@@ -1846,6 +1778,7 @@ func TestTaskQueueBuilder_ApplyPruneBuild(t *testing.T) {
 				Pruner:    pruner,
 				Mapper:    mapper,
 				InvClient: fakeInvClient,
+				Inventory: clusterInventory,
 				Collector: vCollector,
 			}
 			taskContext := taskrunner.NewTaskContext(t.Context(), nil, nil)
@@ -1863,7 +1796,7 @@ func TestTaskQueueBuilder_ApplyPruneBuild(t *testing.T) {
 
 			asserter.Equal(t, tc.expectedTasks, tq.tasks)
 
-			actualStatus := taskContext.InventoryManager().Inventory().Status.Objects
+			actualStatus := taskContext.InventoryManager().Inventory().ObjStatuses
 			testutil.AssertEqual(t, tc.expectedStatus, actualStatus)
 		})
 	}
@@ -1904,7 +1837,6 @@ func inventoryInfoComparer() cmp.Option {
 	return cmp.Comparer(func(x, y inventory.Info) bool {
 		return x.ID() == y.ID() &&
 			x.Name() == y.Name() &&
-			x.Namespace() == y.Namespace() &&
-			x.Strategy() == y.Strategy()
+			x.Namespace() == y.Namespace()
 	})
 }
