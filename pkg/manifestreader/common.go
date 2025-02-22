@@ -102,7 +102,7 @@ func SetNamespaces(mapper meta.RESTMapper, objs []*unstructured.Unstructured,
 			}
 		case meta.RESTScopeRoot:
 			if ns := obj.GetNamespace(); ns != "" {
-				return fmt.Errorf("resource is cluster-scoped but has a non-empty namespace %q", ns)
+				return fmt.Errorf("resource %q is cluster-scoped but has a non-empty namespace %q", obj.GroupVersionKind(), ns)
 			}
 		default:
 			return fmt.Errorf("unknown RESTScope %q", scope.Name())
