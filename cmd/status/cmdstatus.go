@@ -371,6 +371,9 @@ func (ir *InventoryLoader) GetInvInfo(cmd *cobra.Command, args []string) (invent
 	if err != nil {
 		return nil, err
 	}
-	inv := inventory.WrapInventoryInfoObj(invObj)
+	inv, err := inventory.ConfigMapToInventoryInfo(invObj)
+	if err != nil {
+		return nil, err
+	}
 	return inv, nil
 }

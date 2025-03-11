@@ -64,8 +64,8 @@ func (i inventoryInfo) toUnstructured() *unstructured.Unstructured {
 	}
 }
 
-func (i inventoryInfo) toWrapped() inventory.Info {
-	return inventory.WrapInventoryInfoObj(i.toUnstructured())
+func (i inventoryInfo) toWrapped() (inventory.Info, error) {
+	return inventory.ConfigMapToInventoryInfo(i.toUnstructured())
 }
 
 func newTestApplier(

@@ -97,7 +97,10 @@ func NewClient(factory cmdutil.Factory,
 // occurred.
 func (cic *ClusterClient) Merge(ctx context.Context, localInv Info, objs object.ObjMetadataSet, dryRun common.DryRunStrategy) (object.ObjMetadataSet, error) {
 	pruneIDs := object.ObjMetadataSet{}
-	invObj := cic.invToUnstructuredFunc(localInv)
+	invObj, err := cic.invToUnstructuredFunc(localInv)
+	if err != nil {
+		return pruneIDs, err
+	}
 	clusterInv, err := cic.getClusterInventoryInfo(ctx, localInv)
 	if err != nil {
 		return pruneIDs, err
@@ -110,7 +113,10 @@ func (cic *ClusterClient) Merge(ctx context.Context, localInv Info, objs object.
 		if cic.statusPolicy == StatusPolicyAll {
 			status = getObjStatus(nil, objs)
 		}
-		inv := cic.InventoryFactoryFunc(invObj)
+		inv, err := cic.InventoryFactoryFunc(invObj)
+		if err != nil {
+			return nil, err
+		}
 		if err := inv.Store(objs, status); err != nil {
 			return nil, err
 		}
@@ -138,7 +144,10 @@ func (cic *ClusterClient) Merge(ctx context.Context, localInv Info, objs object.
 	}
 	klog.V(4).Infof("num objects to prune: %d", len(pruneIDs))
 	klog.V(4).Infof("num merged objects to store in inventory: %d", len(unionObjs))
-	wrappedInv := cic.InventoryFactoryFunc(clusterInv)
+	wrappedInv, err := cic.InventoryFactoryFunc(clusterInv)
+	if err != nil {
+		return pruneIDs, err
+	}
 	if err = wrappedInv.Store(unionObjs, status); err != nil {
 		return pruneIDs, err
 	}
@@ -205,7 +214,10 @@ func (cic *ClusterClient) replaceInventory(inv *unstructured.Unstructured, objs 
 	if cic.statusPolicy == StatusPolicyNone {
 		status = nil
 	}
-	wrappedInv := cic.InventoryFactoryFunc(inv)
+	wrappedInv, err := cic.InventoryFactoryFunc(inv)
+	if err != nil {
+		return nil, nil, err
+	}
 	if err := wrappedInv.Store(objs, status); err != nil {
 		return nil, nil, err
 	}
@@ -224,7 +236,11 @@ func (cic *ClusterClient) DeleteInventoryObj(ctx context.Context, localInv Info,
 	}
 	switch localInv.Strategy() {
 	case NameStrategy:
-		return cic.deleteInventoryObjByName(ctx, cic.invToUnstructuredFunc(localInv), dryRun)
+		obj, err := cic.invToUnstructuredFunc(localInv)
+		if err != nil {
+			return err
+		}
+		return cic.deleteInventoryObjByName(ctx, obj, dryRun)
 	case LabelStrategy:
 		return cic.deleteInventoryObjsByLabel(ctx, localInv, dryRun)
 	default:
@@ -257,7 +273,10 @@ func (cic *ClusterClient) GetClusterObjs(ctx context.Context, localInv Info) (ob
 	if clusterInv == nil {
 		return objs, nil
 	}
-	wrapped := cic.InventoryFactoryFunc(clusterInv)
+	wrapped, err := cic.InventoryFactoryFunc(clusterInv)
+	if err != nil {
+		return objs, err
+	}
 	return wrapped.Load()
 }
 
@@ -286,7 +305,10 @@ func (cic *ClusterClient) getClusterInventoryInfo(ctx context.Context, inv Info)
 }
 
 func (cic *ClusterClient) getClusterInventoryObjsByLabel(ctx context.Context, inv Info) (object.UnstructuredSet, error) {
-	localInv := cic.invToUnstructuredFunc(inv)
+	localInv, err := cic.invToUnstructuredFunc(inv)
+	if err != nil {
+		return nil, err
+	}
 	if localInv == nil {
 		return nil, fmt.Errorf("retrieving cluster inventory object with nil local inventory")
 	}
@@ -318,7 +340,10 @@ func (cic *ClusterClient) getClusterInventoryObjsByLabel(ctx context.Context, in
 }
 
 func (cic *ClusterClient) getClusterInventoryObjsByName(ctx context.Context, inv Info) (object.UnstructuredSet, error) {
-	localInv := cic.invToUnstructuredFunc(inv)
+	localInv, err := cic.invToUnstructuredFunc(inv)
+	if err != nil {
+		return nil, err
+	}
 	if localInv == nil {
 		return nil, fmt.Errorf("retrieving cluster inventory object with nil local inventory")
 	}
@@ -387,7 +412,11 @@ func (cic *ClusterClient) ListClusterInventoryObjs(ctx context.Context) (map[str
 	for i, inv := range clusterInvs.Items {
 		invName := inv.GetName()
 		identifiers[invName] = object.ObjMetadataSet{}
-		wrappedInvObjSlice, err := cic.InventoryFactoryFunc(&clusterInvs.Items[i]).Load()
+		invObj, err := cic.InventoryFactoryFunc(&clusterInvs.Items[i])
+		if err != nil {
+			return nil, err
+		}
+		wrappedInvObjSlice, err := invObj.Load()
 		if err != nil {
 			return nil, err
 		}

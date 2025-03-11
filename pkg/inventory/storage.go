@@ -51,11 +51,11 @@ type Storage interface {
 
 // StorageFactoryFunc creates the object which implements the Inventory
 // interface from the passed info object.
-type StorageFactoryFunc func(*unstructured.Unstructured) Storage
+type StorageFactoryFunc func(*unstructured.Unstructured) (Storage, error)
 
 // ToUnstructuredFunc returns the unstructured object for the
 // given Info.
-type ToUnstructuredFunc func(Info) *unstructured.Unstructured
+type ToUnstructuredFunc func(Info) (*unstructured.Unstructured, error)
 
 // FindInventoryObj returns the "Inventory" object (ConfigMap with
 // inventory label) if it exists, or nil if it does not exist.

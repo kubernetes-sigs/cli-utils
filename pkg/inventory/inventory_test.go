@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/cli-runtime/pkg/resource"
@@ -49,8 +50,6 @@ var legacyInvObj = &unstructured.Unstructured{
 		},
 	},
 }
-
-var localInv = WrapInventoryInfoObj(inventoryObj)
 
 var invInfo = &resource.Info{
 	Namespace: testNamespace,
@@ -416,7 +415,9 @@ func copyInventoryInfo() *unstructured.Unstructured {
 	return inventoryObj.DeepCopy()
 }
 
-func copyInventory() Info {
+func copyInventory(t *testing.T) Info {
 	u := inventoryObj.DeepCopy()
-	return WrapInventoryInfoObj(u)
+	invInfoObj, err := ConfigMapToInventoryInfo(u)
+	require.NoError(t, err)
+	return invInfoObj
 }

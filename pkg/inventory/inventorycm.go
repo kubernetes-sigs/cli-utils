@@ -31,26 +31,26 @@ var ConfigMapGVK = schema.GroupVersionKind{
 	Version: "v1",
 }
 
-// WrapInventoryObj takes a passed ConfigMap (as a resource.Info),
+// ConfigMapToInventoryObj takes a passed ConfigMap (as a resource.Info),
 // wraps it with the ConfigMap and upcasts the wrapper as
 // an the Inventory interface.
-func WrapInventoryObj(inv *unstructured.Unstructured) Storage {
-	return &ConfigMap{inv: inv}
+func ConfigMapToInventoryObj(inv *unstructured.Unstructured) (Storage, error) {
+	return &ConfigMap{inv: inv}, nil
 }
 
-// WrapInventoryInfoObj takes a passed ConfigMap (as a resource.Info),
+// ConfigMapToInventoryInfo takes a passed ConfigMap (as a resource.Info),
 // wraps it with the ConfigMap and upcasts the wrapper as
 // an the Info interface.
-func WrapInventoryInfoObj(inv *unstructured.Unstructured) Info {
-	return &ConfigMap{inv: inv}
+func ConfigMapToInventoryInfo(inv *unstructured.Unstructured) (Info, error) {
+	return &ConfigMap{inv: inv}, nil
 }
 
-func InvInfoToConfigMap(inv Info) *unstructured.Unstructured {
+func InvInfoToConfigMap(inv Info) (*unstructured.Unstructured, error) {
 	icm, ok := inv.(*ConfigMap)
 	if ok {
-		return icm.inv
+		return icm.inv, nil
 	}
-	return nil
+	return nil, fmt.Errorf("failed to convert to ConfigMap")
 }
 
 // ConfigMap wraps a ConfigMap resource and implements

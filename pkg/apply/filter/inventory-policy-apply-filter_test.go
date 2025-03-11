@@ -6,6 +6,7 @@ package filter
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
@@ -98,14 +99,16 @@ func TestInventoryPolicyApplyFilter(t *testing.T) {
 			}
 			invObj := invObjTemplate.DeepCopy()
 			invObj.SetLabels(invIDLabel)
+			invInfoObj, err := inventory.ConfigMapToInventoryInfo(invObj)
+			require.NoError(t, err)
 			filter := InventoryPolicyApplyFilter{
 				Client: dynamicfake.NewSimpleDynamicClient(scheme.Scheme, obj),
 				Mapper: testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme,
 					scheme.Scheme.PrioritizedVersionsAllGroups()...),
-				Inv:       inventory.WrapInventoryInfoObj(invObj),
+				Inv:       invInfoObj,
 				InvPolicy: tc.policy,
 			}
-			err := filter.Filter(t.Context(), obj)
+			err = filter.Filter(t.Context(), obj)
 			testutil.AssertEqual(t, tc.expectedError, err)
 		})
 	}

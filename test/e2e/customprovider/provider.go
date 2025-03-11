@@ -116,17 +116,17 @@ func (CustomClientFactory) NewClient(factory util.Factory) (inventory.Client, er
 		WrapInventoryObj, invToUnstructuredFunc, inventory.StatusPolicyAll, inventory.ConfigMapGVK)
 }
 
-func invToUnstructuredFunc(inv inventory.Info) *unstructured.Unstructured {
+func invToUnstructuredFunc(inv inventory.Info) (*unstructured.Unstructured, error) {
 	switch invInfo := inv.(type) {
 	case *InventoryCustomType:
-		return invInfo.inv
+		return invInfo.inv, nil
 	default:
-		return nil
+		return nil, fmt.Errorf("wrong type: want %T but got %T", InventoryCustomType{}, inv)
 	}
 }
 
-func WrapInventoryObj(obj *unstructured.Unstructured) inventory.Storage {
-	return &InventoryCustomType{inv: obj}
+func WrapInventoryObj(obj *unstructured.Unstructured) (inventory.Storage, error) {
+	return &InventoryCustomType{inv: obj}, nil
 }
 
 func WrapInventoryInfoObj(obj *unstructured.Unstructured) inventory.Info {
