@@ -90,29 +90,23 @@ func TestGetClusterInventoryInfo(t *testing.T) {
 				WrapInventoryObj, InvInfoToConfigMap, tc.statusPolicy, ConfigMapGVK)
 			require.NoError(t, err)
 
-			var inv *unstructured.Unstructured
 			if tc.inv != nil {
-				inv = storeObjsInInventory(tc.inv, tc.localObjs, tc.objStatus)
+				wrapped := storeObjsInInventory(tc.inv, tc.localObjs, tc.objStatus)
+				err = wrapped.Apply(t.Context(), invClient.dc, invClient.mapper, tc.statusPolicy)
+				require.NoError(t, err)
 			}
-			clusterInv, err := invClient.getClusterInventoryInfo(t.Context(), WrapInventoryInfoObj(inv))
+			clusterInv, err := invClient.getClusterInventoryInfo(t.Context(), tc.inv)
 			if tc.isError {
-				if err == nil {
-					t.Fatalf("expected error but received none")
-				}
+				require.Error(t, err)
 				return
 			}
-			if !tc.isError && err != nil {
-				t.Fatalf("unexpected error received: %s", err)
-			}
-			if clusterInv != nil {
-				wrapped := WrapInventoryObj(clusterInv)
-				clusterObjs, err := wrapped.Load()
-				if err != nil {
-					t.Fatalf("unexpected error received: %s", err)
-				}
-				if !tc.localObjs.Equal(clusterObjs) {
-					t.Fatalf("expected cluster objs (%v), got (%v)", tc.localObjs, clusterObjs)
-				}
+			require.NoError(t, err)
+			require.NotNil(t, clusterInv)
+			wrapped := WrapInventoryObj(clusterInv)
+			clusterObjs, err := wrapped.Load()
+			require.NoError(t, err)
+			if !tc.localObjs.Equal(clusterObjs) {
+				t.Fatalf("expected cluster objs (%v), got (%v)", tc.localObjs, clusterObjs)
 			}
 		})
 	}
@@ -398,10 +392,12 @@ func TestDeleteInventoryObj(t *testing.T) {
 		inv          Info
 		localObjs    object.ObjMetadataSet
 		objStatus    []actuation.ObjectStatus
+		wantError    bool
 	}{
 		"Nil local inventory object is an error": {
 			inv:       nil,
 			localObjs: object.ObjMetadataSet{},
+			wantError: true,
 		},
 		"Empty local inventory object": {
 			inv:       localInv,
@@ -438,13 +434,19 @@ func TestDeleteInventoryObj(t *testing.T) {
 				invClient, err := NewClient(tf,
 					WrapInventoryObj, InvInfoToConfigMap, tc.statusPolicy, ConfigMapGVK)
 				require.NoError(t, err)
-				inv := invClient.invToUnstructuredFunc(tc.inv)
-				if inv != nil {
-					inv = storeObjsInInventory(tc.inv, tc.localObjs, tc.objStatus)
+				var obj *unstructured.Unstructured
+				if tc.inv != nil {
+					wrapped := storeObjsInInventory(tc.inv, tc.localObjs, tc.objStatus)
+					err = wrapped.Apply(t.Context(), invClient.dc, invClient.mapper, tc.statusPolicy)
+					require.NoError(t, err)
+					obj, err = wrapped.GetObject()
+					require.NoError(t, err)
 				}
-				err = invClient.deleteInventoryObjByName(t.Context(), inv, drs)
-				if err != nil {
-					t.Fatalf("unexpected error received: %s", err)
+				err = invClient.deleteInventoryObjByName(t.Context(), obj, drs)
+				if tc.wantError {
+					require.Error(t, err)
+				} else {
+					require.NoError(t, err)
 				}
 			})
 		}
@@ -469,9 +471,8 @@ func toReactionFunc(objs object.ObjMetadataSet) clienttesting.ReactionFunc {
 	}
 }
 
-func storeObjsInInventory(info Info, objs object.ObjMetadataSet, status []actuation.ObjectStatus) *unstructured.Unstructured {
+func storeObjsInInventory(info Info, objs object.ObjMetadataSet, status []actuation.ObjectStatus) Storage {
 	wrapped := WrapInventoryObj(InvInfoToConfigMap(info))
 	_ = wrapped.Store(objs, status)
-	inv, _ := wrapped.GetObject()
-	return inv
+	return wrapped
 }
