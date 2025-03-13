@@ -10,6 +10,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/cli-utils/pkg/apis/actuation"
 	"sigs.k8s.io/cli-utils/pkg/apply/prune"
@@ -130,8 +131,9 @@ func TestTaskQueueBuilder_ApplyBuild(t *testing.T) {
 		inventoryInfoComparer(),
 	)
 
-	invInfo := inventory.WrapInventoryInfoObj(newInvObject(
+	invInfo, err := inventory.ConfigMapToInventoryInfo(newInvObject(
 		"abc-123", "default", "test"))
+	require.NoError(t, err)
 
 	testCases := map[string]struct {
 		applyObjs      []*unstructured.Unstructured
@@ -844,8 +846,9 @@ func TestTaskQueueBuilder_PruneBuild(t *testing.T) {
 		inventoryInfoComparer(),
 	)
 
-	invInfo := inventory.WrapInventoryInfoObj(newInvObject(
+	invInfo, err := inventory.ConfigMapToInventoryInfo(newInvObject(
 		"abc-123", "default", "test"))
+	require.NoError(t, err)
 
 	testCases := map[string]struct {
 		pruneObjs      []*unstructured.Unstructured
@@ -1520,8 +1523,9 @@ func TestTaskQueueBuilder_ApplyPruneBuild(t *testing.T) {
 		inventoryInfoComparer(),
 	)
 
-	invInfo := inventory.WrapInventoryInfoObj(newInvObject(
+	invInfo, err := inventory.ConfigMapToInventoryInfo(newInvObject(
 		"abc-123", "default", "test"))
+	require.NoError(t, err)
 
 	testCases := map[string]struct {
 		inventoryIDs   object.ObjMetadataSet

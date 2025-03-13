@@ -129,7 +129,10 @@ func (r *Runner) RunE(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	inv := inventory.WrapInventoryInfoObj(invObj)
+	inv, err := inventory.ConfigMapToInventoryInfo(invObj)
+	if err != nil {
+		return err
+	}
 
 	invClient, err := r.invFactory.NewClient(r.factory)
 	if err != nil {

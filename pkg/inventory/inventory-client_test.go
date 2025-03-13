@@ -41,6 +41,8 @@ func podDataNoStatus(name string) map[string]string {
 }
 
 func TestGetClusterInventoryInfo(t *testing.T) {
+	localInv, err := ConfigMapToInventoryInfo(inventoryObj)
+	require.NoError(t, err)
 	tests := map[string]struct {
 		statusPolicy StatusPolicy
 		inv          Info
@@ -87,11 +89,12 @@ func TestGetClusterInventoryInfo(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			invClient, err := NewClient(tf,
-				WrapInventoryObj, InvInfoToConfigMap, tc.statusPolicy, ConfigMapGVK)
+				ConfigMapToInventoryObj, InvInfoToConfigMap, tc.statusPolicy, ConfigMapGVK)
 			require.NoError(t, err)
 
 			if tc.inv != nil {
-				wrapped := storeObjsInInventory(tc.inv, tc.localObjs, tc.objStatus)
+				wrapped, err := storeObjsInInventory(tc.inv, tc.localObjs, tc.objStatus)
+				require.NoError(t, err)
 				err = wrapped.Apply(t.Context(), invClient.dc, invClient.mapper, tc.statusPolicy)
 				require.NoError(t, err)
 			}
@@ -102,7 +105,8 @@ func TestGetClusterInventoryInfo(t *testing.T) {
 			}
 			require.NoError(t, err)
 			require.NotNil(t, clusterInv)
-			wrapped := WrapInventoryObj(clusterInv)
+			wrapped, err := ConfigMapToInventoryObj(clusterInv)
+			require.NoError(t, err)
 			clusterObjs, err := wrapped.Load()
 			require.NoError(t, err)
 			if !tc.localObjs.Equal(clusterObjs) {
@@ -130,7 +134,7 @@ func TestMerge(t *testing.T) {
 			statusPolicy: StatusPolicyAll,
 		},
 		"Cluster and local inventories empty: no prune objects; no change": {
-			localInv:     copyInventory(),
+			localInv:     copyInventory(t),
 			localObjs:    object.ObjMetadataSet{},
 			clusterObjs:  object.ObjMetadataSet{},
 			pruneObjs:    object.ObjMetadataSet{},
@@ -138,7 +142,7 @@ func TestMerge(t *testing.T) {
 			statusPolicy: StatusPolicyAll,
 		},
 		"Cluster and local inventories same: no prune objects; no change": {
-			localInv: copyInventory(),
+			localInv: copyInventory(t),
 			localObjs: object.ObjMetadataSet{
 				ignoreErrInfoToObjMeta(pod1Info),
 			},
@@ -150,7 +154,7 @@ func TestMerge(t *testing.T) {
 			statusPolicy: StatusPolicyAll,
 		},
 		"Cluster two obj, local one: prune obj": {
-			localInv: copyInventory(),
+			localInv: copyInventory(t),
 			localObjs: object.ObjMetadataSet{
 				ignoreErrInfoToObjMeta(pod1Info),
 			},
@@ -165,7 +169,7 @@ func TestMerge(t *testing.T) {
 			isError:      false,
 		},
 		"Cluster multiple objs, local multiple different objs: prune objs": {
-			localInv: copyInventory(),
+			localInv: copyInventory(t),
 			localObjs: object.ObjMetadataSet{
 				ignoreErrInfoToObjMeta(pod2Info),
 			},
@@ -192,7 +196,7 @@ func TestMerge(t *testing.T) {
 				tf.FakeDynamicClient.PrependReactor("list", "configmaps", toReactionFunc(tc.clusterObjs))
 				// Create the local inventory object storing "tc.localObjs"
 				invClient, err := NewClient(tf,
-					WrapInventoryObj, InvInfoToConfigMap, tc.statusPolicy, ConfigMapGVK)
+					ConfigMapToInventoryObj, InvInfoToConfigMap, tc.statusPolicy, ConfigMapGVK)
 				require.NoError(t, err)
 
 				// Call "Merge" to create the union of clusterObjs and localObjs.
@@ -281,13 +285,13 @@ func TestReplace(t *testing.T) {
 
 	// Client and server dry-run do not throw errors.
 	invClient, err := NewClient(tf,
-		WrapInventoryObj, InvInfoToConfigMap, StatusPolicyAll, ConfigMapGVK)
+		ConfigMapToInventoryObj, InvInfoToConfigMap, StatusPolicyAll, ConfigMapGVK)
 	require.NoError(t, err)
-	err = invClient.Replace(t.Context(), copyInventory(), object.ObjMetadataSet{}, nil, common.DryRunClient)
+	err = invClient.Replace(t.Context(), copyInventory(t), object.ObjMetadataSet{}, nil, common.DryRunClient)
 	if err != nil {
 		t.Fatalf("unexpected error received: %s", err)
 	}
-	err = invClient.Replace(t.Context(), copyInventory(), object.ObjMetadataSet{}, nil, common.DryRunServer)
+	err = invClient.Replace(t.Context(), copyInventory(t), object.ObjMetadataSet{}, nil, common.DryRunServer)
 	if err != nil {
 		t.Fatalf("unexpected error received: %s", err)
 	}
@@ -296,9 +300,10 @@ func TestReplace(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			// Create inventory client, and store the cluster objs in the inventory object.
 			invClient, err := NewClient(tf,
-				WrapInventoryObj, InvInfoToConfigMap, tc.statusPolicy, ConfigMapGVK)
+				ConfigMapToInventoryObj, InvInfoToConfigMap, tc.statusPolicy, ConfigMapGVK)
 			require.NoError(t, err)
-			wrappedInv := invClient.InventoryFactoryFunc(inventoryObj)
+			wrappedInv, err := invClient.InventoryFactoryFunc(inventoryObj)
+			require.NoError(t, err)
 			if err := wrappedInv.Store(tc.clusterObjs, tc.objStatus); err != nil {
 				t.Fatalf("unexpected error storing inventory objects: %s", err)
 			}
@@ -311,7 +316,8 @@ func TestReplace(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unexpected error received: %s", err)
 			}
-			wrappedInv = invClient.InventoryFactoryFunc(inv)
+			wrappedInv, err = invClient.InventoryFactoryFunc(inv)
+			require.NoError(t, err)
 			// Validate that the stored objects are now the "localObjs".
 			actualObjs, err := wrappedInv.Load()
 			if err != nil {
@@ -344,17 +350,17 @@ func TestGetClusterObjs(t *testing.T) {
 			isError:     true,
 		},
 		"No cluster objs": {
-			localInv:    copyInventory(),
+			localInv:    copyInventory(t),
 			clusterObjs: object.ObjMetadataSet{},
 			isError:     false,
 		},
 		"Single cluster obj": {
-			localInv:    copyInventory(),
+			localInv:    copyInventory(t),
 			clusterObjs: object.ObjMetadataSet{ignoreErrInfoToObjMeta(pod1Info)},
 			isError:     false,
 		},
 		"Multiple cluster objs": {
-			localInv:    copyInventory(),
+			localInv:    copyInventory(t),
 			clusterObjs: object.ObjMetadataSet{ignoreErrInfoToObjMeta(pod1Info), ignoreErrInfoToObjMeta(pod3Info)},
 			isError:     false,
 		},
@@ -367,7 +373,7 @@ func TestGetClusterObjs(t *testing.T) {
 			tf.FakeDynamicClient.PrependReactor("list", "configmaps", toReactionFunc(tc.clusterObjs))
 
 			invClient, err := NewClient(tf,
-				WrapInventoryObj, InvInfoToConfigMap, tc.statusPolicy, ConfigMapGVK)
+				ConfigMapToInventoryObj, InvInfoToConfigMap, tc.statusPolicy, ConfigMapGVK)
 			require.NoError(t, err)
 			clusterObjs, err := invClient.GetClusterObjs(t.Context(), tc.localInv)
 			if tc.isError {
@@ -387,6 +393,8 @@ func TestGetClusterObjs(t *testing.T) {
 }
 
 func TestDeleteInventoryObj(t *testing.T) {
+	localInv, err := ConfigMapToInventoryInfo(inventoryObj)
+	require.NoError(t, err)
 	tests := map[string]struct {
 		statusPolicy StatusPolicy
 		inv          Info
@@ -432,11 +440,12 @@ func TestDeleteInventoryObj(t *testing.T) {
 				defer tf.Cleanup()
 
 				invClient, err := NewClient(tf,
-					WrapInventoryObj, InvInfoToConfigMap, tc.statusPolicy, ConfigMapGVK)
+					ConfigMapToInventoryObj, InvInfoToConfigMap, tc.statusPolicy, ConfigMapGVK)
 				require.NoError(t, err)
 				var obj *unstructured.Unstructured
 				if tc.inv != nil {
-					wrapped := storeObjsInInventory(tc.inv, tc.localObjs, tc.objStatus)
+					wrapped, err := storeObjsInInventory(tc.inv, tc.localObjs, tc.objStatus)
+					require.NoError(t, err)
 					err = wrapped.Apply(t.Context(), invClient.dc, invClient.mapper, tc.statusPolicy)
 					require.NoError(t, err)
 					obj, err = wrapped.GetObject()
@@ -471,8 +480,18 @@ func toReactionFunc(objs object.ObjMetadataSet) clienttesting.ReactionFunc {
 	}
 }
 
-func storeObjsInInventory(info Info, objs object.ObjMetadataSet, status []actuation.ObjectStatus) Storage {
-	wrapped := WrapInventoryObj(InvInfoToConfigMap(info))
-	_ = wrapped.Store(objs, status)
-	return wrapped
+func storeObjsInInventory(info Info, objs object.ObjMetadataSet, status []actuation.ObjectStatus) (Storage, error) {
+	cm, err := InvInfoToConfigMap(info)
+	if err != nil {
+		return nil, err
+	}
+	wrapped, err := ConfigMapToInventoryObj(cm)
+	if err != nil {
+		return nil, err
+	}
+	err = wrapped.Store(objs, status)
+	if err != nil {
+		return nil, err
+	}
+	return wrapped, err
 }

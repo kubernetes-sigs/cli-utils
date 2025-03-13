@@ -6,6 +6,7 @@ package task
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	clienttesting "k8s.io/client-go/testing"
@@ -33,8 +34,6 @@ var inventoryObj = &unstructured.Unstructured{
 		},
 	},
 }
-
-var localInv = inventory.WrapInventoryInfoObj(inventoryObj)
 
 var obj1 = &unstructured.Unstructured{
 	Object: map[string]interface{}{
@@ -82,6 +81,8 @@ var nsObj = &unstructured.Unstructured{
 const taskName = "test-inventory-task"
 
 func TestInvAddTask(t *testing.T) {
+	localInv, err := inventory.ConfigMapToInventoryInfo(inventoryObj)
+	require.NoError(t, err)
 	id1 := object.UnstructuredToObjMetadata(obj1)
 	id2 := object.UnstructuredToObjMetadata(obj2)
 	id3 := object.UnstructuredToObjMetadata(obj3)
@@ -179,6 +180,8 @@ func TestInvAddTask(t *testing.T) {
 }
 
 func TestInventoryNamespaceInSet(t *testing.T) {
+	localInv, err := inventory.ConfigMapToInventoryInfo(inventoryObj)
+	require.NoError(t, err)
 	inventoryNamespace := createNamespace(namespace)
 
 	tests := map[string]struct {

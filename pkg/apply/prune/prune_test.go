@@ -122,18 +122,21 @@ metadata:
 
 // Returns a inventory object with the inventory set from
 // the passed "children".
-func createInventoryInfo(children ...*unstructured.Unstructured) inventory.Info {
+func createInventoryInfo(children ...*unstructured.Unstructured) (inventory.Info, error) {
 	inventoryObjCopy := inventoryObj.DeepCopy()
-	wrappedInv := inventory.WrapInventoryObj(inventoryObjCopy)
+	wrappedInv, err := inventory.ConfigMapToInventoryObj(inventoryObjCopy)
+	if err != nil {
+		return nil, err
+	}
 	objs := object.UnstructuredSetToObjMetadataSet(children)
 	if err := wrappedInv.Store(objs, nil); err != nil {
-		return nil
+		return nil, err
 	}
 	obj, err := wrappedInv.GetObject()
 	if err != nil {
-		return nil
+		return nil, err
 	}
-	return inventory.WrapInventoryInfoObj(obj)
+	return inventory.ConfigMapToInventoryInfo(obj)
 }
 
 // podDeletionPrevention object contains the "on-remove:keep" lifecycle directive.
@@ -859,7 +862,8 @@ func TestGetPruneObjs(t *testing.T) {
 				Mapper: testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme,
 					scheme.Scheme.PrioritizedVersionsAllGroups()...),
 			}
-			currentInventory := createInventoryInfo(tc.prevInventory...)
+			currentInventory, err := createInventoryInfo(tc.prevInventory...)
+			require.NoError(t, err)
 			actualObjs, err := po.GetPruneObjs(t.Context(), currentInventory, tc.localObjs, Options{})
 			if err != nil {
 				t.Fatalf("unexpected error %s returned", err)

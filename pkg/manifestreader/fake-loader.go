@@ -7,7 +7,6 @@ import (
 	"io"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/object"
@@ -42,9 +41,4 @@ func (f *FakeLoader) ManifestReader(reader io.Reader, _ string) (ManifestReader,
 		Reader:        reader,
 		ReaderOptions: readerOptions,
 	}, nil
-}
-
-func (f *FakeLoader) InventoryInfo(objs []*unstructured.Unstructured) (inventory.Info, []*unstructured.Unstructured, error) {
-	inv, objs, err := inventory.SplitUnstructureds(objs)
-	return inventory.WrapInventoryInfoObj(inv), objs, err
 }

@@ -6,6 +6,7 @@ package filter
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/cli-utils/pkg/apis/actuation"
 	"sigs.k8s.io/cli-utils/pkg/common"
@@ -90,8 +91,10 @@ func TestInventoryPolicyPruneFilter(t *testing.T) {
 			}
 			invObj := inventoryObj.DeepCopy()
 			invObj.SetLabels(invIDLabel)
+			invInfoObj, err := inventory.ConfigMapToInventoryInfo(invObj)
+			require.NoError(t, err)
 			filter := InventoryPolicyPruneFilter{
-				Inv:       inventory.WrapInventoryInfoObj(invObj),
+				Inv:       invInfoObj,
 				InvPolicy: tc.policy,
 			}
 			objIDAnnotation := map[string]string{
@@ -99,7 +102,7 @@ func TestInventoryPolicyPruneFilter(t *testing.T) {
 			}
 			obj := defaultObj.DeepCopy()
 			obj.SetAnnotations(objIDAnnotation)
-			err := filter.Filter(t.Context(), obj)
+			err = filter.Filter(t.Context(), obj)
 			testutil.AssertEqual(t, tc.expectedError, err)
 		})
 	}
