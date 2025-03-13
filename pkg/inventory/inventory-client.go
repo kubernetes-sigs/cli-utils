@@ -400,12 +400,12 @@ func (cic *ClusterClient) ListClusterInventoryObjs(ctx context.Context) (map[str
 // deleteInventoryObjByName deletes the passed inventory object from the APIServer, or
 // an error if one occurs.
 func (cic *ClusterClient) deleteInventoryObjByName(ctx context.Context, obj *unstructured.Unstructured, dryRun common.DryRunStrategy) error {
+	if obj == nil {
+		return fmt.Errorf("attempting delete a nil inventory object")
+	}
 	if dryRun.ClientOrServerDryRun() {
 		klog.V(4).Infof("dry-run delete inventory object: not deleted")
 		return nil
-	}
-	if obj == nil {
-		return fmt.Errorf("attempting delete a nil inventory object")
 	}
 
 	mapping, err := cic.getMapping(obj)
