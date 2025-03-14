@@ -8,7 +8,7 @@ import (
 )
 
 var (
-	_ ClientFactory = ClusterClientFactory{}
+	_ ClientFactory = ConfigMapClientFactory{}
 )
 
 // ClientFactory is a factory that constructs new Client instances.
@@ -16,11 +16,12 @@ type ClientFactory interface {
 	NewClient(factory cmdutil.Factory) (Client, error)
 }
 
-// ClusterClientFactory is a factory that creates instances of ClusterClient inventory client.
-type ClusterClientFactory struct {
+// ConfigMapClientFactory is a factory that creates instances of inventory clients
+// which are backed by ConfigMaps.
+type ConfigMapClientFactory struct {
 	StatusPolicy StatusPolicy
 }
 
-func (ccf ClusterClientFactory) NewClient(factory cmdutil.Factory) (Client, error) {
+func (ccf ConfigMapClientFactory) NewClient(factory cmdutil.Factory) (Client, error) {
 	return NewClient(factory, ConfigMapToInventoryObj, InvInfoToConfigMap, ccf.StatusPolicy, ConfigMapGVK)
 }
