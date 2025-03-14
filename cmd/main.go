@@ -63,7 +63,7 @@ func main() {
 	}
 
 	loader := manifestreader.NewManifestLoader(f)
-	invFactory := inventory.ClusterClientFactory{StatusPolicy: inventory.StatusPolicyNone}
+	invFactory := inventory.ConfigMapClientFactory{StatusPolicy: inventory.StatusPolicyNone}
 
 	names := []string{"init", "apply", "destroy", "diff", "preview", "status"}
 	subCmds := []*cobra.Command{
