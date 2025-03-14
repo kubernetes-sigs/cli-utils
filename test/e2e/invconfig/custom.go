@@ -25,7 +25,6 @@ import (
 func NewCustomTypeInvConfig(cfg *rest.Config) InventoryConfig {
 	return InventoryConfig{
 		ClientConfig:         cfg,
-		Strategy:             inventory.NameStrategy,
 		FactoryFunc:          customInventoryManifest,
 		InvWrapperFunc:       customprovider.WrapInventoryInfoObj,
 		ApplierFactoryFunc:   newCustomInvApplierFactory(cfg),
@@ -39,14 +38,14 @@ func NewCustomTypeInvConfig(cfg *rest.Config) InventoryConfig {
 func newCustomInvApplierFactory(cfg *rest.Config) applierFactoryFunc {
 	cfgPtrCopy := cfg
 	return func() *apply.Applier {
-		return newApplier(customprovider.CustomClientFactory{}, cfgPtrCopy)
+		return newApplier(customprovider.CustomClientFactory{}, inventory.StatusPolicyAll, cfgPtrCopy)
 	}
 }
 
 func newCustomInvDestroyerFactory(cfg *rest.Config) destroyerFactoryFunc {
 	cfgPtrCopy := cfg
 	return func() *apply.Destroyer {
-		return newDestroyer(customprovider.CustomClientFactory{}, cfgPtrCopy)
+		return newDestroyer(customprovider.CustomClientFactory{}, inventory.StatusPolicyAll, cfgPtrCopy)
 	}
 }
 

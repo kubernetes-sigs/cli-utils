@@ -164,10 +164,12 @@ func (r *Runner) loadInvFromDisk(cmd *cobra.Command, args []string) (*printer.Pr
 
 	// Based on the inventory template manifest we look up the inventory
 	// from the live state using the inventory client.
-	identifiers, err := invClient.GetClusterObjs(cmd.Context(), inv)
+	clusterInventory, err := invClient.Get(cmd.Context(), inv, inventory.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
+
+	identifiers := clusterInventory.Objects()
 
 	printData := printer.PrintData{
 		Identifiers: object.ObjMetadataSet{},
@@ -179,7 +181,7 @@ func (r *Runner) loadInvFromDisk(cmd *cobra.Command, args []string) (*printer.Pr
 		// check if the object is under one of the targeted namespaces
 		if _, ok := r.namespaceSet[obj.Namespace]; ok || len(r.namespaceSet) == 0 {
 			// add to the map for future reference
-			printData.InvNameMap[obj] = inv.Name()
+			printData.InvNameMap[obj] = string(inv.ID())
 			// append to identifiers
 			printData.Identifiers = append(printData.Identifiers, obj)
 		}
@@ -201,9 +203,14 @@ func (r *Runner) listInvFromCluster() (*printer.PrintData, error) {
 		StatusSet:   r.statusSet,
 	}
 
-	identifiersMap, err := invClient.ListClusterInventoryObjs(r.ctx)
+	inventories, err := invClient.List(r.ctx, inventory.ListOptions{})
 	if err != nil {
 		return nil, err
+	}
+
+	identifiersMap := make(map[string]object.ObjMetadataSet)
+	for _, inv := range inventories {
+		identifiersMap[string(inv.ID())] = inv.Objects()
 	}
 
 	for invName, identifiers := range identifiersMap {

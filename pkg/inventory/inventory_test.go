@@ -7,7 +7,6 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/cli-runtime/pkg/resource"
@@ -413,11 +412,4 @@ func TestLegacyInventoryName(t *testing.T) {
 
 func copyInventoryInfo() *unstructured.Unstructured {
 	return inventoryObj.DeepCopy()
-}
-
-func copyInventory(t *testing.T) Info {
-	u := inventoryObj.DeepCopy()
-	invInfoObj, err := ConfigMapToInventoryInfo(u)
-	require.NoError(t, err)
-	return invInfoObj
 }

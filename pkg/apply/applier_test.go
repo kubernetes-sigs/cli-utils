@@ -1431,7 +1431,7 @@ func TestApplier(t *testing.T) {
 			testCtx, testCancel := context.WithTimeout(context.Background(), testTimeout)
 			defer testCancel() // cleanup
 
-			invInfo, err := tc.invInfo.toWrapped()
+			invInfo, err := tc.invInfo.toInfo()
 			require.NoError(t, err)
 			eventChannel := applier.Run(runCtx, invInfo, tc.resources, tc.options)
 
@@ -1874,7 +1874,7 @@ func TestApplierCancel(t *testing.T) {
 			testCtx, testCancel := context.WithTimeout(context.Background(), tc.testTimeout)
 			defer testCancel() // cleanup
 
-			invInfo, err := tc.invInfo.toWrapped()
+			invInfo, err := tc.invInfo.toInfo()
 			require.NoError(t, err)
 			eventChannel := applier.Run(runCtx, invInfo, tc.resources, tc.options)
 
@@ -1976,26 +1976,23 @@ func TestReadAndPrepareObjects(t *testing.T) {
 	}{
 		"objects include inventory": {
 			invInfo: inventoryInfo{
-				name:      invInfo.Name(),
 				namespace: invInfo.Namespace(),
-				id:        invInfo.ID(),
+				id:        string(invInfo.ID()),
 			},
 			resources: object.UnstructuredSet{inventoryObj},
 			isError:   true,
 		},
 		"empty inventory, empty objects, apply none, prune none": {
 			invInfo: inventoryInfo{
-				name:      invInfo.Name(),
 				namespace: invInfo.Namespace(),
-				id:        invInfo.ID(),
+				id:        string(invInfo.ID()),
 			},
 		},
 		"one in inventory, empty objects, prune one": {
 			clusterObjs: object.UnstructuredSet{obj1},
 			invInfo: inventoryInfo{
-				name:      invInfo.Name(),
 				namespace: invInfo.Namespace(),
-				id:        invInfo.ID(),
+				id:        string(invInfo.ID()),
 				set: object.ObjMetadataSet{
 					object.UnstructuredToObjMetadata(obj1),
 				},
@@ -2004,9 +2001,8 @@ func TestReadAndPrepareObjects(t *testing.T) {
 		},
 		"all in inventory, apply all": {
 			invInfo: inventoryInfo{
-				name:      invInfo.Name(),
 				namespace: invInfo.Namespace(),
-				id:        invInfo.ID(),
+				id:        string(invInfo.ID()),
 				set: object.ObjMetadataSet{
 					object.UnstructuredToObjMetadata(obj1),
 					object.UnstructuredToObjMetadata(clusterScopedObj),
@@ -2018,9 +2014,8 @@ func TestReadAndPrepareObjects(t *testing.T) {
 		"disjoint set, apply new, prune old": {
 			clusterObjs: object.UnstructuredSet{obj2},
 			invInfo: inventoryInfo{
-				name:      invInfo.Name(),
 				namespace: invInfo.Namespace(),
-				id:        invInfo.ID(),
+				id:        string(invInfo.ID()),
 				set: object.ObjMetadataSet{
 					object.UnstructuredToObjMetadata(obj2),
 				},
@@ -2032,9 +2027,8 @@ func TestReadAndPrepareObjects(t *testing.T) {
 		"most in inventory, apply all": {
 			clusterObjs: object.UnstructuredSet{obj2},
 			invInfo: inventoryInfo{
-				name:      invInfo.Name(),
 				namespace: invInfo.Namespace(),
-				id:        invInfo.ID(),
+				id:        string(invInfo.ID()),
 				set: object.ObjMetadataSet{
 					object.UnstructuredToObjMetadata(obj2),
 				},
