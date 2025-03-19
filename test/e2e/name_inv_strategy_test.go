@@ -20,27 +20,29 @@ import (
 func applyWithExistingInvTest(ctx context.Context, c client.Client, invConfig invconfig.InventoryConfig, inventoryName, namespaceName string) {
 	By("Apply first set of resources")
 	applier := invConfig.ApplierFactoryFunc()
-	orgInventoryID := fmt.Sprintf("%s-%s", inventoryName, namespaceName)
 
-	orgApplyInv := invConfig.InvWrapperFunc(invConfig.FactoryFunc(inventoryName, namespaceName, orgInventoryID))
+	firstInventoryID := fmt.Sprintf("%s-%s", inventoryName, namespaceName)
+	firstInventoryInfo, err := invconfig.CreateInventoryInfo(invConfig, inventoryName, namespaceName, firstInventoryID)
+	Expect(err).NotTo(HaveOccurred())
 
 	resources := []*unstructured.Unstructured{
 		e2eutil.WithNamespace(e2eutil.ManifestToUnstructured(deployment1), namespaceName),
 	}
 
-	e2eutil.RunWithNoErr(applier.Run(ctx, orgApplyInv, resources, apply.ApplierOptions{
+	e2eutil.RunWithNoErr(applier.Run(ctx, firstInventoryInfo, resources, apply.ApplierOptions{
 		ReconcileTimeout: 2 * time.Minute,
 		EmitStatusEvents: true,
 	}))
 
 	By("Verify inventory")
-	invConfig.InvSizeVerifyFunc(ctx, c, inventoryName, namespaceName, orgInventoryID, 1, 1)
+	invConfig.InvSizeVerifyFunc(ctx, c, inventoryName, namespaceName, firstInventoryID, 1, 1)
 
 	By("Apply second set of resources, using same inventory name but different ID")
 	secondInventoryID := fmt.Sprintf("%s-%s-2", inventoryName, namespaceName)
-	secondApplyInv := invConfig.InvWrapperFunc(invConfig.FactoryFunc(inventoryName, namespaceName, secondInventoryID))
+	secondInventoryInfo, err := invconfig.CreateInventoryInfo(invConfig, inventoryName, namespaceName, secondInventoryID)
+	Expect(err).NotTo(HaveOccurred())
 
-	err := e2eutil.Run(applier.Run(ctx, secondApplyInv, resources, apply.ApplierOptions{
+	err = e2eutil.Run(applier.Run(ctx, secondInventoryInfo, resources, apply.ApplierOptions{
 		ReconcileTimeout: 2 * time.Minute,
 		EmitStatusEvents: true,
 	}))

@@ -27,7 +27,9 @@ func dependencyFilterTest(ctx context.Context, c client.Client, invConfig invcon
 	By("apply resources in order based on depends-on annotation")
 	applier := invConfig.ApplierFactoryFunc()
 
-	inv := invConfig.InvWrapperFunc(invConfig.FactoryFunc(inventoryName, namespaceName, "test"))
+	inventoryID := fmt.Sprintf("%s-%s", inventoryName, namespaceName)
+	inventoryInfo, err := invconfig.CreateInventoryInfo(invConfig, inventoryName, namespaceName, inventoryID)
+	Expect(err).ToNot(HaveOccurred())
 
 	pod1Obj := e2eutil.WithDependsOn(e2eutil.WithNamespace(e2eutil.ManifestToUnstructured(pod1), namespaceName), fmt.Sprintf("/namespaces/%s/Pod/pod2", namespaceName))
 	pod2Obj := e2eutil.WithNamespace(e2eutil.ManifestToUnstructured(pod2), namespaceName)
@@ -45,7 +47,7 @@ func dependencyFilterTest(ctx context.Context, c client.Client, invConfig invcon
 		e2eutil.DeleteUnstructuredIfExists(ctx, c, pod2Obj)
 	}(ctx, c)
 
-	applierEvents := e2eutil.RunCollect(applier.Run(ctx, inv, resources, apply.ApplierOptions{
+	applierEvents := e2eutil.RunCollect(applier.Run(ctx, inventoryInfo, resources, apply.ApplierOptions{
 		EmitStatusEvents: false,
 	}))
 
@@ -245,7 +247,7 @@ func dependencyFilterTest(ctx context.Context, c client.Client, invConfig invcon
 		pod1Obj,
 	}
 
-	applierEvents = e2eutil.RunCollect(applier.Run(ctx, inv, resources, apply.ApplierOptions{
+	applierEvents = e2eutil.RunCollect(applier.Run(ctx, inventoryInfo, resources, apply.ApplierOptions{
 		EmitStatusEvents: false,
 		ValidationPolicy: validation.SkipInvalid,
 	}))

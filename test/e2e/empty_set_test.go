@@ -25,7 +25,8 @@ func emptySetTest(ctx context.Context, c client.Client, invConfig invconfig.Inve
 	applier := invConfig.ApplierFactoryFunc()
 
 	inventoryID := fmt.Sprintf("%s-%s", inventoryName, namespaceName)
-	inventoryInfo := invConfig.InvWrapperFunc(invConfig.FactoryFunc(inventoryName, namespaceName, inventoryID))
+	inventoryInfo, err := invconfig.CreateInventoryInfo(invConfig, inventoryName, namespaceName, inventoryID)
+	Expect(err).ToNot(HaveOccurred())
 
 	resources := []*unstructured.Unstructured{}
 

@@ -25,9 +25,10 @@ import (
 func applyAndDestroyTest(ctx context.Context, c client.Client, invConfig invconfig.InventoryConfig, inventoryName, namespaceName string) {
 	By("Apply resources")
 	applier := invConfig.ApplierFactoryFunc()
-	inventoryID := fmt.Sprintf("%s-%s", inventoryName, namespaceName)
 
-	inventoryInfo := invconfig.CreateInventoryInfo(invConfig, inventoryName, namespaceName, inventoryID)
+	inventoryID := fmt.Sprintf("%s-%s", inventoryName, namespaceName)
+	inventoryInfo, err := invconfig.CreateInventoryInfo(invConfig, inventoryName, namespaceName, inventoryID)
+	Expect(err).ToNot(HaveOccurred())
 
 	deployment1Obj := e2eutil.WithNamespace(e2eutil.ManifestToUnstructured(deployment1), namespaceName)
 	resources := []*unstructured.Unstructured{

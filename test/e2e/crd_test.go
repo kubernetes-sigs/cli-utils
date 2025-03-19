@@ -5,6 +5,7 @@ package e2e
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
@@ -26,7 +27,9 @@ func crdTest(ctx context.Context, _ client.Client, invConfig invconfig.Inventory
 	By("apply a set of resources that includes both a crd and a cr")
 	applier := invConfig.ApplierFactoryFunc()
 
-	inv := invConfig.InvWrapperFunc(invConfig.FactoryFunc(inventoryName, namespaceName, "test"))
+	inventoryID := fmt.Sprintf("%s-%s", inventoryName, namespaceName)
+	inv, err := invconfig.CreateInventoryInfo(invConfig, inventoryName, namespaceName, inventoryID)
+	Expect(err).ToNot(HaveOccurred())
 
 	crdObj := e2eutil.ManifestToUnstructured(crd)
 	crObj := e2eutil.ManifestToUnstructured(cr)

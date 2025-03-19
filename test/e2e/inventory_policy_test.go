@@ -5,6 +5,7 @@ package e2e
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2" //nolint:revive
@@ -26,27 +27,33 @@ func inventoryPolicyMustMatchTest(ctx context.Context, c client.Client, invConfi
 	By("Apply first set of resources")
 	applier := invConfig.ApplierFactoryFunc()
 
-	firstInvName := e2eutil.RandomString("first-inv-")
-	firstInv := invConfig.InvWrapperFunc(invConfig.FactoryFunc(firstInvName, namespaceName, firstInvName))
+	firstInventoryName := e2eutil.RandomString("first-inv-")
+	firstInventoryID := fmt.Sprintf("%s-%s", firstInventoryName, namespaceName)
+	firstInventoryInfo, err := invconfig.CreateInventoryInfo(invConfig, firstInventoryName, namespaceName, firstInventoryID)
+	Expect(err).ToNot(HaveOccurred())
+
 	deployment1Obj := e2eutil.WithNamespace(e2eutil.ManifestToUnstructured(deployment1), namespaceName)
 	firstResources := []*unstructured.Unstructured{
 		deployment1Obj,
 	}
 
-	e2eutil.RunWithNoErr(applier.Run(ctx, firstInv, firstResources, apply.ApplierOptions{
+	e2eutil.RunWithNoErr(applier.Run(ctx, firstInventoryInfo, firstResources, apply.ApplierOptions{
 		ReconcileTimeout: 2 * time.Minute,
 		EmitStatusEvents: true,
 	}))
 
 	By("Apply second set of resources")
-	secondInvName := e2eutil.RandomString("second-inv-")
-	secondInv := invConfig.InvWrapperFunc(invConfig.FactoryFunc(secondInvName, namespaceName, secondInvName))
+	secondInventoryName := e2eutil.RandomString("second-inv-")
+	secondInventoryID := fmt.Sprintf("%s-%s", secondInventoryName, namespaceName)
+	secondInventoryInfo, err := invconfig.CreateInventoryInfo(invConfig, secondInventoryName, namespaceName, secondInventoryID)
+	Expect(err).ToNot(HaveOccurred())
+
 	deployment1Obj = e2eutil.WithNamespace(e2eutil.ManifestToUnstructured(deployment1), namespaceName)
 	secondResources := []*unstructured.Unstructured{
 		e2eutil.WithReplicas(deployment1Obj, 6),
 	}
 
-	applierEvents := e2eutil.RunCollect(applier.Run(ctx, secondInv, secondResources, apply.ApplierOptions{
+	applierEvents := e2eutil.RunCollect(applier.Run(ctx, secondInventoryInfo, secondResources, apply.ApplierOptions{
 		ReconcileTimeout: 2 * time.Minute,
 		EmitStatusEvents: true,
 		InventoryPolicy:  inventory.PolicyMustMatch,
@@ -200,14 +207,17 @@ func inventoryPolicyAdoptIfNoInventoryTest(ctx context.Context, c client.Client,
 	By("Apply resources")
 	applier := invConfig.ApplierFactoryFunc()
 
-	invName := e2eutil.RandomString("test-inv-")
-	inv := invConfig.InvWrapperFunc(invConfig.FactoryFunc(invName, namespaceName, invName))
+	inventoryName := e2eutil.RandomString("test-inv-")
+	inventoryID := fmt.Sprintf("%s-%s", inventoryName, namespaceName)
+	inventoryInfo, err := invconfig.CreateInventoryInfo(invConfig, inventoryName, namespaceName, inventoryID)
+	Expect(err).ToNot(HaveOccurred())
+
 	deployment1Obj = e2eutil.WithNamespace(e2eutil.ManifestToUnstructured(deployment1), namespaceName)
 	resources := []*unstructured.Unstructured{
 		e2eutil.WithReplicas(deployment1Obj, 6),
 	}
 
-	applierEvents := e2eutil.RunCollect(applier.Run(ctx, inv, resources, apply.ApplierOptions{
+	applierEvents := e2eutil.RunCollect(applier.Run(ctx, inventoryInfo, resources, apply.ApplierOptions{
 		ReconcileTimeout: 2 * time.Minute,
 		EmitStatusEvents: true,
 		InventoryPolicy:  inventory.PolicyAdoptIfNoInventory,
@@ -361,37 +371,43 @@ func inventoryPolicyAdoptIfNoInventoryTest(ctx context.Context, c client.Client,
 	value, found, err := object.NestedField(result.Object, "metadata", "annotations", "config.k8s.io/owning-inventory")
 	Expect(err).NotTo(HaveOccurred())
 	Expect(found).To(BeTrue())
-	Expect(value).To(Equal(invName))
+	Expect(value).To(Equal(inventoryID))
 
 	invConfig.InvCountVerifyFunc(ctx, c, namespaceName, 1)
-	invConfig.InvSizeVerifyFunc(ctx, c, invName, namespaceName, invName, 1, 1)
+	invConfig.InvSizeVerifyFunc(ctx, c, inventoryName, namespaceName, inventoryID, 1, 1)
 }
 
 func inventoryPolicyAdoptAllTest(ctx context.Context, c client.Client, invConfig invconfig.InventoryConfig, namespaceName string) {
 	By("Apply an initial set of resources")
 	applier := invConfig.ApplierFactoryFunc()
 
-	firstInvName := e2eutil.RandomString("first-inv-")
-	firstInv := invConfig.InvWrapperFunc(invConfig.FactoryFunc(firstInvName, namespaceName, firstInvName))
+	firstInventoryName := e2eutil.RandomString("first-inv-")
+	firstInventoryID := fmt.Sprintf("%s-%s", firstInventoryName, namespaceName)
+	firstInventoryInfo, err := invconfig.CreateInventoryInfo(invConfig, firstInventoryName, namespaceName, firstInventoryID)
+	Expect(err).ToNot(HaveOccurred())
+
 	deployment1Obj := e2eutil.WithNamespace(e2eutil.ManifestToUnstructured(deployment1), namespaceName)
 	firstResources := []*unstructured.Unstructured{
 		deployment1Obj,
 	}
 
-	e2eutil.RunWithNoErr(applier.Run(ctx, firstInv, firstResources, apply.ApplierOptions{
+	e2eutil.RunWithNoErr(applier.Run(ctx, firstInventoryInfo, firstResources, apply.ApplierOptions{
 		ReconcileTimeout: 2 * time.Minute,
 		EmitStatusEvents: true,
 	}))
 
 	By("Apply resources")
-	secondInvName := e2eutil.RandomString("test-inv-")
-	secondInv := invConfig.InvWrapperFunc(invConfig.FactoryFunc(secondInvName, namespaceName, secondInvName))
+	secondInventoryName := e2eutil.RandomString("second-inv-")
+	secondInventoryID := fmt.Sprintf("%s-%s", secondInventoryName, namespaceName)
+	secondInventoryInfo, err := invconfig.CreateInventoryInfo(invConfig, secondInventoryName, namespaceName, secondInventoryID)
+	Expect(err).ToNot(HaveOccurred())
+
 	deployment1Obj = e2eutil.WithNamespace(e2eutil.ManifestToUnstructured(deployment1), namespaceName)
 	secondResources := []*unstructured.Unstructured{
 		e2eutil.WithReplicas(deployment1Obj, 6),
 	}
 
-	applierEvents := e2eutil.RunCollect(applier.Run(ctx, secondInv, secondResources, apply.ApplierOptions{
+	applierEvents := e2eutil.RunCollect(applier.Run(ctx, secondInventoryInfo, secondResources, apply.ApplierOptions{
 		ReconcileTimeout: 2 * time.Minute,
 		EmitStatusEvents: true,
 		InventoryPolicy:  inventory.PolicyAdoptAll,
@@ -545,7 +561,7 @@ func inventoryPolicyAdoptAllTest(ctx context.Context, c client.Client, invConfig
 	value, found, err := object.NestedField(result.Object, "metadata", "annotations", "config.k8s.io/owning-inventory")
 	Expect(err).NotTo(HaveOccurred())
 	Expect(found).To(BeTrue())
-	Expect(value).To(Equal(secondInvName))
+	Expect(value).To(Equal(secondInventoryID))
 
 	invConfig.InvCountVerifyFunc(ctx, c, namespaceName, 2)
 }

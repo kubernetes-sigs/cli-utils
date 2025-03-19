@@ -38,7 +38,9 @@ func mutationTest(ctx context.Context, c client.Client, invConfig invconfig.Inve
 	By("apply resources in order with substitutions based on apply-time-mutation annotation")
 	applier := invConfig.ApplierFactoryFunc()
 
-	inv := invConfig.InvWrapperFunc(invConfig.FactoryFunc(inventoryName, namespaceName, "test"))
+	inventoryID := fmt.Sprintf("%s-%s", inventoryName, namespaceName)
+	inventoryInfo, err := invconfig.CreateInventoryInfo(invConfig, inventoryName, namespaceName, inventoryID)
+	Expect(err).ToNot(HaveOccurred())
 
 	fields := struct{ Namespace string }{Namespace: namespaceName}
 	podAObj := e2eutil.TemplateToUnstructured(podATemplate, fields)
@@ -51,7 +53,7 @@ func mutationTest(ctx context.Context, c client.Client, invConfig invconfig.Inve
 		podBObj,
 	}
 
-	applierEvents := e2eutil.RunCollect(applier.Run(ctx, inv, resources, apply.ApplierOptions{
+	applierEvents := e2eutil.RunCollect(applier.Run(ctx, inventoryInfo, resources, apply.ApplierOptions{
 		EmitStatusEvents: false,
 	}))
 
@@ -263,7 +265,7 @@ func mutationTest(ctx context.Context, c client.Client, invConfig invconfig.Inve
 	By("destroy resources in opposite order")
 	destroyer := invConfig.DestroyerFactoryFunc()
 	options := apply.DestroyerOptions{InventoryPolicy: inventory.PolicyAdoptIfNoInventory}
-	destroyerEvents := e2eutil.RunCollect(destroyer.Run(ctx, inv, options))
+	destroyerEvents := e2eutil.RunCollect(destroyer.Run(ctx, inventoryInfo, options))
 
 	expEvents = []testutil.ExpEvent{
 		{
