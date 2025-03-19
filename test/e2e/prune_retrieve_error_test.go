@@ -25,15 +25,15 @@ func pruneRetrieveErrorTest(ctx context.Context, c client.Client, invConfig invc
 	applier := invConfig.ApplierFactoryFunc()
 
 	inventoryID := fmt.Sprintf("%s-%s", inventoryName, namespaceName)
-
-	inv := invconfig.CreateInventoryInfo(invConfig, inventoryName, namespaceName, inventoryID)
+	inventoryInfo, err := invconfig.CreateInventoryInfo(invConfig, inventoryName, namespaceName, inventoryID)
+	Expect(err).ToNot(HaveOccurred())
 
 	pod1Obj := e2eutil.WithNamespace(e2eutil.ManifestToUnstructured(pod1), namespaceName)
 	resource1 := []*unstructured.Unstructured{
 		pod1Obj,
 	}
 
-	applierEvents := e2eutil.RunCollect(applier.Run(ctx, inv, resource1, apply.ApplierOptions{
+	applierEvents := e2eutil.RunCollect(applier.Run(ctx, inventoryInfo, resource1, apply.ApplierOptions{
 		EmitStatusEvents: false,
 	}))
 
@@ -171,7 +171,7 @@ func pruneRetrieveErrorTest(ctx context.Context, c client.Client, invConfig invc
 		pod2Obj,
 	}
 
-	applierEvents = e2eutil.RunCollect(applier.Run(ctx, inv, resource2, apply.ApplierOptions{
+	applierEvents = e2eutil.RunCollect(applier.Run(ctx, inventoryInfo, resource2, apply.ApplierOptions{
 		EmitStatusEvents: false,
 	}))
 
@@ -307,7 +307,7 @@ func pruneRetrieveErrorTest(ctx context.Context, c client.Client, invConfig invc
 	destroyer := invConfig.DestroyerFactoryFunc()
 
 	options := apply.DestroyerOptions{InventoryPolicy: inventory.PolicyAdoptIfNoInventory}
-	destroyerEvents := e2eutil.RunCollect(destroyer.Run(ctx, inv, options))
+	destroyerEvents := e2eutil.RunCollect(destroyer.Run(ctx, inventoryInfo, options))
 
 	expEvents = []testutil.ExpEvent{
 		{

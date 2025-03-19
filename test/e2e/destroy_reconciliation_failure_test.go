@@ -24,8 +24,8 @@ func destroyReconciliationFailureTest(ctx context.Context, c client.Client, invC
 	applier := invConfig.ApplierFactoryFunc()
 
 	inventoryID := fmt.Sprintf("%s-%s", inventoryName, namespaceName)
-
-	inv := invconfig.CreateInventoryInfo(invConfig, inventoryName, namespaceName, inventoryID)
+	inventoryInfo, err := invconfig.CreateInventoryInfo(invConfig, inventoryName, namespaceName, inventoryID)
+	Expect(err).ToNot(HaveOccurred())
 
 	podObject := e2eutil.WithNamespace(e2eutil.ManifestToUnstructured(pod1), namespaceName)
 	podWithFinalizerObject := e2eutil.WithNamespace(e2eutil.ManifestToUnstructured(pod2), namespaceName)
@@ -37,7 +37,7 @@ func destroyReconciliationFailureTest(ctx context.Context, c client.Client, invC
 		podWithFinalizerObject,
 	}
 
-	_ = e2eutil.RunCollect(applier.Run(ctx, inv, resource1, apply.ApplierOptions{
+	_ = e2eutil.RunCollect(applier.Run(ctx, inventoryInfo, resource1, apply.ApplierOptions{
 		EmitStatusEvents: false,
 	}))
 
@@ -83,7 +83,7 @@ func destroyReconciliationFailureTest(ctx context.Context, c client.Client, invC
 		},
 	}
 	for _, ec := range expectedCounts {
-		_ = e2eutil.RunCollect(destroyer.Run(ctx, inv, options))
+		_ = e2eutil.RunCollect(destroyer.Run(ctx, inventoryInfo, options))
 
 		By("Verify pod1 is deleted")
 		e2eutil.AssertUnstructuredDoesNotExist(ctx, c, podObject)
@@ -99,7 +99,7 @@ func destroyReconciliationFailureTest(ctx context.Context, c client.Client, invC
 	podWithFinalizerObject = e2eutil.WithoutFinalizers(podWithFinalizerObject)
 	e2eutil.ApplyUnstructured(ctx, c, podWithFinalizerObject)
 	// re-run the destroyer and verify the object is removed from the inventory
-	_ = e2eutil.RunCollect(destroyer.Run(ctx, inv, options))
+	_ = e2eutil.RunCollect(destroyer.Run(ctx, inventoryInfo, options))
 
 	By("Verify pod1 is deleted")
 	e2eutil.AssertUnstructuredDoesNotExist(ctx, c, podObject)

@@ -59,8 +59,10 @@ type: Warning
 // - inventory should not double-track the object i.e. we should hold reference only to the object with the groupKind that was most recently applied
 func currentUIDFilterTest(ctx context.Context, c client.Client, invConfig invconfig.InventoryConfig, inventoryName, namespaceName string) {
 	applier := invConfig.ApplierFactoryFunc()
+
 	inventoryID := fmt.Sprintf("%s-%s", inventoryName, namespaceName)
-	inventoryInfo := invconfig.CreateInventoryInfo(invConfig, inventoryName, namespaceName, inventoryID)
+	inventoryInfo, err := invconfig.CreateInventoryInfo(invConfig, inventoryName, namespaceName, inventoryID)
+	Expect(err).ToNot(HaveOccurred())
 
 	templateFields := struct{ Namespace string }{Namespace: namespaceName}
 	v1Event := e2eutil.TemplateToUnstructured(v1EventTemplate, templateFields)
@@ -70,7 +72,7 @@ func currentUIDFilterTest(ctx context.Context, c client.Client, invConfig invcon
 	resources := []*unstructured.Unstructured{
 		v1Event,
 	}
-	err := e2eutil.Run(applier.Run(ctx, inventoryInfo, resources, apply.ApplierOptions{}))
+	err = e2eutil.Run(applier.Run(ctx, inventoryInfo, resources, apply.ApplierOptions{}))
 	Expect(err).ToNot(HaveOccurred())
 
 	By("Verify resource available in both apiGroups")

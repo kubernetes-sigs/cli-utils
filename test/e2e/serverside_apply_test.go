@@ -5,6 +5,7 @@ package e2e
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2" //nolint:revive
@@ -23,13 +24,16 @@ func serversideApplyTest(ctx context.Context, c client.Client, invConfig invconf
 	By("Apply a Deployment and an APIService by server-side apply")
 	applier := invConfig.ApplierFactoryFunc()
 
-	inv := invConfig.InvWrapperFunc(invConfig.FactoryFunc(inventoryName, namespaceName, "test"))
+	inventoryID := fmt.Sprintf("%s-%s", inventoryName, namespaceName)
+	inventoryInfo, err := invconfig.CreateInventoryInfo(invConfig, inventoryName, namespaceName, inventoryID)
+	Expect(err).ToNot(HaveOccurred())
+
 	firstResources := []*unstructured.Unstructured{
 		e2eutil.WithNamespace(e2eutil.ManifestToUnstructured(deployment1), namespaceName),
 		e2eutil.ManifestToUnstructured(apiservice1),
 	}
 
-	e2eutil.RunWithNoErr(applier.Run(ctx, inv, firstResources, apply.ApplierOptions{
+	e2eutil.RunWithNoErr(applier.Run(ctx, inventoryInfo, firstResources, apply.ApplierOptions{
 		ReconcileTimeout: 2 * time.Minute,
 		EmitStatusEvents: true,
 		ServerSideOptions: common.ServerSideOptions{

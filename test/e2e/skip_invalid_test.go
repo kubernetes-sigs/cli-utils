@@ -30,7 +30,9 @@ func skipInvalidTest(ctx context.Context, c client.Client, invConfig invconfig.I
 	By("apply valid objects and skip invalid objects")
 	applier := invConfig.ApplierFactoryFunc()
 
-	inv := invConfig.InvWrapperFunc(invConfig.FactoryFunc(inventoryName, namespaceName, "test"))
+	inventoryID := fmt.Sprintf("%s-%s", inventoryName, namespaceName)
+	inventoryInfo, err := invconfig.CreateInventoryInfo(invConfig, inventoryName, namespaceName, inventoryID)
+	Expect(err).ToNot(HaveOccurred())
 
 	fields := struct{ Namespace string }{Namespace: namespaceName}
 	// valid pod
@@ -57,7 +59,7 @@ func skipInvalidTest(ctx context.Context, c client.Client, invConfig invconfig.I
 		invalidPodObj,
 	}
 
-	applierEvents := e2eutil.RunCollect(applier.Run(ctx, inv, resources, apply.ApplierOptions{
+	applierEvents := e2eutil.RunCollect(applier.Run(ctx, inventoryInfo, resources, apply.ApplierOptions{
 		EmitStatusEvents: false,
 		ValidationPolicy: validation.SkipInvalid,
 	}))
@@ -354,7 +356,7 @@ func skipInvalidTest(ctx context.Context, c client.Client, invConfig invconfig.I
 
 	By("destroy valid objects and skip invalid objects")
 	destroyer := invConfig.DestroyerFactoryFunc()
-	destroyerEvents := e2eutil.RunCollect(destroyer.Run(ctx, inv, apply.DestroyerOptions{
+	destroyerEvents := e2eutil.RunCollect(destroyer.Run(ctx, inventoryInfo, apply.DestroyerOptions{
 		InventoryPolicy:  inventory.PolicyAdoptIfNoInventory,
 		ValidationPolicy: validation.SkipInvalid,
 	}))

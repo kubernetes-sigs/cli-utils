@@ -129,8 +129,8 @@ func WrapInventoryObj(obj *unstructured.Unstructured) (inventory.Storage, error)
 	return &InventoryCustomType{inv: obj}, nil
 }
 
-func WrapInventoryInfoObj(obj *unstructured.Unstructured) inventory.Info {
-	return &InventoryCustomType{inv: obj}
+func WrapInventoryInfoObj(obj *unstructured.Unstructured) (inventory.Info, error) {
+	return &InventoryCustomType{inv: obj}, nil
 }
 
 var _ inventory.Storage = &InventoryCustomType{}
