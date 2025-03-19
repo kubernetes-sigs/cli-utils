@@ -22,9 +22,10 @@ import (
 func reconciliationFailed(ctx context.Context, invConfig invconfig.InventoryConfig, inventoryName, namespaceName string) {
 	By("Apply resources")
 	applier := invConfig.ApplierFactoryFunc()
-	inventoryID := fmt.Sprintf("%s-%s", inventoryName, namespaceName)
 
-	inventoryInfo := invconfig.CreateInventoryInfo(invConfig, inventoryName, namespaceName, inventoryID)
+	inventoryID := fmt.Sprintf("%s-%s", inventoryName, namespaceName)
+	inventoryInfo, err := invconfig.CreateInventoryInfo(invConfig, inventoryName, namespaceName, inventoryID)
+	Expect(err).ToNot(HaveOccurred())
 
 	podObj := e2eutil.WithNodeSelector(e2eutil.WithNamespace(e2eutil.ManifestToUnstructured(pod1), namespaceName), "foo", "bar")
 	resources := []*unstructured.Unstructured{
@@ -45,9 +46,10 @@ func reconciliationFailed(ctx context.Context, invConfig invconfig.InventoryConf
 func reconciliationTimeout(ctx context.Context, invConfig invconfig.InventoryConfig, inventoryName, namespaceName string) {
 	By("Apply resources")
 	applier := invConfig.ApplierFactoryFunc()
-	inventoryID := fmt.Sprintf("%s-%s", inventoryName, namespaceName)
 
-	inventoryInfo := invconfig.CreateInventoryInfo(invConfig, inventoryName, namespaceName, inventoryID)
+	inventoryID := fmt.Sprintf("%s-%s", inventoryName, namespaceName)
+	inventoryInfo, err := invconfig.CreateInventoryInfo(invConfig, inventoryName, namespaceName, inventoryID)
+	Expect(err).ToNot(HaveOccurred())
 
 	podObj := e2eutil.PodWithImage(e2eutil.WithNamespace(e2eutil.ManifestToUnstructured(pod1), namespaceName), "kubernetes-pause", "does-not-exist")
 	resources := []*unstructured.Unstructured{

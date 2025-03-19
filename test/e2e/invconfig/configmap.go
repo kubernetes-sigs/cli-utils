@@ -8,7 +8,6 @@ import (
 
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/cli-utils/pkg/apply"
 	"sigs.k8s.io/cli-utils/pkg/common"
@@ -18,14 +17,10 @@ import (
 
 func NewConfigMapTypeInvConfig(cfg *rest.Config) InventoryConfig {
 	return InventoryConfig{
-		ClientConfig: cfg,
-		Strategy:     inventory.LabelStrategy,
-		FactoryFunc:  cmInventoryManifest,
-		InvWrapperFunc: func(obj *unstructured.Unstructured) inventory.Info {
-			info, err := inventory.ConfigMapToInventoryInfo(obj)
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-			return info
-		},
+		ClientConfig:         cfg,
+		Strategy:             inventory.LabelStrategy,
+		FactoryFunc:          cmInventoryManifest,
+		InvWrapperFunc:       inventory.ConfigMapToInventoryInfo,
 		ApplierFactoryFunc:   newDefaultInvApplierFactory(cfg),
 		DestroyerFactoryFunc: newDefaultInvDestroyerFactory(cfg),
 		InvSizeVerifyFunc:    defaultInvSizeVerifyFunc,
