@@ -6,11 +6,13 @@ package inventory
 import (
 	"context"
 	"fmt"
+	"maps"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
@@ -18,6 +20,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/apis/actuation"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/object"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // Client expresses an interface for interacting with
@@ -25,6 +28,7 @@ import (
 type Client interface {
 	ReadClient
 	WriteClient
+	Factory
 }
 
 // ID is a unique identifier for an inventory object.
@@ -44,22 +48,93 @@ func (id ID) String() string {
 // needs to know how to create, look up and update it based
 // on the Info.
 type Info interface {
-	// Namespace of the inventory object.
-	// It should be the value of the field .metadata.namespace.
-	Namespace() string
-
 	// ID of the inventory object.
 	// The inventory client uses this to determine how to get/update the object(s)
 	// from the cluster.
 	ID() ID
 
-	// NewEmptyInventory returns an empty initialized inventory object.
+	// Namespace of the inventory object.
+	// It should be the value of the field .metadata.namespace.
+	Namespace() string
+
+	GetLabels() map[string]string
+
+	GetAnnotations() map[string]string
+
+	DeepCopy() Info
+}
+
+type SimpleInfo struct {
+	id          ID
+	namespace   string
+	labels      map[string]string
+	annotations map[string]string
+}
+
+func (i SimpleInfo) ID() ID {
+	return i.id
+}
+
+func (i SimpleInfo) Namespace() string {
+	return i.namespace
+}
+
+func (i SimpleInfo) GetLabels() map[string]string {
+	return i.labels
+}
+
+func (i SimpleInfo) GetAnnotations() map[string]string {
+	return i.annotations
+}
+
+func (i SimpleInfo) DeepCopy() Info {
+	return SimpleInfo{
+		id:          i.id,
+		namespace:   i.namespace,
+		labels:      maps.Clone(i.labels),
+		annotations: maps.Clone(i.annotations),
+	}
+}
+
+func NewSimpleInfo(id ID, namespace string, labels, annotations map[string]string) SimpleInfo {
+	return SimpleInfo{
+		id:          id,
+		namespace:   namespace,
+		labels:      labels,
+		annotations: annotations,
+	}
+}
+
+type SingleObjectInfo struct {
+	SimpleInfo
+
+	name string
+}
+
+func (i SingleObjectInfo) Name() string {
+	return i.name
+}
+
+func NewSingleObjectInfo(id ID, nn types.NamespacedName, labels, annotations map[string]string) SingleObjectInfo {
+	return SingleObjectInfo{
+		SimpleInfo: SimpleInfo{
+			id:          id,
+			namespace:   nn.Namespace,
+			labels:      labels,
+			annotations: annotations,
+		},
+		name: nn.Name,
+	}
+}
+
+type Factory interface {
+	// NewInventory returns an empty initialized inventory object.
 	// This is used in the case that there is no existing object on the cluster.
-	NewEmptyInventory() Inventory
+	NewInventory(Info) (Inventory, error)
 }
 
 type Inventory interface {
-	Info
+	Info() Info
 	ObjectRefs() object.ObjMetadataSet
 	ObjectStatuses() []actuation.ObjectStatus
 	SetObjectRefs(object.ObjMetadataSet)
@@ -97,18 +172,13 @@ type UnstructuredInventory struct {
 	ClusterObj *unstructured.Unstructured
 }
 
-func (ui *UnstructuredInventory) Name() string {
+func (ui *UnstructuredInventory) Info() Info {
 	if ui.ClusterObj == nil {
-		return ""
+		return SingleObjectInfo{}
 	}
-	return ui.ClusterObj.GetName()
-}
-
-func (ui *UnstructuredInventory) Namespace() string {
-	if ui.ClusterObj == nil {
-		return ""
-	}
-	return ui.ClusterObj.GetNamespace()
+	// TODO: DeepCopy labels & annotations?
+	return NewSingleObjectInfo(ui.ID(), client.ObjectKeyFromObject(ui.ClusterObj),
+		maps.Clone(ui.ClusterObj.GetLabels()), maps.Clone(ui.ClusterObj.GetAnnotations()))
 }
 
 func (ui *UnstructuredInventory) ID() ID {
@@ -117,10 +187,6 @@ func (ui *UnstructuredInventory) ID() ID {
 	}
 	// Empty string if not set.
 	return ID(ui.ClusterObj.GetLabels()[common.InventoryLabel])
-}
-
-func (ui *UnstructuredInventory) NewEmptyInventory() Inventory {
-	return ui
 }
 
 var _ Inventory = &UnstructuredInventory{}
@@ -186,16 +252,23 @@ func NewUnstructuredClient(factory cmdutil.Factory,
 	return unstructuredClient, nil
 }
 
+func (cic *UnstructuredClient) NewInventory(inv Info) (Inventory, error) {
+	soi := inv.(SingleObjectInfo)
+	obj := &unstructured.Unstructured{}
+	obj.SetName(soi.Name())
+	obj.SetNamespace(soi.Namespace())
+	obj.SetLabels(maps.Clone(soi.GetLabels()))
+	obj.SetAnnotations(maps.Clone(soi.GetAnnotations()))
+	return cic.fromUnstructured(obj)
+}
+
 // Get the in-cluster inventory
-func (cic *UnstructuredClient) Get(ctx context.Context, inv Info, _ GetOptions) (Inventory, error) {
-	ui, ok := inv.(*UnstructuredInventory)
+func (cic *UnstructuredClient) Get(ctx context.Context, invInfo Info, _ GetOptions) (Inventory, error) {
+	inv, ok := invInfo.(SingleObjectInfo)
 	if !ok {
-		return nil, fmt.Errorf("expected UnstructuredInventory")
+		return nil, fmt.Errorf("expected SingleObjectInfo")
 	}
-	if ui == nil {
-		return nil, fmt.Errorf("inv is nil")
-	}
-	obj, err := cic.client.Namespace(ui.Namespace()).Get(ctx, ui.Name(), metav1.GetOptions{})
+	obj, err := cic.client.Namespace(invInfo.Namespace()).Get(ctx, inv.Name(), metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -230,11 +303,13 @@ func (cic *UnstructuredClient) CreateOrUpdate(ctx context.Context, inv Inventory
 	if ui == nil {
 		return fmt.Errorf("inventory is nil")
 	}
+	// TODO: avoid deepcopy-ing the labels and annotations
+	invInfo := inv.Info().(SingleObjectInfo)
 	// Attempt to retry on a resource conflict error to avoid needing to retry the
 	// entire Apply/Destroy when there's a transient conflict.
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		create := false
-		obj, err := cic.client.Namespace(ui.Namespace()).Get(ctx, ui.Name(), metav1.GetOptions{})
+		obj, err := cic.client.Namespace(invInfo.Namespace()).Get(ctx, invInfo.Name(), metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
 			create = true
 		} else if err != nil {
@@ -276,10 +351,12 @@ func (cic *UnstructuredClient) UpdateStatus(ctx context.Context, inv Inventory, 
 	if ui == nil {
 		return fmt.Errorf("inventory is nil")
 	}
+	// TODO: avoid deepcopy-ing the labels and annotations
+	invInfo := inv.Info().(SingleObjectInfo)
 	// Attempt to retry on a resource conflict error to avoid needing to retry the
 	// entire Apply/Destroy when there's a transient conflict.
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		obj, err := cic.client.Namespace(ui.Namespace()).Get(ctx, ui.Name(), metav1.GetOptions{})
+		obj, err := cic.client.Namespace(invInfo.Namespace()).Get(ctx, invInfo.Name(), metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -311,15 +388,13 @@ func (cic *UnstructuredClient) UpdateStatus(ctx context.Context, inv Inventory, 
 
 // Delete the in-cluster inventory
 // Performs a simple deletion of the unstructured object
-func (cic *UnstructuredClient) Delete(ctx context.Context, inv Info, _ DeleteOptions) error {
-	ui, ok := inv.(*UnstructuredInventory)
+func (cic *UnstructuredClient) Delete(ctx context.Context, invInfo Info, _ DeleteOptions) error {
+	soi, ok := invInfo.(SingleObjectInfo)
 	if !ok {
-		return fmt.Errorf("expected UnstructuredInventory")
+		return fmt.Errorf("expected SingleObjectInfo")
 	}
-	if ui == nil {
-		return fmt.Errorf("id is nil")
-	}
-	if err := cic.client.Namespace(ui.Namespace()).Delete(ctx, ui.Name(), metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+	err := cic.client.Namespace(soi.Namespace()).Delete(ctx, soi.Name(), metav1.DeleteOptions{})
+	if err != nil && !apierrors.IsNotFound(err) {
 		return fmt.Errorf("delete: %w", err)
 	}
 	return nil
