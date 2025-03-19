@@ -47,7 +47,7 @@ func (t *Printer) Print(ch <-chan event.Event, identifiers object.ObjMetadataSet
 	// printing the latest state on a regular cadence.
 	printCompleted := t.runPrintLoop(&CollectorAdapter{
 		collector:  coll,
-		invNameMap: t.PrintData.InvNameMap,
+		invNameMap: t.PrintData.InvIDMap,
 		statusSet:  t.PrintData.StatusSet,
 	}, stop)
 
@@ -77,7 +77,7 @@ var invNameColumn = table.ColumnDef{
 	ColumnHeader: "INVENTORY_NAME",
 	ColumnWidth:  30,
 	PrintResourceFunc: func(w io.Writer, width int, r table.Resource) (int, error) {
-		group := r.(*ResourceInfo).invName
+		group := r.(*ResourceInfo).invName.String()
 		if len(group) > width {
 			group = group[:width]
 		}

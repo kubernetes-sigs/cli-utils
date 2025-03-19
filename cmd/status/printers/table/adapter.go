@@ -4,6 +4,7 @@
 package table
 
 import (
+	"fmt"
 	"strings"
 
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/collector"
@@ -17,13 +18,13 @@ import (
 // needed by the BaseTablePrinter.
 type CollectorAdapter struct {
 	collector  *collector.ResourceStatusCollector
-	invNameMap map[object.ObjMetadata]string
+	invNameMap map[object.ObjMetadata]fmt.Stringer
 	statusSet  map[string]bool
 }
 
 type ResourceInfo struct {
 	resourceStatus *pe.ResourceStatus
-	invName        string
+	invName        fmt.Stringer
 }
 
 func (r *ResourceInfo) Identifier() object.ObjMetadata {

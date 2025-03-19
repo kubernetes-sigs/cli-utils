@@ -69,9 +69,9 @@ func (ep *Printer) printStatusEvent(se pollevent.Event) error {
 	switch se.Type {
 	case pollevent.ResourceUpdateEvent:
 		id := se.Resource.Identifier
-		var invName string
+		var invName fmt.Stringer
 		var ok bool
-		if invName, ok = ep.Data.InvNameMap[id]; !ok {
+		if invName, ok = ep.Data.InvIDMap[id]; !ok {
 			return fmt.Errorf("%s: resource not found", id)
 		}
 		// filter out status that are not assigned

@@ -4,6 +4,8 @@
 package printer
 
 import (
+	"fmt"
+
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/collector"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/object"
@@ -12,7 +14,7 @@ import (
 // PrintData records data required for printing
 type PrintData struct {
 	Identifiers object.ObjMetadataSet
-	InvNameMap  map[object.ObjMetadata]string
+	InvIDMap    map[object.ObjMetadata]fmt.Stringer
 	StatusSet   map[string]bool
 }
 

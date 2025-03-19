@@ -38,7 +38,7 @@ import (
 type inventoryInfo struct {
 	name      string
 	namespace string
-	id        string
+	id        inventory.ID
 	set       object.ObjMetadataSet
 }
 
@@ -56,7 +56,7 @@ func (i inventoryInfo) toUnstructured() *unstructured.Unstructured {
 				"name":      i.name,
 				"namespace": i.namespace,
 				"labels": map[string]interface{}{
-					common.InventoryLabel: i.id,
+					common.InventoryLabel: i.id.String(),
 				},
 			},
 			"data": invMap,
@@ -64,7 +64,11 @@ func (i inventoryInfo) toUnstructured() *unstructured.Unstructured {
 	}
 }
 
-func (i inventoryInfo) toWrapped() (inventory.Info, error) {
+func (i inventoryInfo) toWrapped() (inventory.Inventory, error) {
+	return inventory.ConfigMapToInventoryObj(i.toUnstructured())
+}
+
+func (i inventoryInfo) toInfo() (inventory.Info, error) {
 	return inventory.ConfigMapToInventoryInfo(i.toUnstructured())
 }
 
@@ -125,7 +129,7 @@ func newTestInventory(
 ) inventory.Client {
 	// Use an Client with a fakeInfoHelper to allow generating Info
 	// objects that use the FakeRESTClient as the UnstructuredClient.
-	invClient, err := inventory.ConfigMapClientFactory{StatusPolicy: inventory.StatusPolicyAll}.NewClient(tf)
+	invClient, err := inventory.ConfigMapClientFactory{}.NewClient(tf)
 	require.NoError(t, err)
 	return invClient
 }

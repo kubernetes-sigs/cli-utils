@@ -18,10 +18,8 @@ type ClientFactory interface {
 
 // ConfigMapClientFactory is a factory that creates instances of inventory clients
 // which are backed by ConfigMaps.
-type ConfigMapClientFactory struct {
-	StatusPolicy StatusPolicy
-}
+type ConfigMapClientFactory struct{}
 
 func (ccf ConfigMapClientFactory) NewClient(factory cmdutil.Factory) (Client, error) {
-	return NewClient(factory, ConfigMapToInventoryObj, InvInfoToConfigMap, ccf.StatusPolicy, ConfigMapGVK)
+	return NewUnstructuredClient(factory, configMapToInventory, inventoryToConfigMap, ConfigMapGVK)
 }

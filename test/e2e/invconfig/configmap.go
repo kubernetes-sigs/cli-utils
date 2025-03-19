@@ -19,7 +19,6 @@ import (
 func NewConfigMapTypeInvConfig(cfg *rest.Config) InventoryConfig {
 	return InventoryConfig{
 		ClientConfig: cfg,
-		Strategy:     inventory.LabelStrategy,
 		FactoryFunc:  cmInventoryManifest,
 		InvWrapperFunc: func(obj *unstructured.Unstructured) inventory.Info {
 			info, err := inventory.ConfigMapToInventoryInfo(obj)
@@ -37,18 +36,14 @@ func NewConfigMapTypeInvConfig(cfg *rest.Config) InventoryConfig {
 func newDefaultInvApplierFactory(cfg *rest.Config) applierFactoryFunc {
 	cfgPtrCopy := cfg
 	return func() *apply.Applier {
-		return newApplier(inventory.ConfigMapClientFactory{
-			StatusPolicy: inventory.StatusPolicyAll,
-		}, cfgPtrCopy)
+		return newApplier(inventory.ConfigMapClientFactory{}, inventory.StatusPolicyNone, cfgPtrCopy)
 	}
 }
 
 func newDefaultInvDestroyerFactory(cfg *rest.Config) destroyerFactoryFunc {
 	cfgPtrCopy := cfg
 	return func() *apply.Destroyer {
-		return newDestroyer(inventory.ConfigMapClientFactory{
-			StatusPolicy: inventory.StatusPolicyAll,
-		}, cfgPtrCopy)
+		return newDestroyer(inventory.ConfigMapClientFactory{}, inventory.StatusPolicyNone, cfgPtrCopy)
 	}
 }
 

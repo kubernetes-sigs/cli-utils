@@ -31,8 +31,8 @@ kind: ConfigMap
 apiVersion: v1
 metadata:
   labels:
-    cli-utils.sigs.k8s.io/inventory-id: test
-  name: foo
+    cli-utils.sigs.k8s.io/inventory-id: inventory-id
+  name: inventory-name
   namespace: default
 `
 	depObject = object.ObjMetadata{
@@ -121,8 +121,8 @@ func TestCommand(t *testing.T) {
 				},
 			},
 			expectedOutput: `
-foo/deployment.apps/default/foo is InProgress: inProgress
-foo/statefulset.apps/default/bar is Current: current
+inventory-id/deployment.apps/default/foo is InProgress: inProgress
+inventory-id/statefulset.apps/default/bar is Current: current
 `,
 		},
 		"wait for all current": {
@@ -168,10 +168,10 @@ foo/statefulset.apps/default/bar is Current: current
 				},
 			},
 			expectedOutput: `
-foo/deployment.apps/default/foo is InProgress: inProgress
-foo/statefulset.apps/default/bar is InProgress: inProgress
-foo/statefulset.apps/default/bar is Current: current
-foo/deployment.apps/default/foo is Current: current
+inventory-id/deployment.apps/default/foo is InProgress: inProgress
+inventory-id/statefulset.apps/default/bar is InProgress: inProgress
+inventory-id/statefulset.apps/default/bar is Current: current
+inventory-id/deployment.apps/default/foo is Current: current
 `,
 		},
 		"wait for all deleted": {
@@ -201,8 +201,8 @@ foo/deployment.apps/default/foo is Current: current
 				},
 			},
 			expectedOutput: `
-foo/statefulset.apps/default/bar is NotFound: notFound
-foo/deployment.apps/default/foo is NotFound: notFound
+inventory-id/statefulset.apps/default/bar is NotFound: notFound
+inventory-id/deployment.apps/default/foo is NotFound: notFound
 `,
 		},
 		"forever with timeout": {
@@ -233,8 +233,8 @@ foo/deployment.apps/default/foo is NotFound: notFound
 				},
 			},
 			expectedOutput: `
-foo/statefulset.apps/default/bar is InProgress: inProgress
-foo/deployment.apps/default/foo is InProgress: inProgress
+inventory-id/statefulset.apps/default/bar is InProgress: inProgress
+inventory-id/deployment.apps/default/foo is InProgress: inProgress
 `,
 		},
 	}
@@ -283,7 +283,7 @@ foo/deployment.apps/default/foo is InProgress: inProgress
 					"name":           "foo",
 					"timestamp":      "",
 					"type":           "status",
-					"inventory-name": "foo",
+					"inventory-name": "inventory-id",
 					"status":         "InProgress",
 					"message":        "inProgress",
 				},
@@ -294,7 +294,7 @@ foo/deployment.apps/default/foo is InProgress: inProgress
 					"name":           "bar",
 					"timestamp":      "",
 					"type":           "status",
-					"inventory-name": "foo",
+					"inventory-name": "inventory-id",
 					"status":         "Current",
 					"message":        "current",
 				},
@@ -350,7 +350,7 @@ foo/deployment.apps/default/foo is InProgress: inProgress
 					"name":           "foo",
 					"timestamp":      "",
 					"type":           "status",
-					"inventory-name": "foo",
+					"inventory-name": "inventory-id",
 					"status":         "InProgress",
 					"message":        "inProgress",
 				},
@@ -361,7 +361,7 @@ foo/deployment.apps/default/foo is InProgress: inProgress
 					"name":           "bar",
 					"timestamp":      "",
 					"type":           "status",
-					"inventory-name": "foo",
+					"inventory-name": "inventory-id",
 					"status":         "InProgress",
 					"message":        "inProgress",
 				},
@@ -372,7 +372,7 @@ foo/deployment.apps/default/foo is InProgress: inProgress
 					"name":           "bar",
 					"timestamp":      "",
 					"type":           "status",
-					"inventory-name": "foo",
+					"inventory-name": "inventory-id",
 					"status":         "Current",
 					"message":        "current",
 				},
@@ -383,7 +383,7 @@ foo/deployment.apps/default/foo is InProgress: inProgress
 					"name":           "foo",
 					"timestamp":      "",
 					"type":           "status",
-					"inventory-name": "foo",
+					"inventory-name": "inventory-id",
 					"status":         "Current",
 					"message":        "current",
 				},
@@ -423,7 +423,7 @@ foo/deployment.apps/default/foo is InProgress: inProgress
 					"name":           "bar",
 					"timestamp":      "",
 					"type":           "status",
-					"inventory-name": "foo",
+					"inventory-name": "inventory-id",
 					"status":         "NotFound",
 					"message":        "notFound",
 				},
@@ -434,7 +434,7 @@ foo/deployment.apps/default/foo is InProgress: inProgress
 					"name":           "foo",
 					"timestamp":      "",
 					"type":           "status",
-					"inventory-name": "foo",
+					"inventory-name": "inventory-id",
 					"status":         "NotFound",
 					"message":        "notFound",
 				},
@@ -475,7 +475,7 @@ foo/deployment.apps/default/foo is InProgress: inProgress
 					"name":           "bar",
 					"timestamp":      "",
 					"type":           "status",
-					"inventory-name": "foo",
+					"inventory-name": "inventory-id",
 					"status":         "InProgress",
 					"message":        "inProgress",
 				},
@@ -486,7 +486,7 @@ foo/deployment.apps/default/foo is InProgress: inProgress
 					"name":           "foo",
 					"timestamp":      "",
 					"type":           "status",
-					"inventory-name": "foo",
+					"inventory-name": "inventory-id",
 					"status":         "InProgress",
 					"message":        "inProgress",
 				},
