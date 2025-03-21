@@ -23,5 +23,5 @@ type ConfigMapClientFactory struct {
 }
 
 func (ccf ConfigMapClientFactory) NewClient(factory cmdutil.Factory) (Client, error) {
-	return NewClient(factory, ConfigMapToInventoryObj, InvInfoToConfigMap, ccf.StatusPolicy, ConfigMapGVK)
+	return NewUnstructuredClient(factory, configMapToInventory, inventoryToConfigMap(ccf.StatusPolicy), ConfigMapGVK, StatusPolicyNone)
 }

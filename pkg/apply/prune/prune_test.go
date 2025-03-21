@@ -122,21 +122,14 @@ metadata:
 
 // Returns a inventory object with the inventory set from
 // the passed "children".
-func createInventoryInfo(children ...*unstructured.Unstructured) (inventory.Info, error) {
+func newInventory(children ...*unstructured.Unstructured) (inventory.Inventory, error) {
 	inventoryObjCopy := inventoryObj.DeepCopy()
 	wrappedInv, err := inventory.ConfigMapToInventoryObj(inventoryObjCopy)
 	if err != nil {
 		return nil, err
 	}
-	objs := object.UnstructuredSetToObjMetadataSet(children)
-	if err := wrappedInv.Store(objs, nil); err != nil {
-		return nil, err
-	}
-	obj, err := wrappedInv.GetObject()
-	if err != nil {
-		return nil, err
-	}
-	return inventory.ConfigMapToInventoryInfo(obj)
+	wrappedInv.SetObjectRefs(object.UnstructuredSetToObjMetadataSet(children))
+	return wrappedInv, nil
 }
 
 // podDeletionPrevention object contains the "on-remove:keep" lifecycle directive.
@@ -862,7 +855,7 @@ func TestGetPruneObjs(t *testing.T) {
 				Mapper: testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme,
 					scheme.Scheme.PrioritizedVersionsAllGroups()...),
 			}
-			currentInventory, err := createInventoryInfo(tc.prevInventory...)
+			currentInventory, err := newInventory(tc.prevInventory...)
 			require.NoError(t, err)
 			actualObjs, err := po.GetPruneObjs(t.Context(), currentInventory, tc.localObjs, Options{})
 			if err != nil {

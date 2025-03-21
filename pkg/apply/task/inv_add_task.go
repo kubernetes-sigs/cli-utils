@@ -30,10 +30,10 @@ var (
 // before the actual object is applied.
 type InvAddTask struct {
 	TaskName      string
-	InvClient     inventory.Client
+	Inventory     inventory.Inventory
+	InvClient     inventory.WriteClient
 	DynamicClient dynamic.Interface
 	Mapper        meta.RESTMapper
-	InvInfo       inventory.Info
 	Objects       object.UnstructuredSet
 	DryRun        common.DryRunStrategy
 }
@@ -60,8 +60,9 @@ func (i *InvAddTask) Start(taskContext *taskrunner.TaskContext) {
 			return
 		}
 		// If the inventory is namespaced, ensure the namespace exists
-		if i.InvInfo.Namespace() != "" {
-			if invNamespace := inventoryNamespaceInSet(i.InvInfo, i.Objects); invNamespace != nil {
+		invInfo := i.Inventory.Info()
+		if invInfo.GetNamespace() != "" {
+			if invNamespace := inventoryNamespaceInSet(invInfo, i.Objects); invNamespace != nil {
 				if err := i.createNamespace(taskContext.Context(), invNamespace, i.DryRun); err != nil {
 					err = fmt.Errorf("failed to create inventory namespace: %w", err)
 					i.sendTaskResult(taskContext, err)
@@ -71,7 +72,20 @@ func (i *InvAddTask) Start(taskContext *taskrunner.TaskContext) {
 		}
 		klog.V(4).Infof("merging %d local objects into inventory", len(i.Objects))
 		currentObjs := object.UnstructuredSetToObjMetadataSet(i.Objects)
-		_, err := i.InvClient.Merge(taskContext.Context(), i.InvInfo, currentObjs, i.DryRun)
+		inventoryObjs := i.Inventory.ObjectRefs()
+		unionObjs := inventoryObjs.Union(currentObjs)
+
+		i.Inventory.SetObjectRefs(unionObjs)
+
+		var err error
+		if !i.DryRun.ClientOrServerDryRun() {
+			// Object statuses are intentionally not updated by this task, so the status
+			// should not be updated/persisted.
+			// Status is updated later by DeleteOrUpdateInvTask after objects are applied/pruned.
+			opts := inventory.UpdateOptions{SkipStatusUpdate: true}
+			err = i.InvClient.CreateOrUpdate(taskContext.Context(), i.Inventory, opts)
+		}
+
 		i.sendTaskResult(taskContext, err)
 	}()
 }
@@ -89,12 +103,12 @@ func inventoryNamespaceInSet(inv inventory.Info, objs object.UnstructuredSet) *u
 	if inv == nil {
 		return nil
 	}
-	invNamespace := inv.Namespace()
+	invNamespace := inv.GetNamespace()
 
 	for _, obj := range objs {
 		gvk := obj.GetObjectKind().GroupVersionKind()
 		if gvk == namespaceGVKv1 && obj.GetName() == invNamespace {
-			inventory.AddInventoryIDAnnotation(obj, inv)
+			inventory.AddInventoryIDAnnotation(obj, inv.GetID())
 			return obj
 		}
 	}

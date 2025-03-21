@@ -191,17 +191,16 @@ func TestInvSetTask(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			client := inventory.NewFakeClient(object.ObjMetadataSet{})
+			client := inventory.NewFakeClient(tc.prevInventory)
 			eventChannel := make(chan event.Event)
 			resourceCache := cache.NewResourceCacheMap()
 			taskContext := taskrunner.NewTaskContext(t.Context(), eventChannel, resourceCache)
 
 			task := DeleteOrUpdateInvTask{
-				TaskName:      taskName,
-				InvClient:     client,
-				InvInfo:       nil,
-				PrevInventory: tc.prevInventory,
-				Destroy:       false,
+				TaskName:  taskName,
+				InvClient: client,
+				Inventory: client.Inv,
+				Destroy:   false,
 			}
 			im := taskContext.InventoryManager()
 			for _, applyObj := range tc.appliedObjs {
@@ -246,10 +245,10 @@ func TestInvSetTask(t *testing.T) {
 			if result.Err != nil {
 				t.Errorf("unexpected error running InvAddTask: %s", result.Err)
 			}
-			actual, _ := client.GetClusterObjs(t.Context(), nil)
-			testutil.AssertEqual(t, tc.expectedObjs, actual,
+			actual, _ := client.Get(t.Context(), nil, inventory.GetOptions{})
+			testutil.AssertEqual(t, tc.expectedObjs, actual.ObjectRefs(),
 				"Actual cluster objects (%d) do not match expected cluster objects (%d)",
-				len(actual), len(tc.expectedObjs))
+				len(actual.ObjectRefs()), len(tc.expectedObjs))
 		})
 	}
 }

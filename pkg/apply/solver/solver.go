@@ -43,7 +43,8 @@ type TaskQueueBuilder struct {
 	OpenAPIGetter discovery.OpenAPISchemaInterface
 	InfoHelper    info.Helper
 	Mapper        meta.RESTMapper
-	InvClient     inventory.Client
+	Inventory     inventory.Inventory
+	InvClient     inventory.WriteClient
 	// Collector is used to collect validation errors and invalid objects.
 	// Invalid objects will be filtered and not be injected into tasks.
 	Collector     *validation.Collector
@@ -56,7 +57,6 @@ type TaskQueueBuilder struct {
 	pruneCounter int
 	waitCounter  int
 
-	invInfo   inventory.Info
 	applyObjs object.UnstructuredSet
 	pruneObjs object.UnstructuredSet
 }
@@ -98,12 +98,6 @@ type Options struct {
 	PrunePropagationPolicy metav1.DeletionPropagation
 	PruneTimeout           time.Duration
 	InventoryPolicy        inventory.Policy
-}
-
-// WithInventory sets the inventory info and returns the builder for chaining.
-func (t *TaskQueueBuilder) WithInventory(inv inventory.Info) *TaskQueueBuilder {
-	t.invInfo = inv
-	return t
 }
 
 // WithApplyObjects sets the apply objects and returns the builder for chaining.
@@ -162,7 +156,7 @@ func (t *TaskQueueBuilder) Build(taskContext *taskrunner.TaskContext, o Options)
 			InvClient:     t.InvClient,
 			DynamicClient: t.DynamicClient,
 			Mapper:        t.Mapper,
-			InvInfo:       t.invInfo,
+			Inventory:     t.Inventory,
 			Objects:       applyObjs,
 			DryRun:        o.DryRunStrategy,
 		})
@@ -213,7 +207,6 @@ func (t *TaskQueueBuilder) Build(taskContext *taskrunner.TaskContext, o Options)
 		}
 	}
 
-	prevInvIDs, _ := t.InvClient.GetClusterObjs(taskContext.Context(), t.invInfo)
 	klog.V(2).Infoln("adding delete/update inventory task")
 	var taskName string
 	if o.Destroy {
@@ -222,12 +215,11 @@ func (t *TaskQueueBuilder) Build(taskContext *taskrunner.TaskContext, o Options)
 		taskName = "inventory-set-0"
 	}
 	tasks = append(tasks, &task.DeleteOrUpdateInvTask{
-		TaskName:      taskName,
-		InvClient:     t.InvClient,
-		InvInfo:       t.invInfo,
-		PrevInventory: prevInvIDs,
-		DryRun:        o.DryRunStrategy,
-		Destroy:       o.Destroy,
+		TaskName:  taskName,
+		Inventory: t.Inventory,
+		InvClient: t.InvClient,
+		DryRun:    o.DryRunStrategy,
+		Destroy:   o.Destroy,
 	})
 
 	return &TaskQueue{tasks: tasks}
