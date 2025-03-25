@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -52,9 +53,9 @@ type Applier struct {
 
 // prepareObjects returns the set of objects to apply and to prune or
 // an error if one occurred.
-func (a *Applier) prepareObjects(ctx context.Context, localInv inventory.Info, localObjs object.UnstructuredSet,
+func (a *Applier) prepareObjects(ctx context.Context, inv inventory.Inventory, localObjs object.UnstructuredSet,
 	o ApplierOptions) (object.UnstructuredSet, object.UnstructuredSet, error) {
-	if localInv == nil {
+	if inv == nil {
 		return nil, nil, fmt.Errorf("the local inventory can't be nil")
 	}
 	if err := inventory.ValidateNoInventory(localObjs); err != nil {
@@ -62,9 +63,9 @@ func (a *Applier) prepareObjects(ctx context.Context, localInv inventory.Info, l
 	}
 	// Add the inventory annotation to the resources being applied.
 	for _, localObj := range localObjs {
-		inventory.AddInventoryIDAnnotation(localObj, localInv)
+		inventory.AddInventoryIDAnnotation(localObj, inv.Info().GetID())
 	}
-	pruneObjs, err := a.pruner.GetPruneObjs(ctx, localInv, localObjs, prune.Options{
+	pruneObjs, err := a.pruner.GetPruneObjs(ctx, inv, localObjs, prune.Options{
 		DryRunStrategy: o.DryRunStrategy,
 	})
 	if err != nil {
@@ -96,8 +97,22 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.Info, objects objec
 		}
 		validator.Validate(objects)
 
+		inv, err := a.invClient.Get(ctx, invInfo, inventory.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			inv, err = a.invClient.NewInventory(invInfo)
+		}
+		if err != nil {
+			handleError(eventChannel, err)
+			return
+		}
+		if inv.Info().GetID() != invInfo.GetID() {
+			handleError(eventChannel, fmt.Errorf("expected inventory object to have inventory-id %q but got %q",
+				invInfo.GetID(), inv.Info().GetID()))
+			return
+		}
+
 		// Decide which objects to apply and which to prune
-		applyObjs, pruneObjs, err := a.prepareObjects(ctx, invInfo, objects, options)
+		applyObjs, pruneObjs, err := a.prepareObjects(ctx, inv, objects, options)
 		if err != nil {
 			handleError(eventChannel, err)
 			return
@@ -154,6 +169,7 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.Info, objects objec
 			OpenAPIGetter: a.openAPIGetter,
 			InfoHelper:    a.infoHelper,
 			Mapper:        a.mapper,
+			Inventory:     inv,
 			InvClient:     a.invClient,
 			Collector:     vCollector,
 			ApplyFilters:  applyFilters,
@@ -175,7 +191,6 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.Info, objects objec
 		taskQueue := taskBuilder.
 			WithApplyObjects(applyObjs).
 			WithPruneObjects(pruneObjs).
-			WithInventory(invInfo).
 			Build(taskContext, opts)
 
 		klog.V(4).Infof("validation errors: %d", len(vCollector.Errors))
@@ -303,7 +318,7 @@ func localNamespaces(localInv inventory.Info, localObjs []object.ObjMetadata) se
 			namespaces.Insert(obj.Namespace)
 		}
 	}
-	invNamespace := localInv.Namespace()
+	invNamespace := localInv.GetNamespace()
 	if invNamespace != "" {
 		namespaces.Insert(invNamespace)
 	}

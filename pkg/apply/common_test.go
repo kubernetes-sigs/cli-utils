@@ -35,16 +35,9 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
-type inventoryInfo struct {
-	name      string
-	namespace string
-	id        string
-	set       object.ObjMetadataSet
-}
-
-func (i inventoryInfo) toUnstructured() *unstructured.Unstructured {
+func newInventoryObj(info *inventory.SingleObjectInfo, set object.ObjMetadataSet) *unstructured.Unstructured {
 	invMap := make(map[string]interface{})
-	for _, objMeta := range i.set {
+	for _, objMeta := range set {
 		invMap[objMeta.String()] = ""
 	}
 
@@ -53,10 +46,10 @@ func (i inventoryInfo) toUnstructured() *unstructured.Unstructured {
 			"apiVersion": "v1",
 			"kind":       "ConfigMap",
 			"metadata": map[string]interface{}{
-				"name":      i.name,
-				"namespace": i.namespace,
+				"name":      info.GetName(),
+				"namespace": info.GetNamespace(),
 				"labels": map[string]interface{}{
-					common.InventoryLabel: i.id,
+					common.InventoryLabel: info.GetID().String(),
 				},
 			},
 			"data": invMap,
@@ -64,18 +57,14 @@ func (i inventoryInfo) toUnstructured() *unstructured.Unstructured {
 	}
 }
 
-func (i inventoryInfo) toWrapped() (inventory.Info, error) {
-	return inventory.ConfigMapToInventoryInfo(i.toUnstructured())
-}
-
 func newTestApplier(
 	t *testing.T,
-	invInfo inventoryInfo,
+	invObj *unstructured.Unstructured,
 	resources object.UnstructuredSet,
 	clusterObjs object.UnstructuredSet,
 	statusWatcher watcher.StatusWatcher,
 ) *Applier {
-	tf := newTestFactory(t, invInfo, resources, clusterObjs)
+	tf := newTestFactory(t, invObj, resources, clusterObjs)
 	defer tf.Cleanup()
 
 	infoHelper := &fakeInfoHelper{
@@ -100,11 +89,11 @@ func newTestApplier(
 
 func newTestDestroyer(
 	t *testing.T,
-	invInfo inventoryInfo,
+	invObj *unstructured.Unstructured,
 	clusterObjs object.UnstructuredSet,
 	statusWatcher watcher.StatusWatcher,
 ) *Destroyer {
-	tf := newTestFactory(t, invInfo, object.UnstructuredSet{}, clusterObjs)
+	tf := newTestFactory(t, invObj, object.UnstructuredSet{}, clusterObjs)
 	defer tf.Cleanup()
 
 	invClient := newTestInventory(t, tf)
@@ -132,11 +121,11 @@ func newTestInventory(
 
 func newTestFactory(
 	t *testing.T,
-	invInfo inventoryInfo,
+	invObj *unstructured.Unstructured,
 	resourceSet object.UnstructuredSet,
 	clusterObjs object.UnstructuredSet,
 ) *cmdtesting.TestFactory {
-	tf := cmdtesting.NewTestFactory().WithNamespace(invInfo.namespace)
+	tf := cmdtesting.NewTestFactory().WithNamespace(invObj.GetNamespace())
 
 	mapper, err := tf.ToRESTMapper()
 	require.NoError(t, err)
@@ -170,7 +159,7 @@ func newTestFactory(
 	}
 
 	tf.UnstructuredClient = newFakeRESTClient(t, handlers)
-	tf.FakeDynamicClient = fakeDynamicClient(t, mapper, invInfo, objs...)
+	tf.FakeDynamicClient = fakeDynamicClient(t, mapper, invObj, objs...)
 
 	return tf
 }
@@ -283,9 +272,9 @@ func (g *genericHandler) handle(t *testing.T, req *http.Request) (*http.Response
 	return nil, false, nil
 }
 
-func newInventoryReactor(invInfo inventoryInfo) *inventoryReactor {
+func newInventoryReactor(invObj *unstructured.Unstructured) *inventoryReactor {
 	return &inventoryReactor{
-		inventoryObj: invInfo.toUnstructured(),
+		inventoryObj: invObj,
 	}
 }
 
@@ -430,10 +419,10 @@ func (f *fakeInfoHelper) getClient(gv schema.GroupVersion) (resource.RESTClient,
 }
 
 // fakeDynamicClient returns a fake dynamic client.
-func fakeDynamicClient(t *testing.T, mapper meta.RESTMapper, invInfo inventoryInfo, objs ...resourceInfo) *dynamicfake.FakeDynamicClient {
+func fakeDynamicClient(t *testing.T, mapper meta.RESTMapper, invObj *unstructured.Unstructured, objs ...resourceInfo) *dynamicfake.FakeDynamicClient {
 	fakeClient := dynamicfake.NewSimpleDynamicClient(scheme.Scheme)
 
-	invReactor := newInventoryReactor(invInfo)
+	invReactor := newInventoryReactor(invObj)
 	invReactor.updateFakeDynamicClient(fakeClient)
 
 	for i := range objs {
