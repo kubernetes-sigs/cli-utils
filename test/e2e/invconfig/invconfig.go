@@ -17,7 +17,7 @@ import (
 )
 
 type inventoryFactoryFunc func(name, namespace, id string) *unstructured.Unstructured
-type invWrapperFunc func(*unstructured.Unstructured) inventory.Info
+type invWrapperFunc func(*unstructured.Unstructured) (inventory.Info, error)
 type applierFactoryFunc func() *apply.Applier
 type destroyerFactoryFunc func() *apply.Destroyer
 type invSizeVerifyFunc func(ctx context.Context, c client.Client, name, namespace, id string, specCount, statusCount int)
@@ -35,7 +35,7 @@ type InventoryConfig struct {
 	InvNotExistsFunc     invNotExistsFunc
 }
 
-func CreateInventoryInfo(invConfig InventoryConfig, inventoryName, namespaceName, inventoryID string) inventory.Info {
+func CreateInventoryInfo(invConfig InventoryConfig, inventoryName, namespaceName, inventoryID string) (inventory.Info, error) {
 	return invConfig.InvWrapperFunc(invConfig.FactoryFunc(inventoryName, namespaceName, inventoryID))
 }
 

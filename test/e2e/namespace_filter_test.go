@@ -26,7 +26,9 @@ func namespaceFilterTest(ctx context.Context, c client.Client, invConfig invconf
 	By("apply resources in order based on depends-on annotation")
 	applier := invConfig.ApplierFactoryFunc()
 
-	inv := invConfig.InvWrapperFunc(invConfig.FactoryFunc(inventoryName, namespaceName, "test"))
+	inventoryID := fmt.Sprintf("%s-%s", inventoryName, namespaceName)
+	inventoryInfo, err := invconfig.CreateInventoryInfo(invConfig, inventoryName, namespaceName, inventoryID)
+	Expect(err).ToNot(HaveOccurred())
 
 	namespace1Name := fmt.Sprintf("%s-ns1", namespaceName)
 
@@ -47,7 +49,7 @@ func namespaceFilterTest(ctx context.Context, c client.Client, invConfig invconf
 		e2eutil.DeleteUnstructuredIfExists(ctx, c, namespace1Obj)
 	}(ctx, c)
 
-	applierEvents := e2eutil.RunCollect(applier.Run(ctx, inv, resources, apply.ApplierOptions{
+	applierEvents := e2eutil.RunCollect(applier.Run(ctx, inventoryInfo, resources, apply.ApplierOptions{
 		EmitStatusEvents: false,
 	}))
 
@@ -243,7 +245,7 @@ func namespaceFilterTest(ctx context.Context, c client.Client, invConfig invconf
 		podBObj,
 	}
 
-	applierEvents = e2eutil.RunCollect(applier.Run(ctx, inv, resources, apply.ApplierOptions{
+	applierEvents = e2eutil.RunCollect(applier.Run(ctx, inventoryInfo, resources, apply.ApplierOptions{
 		EmitStatusEvents: false,
 	}))
 

@@ -176,6 +176,6 @@ func fromUnstructured(obj *unstructured.Unstructured) (*inventory.UnstructuredIn
 	return inv, nil
 }
 
-func WrapInventoryInfoObj(obj *unstructured.Unstructured) inventory.Info {
-	return inventory.NewUnstructuredInventory(obj).Info()
+func WrapInventoryInfoObj(obj *unstructured.Unstructured) (inventory.Info, error) {
+	return inventory.NewUnstructuredInventory(obj).Info(), nil
 }
