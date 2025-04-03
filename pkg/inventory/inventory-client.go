@@ -241,11 +241,23 @@ type ToUnstructuredFunc func(fromObj *unstructured.Unstructured, toInv *SingleOb
 
 // UnstructuredClient implements the inventory client interface for a single unstructured object
 type UnstructuredClient struct {
-	client           dynamic.NamespaceableResourceInterface
+	// client is the namespaced dynamic client to use when reading or writing
+	// the inventory objects to and from the server.
+	client dynamic.NamespaceableResourceInterface
+	// fromUnstructured is used in NewInventory, Get, and List, to convert the
+	// object(s) from Unstructured to UnstructuredInventory.
 	fromUnstructured FromUnstructuredFunc
-	toUnstructured   ToUnstructuredFunc
-	gvk              schema.GroupVersionKind
-	statusPolicy     StatusPolicy
+	// toUnstructured is used in CreateOrUpdate, to convert the object(s) from
+	// UnstructuredInventory to Unstructured. This is called before calling
+	// Create or Update.
+	toUnstructured ToUnstructuredFunc
+	// toUnstructuredStatus is used in CreateOrUpdate, to convert the object(s)
+	// from UnstructuredInventory to Unstructured. This is called before calling
+	// UpdateStatus. Set to nil to skip calling UpdateStatus, either because
+	// there is no status or because the status is not a subresource.
+	toUnstructuredStatus ToUnstructuredFunc
+	// gvk is the GroupVersionKind of the inventory object in the Kubernetes API.
+	gvk schema.GroupVersionKind
 }
 
 // NewUnstructuredClient constructs an instance of UnstructuredClient.
@@ -254,8 +266,9 @@ type UnstructuredClient struct {
 func NewUnstructuredClient(factory cmdutil.Factory,
 	from FromUnstructuredFunc,
 	to ToUnstructuredFunc,
+	toStatus ToUnstructuredFunc,
 	gvk schema.GroupVersionKind,
-	statusPolicy StatusPolicy) (*UnstructuredClient, error) {
+) (*UnstructuredClient, error) {
 	dc, err := factory.DynamicClient()
 	if err != nil {
 		return nil, err
@@ -269,11 +282,11 @@ func NewUnstructuredClient(factory cmdutil.Factory,
 		return nil, err
 	}
 	unstructuredClient := &UnstructuredClient{
-		client:           dc.Resource(mapping.Resource),
-		fromUnstructured: from,
-		toUnstructured:   to,
-		gvk:              gvk,
-		statusPolicy:     statusPolicy,
+		client:               dc.Resource(mapping.Resource),
+		fromUnstructured:     from,
+		toUnstructured:       to,
+		toUnstructuredStatus: toStatus,
+		gvk:                  gvk,
 	}
 	return unstructuredClient, nil
 }
@@ -382,7 +395,8 @@ func (cic *UnstructuredClient) CreateOrUpdate(ctx context.Context, inv Inventory
 	if err != nil {
 		return err
 	}
-	if cic.statusPolicy != StatusPolicyAll {
+	// toUnstructuredStatus being nil means that there is no status subresource
+	if cic.toUnstructuredStatus == nil {
 		return nil
 	}
 	attempt = 0
@@ -396,7 +410,7 @@ func (cic *UnstructuredClient) CreateOrUpdate(ctx context.Context, inv Inventory
 				return err
 			}
 		}
-		uObj, err := cic.toUnstructured(obj.DeepCopy(), ui)
+		uObj, err := cic.toUnstructuredStatus(obj.DeepCopy(), ui)
 		if err != nil {
 			return err
 		}
