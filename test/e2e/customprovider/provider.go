@@ -104,10 +104,11 @@ type CustomClientFactory struct {
 }
 
 func (CustomClientFactory) NewClient(factory util.Factory) (inventory.Client, error) {
-	return inventory.NewUnstructuredClient(factory, fromUnstructured, toUnstructured, InventoryGVK, inventory.StatusPolicyAll)
+	return inventory.NewUnstructuredClient(factory, fromUnstructured, toUnstructured, toUnstructuredStatus, InventoryGVK)
 }
 
 func toUnstructured(uObj *unstructured.Unstructured, inv *inventory.SingleObjectInventory) (*unstructured.Unstructured, error) {
+	// Populate the spec
 	var specObjs []interface{}
 	for _, obj := range inv.ObjectRefs {
 		specObjs = append(specObjs, map[string]interface{}{
@@ -117,6 +118,23 @@ func toUnstructured(uObj *unstructured.Unstructured, inv *inventory.SingleObject
 			"name":      obj.Name,
 		})
 	}
+	if len(specObjs) > 0 {
+		err := unstructured.SetNestedSlice(uObj.Object, specObjs, "spec", "objects")
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		unstructured.RemoveNestedField(uObj.Object, "spec")
+	}
+	// Remove the status. It's ignored by the server when calling Create/Update.
+	unstructured.RemoveNestedField(uObj.Object, "status")
+	return uObj, nil
+}
+
+func toUnstructuredStatus(uObj *unstructured.Unstructured, inv *inventory.SingleObjectInventory) (*unstructured.Unstructured, error) {
+	// Remove the spec. It's ignored by the server when calling UpdateStatus.
+	unstructured.RemoveNestedField(uObj.Object, "spec")
+	// Populate the status.
 	var statusObjs []interface{}
 	for _, objStatus := range inv.ObjectStatuses {
 		statusObjs = append(statusObjs, map[string]interface{}{
@@ -128,14 +146,6 @@ func toUnstructured(uObj *unstructured.Unstructured, inv *inventory.SingleObject
 			"actuation": objStatus.Actuation.String(),
 			"reconcile": objStatus.Reconcile.String(),
 		})
-	}
-	if len(specObjs) > 0 {
-		err := unstructured.SetNestedSlice(uObj.Object, specObjs, "spec", "objects")
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		unstructured.RemoveNestedField(uObj.Object, "spec")
 	}
 	if len(statusObjs) > 0 {
 		err := unstructured.SetNestedSlice(uObj.Object, statusObjs, "status", "objects")

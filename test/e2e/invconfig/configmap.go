@@ -32,7 +32,7 @@ func newDefaultInvApplierFactory(cfg *rest.Config) applierFactoryFunc {
 	cfgPtrCopy := cfg
 	return func() *apply.Applier {
 		return newApplier(inventory.ConfigMapClientFactory{
-			StatusPolicy: inventory.StatusPolicyAll,
+			StatusEnabled: true,
 		}, cfgPtrCopy)
 	}
 }
@@ -41,7 +41,7 @@ func newDefaultInvDestroyerFactory(cfg *rest.Config) destroyerFactoryFunc {
 	cfgPtrCopy := cfg
 	return func() *apply.Destroyer {
 		return newDestroyer(inventory.ConfigMapClientFactory{
-			StatusPolicy: inventory.StatusPolicyAll,
+			StatusEnabled: true,
 		}, cfgPtrCopy)
 	}
 }
