@@ -35,7 +35,7 @@ func ConfigMapToInventoryObj(uObj *unstructured.Unstructured) (Inventory, error)
 // wraps it with the ConfigMap and upcasts the wrapper as
 // an the Info interface.
 func ConfigMapToInventoryInfo(uObj *unstructured.Unstructured) (Info, error) {
-	inv := NewUnstructuredInventory(uObj)
+	inv := NewSingleObjectInventory(uObj)
 	return inv.Info(), nil
 }
 
@@ -59,8 +59,8 @@ func buildDataMap(objMetas object.ObjMetadataSet, objStatus []actuation.ObjectSt
 
 var _ FromUnstructuredFunc = configMapToInventory
 
-func configMapToInventory(configMap *unstructured.Unstructured) (*UnstructuredInventory, error) {
-	inv := NewUnstructuredInventory(configMap)
+func configMapToInventory(configMap *unstructured.Unstructured) (*SingleObjectInventory, error) {
+	inv := NewSingleObjectInventory(configMap)
 	objMap, exists, err := unstructured.NestedStringMap(configMap.Object, "data")
 	if err != nil {
 		err := fmt.Errorf("error retrieving object metadata from inventory object")
@@ -81,7 +81,7 @@ func configMapToInventory(configMap *unstructured.Unstructured) (*UnstructuredIn
 // ConfigMap does not have an actual status, so the object statuses are persisted
 // as values in the ConfigMap key/value pairs.
 func inventoryToConfigMap(statusPolicy StatusPolicy) ToUnstructuredFunc {
-	return func(uObj *unstructured.Unstructured, inv *UnstructuredInventory) (*unstructured.Unstructured, error) {
+	return func(uObj *unstructured.Unstructured, inv *SingleObjectInventory) (*unstructured.Unstructured, error) {
 		var dataMap map[string]string
 		if statusPolicy == StatusPolicyAll {
 			dataMap = buildDataMap(inv.GetObjectRefs(), inv.GetObjectStatuses())

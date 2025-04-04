@@ -107,7 +107,7 @@ func (CustomClientFactory) NewClient(factory util.Factory) (inventory.Client, er
 	return inventory.NewUnstructuredClient(factory, fromUnstructured, toUnstructured, InventoryGVK, inventory.StatusPolicyAll)
 }
 
-func toUnstructured(uObj *unstructured.Unstructured, inv *inventory.UnstructuredInventory) (*unstructured.Unstructured, error) {
+func toUnstructured(uObj *unstructured.Unstructured, inv *inventory.SingleObjectInventory) (*unstructured.Unstructured, error) {
 	var specObjs []interface{}
 	for _, obj := range inv.ObjectRefs {
 		specObjs = append(specObjs, map[string]interface{}{
@@ -148,8 +148,8 @@ func toUnstructured(uObj *unstructured.Unstructured, inv *inventory.Unstructured
 	return uObj, nil
 }
 
-func fromUnstructured(obj *unstructured.Unstructured) (*inventory.UnstructuredInventory, error) {
-	inv := inventory.NewUnstructuredInventory(obj)
+func fromUnstructured(obj *unstructured.Unstructured) (*inventory.SingleObjectInventory, error) {
+	inv := inventory.NewSingleObjectInventory(obj)
 	s, found, err := unstructured.NestedSlice(obj.Object, "spec", "objects")
 	if err != nil {
 		return nil, err
@@ -177,5 +177,5 @@ func fromUnstructured(obj *unstructured.Unstructured) (*inventory.UnstructuredIn
 }
 
 func WrapInventoryInfoObj(obj *unstructured.Unstructured) (inventory.Info, error) {
-	return inventory.NewUnstructuredInventory(obj).Info(), nil
+	return inventory.NewSingleObjectInventory(obj).Info(), nil
 }
