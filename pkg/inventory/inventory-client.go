@@ -84,7 +84,7 @@ func NewSimpleInfo(id ID, namespace string) *SimpleInfo {
 
 // SingleObjectInfo implements the Info interface and also adds a Name field.
 // This assumes the underlying inventory is a singleton object with a single
-// name. Used by UnstructuredInventory, which assumes a single object.
+// name. Used by SingleObjectInventory, which assumes a single object.
 type SingleObjectInfo struct {
 	SimpleInfo
 	// name of the singleton inventory object
@@ -168,10 +168,10 @@ type DeleteOptions struct{}
 
 var _ Client = &UnstructuredClient{}
 
-// NewUnstructuredInventory constructs a new UnstructuredInventory object
+// NewSingleObjectInventory constructs a new SingleObjectInventory object
 // from a raw unstructured object.
-func NewUnstructuredInventory(uObj *unstructured.Unstructured) *UnstructuredInventory {
-	return &UnstructuredInventory{
+func NewSingleObjectInventory(uObj *unstructured.Unstructured) *SingleObjectInventory {
+	return &SingleObjectInventory{
 		SingleObjectInfo: SingleObjectInfo{
 			SimpleInfo: SimpleInfo{
 				id:        ID(uObj.GetLabels()[common.InventoryLabel]),
@@ -182,20 +182,20 @@ func NewUnstructuredInventory(uObj *unstructured.Unstructured) *UnstructuredInve
 	}
 }
 
-// UnstructuredInventory implements Inventory while also tracking the actual
-// KRM object from the cluster. This enables the client to update the
-// same object and utilize resourceVersion checks.
-type UnstructuredInventory struct {
+// SingleObjectInventory implements Inventory while also retaining a reference
+// to a singleton KRM object from the cluster. This enables the client to update
+// set the object metadata for create/update/delete calls.
+type SingleObjectInventory struct {
 	SingleObjectInfo
 	InventoryContents
 }
 
-// Info returns the metadata associated with this UnstructuredInventory
-func (ui *UnstructuredInventory) Info() Info {
+// Info returns the metadata associated with this SingleObjectInventory
+func (ui *SingleObjectInventory) Info() Info {
 	return &ui.SingleObjectInfo
 }
 
-var _ Inventory = &UnstructuredInventory{}
+var _ Inventory = &SingleObjectInventory{}
 
 // InventoryContents is a boilerplate struct that contains the basic methods
 // to implement Inventory. Can be extended for different inventory implementations.
@@ -232,13 +232,13 @@ func (inv *InventoryContents) SetObjectStatuses(statuses []actuation.ObjectStatu
 // FromUnstructuredFunc is used by UnstructuredClient to convert an unstructured
 // object, usually fetched from the cluster, to an Inventory object for use by
 // the applier/destroyer.
-type FromUnstructuredFunc func(fromObj *unstructured.Unstructured) (*UnstructuredInventory, error)
+type FromUnstructuredFunc func(fromObj *unstructured.Unstructured) (*SingleObjectInventory, error)
 
 // ToUnstructuredFunc is used by UnstructuredClient to take an unstructured object,
-// usually fetched from the cluster, and update it using the UnstructuredInventory.
+// usually fetched from the cluster, and update it using the SingleObjectInventory.
 // The function should return an updated unstructured object which will then be
 // applied to the cluster by UnstructuredClient.
-type ToUnstructuredFunc func(fromObj *unstructured.Unstructured, toInv *UnstructuredInventory) (*unstructured.Unstructured, error)
+type ToUnstructuredFunc func(fromObj *unstructured.Unstructured, toInv *SingleObjectInventory) (*unstructured.Unstructured, error)
 
 // UnstructuredClient implements the inventory client interface for a single unstructured object
 type UnstructuredClient struct {
@@ -288,7 +288,7 @@ func (cic *UnstructuredClient) NewInventory(inv Info) (Inventory, error) {
 	return cic.fromUnstructured(cic.newUnstructuredObject(soi))
 }
 
-// newInventory is used internally to return a typed UnstructuredInventory
+// newInventory is used internally to return a typed SingleObjectInventory
 func (cic *UnstructuredClient) newUnstructuredObject(invInfo *SingleObjectInfo) *unstructured.Unstructured {
 	obj := &unstructured.Unstructured{}
 	obj.SetName(invInfo.GetName())
@@ -335,9 +335,9 @@ func (cic *UnstructuredClient) List(ctx context.Context, _ ListOptions) ([]Inven
 // CreateOrUpdate the in-cluster inventory
 // Updates the unstructured object, or creates it if it doesn't exist
 func (cic *UnstructuredClient) CreateOrUpdate(ctx context.Context, inv Inventory, opts UpdateOptions) error {
-	ui, ok := inv.(*UnstructuredInventory)
+	ui, ok := inv.(*SingleObjectInventory)
 	if !ok {
-		return fmt.Errorf("expected UnstructuredInventory")
+		return fmt.Errorf("expected SingleObjectInventory")
 	}
 	if ui == nil {
 		return fmt.Errorf("inventory is nil")

@@ -73,7 +73,7 @@ func TestGet(t *testing.T) {
 			tf := cmdtesting.NewTestFactory().WithNamespace(testNamespace)
 			defer tf.Cleanup()
 			tf.FakeDynamicClient.PrependReactor("get", "configmaps", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
-				inv := NewUnstructuredInventory(emptyInventoryObject())
+				inv := NewSingleObjectInventory(emptyInventoryObject())
 				inv.SetObjectRefs(tc.localObjs)
 				inv.SetObjectStatuses(tc.objStatus)
 				cm, _ := inventoryToConfigMap(tc.statusPolicy)(emptyInventoryObject(), inv)
@@ -99,7 +99,7 @@ func TestGet(t *testing.T) {
 
 func TestCreateOrUpdate(t *testing.T) {
 	tests := map[string]struct {
-		inventory  *UnstructuredInventory
+		inventory  *SingleObjectInventory
 		createObjs object.ObjMetadataSet
 		updateObjs object.ObjMetadataSet
 		isError    bool
@@ -110,13 +110,13 @@ func TestCreateOrUpdate(t *testing.T) {
 			isError:    true,
 		},
 		"Create and update inventory with empty object set": {
-			inventory:  NewUnstructuredInventory(emptyInventoryObject()),
+			inventory:  NewSingleObjectInventory(emptyInventoryObject()),
 			createObjs: object.ObjMetadataSet{},
 			updateObjs: object.ObjMetadataSet{},
 			isError:    false,
 		},
 		"Create and Update inventory with identical object set": {
-			inventory: NewUnstructuredInventory(emptyInventoryObject()),
+			inventory: NewSingleObjectInventory(emptyInventoryObject()),
 			createObjs: object.ObjMetadataSet{
 				ignoreErrInfoToObjMeta(pod1Info),
 			},
@@ -126,7 +126,7 @@ func TestCreateOrUpdate(t *testing.T) {
 			isError: false,
 		},
 		"Create and Update inventory with expanding object set": {
-			inventory: NewUnstructuredInventory(emptyInventoryObject()),
+			inventory: NewSingleObjectInventory(emptyInventoryObject()),
 			createObjs: object.ObjMetadataSet{
 				ignoreErrInfoToObjMeta(pod1Info),
 			},
@@ -137,7 +137,7 @@ func TestCreateOrUpdate(t *testing.T) {
 			isError: false,
 		},
 		"Create and Update inventory with shrinking object set": {
-			inventory: NewUnstructuredInventory(emptyInventoryObject()),
+			inventory: NewSingleObjectInventory(emptyInventoryObject()),
 			createObjs: object.ObjMetadataSet{
 				ignoreErrInfoToObjMeta(pod1Info),
 				ignoreErrInfoToObjMeta(pod2Info),

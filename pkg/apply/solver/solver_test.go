@@ -737,7 +737,7 @@ func TestTaskQueueBuilder_ApplyBuild(t *testing.T) {
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
 			mapper := testutil.NewFakeRESTMapper()
-			inventoryObj := inventory.NewUnstructuredInventory(uObj)
+			inventoryObj := inventory.NewSingleObjectInventory(uObj)
 			// inject mapper for equality comparison
 			for _, t := range tc.expectedTasks {
 				switch typedTask := t.(type) {
@@ -1359,7 +1359,7 @@ func TestTaskQueueBuilder_PruneBuild(t *testing.T) {
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
 			mapper := testutil.NewFakeRESTMapper()
-			inventoryObj := inventory.NewUnstructuredInventory(uObj)
+			inventoryObj := inventory.NewSingleObjectInventory(uObj)
 			// inject mapper & pruner for equality comparison
 			for _, t := range tc.expectedTasks {
 				switch typedTask := t.(type) {
@@ -1696,7 +1696,7 @@ func TestTaskQueueBuilder_ApplyPruneBuild(t *testing.T) {
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
 			mapper := testutil.NewFakeRESTMapper()
-			inventoryObj := inventory.NewUnstructuredInventory(uObj)
+			inventoryObj := inventory.NewSingleObjectInventory(uObj)
 			// inject mapper & pruner for equality comparison
 			for _, t := range tc.expectedTasks {
 				switch typedTask := t.(type) {
