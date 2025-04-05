@@ -90,7 +90,7 @@ func TestInvAddTask(t *testing.T) {
 		initialObjs           object.ObjMetadataSet
 		applyObjs             []*unstructured.Unstructured
 		expectedObjs          object.ObjMetadataSet
-		expectedObjStatuses   []actuation.ObjectStatus
+		expectedObjStatuses   actuation.ObjectStatusSet
 		reactorError          error
 		expectCreateNamespace bool
 	}{
@@ -103,7 +103,7 @@ func TestInvAddTask(t *testing.T) {
 			initialObjs:  object.ObjMetadataSet{},
 			applyObjs:    []*unstructured.Unstructured{obj1},
 			expectedObjs: object.ObjMetadataSet{id1},
-			expectedObjStatuses: []actuation.ObjectStatus{
+			expectedObjStatuses: actuation.ObjectStatusSet{
 				{
 					ObjectReference: inventory.ObjectReferenceFromObjMetadata(id1),
 					Strategy:        actuation.ActuationStrategyApply,
@@ -116,7 +116,7 @@ func TestInvAddTask(t *testing.T) {
 			initialObjs:  object.ObjMetadataSet{id2},
 			applyObjs:    []*unstructured.Unstructured{},
 			expectedObjs: object.ObjMetadataSet{id2},
-			expectedObjStatuses: []actuation.ObjectStatus{
+			expectedObjStatuses: actuation.ObjectStatusSet{
 				{
 					ObjectReference: inventory.ObjectReferenceFromObjMetadata(id2),
 					Strategy:        actuation.ActuationStrategyDelete,
@@ -129,7 +129,7 @@ func TestInvAddTask(t *testing.T) {
 			initialObjs:  object.ObjMetadataSet{id3},
 			applyObjs:    []*unstructured.Unstructured{obj3},
 			expectedObjs: object.ObjMetadataSet{id3},
-			expectedObjStatuses: []actuation.ObjectStatus{
+			expectedObjStatuses: actuation.ObjectStatusSet{
 				{
 					ObjectReference: inventory.ObjectReferenceFromObjMetadata(id3),
 					Strategy:        actuation.ActuationStrategyApply,
@@ -142,7 +142,7 @@ func TestInvAddTask(t *testing.T) {
 			initialObjs:  object.ObjMetadataSet{id1, id2, id3},
 			applyObjs:    []*unstructured.Unstructured{obj2, obj3},
 			expectedObjs: object.ObjMetadataSet{id1, id2, id3},
-			expectedObjStatuses: []actuation.ObjectStatus{
+			expectedObjStatuses: actuation.ObjectStatusSet{
 				{
 					ObjectReference: inventory.ObjectReferenceFromObjMetadata(id1),
 					Strategy:        actuation.ActuationStrategyDelete,
@@ -167,7 +167,7 @@ func TestInvAddTask(t *testing.T) {
 			initialObjs:  object.ObjMetadataSet{},
 			applyObjs:    []*unstructured.Unstructured{nsObj},
 			expectedObjs: object.ObjMetadataSet{idNs},
-			expectedObjStatuses: []actuation.ObjectStatus{
+			expectedObjStatuses: actuation.ObjectStatusSet{
 				{
 					ObjectReference: inventory.ObjectReferenceFromObjMetadata(idNs),
 					Strategy:        actuation.ActuationStrategyApply,

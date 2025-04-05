@@ -41,14 +41,14 @@ func (a *Asserter) EqualMatcher(expected interface{}) *EqualMatcher {
 // expected value. Prints a diff on failure.
 func (a *Asserter) Equal(t *testing.T, expected, actual interface{}, msgAndArgs ...interface{}) {
 	t.Helper() // print the caller's file:line, instead of this func, on failure
-	matcher := a.EqualMatcher(expected)
-	match, err := matcher.Match(actual)
+	matcher := a.EqualMatcher(actual)
+	match, err := matcher.Match(expected)
 	if err != nil {
 		t.Errorf("errored testing equality: %v", err)
 		return
 	}
 	if !match {
-		assert.Fail(t, matcher.FailureMessage(actual), msgAndArgs...)
+		assert.Fail(t, matcher.FailureMessage(expected), msgAndArgs...)
 	}
 }
 
