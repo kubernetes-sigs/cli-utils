@@ -217,7 +217,7 @@ loop:
 		len(receivedEvents), len(expectedEvents))
 
 	expectedInventory := inventory.InventoryContents{
-		ObjectStatuses: []actuation.ObjectStatus{
+		ObjectStatuses: object.ObjectStatusSet{
 			{
 				ObjectReference: inventory.ObjectReferenceFromObjMetadata(testDeployment1ID),
 				Strategy:        actuation.ActuationStrategyApply,
@@ -387,7 +387,7 @@ loop:
 		len(receivedEvents), len(expectedEvents))
 
 	expectedInventory := inventory.InventoryContents{
-		ObjectStatuses: []actuation.ObjectStatus{
+		ObjectStatuses: object.ObjectStatusSet{
 			{
 				ObjectReference: inventory.ObjectReferenceFromObjMetadata(testDeployment1ID),
 				Strategy:        actuation.ActuationStrategyApply,
@@ -490,7 +490,7 @@ loop:
 		len(receivedEvents), len(expectedEvents))
 
 	expectedInventory := inventory.InventoryContents{
-		ObjectStatuses: []actuation.ObjectStatus{
+		ObjectStatuses: object.ObjectStatusSet{
 			{
 				ObjectReference: inventory.ObjectReferenceFromObjMetadata(testDeploymentID),
 				Strategy:        actuation.ActuationStrategyApply,
@@ -575,7 +575,7 @@ loop:
 		len(receivedEvents), len(expectedEvents))
 
 	expectedInventory := inventory.InventoryContents{
-		ObjectStatuses: []actuation.ObjectStatus{
+		ObjectStatuses: object.ObjectStatusSet{
 			{
 				ObjectReference: inventory.ObjectReferenceFromObjMetadata(testDeploymentID),
 				Strategy:        actuation.ActuationStrategyApply,
@@ -681,7 +681,7 @@ loop:
 	assert.Equal(t, expectedResults, receivedResults)
 
 	expectedInventory := inventory.InventoryContents{
-		ObjectStatuses: []actuation.ObjectStatus{
+		ObjectStatuses: object.ObjectStatusSet{
 			{
 				ObjectReference: inventory.ObjectReferenceFromObjMetadata(testDeploymentID),
 				Strategy:        actuation.ActuationStrategyApply,
@@ -782,7 +782,7 @@ func TestWaitTask_Failed(t *testing.T) {
 				},
 			},
 			expectedInventory: inventory.InventoryContents{
-				ObjectStatuses: []actuation.ObjectStatus{
+				ObjectStatuses: object.ObjectStatusSet{
 					{
 						ObjectReference: inventory.ObjectReferenceFromObjMetadata(testDeployment1ID),
 						Strategy:        actuation.ActuationStrategyApply,
@@ -863,7 +863,7 @@ func TestWaitTask_Failed(t *testing.T) {
 				},
 			},
 			expectedInventory: inventory.InventoryContents{
-				ObjectStatuses: []actuation.ObjectStatus{
+				ObjectStatuses: object.ObjectStatusSet{
 					{
 						ObjectReference: inventory.ObjectReferenceFromObjMetadata(testDeployment1ID),
 						Strategy:        actuation.ActuationStrategyApply,
@@ -959,7 +959,7 @@ func TestWaitTask_Failed(t *testing.T) {
 				},
 			},
 			expectedInventory: inventory.InventoryContents{
-				ObjectStatuses: []actuation.ObjectStatus{
+				ObjectStatuses: object.ObjectStatusSet{
 					{
 						ObjectReference: inventory.ObjectReferenceFromObjMetadata(testDeployment1ID),
 						Strategy:        actuation.ActuationStrategyApply,
@@ -1064,7 +1064,7 @@ func TestWaitTask_Failed(t *testing.T) {
 				},
 			},
 			expectedInventory: inventory.InventoryContents{
-				ObjectStatuses: []actuation.ObjectStatus{
+				ObjectStatuses: object.ObjectStatusSet{
 					{
 						ObjectReference: inventory.ObjectReferenceFromObjMetadata(testDeployment1ID),
 						Strategy:        actuation.ActuationStrategyApply,
@@ -1223,7 +1223,7 @@ func TestWaitTask_UIDChanged(t *testing.T) {
 				},
 			},
 			expectedInventory: inventory.InventoryContents{
-				ObjectStatuses: []actuation.ObjectStatus{
+				ObjectStatuses: object.ObjectStatusSet{
 					{
 						ObjectReference: inventory.ObjectReferenceFromObjMetadata(testDeployment1ID),
 						Strategy:        actuation.ActuationStrategyApply,
@@ -1308,7 +1308,7 @@ func TestWaitTask_UIDChanged(t *testing.T) {
 				},
 			},
 			expectedInventory: inventory.InventoryContents{
-				ObjectStatuses: []actuation.ObjectStatus{
+				ObjectStatuses: object.ObjectStatusSet{
 					{
 						ObjectReference: inventory.ObjectReferenceFromObjMetadata(testDeployment1ID),
 						Strategy:        actuation.ActuationStrategyDelete,

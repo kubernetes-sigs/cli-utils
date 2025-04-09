@@ -138,7 +138,7 @@ func TestTaskQueueBuilder_ApplyBuild(t *testing.T) {
 		options        Options
 		expectedTasks  []taskrunner.Task
 		expectedError  error
-		expectedStatus []actuation.ObjectStatus
+		expectedStatus object.ObjectStatusSet
 	}{
 		"no resources, no apply or wait tasks": {
 			applyObjs: []*unstructured.Unstructured{},
@@ -184,7 +184,7 @@ func TestTaskQueueBuilder_ApplyBuild(t *testing.T) {
 					InvClient: &inventory.FakeClient{},
 				},
 			},
-			expectedStatus: []actuation.ObjectStatus{
+			expectedStatus: object.ObjectStatusSet{
 				{
 					ObjectReference: inventory.ObjectReferenceFromObjMetadata(
 						testutil.ToIdentifier(t, resources["deployment"]),
@@ -230,7 +230,7 @@ func TestTaskQueueBuilder_ApplyBuild(t *testing.T) {
 					InvClient: &inventory.FakeClient{},
 				},
 			},
-			expectedStatus: []actuation.ObjectStatus{
+			expectedStatus: object.ObjectStatusSet{
 				{
 					ObjectReference: inventory.ObjectReferenceFromObjMetadata(
 						testutil.ToIdentifier(t, resources["deployment"]),
@@ -288,7 +288,7 @@ func TestTaskQueueBuilder_ApplyBuild(t *testing.T) {
 					InvClient: &inventory.FakeClient{},
 				},
 			},
-			expectedStatus: []actuation.ObjectStatus{
+			expectedStatus: object.ObjectStatusSet{
 				{
 					ObjectReference: inventory.ObjectReferenceFromObjMetadata(
 						testutil.ToIdentifier(t, resources["deployment"]),
@@ -341,7 +341,7 @@ func TestTaskQueueBuilder_ApplyBuild(t *testing.T) {
 					DryRun:    common.DryRunClient,
 				},
 			},
-			expectedStatus: []actuation.ObjectStatus{
+			expectedStatus: object.ObjectStatusSet{
 				{
 					ObjectReference: inventory.ObjectReferenceFromObjMetadata(
 						testutil.ToIdentifier(t, resources["deployment"]),
@@ -394,7 +394,7 @@ func TestTaskQueueBuilder_ApplyBuild(t *testing.T) {
 					DryRun:    common.DryRunServer,
 				},
 			},
-			expectedStatus: []actuation.ObjectStatus{
+			expectedStatus: object.ObjectStatusSet{
 				{
 					ObjectReference: inventory.ObjectReferenceFromObjMetadata(
 						testutil.ToIdentifier(t, resources["pod"]),
@@ -464,7 +464,7 @@ func TestTaskQueueBuilder_ApplyBuild(t *testing.T) {
 					InvClient: &inventory.FakeClient{},
 				},
 			},
-			expectedStatus: []actuation.ObjectStatus{
+			expectedStatus: object.ObjectStatusSet{
 				{
 					ObjectReference: inventory.ObjectReferenceFromObjMetadata(
 						testutil.ToIdentifier(t, resources["crontab1"]),
@@ -533,7 +533,7 @@ func TestTaskQueueBuilder_ApplyBuild(t *testing.T) {
 					DryRun:    common.DryRunClient,
 				},
 			},
-			expectedStatus: []actuation.ObjectStatus{
+			expectedStatus: object.ObjectStatusSet{
 				{
 					ObjectReference: inventory.ObjectReferenceFromObjMetadata(
 						testutil.ToIdentifier(t, resources["crontab1"]),
@@ -611,7 +611,7 @@ func TestTaskQueueBuilder_ApplyBuild(t *testing.T) {
 					InvClient: &inventory.FakeClient{},
 				},
 			},
-			expectedStatus: []actuation.ObjectStatus{
+			expectedStatus: object.ObjectStatusSet{
 				{
 					ObjectReference: inventory.ObjectReferenceFromObjMetadata(
 						testutil.ToIdentifier(t, resources["namespace"]),
@@ -688,7 +688,7 @@ func TestTaskQueueBuilder_ApplyBuild(t *testing.T) {
 					InvClient: &inventory.FakeClient{},
 				},
 			},
-			expectedStatus: []actuation.ObjectStatus{
+			expectedStatus: object.ObjectStatusSet{
 				{
 					ObjectReference: inventory.ObjectReferenceFromObjMetadata(
 						testutil.ToIdentifier(t, resources["deployment"]),
@@ -796,7 +796,7 @@ func TestTaskQueueBuilder_PruneBuild(t *testing.T) {
 		options        Options
 		expectedTasks  []taskrunner.Task
 		expectedError  error
-		expectedStatus []actuation.ObjectStatus
+		expectedStatus object.ObjectStatusSet
 	}{
 		"no resources, no apply or prune tasks": {
 			pruneObjs: []*unstructured.Unstructured{},
@@ -842,7 +842,7 @@ func TestTaskQueueBuilder_PruneBuild(t *testing.T) {
 					InvClient: &inventory.FakeClient{},
 				},
 			},
-			expectedStatus: []actuation.ObjectStatus{
+			expectedStatus: object.ObjectStatusSet{
 				{
 					ObjectReference: inventory.ObjectReferenceFromObjMetadata(
 						testutil.ToIdentifier(t, resources["default-pod"]),
@@ -885,7 +885,7 @@ func TestTaskQueueBuilder_PruneBuild(t *testing.T) {
 					InvClient: &inventory.FakeClient{},
 				},
 			},
-			expectedStatus: []actuation.ObjectStatus{
+			expectedStatus: object.ObjectStatusSet{
 				{
 					ObjectReference: inventory.ObjectReferenceFromObjMetadata(
 						testutil.ToIdentifier(t, resources["default-pod"]),
@@ -950,7 +950,7 @@ func TestTaskQueueBuilder_PruneBuild(t *testing.T) {
 					InvClient: &inventory.FakeClient{},
 				},
 			},
-			expectedStatus: []actuation.ObjectStatus{
+			expectedStatus: object.ObjectStatusSet{
 				{
 					ObjectReference: inventory.ObjectReferenceFromObjMetadata(
 						testutil.ToIdentifier(t, resources["pod"]),
@@ -1002,7 +1002,7 @@ func TestTaskQueueBuilder_PruneBuild(t *testing.T) {
 					InvClient: &inventory.FakeClient{},
 				},
 			},
-			expectedStatus: []actuation.ObjectStatus{
+			expectedStatus: object.ObjectStatusSet{
 				{
 					ObjectReference: inventory.ObjectReferenceFromObjMetadata(
 						testutil.ToIdentifier(t, resources["pod"]),
@@ -1045,7 +1045,7 @@ func TestTaskQueueBuilder_PruneBuild(t *testing.T) {
 					DryRun:    common.DryRunServer,
 				},
 			},
-			expectedStatus: []actuation.ObjectStatus{
+			expectedStatus: object.ObjectStatusSet{
 				{
 					ObjectReference: inventory.ObjectReferenceFromObjMetadata(
 						testutil.ToIdentifier(t, resources["pod"]),
@@ -1111,7 +1111,7 @@ func TestTaskQueueBuilder_PruneBuild(t *testing.T) {
 					InvClient: &inventory.FakeClient{},
 				},
 			},
-			expectedStatus: []actuation.ObjectStatus{
+			expectedStatus: object.ObjectStatusSet{
 				{
 					ObjectReference: inventory.ObjectReferenceFromObjMetadata(
 						testutil.ToIdentifier(t, resources["crontab1"]),
@@ -1177,7 +1177,7 @@ func TestTaskQueueBuilder_PruneBuild(t *testing.T) {
 					DryRun:    common.DryRunClient,
 				},
 			},
-			expectedStatus: []actuation.ObjectStatus{
+			expectedStatus: object.ObjectStatusSet{
 				{
 					ObjectReference: inventory.ObjectReferenceFromObjMetadata(
 						testutil.ToIdentifier(t, resources["crontab1"]),
@@ -1250,7 +1250,7 @@ func TestTaskQueueBuilder_PruneBuild(t *testing.T) {
 					InvClient: &inventory.FakeClient{},
 				},
 			},
-			expectedStatus: []actuation.ObjectStatus{
+			expectedStatus: object.ObjectStatusSet{
 				{
 					ObjectReference: inventory.ObjectReferenceFromObjMetadata(
 						testutil.ToIdentifier(t, resources["namespace"]),
@@ -1420,7 +1420,7 @@ func TestTaskQueueBuilder_ApplyPruneBuild(t *testing.T) {
 		options        Options
 		expectedTasks  []taskrunner.Task
 		expectedError  error
-		expectedStatus []actuation.ObjectStatus
+		expectedStatus object.ObjectStatusSet
 	}{
 		"two resources, one apply, one prune": {
 			inventoryIDs: object.ObjMetadataSet{
@@ -1472,7 +1472,7 @@ func TestTaskQueueBuilder_ApplyPruneBuild(t *testing.T) {
 					InvClient: &inventory.FakeClient{},
 				},
 			},
-			expectedStatus: []actuation.ObjectStatus{
+			expectedStatus: object.ObjectStatusSet{
 				{
 					ObjectReference: inventory.ObjectReferenceFromObjMetadata(
 						testutil.ToIdentifier(t, resources["deployment"]),
@@ -1528,7 +1528,7 @@ func TestTaskQueueBuilder_ApplyPruneBuild(t *testing.T) {
 					InvClient: &inventory.FakeClient{},
 				},
 			},
-			expectedStatus: []actuation.ObjectStatus{
+			expectedStatus: object.ObjectStatusSet{
 				{
 					ObjectReference: inventory.ObjectReferenceFromObjMetadata(
 						testutil.ToIdentifier(t, resources["deployment"]),
@@ -1597,7 +1597,7 @@ func TestTaskQueueBuilder_ApplyPruneBuild(t *testing.T) {
 					InvClient: &inventory.FakeClient{},
 				},
 			},
-			expectedStatus: []actuation.ObjectStatus{
+			expectedStatus: object.ObjectStatusSet{
 				{
 					ObjectReference: inventory.ObjectReferenceFromObjMetadata(
 						testutil.ToIdentifier(t, resources["deployment"]),
@@ -1672,7 +1672,7 @@ func TestTaskQueueBuilder_ApplyPruneBuild(t *testing.T) {
 					InvClient: &inventory.FakeClient{},
 				},
 			},
-			expectedStatus: []actuation.ObjectStatus{
+			expectedStatus: object.ObjectStatusSet{
 				{
 					ObjectReference: inventory.ObjectReferenceFromObjMetadata(
 						testutil.ToIdentifier(t, resources["deployment"]),
