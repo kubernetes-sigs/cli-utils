@@ -16,7 +16,6 @@ import (
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-	"sigs.k8s.io/cli-utils/pkg/apis/actuation"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
@@ -121,13 +120,13 @@ type Inventory interface {
 	// GetObjectRefs returns the list of object references tracked in the inventory
 	GetObjectRefs() object.ObjMetadataSet
 	// GetObjectStatuses returns the list of statuses for each object reference tracked in the inventory
-	GetObjectStatuses() []actuation.ObjectStatus
+	GetObjectStatuses() object.ObjectStatusSet
 	// SetObjectRefs updates the local cache of object references tracked in the inventory.
 	// This will be persisted to the cluster when the Inventory is passed to CreateOrUpdate.
 	SetObjectRefs(object.ObjMetadataSet)
 	// SetObjectStatuses updates the local cache of object statuses tracked in the inventory.
 	// This will be persisted to the cluster when the Inventory is passed to CreateOrUpdate.
-	SetObjectStatuses([]actuation.ObjectStatus)
+	SetObjectStatuses(object.ObjectStatusSet)
 }
 
 type ReadClient interface {
@@ -204,7 +203,7 @@ type InventoryContents struct {
 	// ObjectRefs and ObjectStatuses are in memory representations of the inventory which are
 	// read and manipulated by the applier.
 	ObjectRefs     object.ObjMetadataSet
-	ObjectStatuses []actuation.ObjectStatus
+	ObjectStatuses object.ObjectStatusSet
 }
 
 // GetObjectRefs returns the list of object references tracked in the inventory
@@ -213,7 +212,7 @@ func (inv *InventoryContents) GetObjectRefs() object.ObjMetadataSet {
 }
 
 // GetObjectStatuses returns the list of statuses for each object reference tracked in the inventory
-func (inv *InventoryContents) GetObjectStatuses() []actuation.ObjectStatus {
+func (inv *InventoryContents) GetObjectStatuses() object.ObjectStatusSet {
 	return inv.ObjectStatuses
 }
 
@@ -225,7 +224,7 @@ func (inv *InventoryContents) SetObjectRefs(objs object.ObjMetadataSet) {
 
 // SetObjectStatuses updates the local cache of object statuses tracked in the inventory.
 // This will be persisted to the cluster when the Inventory is passed to CreateOrUpdate.
-func (inv *InventoryContents) SetObjectStatuses(statuses []actuation.ObjectStatus) {
+func (inv *InventoryContents) SetObjectStatuses(statuses object.ObjectStatusSet) {
 	inv.ObjectStatuses = statuses
 }
 

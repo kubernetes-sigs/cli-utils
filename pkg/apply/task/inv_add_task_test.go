@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	clienttesting "k8s.io/client-go/testing"
@@ -19,6 +18,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/inventory"
 	"sigs.k8s.io/cli-utils/pkg/object"
+	"sigs.k8s.io/cli-utils/pkg/testutil"
 )
 
 var inventoryObj = &unstructured.Unstructured{
@@ -90,7 +90,7 @@ func TestInvAddTask(t *testing.T) {
 		initialObjs           object.ObjMetadataSet
 		applyObjs             []*unstructured.Unstructured
 		expectedObjs          object.ObjMetadataSet
-		expectedObjStatuses   []actuation.ObjectStatus
+		expectedStatus        object.ObjectStatusSet
 		reactorError          error
 		expectCreateNamespace bool
 	}{
@@ -103,7 +103,7 @@ func TestInvAddTask(t *testing.T) {
 			initialObjs:  object.ObjMetadataSet{},
 			applyObjs:    []*unstructured.Unstructured{obj1},
 			expectedObjs: object.ObjMetadataSet{id1},
-			expectedObjStatuses: []actuation.ObjectStatus{
+			expectedStatus: object.ObjectStatusSet{
 				{
 					ObjectReference: inventory.ObjectReferenceFromObjMetadata(id1),
 					Strategy:        actuation.ActuationStrategyApply,
@@ -116,7 +116,7 @@ func TestInvAddTask(t *testing.T) {
 			initialObjs:  object.ObjMetadataSet{id2},
 			applyObjs:    []*unstructured.Unstructured{},
 			expectedObjs: object.ObjMetadataSet{id2},
-			expectedObjStatuses: []actuation.ObjectStatus{
+			expectedStatus: object.ObjectStatusSet{
 				{
 					ObjectReference: inventory.ObjectReferenceFromObjMetadata(id2),
 					Strategy:        actuation.ActuationStrategyDelete,
@@ -129,7 +129,7 @@ func TestInvAddTask(t *testing.T) {
 			initialObjs:  object.ObjMetadataSet{id3},
 			applyObjs:    []*unstructured.Unstructured{obj3},
 			expectedObjs: object.ObjMetadataSet{id3},
-			expectedObjStatuses: []actuation.ObjectStatus{
+			expectedStatus: object.ObjectStatusSet{
 				{
 					ObjectReference: inventory.ObjectReferenceFromObjMetadata(id3),
 					Strategy:        actuation.ActuationStrategyApply,
@@ -142,7 +142,7 @@ func TestInvAddTask(t *testing.T) {
 			initialObjs:  object.ObjMetadataSet{id1, id2, id3},
 			applyObjs:    []*unstructured.Unstructured{obj2, obj3},
 			expectedObjs: object.ObjMetadataSet{id1, id2, id3},
-			expectedObjStatuses: []actuation.ObjectStatus{
+			expectedStatus: object.ObjectStatusSet{
 				{
 					ObjectReference: inventory.ObjectReferenceFromObjMetadata(id1),
 					Strategy:        actuation.ActuationStrategyDelete,
@@ -167,7 +167,7 @@ func TestInvAddTask(t *testing.T) {
 			initialObjs:  object.ObjMetadataSet{},
 			applyObjs:    []*unstructured.Unstructured{nsObj},
 			expectedObjs: object.ObjMetadataSet{idNs},
-			expectedObjStatuses: []actuation.ObjectStatus{
+			expectedStatus: object.ObjectStatusSet{
 				{
 					ObjectReference: inventory.ObjectReferenceFromObjMetadata(idNs),
 					Strategy:        actuation.ActuationStrategyApply,
@@ -207,29 +207,18 @@ func TestInvAddTask(t *testing.T) {
 				DynamicClient: tf.FakeDynamicClient,
 				Mapper:        mapper,
 			}
-			if taskName != task.Name() {
-				t.Errorf("expected task name (%s), got (%s)", taskName, task.Name())
-			}
+			require.Equal(t, taskName, task.Name())
 			applyIDs := object.UnstructuredSetToObjMetadataSet(tc.applyObjs)
-			if !task.Identifiers().Equal(applyIDs) {
-				t.Errorf("expected task ids (%s), got (%s)", applyIDs, task.Identifiers())
-			}
+			testutil.AssertEqual(t, applyIDs, task.Identifiers())
 			task.Start(taskContext)
 			result := <-taskContext.TaskChannel()
-			if result.Err != nil {
-				t.Errorf("unexpected error running InvAddTask: %s", result.Err)
-			}
+			require.NoError(t, result.Err)
 			// argument doesn't matter for fake client, it always returns cached obj
-			actual, _ := client.Get(t.Context(), nil, inventory.GetOptions{})
-			if !tc.expectedObjs.Equal(actual.GetObjectRefs()) {
-				t.Errorf("expected merged inventory (%s), got (%s)", tc.expectedObjs, actual)
-			}
-			if !equality.Semantic.DeepEqual(tc.expectedObjStatuses, actual.GetObjectStatuses()) {
-				t.Errorf("expected object statuses (%v), got (%v)", tc.expectedObjStatuses, actual.GetObjectStatuses())
-			}
-			if createdNamespace != tc.expectCreateNamespace {
-				t.Errorf("expected create namespace %v, got %v", tc.expectCreateNamespace, createdNamespace)
-			}
+			actual, err := client.Get(t.Context(), nil, inventory.GetOptions{})
+			require.NoError(t, err)
+			testutil.AssertEqual(t, tc.expectedObjs, actual.GetObjectRefs())
+			testutil.AssertEqual(t, tc.expectedStatus, actual.GetObjectStatuses())
+			require.Equal(t, tc.expectCreateNamespace, createdNamespace)
 		})
 	}
 }

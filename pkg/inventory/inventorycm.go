@@ -40,7 +40,7 @@ func ConfigMapToInventoryInfo(uObj *unstructured.Unstructured) (Info, error) {
 }
 
 // buildDataMap converts the inventory to the storage format to be used in a ConfigMap
-func buildDataMap(objMetas object.ObjMetadataSet, objStatus []actuation.ObjectStatus) map[string]string {
+func buildDataMap(objMetas object.ObjMetadataSet, objStatus object.ObjectStatusSet) map[string]string {
 	objMap := map[string]string{}
 	objStatusMap := map[object.ObjMetadata]actuation.ObjectStatus{}
 	for _, status := range objStatus {

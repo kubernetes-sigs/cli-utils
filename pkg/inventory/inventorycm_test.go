@@ -6,9 +6,9 @@ package inventory
 import (
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
 	"sigs.k8s.io/cli-utils/pkg/apis/actuation"
 	"sigs.k8s.io/cli-utils/pkg/object"
+	"sigs.k8s.io/cli-utils/pkg/testutil"
 )
 
 func TestBuildObjMap(t *testing.T) {
@@ -27,13 +27,13 @@ func TestBuildObjMap(t *testing.T) {
 
 	tests := map[string]struct {
 		objSet    object.ObjMetadataSet
-		objStatus []actuation.ObjectStatus
+		objStatus object.ObjectStatusSet
 		expected  map[string]string
 		hasError  bool
 	}{
 		"objMetadata matches the status": {
 			objSet: object.ObjMetadataSet{ObjMetadataFromObjectReference(obj1), ObjMetadataFromObjectReference(obj2)},
-			objStatus: []actuation.ObjectStatus{
+			objStatus: object.ObjectStatusSet{
 				{
 					ObjectReference: obj1,
 					Strategy:        actuation.ActuationStrategyApply,
@@ -64,9 +64,7 @@ func TestBuildObjMap(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			actual := buildDataMap(tc.objSet, tc.objStatus)
-			if diff := cmp.Diff(actual, tc.expected); diff != "" {
-				t.Error(diff)
-			}
+			testutil.AssertEqual(t, tc.expected, actual)
 		})
 	}
 }

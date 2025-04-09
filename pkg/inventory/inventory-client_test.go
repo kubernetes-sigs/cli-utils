@@ -14,6 +14,7 @@ import (
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	"sigs.k8s.io/cli-utils/pkg/apis/actuation"
 	"sigs.k8s.io/cli-utils/pkg/object"
+	"sigs.k8s.io/cli-utils/pkg/testutil"
 )
 
 func podStatus(info *resource.Info) actuation.ObjectStatus {
@@ -32,7 +33,7 @@ func TestGet(t *testing.T) {
 		statusPolicy StatusPolicy
 		inv          Info
 		localObjs    object.ObjMetadataSet
-		objStatus    []actuation.ObjectStatus
+		objStatus    object.ObjectStatusSet
 		isError      bool
 	}{
 		"Nil local inventory object is an error": {
@@ -50,7 +51,7 @@ func TestGet(t *testing.T) {
 			localObjs: object.ObjMetadataSet{
 				ignoreErrInfoToObjMeta(pod2Info),
 			},
-			objStatus: []actuation.ObjectStatus{podStatus(pod2Info)},
+			objStatus: object.ObjectStatusSet{podStatus(pod2Info)},
 			isError:   false,
 		},
 		"Local inventory with multiple objects": {
@@ -59,7 +60,7 @@ func TestGet(t *testing.T) {
 				ignoreErrInfoToObjMeta(pod1Info),
 				ignoreErrInfoToObjMeta(pod2Info),
 				ignoreErrInfoToObjMeta(pod3Info)},
-			objStatus: []actuation.ObjectStatus{
+			objStatus: object.ObjectStatusSet{
 				podStatus(pod1Info),
 				podStatus(pod2Info),
 				podStatus(pod3Info),
@@ -89,9 +90,7 @@ func TestGet(t *testing.T) {
 			}
 			require.NoError(t, err)
 			if clusterInv != nil {
-				if !tc.localObjs.Equal(clusterInv.GetObjectRefs()) {
-					t.Fatalf("expected cluster objs (%v), got (%v)", tc.localObjs, clusterInv.GetObjectRefs())
-				}
+				testutil.AssertEqual(t, tc.localObjs, clusterInv.GetObjectRefs())
 			}
 		})
 	}
@@ -187,9 +186,7 @@ func TestCreateOrUpdate(t *testing.T) {
 			}
 			inv, err := invClient.Get(context.TODO(), tc.inventory.Info(), GetOptions{})
 			require.NoError(t, err)
-			if !tc.createObjs.Equal(inv.GetObjectRefs()) {
-				t.Fatalf("expected %v to equal %v", tc.createObjs, inv.GetObjectRefs())
-			}
+			testutil.AssertEqual(t, tc.createObjs, inv.GetObjectRefs())
 
 			inventory.SetObjectRefs(tc.updateObjs)
 			// Call Update a second time should update the existing object
@@ -200,9 +197,7 @@ func TestCreateOrUpdate(t *testing.T) {
 			}
 			inv, err = invClient.Get(context.TODO(), tc.inventory.Info(), GetOptions{})
 			require.NoError(t, err)
-			if !tc.updateObjs.Equal(inv.GetObjectRefs()) {
-				t.Fatalf("expected %v to equal %v", tc.updateObjs, inv.GetObjectRefs())
-			}
+			testutil.AssertEqual(t, tc.updateObjs, inv.GetObjectRefs())
 		})
 	}
 }
@@ -214,7 +209,7 @@ func TestDelete(t *testing.T) {
 		statusPolicy StatusPolicy
 		inv          Info
 		localObjs    object.ObjMetadataSet
-		objStatus    []actuation.ObjectStatus
+		objStatus    object.ObjectStatusSet
 		wantErr      bool
 	}{
 		"Nil local inventory object is an error": {
@@ -231,7 +226,7 @@ func TestDelete(t *testing.T) {
 			localObjs: object.ObjMetadataSet{
 				ignoreErrInfoToObjMeta(pod2Info),
 			},
-			objStatus: []actuation.ObjectStatus{podStatus(pod2Info)},
+			objStatus: object.ObjectStatusSet{podStatus(pod2Info)},
 		},
 		"Local inventory with multiple objects": {
 			inv: localInv,
@@ -239,7 +234,7 @@ func TestDelete(t *testing.T) {
 				ignoreErrInfoToObjMeta(pod1Info),
 				ignoreErrInfoToObjMeta(pod2Info),
 				ignoreErrInfoToObjMeta(pod3Info)},
-			objStatus: []actuation.ObjectStatus{
+			objStatus: object.ObjectStatusSet{
 				podStatus(pod1Info),
 				podStatus(pod2Info),
 				podStatus(pod3Info),
