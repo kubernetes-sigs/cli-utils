@@ -17,24 +17,15 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/testutil"
 )
 
-func podStatus(info *resource.Info) actuation.ObjectStatus {
-	return actuation.ObjectStatus{
-		ObjectReference: ObjectReferenceFromObjMetadata(ignoreErrInfoToObjMeta(info)),
-		Strategy:        actuation.ActuationStrategyApply,
-		Actuation:       actuation.ActuationSucceeded,
-		Reconcile:       actuation.ReconcileSucceeded,
-	}
-}
-
 func TestGet(t *testing.T) {
 	localInv, err := ConfigMapToInventoryInfo(inventoryObj)
 	require.NoError(t, err)
 	tests := map[string]struct {
-		statusPolicy StatusPolicy
-		inv          Info
-		localObjs    object.ObjMetadataSet
-		objStatus    object.ObjectStatusSet
-		isError      bool
+		statusEnabled bool
+		inv           Info
+		localObjs     object.ObjMetadataSet
+		objStatus     object.ObjectStatusSet
+		isError       bool
 	}{
 		"Nil local inventory object is an error": {
 			inv:       nil,
@@ -49,21 +40,23 @@ func TestGet(t *testing.T) {
 		"Local inventory with a single object": {
 			inv: localInv,
 			localObjs: object.ObjMetadataSet{
-				ignoreErrInfoToObjMeta(pod2Info),
+				toObjMeta(t, pod2Info),
 			},
-			objStatus: object.ObjectStatusSet{podStatus(pod2Info)},
-			isError:   false,
+			objStatus: object.ObjectStatusSet{
+				podStatus(t, pod2Info),
+			},
+			isError: false,
 		},
 		"Local inventory with multiple objects": {
 			inv: localInv,
 			localObjs: object.ObjMetadataSet{
-				ignoreErrInfoToObjMeta(pod1Info),
-				ignoreErrInfoToObjMeta(pod2Info),
-				ignoreErrInfoToObjMeta(pod3Info)},
+				toObjMeta(t, pod1Info),
+				toObjMeta(t, pod2Info),
+				toObjMeta(t, pod3Info)},
 			objStatus: object.ObjectStatusSet{
-				podStatus(pod1Info),
-				podStatus(pod2Info),
-				podStatus(pod3Info),
+				podStatus(t, pod1Info),
+				podStatus(t, pod2Info),
+				podStatus(t, pod3Info),
 			},
 			isError: false,
 		},
@@ -77,10 +70,10 @@ func TestGet(t *testing.T) {
 				inv := NewSingleObjectInventory(emptyInventoryObject())
 				inv.SetObjectRefs(tc.localObjs)
 				inv.SetObjectStatuses(tc.objStatus)
-				cm, _ := inventoryToConfigMap(tc.statusPolicy)(emptyInventoryObject(), inv)
+				cm, _ := inventoryToConfigMap(tc.statusEnabled)(emptyInventoryObject(), inv)
 				return true, cm, nil
 			})
-			invClient, err := ConfigMapClientFactory{StatusPolicy: tc.statusPolicy}.NewClient(tf)
+			invClient, err := ConfigMapClientFactory{StatusEnabled: tc.statusEnabled}.NewClient(tf)
 			require.NoError(t, err)
 
 			clusterInv, err := invClient.Get(t.Context(), tc.inv, GetOptions{})
@@ -98,55 +91,97 @@ func TestGet(t *testing.T) {
 
 func TestCreateOrUpdate(t *testing.T) {
 	tests := map[string]struct {
-		inventory  *SingleObjectInventory
-		createObjs object.ObjMetadataSet
-		updateObjs object.ObjMetadataSet
-		isError    bool
+		statusEnabled        bool
+		inventory            *SingleObjectInventory
+		createObjectRefs     object.ObjMetadataSet
+		createObjectStatuses object.ObjectStatusSet
+		updateObjectRefs     object.ObjMetadataSet
+		updateObjectStatuses object.ObjectStatusSet
+		isError              bool
 	}{
 		"Nil local inventory object is error": {
-			inventory:  nil,
-			createObjs: object.ObjMetadataSet{},
-			isError:    true,
+			inventory: nil,
+			isError:   true,
 		},
 		"Create and update inventory with empty object set": {
-			inventory:  NewSingleObjectInventory(emptyInventoryObject()),
-			createObjs: object.ObjMetadataSet{},
-			updateObjs: object.ObjMetadataSet{},
-			isError:    false,
+			statusEnabled: true,
+			inventory:     NewSingleObjectInventory(emptyInventoryObject()),
+			isError:       false,
 		},
 		"Create and Update inventory with identical object set": {
-			inventory: NewSingleObjectInventory(emptyInventoryObject()),
-			createObjs: object.ObjMetadataSet{
-				ignoreErrInfoToObjMeta(pod1Info),
+			statusEnabled: true,
+			inventory:     NewSingleObjectInventory(emptyInventoryObject()),
+			createObjectRefs: object.ObjMetadataSet{
+				toObjMeta(t, pod1Info),
 			},
-			updateObjs: object.ObjMetadataSet{
-				ignoreErrInfoToObjMeta(pod1Info),
+			createObjectStatuses: object.ObjectStatusSet{
+				podStatus(t, pod1Info),
+			},
+			updateObjectRefs: object.ObjMetadataSet{
+				toObjMeta(t, pod1Info),
+			},
+			updateObjectStatuses: object.ObjectStatusSet{
+				podStatus(t, pod1Info),
 			},
 			isError: false,
 		},
 		"Create and Update inventory with expanding object set": {
-			inventory: NewSingleObjectInventory(emptyInventoryObject()),
-			createObjs: object.ObjMetadataSet{
-				ignoreErrInfoToObjMeta(pod1Info),
+			statusEnabled: true,
+			inventory:     NewSingleObjectInventory(emptyInventoryObject()),
+			createObjectRefs: object.ObjMetadataSet{
+				toObjMeta(t, pod1Info),
 			},
-			updateObjs: object.ObjMetadataSet{
-				ignoreErrInfoToObjMeta(pod1Info),
-				ignoreErrInfoToObjMeta(pod3Info),
+			createObjectStatuses: object.ObjectStatusSet{
+				podStatus(t, pod1Info),
+			},
+			updateObjectRefs: object.ObjMetadataSet{
+				toObjMeta(t, pod1Info),
+				toObjMeta(t, pod3Info),
+			},
+			updateObjectStatuses: object.ObjectStatusSet{
+				podStatus(t, pod1Info),
+				podStatus(t, pod3Info),
 			},
 			isError: false,
 		},
 		"Create and Update inventory with shrinking object set": {
-			inventory: NewSingleObjectInventory(emptyInventoryObject()),
-			createObjs: object.ObjMetadataSet{
-				ignoreErrInfoToObjMeta(pod1Info),
-				ignoreErrInfoToObjMeta(pod2Info),
-				ignoreErrInfoToObjMeta(pod3Info),
+			statusEnabled: true,
+			inventory:     NewSingleObjectInventory(emptyInventoryObject()),
+			createObjectRefs: object.ObjMetadataSet{
+				toObjMeta(t, pod1Info),
+				toObjMeta(t, pod2Info),
+				toObjMeta(t, pod3Info),
 			},
-			updateObjs: object.ObjMetadataSet{
-				ignoreErrInfoToObjMeta(pod1Info),
-				ignoreErrInfoToObjMeta(pod3Info),
+			createObjectStatuses: object.ObjectStatusSet{
+				podStatus(t, pod1Info),
+				podStatus(t, pod2Info),
+				podStatus(t, pod3Info),
+			},
+			updateObjectRefs: object.ObjMetadataSet{
+				toObjMeta(t, pod1Info),
+				toObjMeta(t, pod3Info),
+			},
+			updateObjectStatuses: object.ObjectStatusSet{
+				podStatus(t, pod1Info),
+				podStatus(t, pod3Info),
 			},
 			isError: false,
+		},
+		"Create and Update inventory with disabled status": {
+			statusEnabled: false,
+			inventory:     NewSingleObjectInventory(emptyInventoryObject()),
+			createObjectRefs: object.ObjMetadataSet{
+				toObjMeta(t, pod1Info),
+				toObjMeta(t, pod2Info),
+				toObjMeta(t, pod3Info),
+			},
+			createObjectStatuses: object.ObjectStatusSet{},
+			updateObjectRefs: object.ObjMetadataSet{
+				toObjMeta(t, pod1Info),
+				toObjMeta(t, pod3Info),
+			},
+			updateObjectStatuses: object.ObjectStatusSet{},
+			isError:              false,
 		},
 	}
 
@@ -167,12 +202,13 @@ func TestCreateOrUpdate(t *testing.T) {
 			})
 
 			// Create the local inventory object storing "tc.localObjs"
-			invClient, err := ConfigMapClientFactory{StatusPolicy: StatusPolicyAll}.NewClient(tf)
+			invClient, err := ConfigMapClientFactory{StatusEnabled: tc.statusEnabled}.NewClient(tf)
 			require.NoError(t, err)
 
 			inventory := tc.inventory
 			if inventory != nil {
-				inventory.SetObjectRefs(tc.createObjs)
+				inventory.SetObjectRefs(tc.createObjectRefs)
+				inventory.SetObjectStatuses(tc.createObjectStatuses)
 			}
 			// Call Update an initial time should create the object
 			err = invClient.CreateOrUpdate(context.TODO(), inventory, UpdateOptions{})
@@ -186,9 +222,11 @@ func TestCreateOrUpdate(t *testing.T) {
 			}
 			inv, err := invClient.Get(context.TODO(), tc.inventory.Info(), GetOptions{})
 			require.NoError(t, err)
-			testutil.AssertEqual(t, tc.createObjs, inv.GetObjectRefs())
+			testutil.AssertEqual(t, tc.createObjectRefs, inv.GetObjectRefs())
+			testutil.AssertEqual(t, tc.createObjectStatuses, inv.GetObjectStatuses())
 
-			inventory.SetObjectRefs(tc.updateObjs)
+			inventory.SetObjectRefs(tc.updateObjectRefs)
+			inventory.SetObjectStatuses(tc.updateObjectStatuses)
 			// Call Update a second time should update the existing object
 			err = invClient.CreateOrUpdate(context.TODO(), inventory, UpdateOptions{})
 			require.NoError(t, err)
@@ -197,7 +235,8 @@ func TestCreateOrUpdate(t *testing.T) {
 			}
 			inv, err = invClient.Get(context.TODO(), tc.inventory.Info(), GetOptions{})
 			require.NoError(t, err)
-			testutil.AssertEqual(t, tc.updateObjs, inv.GetObjectRefs())
+			testutil.AssertEqual(t, tc.updateObjectRefs, inv.GetObjectRefs())
+			testutil.AssertEqual(t, tc.updateObjectStatuses, inv.GetObjectStatuses())
 		})
 	}
 }
@@ -206,11 +245,11 @@ func TestDelete(t *testing.T) {
 	localInv, err := ConfigMapToInventoryInfo(inventoryObj)
 	require.NoError(t, err)
 	tests := map[string]struct {
-		statusPolicy StatusPolicy
-		inv          Info
-		localObjs    object.ObjMetadataSet
-		objStatus    object.ObjectStatusSet
-		wantErr      bool
+		statusEnabled bool
+		inv           Info
+		localObjs     object.ObjMetadataSet
+		objStatus     object.ObjectStatusSet
+		wantErr       bool
 	}{
 		"Nil local inventory object is an error": {
 			inv:       nil,
@@ -224,20 +263,22 @@ func TestDelete(t *testing.T) {
 		"Local inventory with a single object": {
 			inv: localInv,
 			localObjs: object.ObjMetadataSet{
-				ignoreErrInfoToObjMeta(pod2Info),
+				toObjMeta(t, pod2Info),
 			},
-			objStatus: object.ObjectStatusSet{podStatus(pod2Info)},
+			objStatus: object.ObjectStatusSet{
+				podStatus(t, pod2Info),
+			},
 		},
 		"Local inventory with multiple objects": {
 			inv: localInv,
 			localObjs: object.ObjMetadataSet{
-				ignoreErrInfoToObjMeta(pod1Info),
-				ignoreErrInfoToObjMeta(pod2Info),
-				ignoreErrInfoToObjMeta(pod3Info)},
+				toObjMeta(t, pod1Info),
+				toObjMeta(t, pod2Info),
+				toObjMeta(t, pod3Info)},
 			objStatus: object.ObjectStatusSet{
-				podStatus(pod1Info),
-				podStatus(pod2Info),
-				podStatus(pod3Info),
+				podStatus(t, pod1Info),
+				podStatus(t, pod2Info),
+				podStatus(t, pod3Info),
 			},
 		},
 	}
@@ -247,7 +288,7 @@ func TestDelete(t *testing.T) {
 			tf := cmdtesting.NewTestFactory().WithNamespace(testNamespace)
 			defer tf.Cleanup()
 
-			invClient, err := ConfigMapClientFactory{StatusPolicy: StatusPolicyAll}.NewClient(tf)
+			invClient, err := ConfigMapClientFactory{StatusEnabled: true}.NewClient(tf)
 			require.NoError(t, err)
 			err = invClient.Delete(context.TODO(), tc.inv, DeleteOptions{})
 			if tc.wantErr {
@@ -259,7 +300,17 @@ func TestDelete(t *testing.T) {
 	}
 }
 
-func ignoreErrInfoToObjMeta(info *resource.Info) object.ObjMetadata {
-	objMeta, _ := object.InfoToObjMeta(info)
+func toObjMeta(t *testing.T, info *resource.Info) object.ObjMetadata {
+	objMeta, err := object.InfoToObjMeta(info)
+	require.NoError(t, err)
 	return objMeta
+}
+
+func podStatus(t *testing.T, info *resource.Info) actuation.ObjectStatus {
+	return actuation.ObjectStatus{
+		ObjectReference: ObjectReferenceFromObjMetadata(toObjMeta(t, info)),
+		Strategy:        actuation.ActuationStrategyApply,
+		Actuation:       actuation.ActuationSucceeded,
+		Reconcile:       actuation.ReconcileSucceeded,
+	}
 }

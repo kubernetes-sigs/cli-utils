@@ -50,19 +50,6 @@ func ConvertInventoryPolicy(policy string) (inventory.Policy, error) {
 	}
 }
 
-// ConvertStatusPolicy converts as status policy described as a string to a
-// StatusPolicy type that is passed into the Applier.
-func ConvertStatusPolicy(policy string) (inventory.StatusPolicy, error) {
-	switch policy {
-	case StatusPolicyNone:
-		return inventory.StatusPolicyNone, nil
-	case StatusPolicyAll:
-		return inventory.StatusPolicyAll, nil
-	default:
-		return inventory.StatusPolicyAll, fmt.Errorf("status policy must be one of none, all")
-	}
-}
-
 // PathFromArgs returns the path which is a positional arg from args list
 // returns "-" if there is length of args is 0, which implies no path is provided
 func PathFromArgs(args []string) string {
