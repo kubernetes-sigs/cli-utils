@@ -167,7 +167,7 @@ func errResourceToResourceStatus(err error, resource *unstructured.Unstructured,
 	// If the error is from the context, we don't attach that to the ResourceStatus,
 	// but just return it directly so the caller can decide how to handle this
 	// situation.
-	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || errWouldExceedContextDeadline(err) {
 		return nil, err
 	}
 	identifier := object.UnstructuredToObjMetadata(resource)
@@ -193,7 +193,7 @@ func errIdentifierToResourceStatus(err error, identifier object.ObjMetadata) (*e
 	// If the error is from the context, we don't attach that to the ResourceStatus,
 	// but just return it directly so the caller can decide how to handle this
 	// situation.
-	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || errWouldExceedContextDeadline(err) {
 		return nil, err
 	}
 	if apierrors.IsNotFound(err) {
@@ -208,4 +208,16 @@ func errIdentifierToResourceStatus(err error, identifier object.ObjMetadata) (*e
 		Status:     status.UnknownStatus,
 		Error:      err,
 	}, nil
+}
+
+func errWouldExceedContextDeadline(err error) bool {
+	for {
+		next := errors.Unwrap(err)
+		if next == nil {
+			break
+		}
+		err = next
+	}
+
+	return err != nil && err.Error() == "rate: Wait(n=1) would exceed context deadline"
 }
