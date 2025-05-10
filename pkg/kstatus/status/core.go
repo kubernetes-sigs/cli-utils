@@ -562,6 +562,15 @@ func jobConditions(u *unstructured.Unstructured) (*Result, error) {
 				return newFailedStatus("JobFailed",
 					fmt.Sprintf("Job Failed. failed: %d/%d", failed, completions)), nil
 			}
+		// Suspended jobs should not be considered in-progress.
+		case "Suspended":
+			if c.Status == corev1.ConditionTrue {
+				return &Result{
+					Status:     CurrentStatus,
+					Message:    "Job is suspended",
+					Conditions: []Condition{},
+				}, nil
+			}
 		}
 	}
 
