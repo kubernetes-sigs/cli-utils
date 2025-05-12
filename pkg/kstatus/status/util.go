@@ -119,8 +119,10 @@ func GetStringField(obj map[string]interface{}, fieldPath string, defaultValue s
 	return rv
 }
 
-// GetIntField return field as string defaulting to value if not found
+// GetIntField return field as int defaulting to value if not found
 func GetIntField(obj map[string]interface{}, fieldPath string, defaultValue int) int {
+	var rv = defaultValue
+
 	fields := strings.Split(fieldPath, ".")
 	if fields[0] == "" {
 		fields = fields[1:]
@@ -128,7 +130,7 @@ func GetIntField(obj map[string]interface{}, fieldPath string, defaultValue int)
 
 	val, found, err := apiunstructured.NestedFieldNoCopy(obj, fields...)
 	if !found || err != nil {
-		return defaultValue
+		return rv
 	}
 
 	switch v := val.(type) {
@@ -139,10 +141,13 @@ func GetIntField(obj map[string]interface{}, fieldPath string, defaultValue int)
 	case int64:
 		return int(v)
 	}
-	return defaultValue
+	return rv
 }
 
+// GetBoolField return field as boolean defaulting to value if not found
 func GetBoolField(obj map[string]interface{}, fieldPath string, defaultValue bool) bool {
+	var rv = defaultValue
+
 	fields := strings.Split(fieldPath, ".")
 	if fields[0] == "" {
 		fields = fields[1:]
@@ -150,12 +155,11 @@ func GetBoolField(obj map[string]interface{}, fieldPath string, defaultValue boo
 
 	val, found, err := apiunstructured.NestedFieldNoCopy(obj, fields...)
 	if !found || err != nil {
-		return defaultValue
+		return rv
 	}
 
-	switch v := val.(type) {
-	case bool:
+	if v, ok := val.(bool); ok {
 		return v
 	}
-	return defaultValue
+	return rv
 }
