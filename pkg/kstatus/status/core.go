@@ -539,6 +539,7 @@ func jobConditions(u *unstructured.Unstructured) (*Result, error) {
 	active := GetIntField(obj, ".status.active", 0)
 	failed := GetIntField(obj, ".status.failed", 0)
 	starttime := GetStringField(obj, ".status.startTime", "")
+	suspended := GetBoolField(obj, ".spec.suspend", false)
 
 	// Conditions
 	// https://github.com/kubernetes/kubernetes/blob/master/pkg/controller/job/utils.go#L24
@@ -562,9 +563,9 @@ func jobConditions(u *unstructured.Unstructured) (*Result, error) {
 				return newFailedStatus("JobFailed",
 					fmt.Sprintf("Job Failed. failed: %d/%d", failed, completions)), nil
 			}
-		// Suspended jobs should not be considered in-progress.
+		// Jobs with spec.suspend=true and a Suspended status, should not be treated as in-progress.
 		case "Suspended":
-			if c.Status == corev1.ConditionTrue {
+			if c.Status == corev1.ConditionTrue && suspended {
 				return &Result{
 					Status:     CurrentStatus,
 					Message:    "Job is suspended",

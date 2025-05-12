@@ -141,3 +141,21 @@ func GetIntField(obj map[string]interface{}, fieldPath string, defaultValue int)
 	}
 	return defaultValue
 }
+
+func GetBoolField(obj map[string]interface{}, fieldPath string, defaultValue bool) bool {
+	fields := strings.Split(fieldPath, ".")
+	if fields[0] == "" {
+		fields = fields[1:]
+	}
+
+	val, found, err := apiunstructured.NestedFieldNoCopy(obj, fields...)
+	if !found || err != nil {
+		return defaultValue
+	}
+
+	switch v := val.(type) {
+	case bool:
+		return v
+	}
+	return defaultValue
+}
