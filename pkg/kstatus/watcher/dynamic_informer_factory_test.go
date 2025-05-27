@@ -444,7 +444,7 @@ func TestNewFilteredListWatchFromDynamicClientList(t *testing.T) {
 			ctx := context.Background()
 			lw := NewFilteredListWatchFromDynamicClient(ctx, fakeClient, tc.args.resource, tc.args.namespace, tc.args.filters)
 
-			obj, err := lw.List(tc.listInput.options)
+			obj, err := lw.ListWithContext(ctx, tc.listInput.options)
 			testutil.AssertEqual(t, tc.listOuput.object, obj)
 			if err != nil && tc.listOuput.err != nil {
 				testutil.AssertEqual(t, testutil.EqualError(tc.listOuput.err), testutil.EqualError(err))
@@ -692,7 +692,7 @@ func TestNewFilteredListWatchFromDynamicClientWatch(t *testing.T) {
 
 			lw := NewFilteredListWatchFromDynamicClient(ctx, fakeClient, tc.args.resource, tc.args.namespace, tc.args.filters)
 
-			watcher, err := lw.Watch(tc.watchInput.options)
+			watcher, err := lw.WatchWithContext(ctx, tc.watchInput.options)
 
 			if err != nil && tc.watchOuput.err != nil {
 				testutil.AssertEqual(t, testutil.EqualError(tc.watchOuput.err), testutil.EqualError(err))
