@@ -435,7 +435,7 @@ func (w *ObjectStatusReporter) eventHandler(
 ) cache.ResourceEventHandler {
 	var handler cache.ResourceEventHandlerFuncs
 
-	handler.AddFunc = func(iobj interface{}) {
+	handler.AddFunc = func(iobj any) {
 		// Bail early if the context is cancelled, to avoid unnecessary work.
 		if ctx.Err() != nil {
 			return
@@ -484,7 +484,7 @@ func (w *ObjectStatusReporter) eventHandler(
 		}
 	}
 
-	handler.UpdateFunc = func(_, iobj interface{}) {
+	handler.UpdateFunc = func(_, iobj any) {
 		// Bail early if the context is cancelled, to avoid unnecessary work.
 		if ctx.Err() != nil {
 			return
@@ -533,7 +533,7 @@ func (w *ObjectStatusReporter) eventHandler(
 		}
 	}
 
-	handler.DeleteFunc = func(iobj interface{}) {
+	handler.DeleteFunc = func(iobj any) {
 		// Bail early if the context is cancelled, to avoid unnecessary work.
 		if ctx.Err() != nil {
 			return

@@ -998,13 +998,13 @@ func TestApplyTimeMutationEdges(t *testing.T) {
 		"error: invalid annotation": {
 			objs: []*unstructured.Unstructured{
 				{
-					Object: map[string]interface{}{
+					Object: map[string]any{
 						"apiVersion": "apps/v1",
 						"kind":       "Deployment",
-						"metadata": map[string]interface{}{
+						"metadata": map[string]any{
 							"name":      "foo",
 							"namespace": "default",
-							"annotations": map[string]interface{}{
+							"annotations": map[string]any{
 								mutation.Annotation: "invalid-mutation",
 							},
 						},
@@ -1065,13 +1065,13 @@ func TestApplyTimeMutationEdges(t *testing.T) {
 		"error: two invalid objects": {
 			objs: []*unstructured.Unstructured{
 				{
-					Object: map[string]interface{}{
+					Object: map[string]any{
 						"apiVersion": "apps/v1",
 						"kind":       "Deployment",
-						"metadata": map[string]interface{}{
+						"metadata": map[string]any{
 							"name":      "foo",
 							"namespace": "default",
-							"annotations": map[string]interface{}{
+							"annotations": map[string]any{
 								mutation.Annotation: "invalid-mutation",
 							},
 						},
@@ -1224,13 +1224,13 @@ func TestAddDependsOnEdges(t *testing.T) {
 		"error: invalid annotation": {
 			objs: []*unstructured.Unstructured{
 				{
-					Object: map[string]interface{}{
+					Object: map[string]any{
 						"apiVersion": "apps/v1",
 						"kind":       "Deployment",
-						"metadata": map[string]interface{}{
+						"metadata": map[string]any{
 							"name":      "foo",
 							"namespace": "default",
-							"annotations": map[string]interface{}{
+							"annotations": map[string]any{
 								dependson.Annotation: "invalid-obj-ref",
 							},
 						},
@@ -1322,13 +1322,13 @@ func TestAddDependsOnEdges(t *testing.T) {
 		"error: two invalid objects": {
 			objs: []*unstructured.Unstructured{
 				{
-					Object: map[string]interface{}{
+					Object: map[string]any{
 						"apiVersion": "apps/v1",
 						"kind":       "Deployment",
-						"metadata": map[string]interface{}{
+						"metadata": map[string]any{
 							"name":      "foo",
 							"namespace": "default",
-							"annotations": map[string]interface{}{
+							"annotations": map[string]any{
 								dependson.Annotation: "invalid-obj-ref",
 							},
 						},

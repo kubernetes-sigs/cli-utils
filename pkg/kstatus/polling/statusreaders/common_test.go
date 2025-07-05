@@ -183,10 +183,10 @@ spec:
 `,
 			listObjects: []unstructured.Unstructured{
 				{
-					Object: map[string]interface{}{
+					Object: map[string]any{
 						"apiVersion": "apps/v1",
 						"kind":       "ReplicaSet",
-						"metadata": map[string]interface{}{
+						"metadata": map[string]any{
 							"name":      "Foo-12345",
 							"namespace": "default",
 						},

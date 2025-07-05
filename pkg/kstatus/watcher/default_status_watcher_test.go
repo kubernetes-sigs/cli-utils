@@ -281,7 +281,7 @@ status:
 `
 
 func yamlToUnstructured(t *testing.T, yml string) *unstructured.Unstructured {
-	m := make(map[string]interface{})
+	m := make(map[string]any)
 	err := yaml.Unmarshal([]byte(yml), &m)
 	if err != nil {
 		t.Fatalf("error parsing yaml: %v", err)

@@ -14,10 +14,10 @@ import (
 )
 
 var configMapObj = unstructured.Unstructured{
-	Object: map[string]interface{}{
+	Object: map[string]any{
 		"apiVersion": "v1",
 		"kind":       "ConfigMap",
-		"metadata": map[string]interface{}{
+		"metadata": map[string]any{
 			"name":      "the-map",
 			"namespace": "testspace",
 		},
@@ -25,20 +25,20 @@ var configMapObj = unstructured.Unstructured{
 }
 
 var namespaceObj = unstructured.Unstructured{
-	Object: map[string]interface{}{
+	Object: map[string]any{
 		"apiVersion": "v1",
 		"kind":       "Namespace",
-		"metadata": map[string]interface{}{
+		"metadata": map[string]any{
 			"name": "testspace",
 		},
 	},
 }
 
 var deploymentObj = unstructured.Unstructured{
-	Object: map[string]interface{}{
+	Object: map[string]any{
 		"apiVersion": "apps/v1",
 		"kind":       "Deployment",
-		"metadata": map[string]interface{}{
+		"metadata": map[string]any{
 			"name":      "testdeployment",
 			"namespace": "testspace",
 		},
@@ -46,10 +46,10 @@ var deploymentObj = unstructured.Unstructured{
 }
 
 var deploymentObj2 = unstructured.Unstructured{
-	Object: map[string]interface{}{
+	Object: map[string]any{
 		"apiVersion": "apps/v1",
 		"kind":       "Deployment",
-		"metadata": map[string]interface{}{
+		"metadata": map[string]any{
 			"name":      "testdeployment2",
 			"namespace": "testspace",
 		},

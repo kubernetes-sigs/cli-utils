@@ -31,8 +31,8 @@ func TestDeepEqual(t *testing.T) {
 					Name:      "Foo",
 				},
 				Resource: &unstructured.Unstructured{
-					Object: map[string]interface{}{
-						"metadata": map[string]interface{}{
+					Object: map[string]any{
+						"metadata": map[string]any{
 							"generation": int64(1),
 						},
 					},
@@ -50,8 +50,8 @@ func TestDeepEqual(t *testing.T) {
 					Name:      "Foo",
 				},
 				Resource: &unstructured.Unstructured{
-					Object: map[string]interface{}{
-						"metadata": map[string]interface{}{
+					Object: map[string]any{
+						"metadata": map[string]any{
 							"generation": int64(2),
 						},
 					},

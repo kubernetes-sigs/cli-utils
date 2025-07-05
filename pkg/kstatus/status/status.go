@@ -196,7 +196,7 @@ func Augment(u *unstructured.Unstructured) error {
 	}
 
 	if !found {
-		conditions = make([]interface{}, 0)
+		conditions = make([]any, 0)
 	}
 
 	currentTime := time.Now().UTC().Format(time.RFC3339)
@@ -204,7 +204,7 @@ func Augment(u *unstructured.Unstructured) error {
 	for _, resCondition := range res.Conditions {
 		present := false
 		for _, c := range conditions {
-			condition, ok := c.(map[string]interface{})
+			condition, ok := c.(map[string]any)
 			if !ok {
 				return errors.New("condition does not have the expected structure")
 			}
@@ -228,7 +228,7 @@ func Augment(u *unstructured.Unstructured) error {
 			}
 		}
 		if !present {
-			conditions = append(conditions, map[string]interface{}{
+			conditions = append(conditions, map[string]any{
 				"lastTransitionTime": currentTime,
 				"lastUpdateTime":     currentTime,
 				"message":            resCondition.Message,

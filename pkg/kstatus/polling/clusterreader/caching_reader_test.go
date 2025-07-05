@@ -67,10 +67,10 @@ func TestSync(t *testing.T) {
 			clusterObjs: map[gkNamespace][]unstructured.Unstructured{
 				{GroupKind: deploymentGVK.GroupKind(), Namespace: "Foo"}: {
 					{
-						Object: map[string]interface{}{
+						Object: map[string]any{
 							"apiVersion": "apps/v1",
 							"kind":       "Deployment",
-							"metadata": map[string]interface{}{
+							"metadata": map[string]any{
 								"name":      "deployment-1",
 								"namespace": "Foo",
 							},
@@ -79,10 +79,10 @@ func TestSync(t *testing.T) {
 				},
 				{GroupKind: deploymentGVK.GroupKind(), Namespace: "Bar"}: {
 					{
-						Object: map[string]interface{}{
+						Object: map[string]any{
 							"apiVersion": "apps/v1",
 							"kind":       "Deployment",
-							"metadata": map[string]interface{}{
+							"metadata": map[string]any{
 								"name":      "deployment-2",
 								"namespace": "Bar",
 							},
@@ -101,13 +101,13 @@ func TestSync(t *testing.T) {
 			expectedCached: map[gkNamespace]cacheEntry{
 				{GroupKind: deploymentGVK.GroupKind(), Namespace: "Foo"}: {
 					resources: unstructured.UnstructuredList{
-						Object: map[string]interface{}{"apiVersion": "apps/v1", "kind": "Deployment"},
+						Object: map[string]any{"apiVersion": "apps/v1", "kind": "Deployment"},
 						Items: []unstructured.Unstructured{
 							{
-								Object: map[string]interface{}{
+								Object: map[string]any{
 									"apiVersion": "apps/v1",
 									"kind":       "Deployment",
-									"metadata": map[string]interface{}{
+									"metadata": map[string]any{
 										"name":      "deployment-1",
 										"namespace": "Foo",
 									},
@@ -118,23 +118,23 @@ func TestSync(t *testing.T) {
 				},
 				{GroupKind: rsGVK.GroupKind(), Namespace: "Foo"}: {
 					resources: unstructured.UnstructuredList{
-						Object: map[string]interface{}{"apiVersion": "apps/v1", "kind": "ReplicaSet"},
+						Object: map[string]any{"apiVersion": "apps/v1", "kind": "ReplicaSet"},
 					},
 				},
 				{GroupKind: podGVK.GroupKind(), Namespace: "Foo"}: {
 					resources: unstructured.UnstructuredList{
-						Object: map[string]interface{}{"apiVersion": "v1", "kind": "Pod"},
+						Object: map[string]any{"apiVersion": "v1", "kind": "Pod"},
 					},
 				},
 				{GroupKind: deploymentGVK.GroupKind(), Namespace: "Bar"}: {
 					resources: unstructured.UnstructuredList{
-						Object: map[string]interface{}{"apiVersion": "apps/v1", "kind": "Deployment"},
+						Object: map[string]any{"apiVersion": "apps/v1", "kind": "Deployment"},
 						Items: []unstructured.Unstructured{
 							{
-								Object: map[string]interface{}{
+								Object: map[string]any{
 									"apiVersion": "apps/v1",
 									"kind":       "Deployment",
-									"metadata": map[string]interface{}{
+									"metadata": map[string]any{
 										"name":      "deployment-2",
 										"namespace": "Bar",
 									},
@@ -145,12 +145,12 @@ func TestSync(t *testing.T) {
 				},
 				{GroupKind: rsGVK.GroupKind(), Namespace: "Bar"}: {
 					resources: unstructured.UnstructuredList{
-						Object: map[string]interface{}{"apiVersion": "apps/v1", "kind": "ReplicaSet"},
+						Object: map[string]any{"apiVersion": "apps/v1", "kind": "ReplicaSet"},
 					},
 				},
 				{GroupKind: podGVK.GroupKind(), Namespace: "Bar"}: {
 					resources: unstructured.UnstructuredList{
-						Object: map[string]interface{}{"apiVersion": "v1", "kind": "Pod"},
+						Object: map[string]any{"apiVersion": "v1", "kind": "Pod"},
 					},
 				},
 			},
@@ -162,10 +162,10 @@ func TestSync(t *testing.T) {
 	barObjs := make([]unstructured.Unstructured, 1001)
 	for i := 0; i < len(barObjs); i++ {
 		barObjs[i] = unstructured.Unstructured{
-			Object: map[string]interface{}{
+			Object: map[string]any{
 				"apiVersion": podGVK.GroupVersion().String(),
 				"kind":       podGVK.Kind,
-				"metadata": map[string]interface{}{
+				"metadata": map[string]any{
 					"name":      fmt.Sprintf("pod-%d", i),
 					"namespace": barPodGKN.Namespace,
 				},
@@ -198,7 +198,7 @@ func TestSync(t *testing.T) {
 		expectedCached: map[gkNamespace]cacheEntry{
 			barPodGKN: {
 				resources: unstructured.UnstructuredList{
-					Object: map[string]interface{}{
+					Object: map[string]any{
 						"apiVersion": podGVK.GroupVersion().String(),
 						"kind":       podGVK.Kind,
 					},

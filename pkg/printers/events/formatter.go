@@ -167,7 +167,7 @@ func (ef *formatter) printResourceStatus(id object.ObjMetadata, se event.StatusE
 		se.PollResourceInfo.Status.String(), se.PollResourceInfo.Message)
 }
 
-func (ef *formatter) print(format string, a ...interface{}) {
+func (ef *formatter) print(format string, a ...any) {
 	_, _ = fmt.Fprintf(ef.ioStreams.Out, format+"\n", a...)
 }
 

@@ -50,12 +50,12 @@ func isPodUnschedulable(obj *unstructured.Unstructured) bool {
 	if err != nil || !found {
 		return false
 	}
-	cnds, ok := icnds.([]interface{})
+	cnds, ok := icnds.([]any)
 	if !ok {
 		return false
 	}
 	for _, icnd := range cnds {
-		cnd, ok := icnd.(map[string]interface{})
+		cnd, ok := icnd.(map[string]any)
 		if !ok {
 			return false
 		}

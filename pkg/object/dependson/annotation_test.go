@@ -11,13 +11,13 @@ import (
 )
 
 var u1 = &unstructured.Unstructured{
-	Object: map[string]interface{}{
+	Object: map[string]any{
 		"apiVersion": "v1",
 		"kind":       "ConfigMap",
-		"metadata": map[string]interface{}{
+		"metadata": map[string]any{
 			"name":      "unused",
 			"namespace": "unused",
-			"annotations": map[string]interface{}{
+			"annotations": map[string]any{
 				Annotation: "test-group/test-kind/cluster-obj",
 			},
 		},
@@ -25,13 +25,13 @@ var u1 = &unstructured.Unstructured{
 }
 
 var u2 = &unstructured.Unstructured{
-	Object: map[string]interface{}{
+	Object: map[string]any{
 		"apiVersion": "v1",
 		"kind":       "ConfigMap",
-		"metadata": map[string]interface{}{
+		"metadata": map[string]any{
 			"name":      "unused",
 			"namespace": "unused",
-			"annotations": map[string]interface{}{
+			"annotations": map[string]any{
 				Annotation: "test-group/namespaces/test-namespace/test-kind/namespaced-obj",
 			},
 		},
@@ -39,13 +39,13 @@ var u2 = &unstructured.Unstructured{
 }
 
 var multipleAnnotations = &unstructured.Unstructured{
-	Object: map[string]interface{}{
+	Object: map[string]any{
 		"apiVersion": "v1",
 		"kind":       "ConfigMap",
-		"metadata": map[string]interface{}{
+		"metadata": map[string]any{
 			"name":      "unused",
 			"namespace": "unused",
-			"annotations": map[string]interface{}{
+			"annotations": map[string]any{
 				Annotation: "test-group/namespaces/test-namespace/test-kind/namespaced-obj," +
 					"test-group/test-kind/cluster-obj",
 			},
@@ -54,10 +54,10 @@ var multipleAnnotations = &unstructured.Unstructured{
 }
 
 var noAnnotations = &unstructured.Unstructured{
-	Object: map[string]interface{}{
+	Object: map[string]any{
 		"apiVersion": "v1",
 		"kind":       "ConfigMap",
-		"metadata": map[string]interface{}{
+		"metadata": map[string]any{
 			"name":      "unused",
 			"namespace": "unused",
 		},
@@ -65,13 +65,13 @@ var noAnnotations = &unstructured.Unstructured{
 }
 
 var badAnnotation = &unstructured.Unstructured{
-	Object: map[string]interface{}{
+	Object: map[string]any{
 		"apiVersion": "v1",
 		"kind":       "ConfigMap",
-		"metadata": map[string]interface{}{
+		"metadata": map[string]any{
 			"name":      "unused",
 			"namespace": "unused",
-			"annotations": map[string]interface{}{
+			"annotations": map[string]any{
 				Annotation: "test-group:namespaces:test-namespace:test-kind:namespaced-obj",
 			},
 		},

@@ -22,13 +22,13 @@ import (
 )
 
 var inventoryObj = &unstructured.Unstructured{
-	Object: map[string]interface{}{
+	Object: map[string]any{
 		"apiVersion": "v1",
 		"kind":       "ConfigMap",
-		"metadata": map[string]interface{}{
+		"metadata": map[string]any{
 			"name":      inventory.TestInventoryName,
 			"namespace": inventory.TestInventoryNamespace,
-			"labels": map[string]interface{}{
+			"labels": map[string]any{
 				common.InventoryLabel: "test-app-label",
 			},
 		},
@@ -36,10 +36,10 @@ var inventoryObj = &unstructured.Unstructured{
 }
 
 var obj1 = &unstructured.Unstructured{
-	Object: map[string]interface{}{
+	Object: map[string]any{
 		"apiVersion": "v1",
 		"kind":       "Pod",
-		"metadata": map[string]interface{}{
+		"metadata": map[string]any{
 			"name":      "obj1",
 			"namespace": inventory.TestInventoryNamespace,
 		},
@@ -47,10 +47,10 @@ var obj1 = &unstructured.Unstructured{
 }
 
 var obj2 = &unstructured.Unstructured{
-	Object: map[string]interface{}{
+	Object: map[string]any{
 		"apiVersion": "batch/v1",
 		"kind":       "Job",
-		"metadata": map[string]interface{}{
+		"metadata": map[string]any{
 			"name":      "obj2",
 			"namespace": inventory.TestInventoryNamespace,
 		},
@@ -58,10 +58,10 @@ var obj2 = &unstructured.Unstructured{
 }
 
 var obj3 = &unstructured.Unstructured{
-	Object: map[string]interface{}{
+	Object: map[string]any{
 		"apiVersion": "apps/v1",
 		"kind":       "Deployment",
-		"metadata": map[string]interface{}{
+		"metadata": map[string]any{
 			"name":      "obj3",
 			"namespace": "different-namespace",
 		},
@@ -69,10 +69,10 @@ var obj3 = &unstructured.Unstructured{
 }
 
 var nsObj = &unstructured.Unstructured{
-	Object: map[string]interface{}{
+	Object: map[string]any{
 		"apiVersion": "v1",
 		"kind":       "Namespace",
-		"metadata": map[string]interface{}{
+		"metadata": map[string]any{
 			"name": inventory.TestInventoryNamespace,
 		},
 	},
@@ -272,10 +272,10 @@ func TestInventoryNamespaceInSet(t *testing.T) {
 
 func createNamespace(ns string) *unstructured.Unstructured {
 	return &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "v1",
 			"kind":       "Namespace",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name": ns,
 			},
 		},

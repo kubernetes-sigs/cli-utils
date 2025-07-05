@@ -76,7 +76,7 @@ type BasicCondition struct {
 }
 
 // GetObjectWithConditions return typed object
-func GetObjectWithConditions(in map[string]interface{}) (*ObjWithConditions, error) {
+func GetObjectWithConditions(in map[string]any) (*ObjWithConditions, error) {
 	var out = new(ObjWithConditions)
 	err := runtime.DefaultUnstructuredConverter.FromUnstructured(in, out)
 	if err != nil {
@@ -100,7 +100,7 @@ func getConditionWithStatus(conditions []BasicCondition, conditionType string, s
 }
 
 // GetStringField return field as string defaulting to value if not found
-func GetStringField(obj map[string]interface{}, fieldPath string, defaultValue string) string {
+func GetStringField(obj map[string]any, fieldPath string, defaultValue string) string {
 	var rv = defaultValue
 
 	fields := strings.Split(fieldPath, ".")
@@ -120,7 +120,7 @@ func GetStringField(obj map[string]interface{}, fieldPath string, defaultValue s
 }
 
 // GetIntField return field as int defaulting to value if not found
-func GetIntField(obj map[string]interface{}, fieldPath string, defaultValue int) int {
+func GetIntField(obj map[string]any, fieldPath string, defaultValue int) int {
 	var rv = defaultValue
 
 	fields := strings.Split(fieldPath, ".")
@@ -145,7 +145,7 @@ func GetIntField(obj map[string]interface{}, fieldPath string, defaultValue int)
 }
 
 // GetBoolField return field as boolean defaulting to value if not found
-func GetBoolField(obj map[string]interface{}, fieldPath string, defaultValue bool) bool {
+func GetBoolField(obj map[string]any, fieldPath string, defaultValue bool) bool {
 	var rv = defaultValue
 
 	fields := strings.Split(fieldPath, ".")

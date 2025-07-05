@@ -28,10 +28,10 @@ func TestKubectlPrinterAdapter(t *testing.T) {
 	assert.NoError(t, err)
 
 	deployment := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "apps/v1",
 			"kind":       "Deployment",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name":      "name",
 				"namespace": "namespace",
 			},

@@ -210,11 +210,11 @@ type condition struct {
 
 func mustResourceWithConditions(conditions []condition) *unstructured.Unstructured {
 	u := &unstructured.Unstructured{
-		Object: make(map[string]interface{}),
+		Object: make(map[string]any),
 	}
-	var conditionsSlice []interface{}
+	var conditionsSlice []any
 	for _, c := range conditions {
-		cond := make(map[string]interface{})
+		cond := make(map[string]any)
 		cond["type"] = c.Type
 		cond["status"] = string(c.Status)
 		conditionsSlice = append(conditionsSlice, cond)
@@ -229,7 +229,7 @@ func mustResourceWithConditions(conditions []condition) *unstructured.Unstructur
 
 func mustResourceWithCreationTimestamp(age time.Duration) *unstructured.Unstructured {
 	u := &unstructured.Unstructured{
-		Object: make(map[string]interface{}),
+		Object: make(map[string]any),
 	}
 	creationTime := time.Now().Add(-age)
 	u.SetCreationTimestamp(metav1.Time{

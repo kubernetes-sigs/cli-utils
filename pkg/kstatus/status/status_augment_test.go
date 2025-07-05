@@ -34,8 +34,8 @@ metadata:
 
 var timestamp = time.Now().Add(-1 * time.Minute).UTC().Format(time.RFC3339)
 
-func addConditions(t *testing.T, u *unstructured.Unstructured, conditions []map[string]interface{}) {
-	conds := make([]interface{}, 0)
+func addConditions(t *testing.T, u *unstructured.Unstructured, conditions []map[string]any) {
+	conds := make([]any, 0)
 	for _, c := range conditions {
 		conds = append(conds, c)
 	}
@@ -48,12 +48,12 @@ func addConditions(t *testing.T, u *unstructured.Unstructured, conditions []map[
 func TestAugmentConditions(t *testing.T) {
 	testCases := map[string]struct {
 		manifest           string
-		withConditions     []map[string]interface{}
+		withConditions     []map[string]any
 		expectedConditions []Condition
 	}{
 		"no existing conditions": {
 			manifest:       pod,
-			withConditions: []map[string]interface{}{},
+			withConditions: []map[string]any{},
 			expectedConditions: []Condition{
 				{
 					Type:   ConditionReconciling,
@@ -64,7 +64,7 @@ func TestAugmentConditions(t *testing.T) {
 		},
 		"has other existing conditions": {
 			manifest: pod,
-			withConditions: []map[string]interface{}{
+			withConditions: []map[string]any{
 				{
 					"lastTransitionTime": timestamp,
 					"lastUpdateTime":     timestamp,
@@ -88,7 +88,7 @@ func TestAugmentConditions(t *testing.T) {
 		},
 		"already has condition of standard type InProgress": {
 			manifest: pod,
-			withConditions: []map[string]interface{}{
+			withConditions: []map[string]any{
 				{
 					"lastTransitionTime": timestamp,
 					"lastUpdateTime":     timestamp,
@@ -107,7 +107,7 @@ func TestAugmentConditions(t *testing.T) {
 		},
 		"already has condition of standard type Failed": {
 			manifest: pod,
-			withConditions: []map[string]interface{}{
+			withConditions: []map[string]any{
 				{
 					"lastTransitionTime": timestamp,
 					"lastUpdateTime":     timestamp,
@@ -126,7 +126,7 @@ func TestAugmentConditions(t *testing.T) {
 		},
 		"custom resource with no conditions": {
 			manifest:           custom,
-			withConditions:     []map[string]interface{}{},
+			withConditions:     []map[string]any{},
 			expectedConditions: []Condition{},
 		},
 	}

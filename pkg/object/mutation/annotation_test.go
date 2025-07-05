@@ -75,13 +75,13 @@ var m2 = ApplyTimeMutation{
 
 // inline json, no spaces or linebreaks
 var u1j = &unstructured.Unstructured{
-	Object: map[string]interface{}{
+	Object: map[string]any{
 		"apiVersion": "v1",
 		"kind":       "ConfigMap",
-		"metadata": map[string]interface{}{
+		"metadata": map[string]any{
 			"name":      "unused",
 			"namespace": "unused",
-			"annotations": map[string]interface{}{
+			"annotations": map[string]any{
 				Annotation: `[` +
 					`{` +
 					`"sourceRef":{` +

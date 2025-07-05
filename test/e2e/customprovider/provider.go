@@ -109,9 +109,9 @@ func (CustomClientFactory) NewClient(factory util.Factory) (inventory.Client, er
 
 func toUnstructured(uObj *unstructured.Unstructured, inv *inventory.SingleObjectInventory) (*unstructured.Unstructured, error) {
 	// Populate the spec
-	var specObjs []interface{}
+	var specObjs []any
 	for _, obj := range inv.ObjectRefs {
-		specObjs = append(specObjs, map[string]interface{}{
+		specObjs = append(specObjs, map[string]any{
 			"group":     obj.GroupKind.Group,
 			"kind":      obj.GroupKind.Kind,
 			"namespace": obj.Namespace,
@@ -135,9 +135,9 @@ func toUnstructuredStatus(uObj *unstructured.Unstructured, inv *inventory.Single
 	// Remove the spec. It's ignored by the server when calling UpdateStatus.
 	unstructured.RemoveNestedField(uObj.Object, "spec")
 	// Populate the status.
-	var statusObjs []interface{}
+	var statusObjs []any
 	for _, objStatus := range inv.ObjectStatuses {
-		statusObjs = append(statusObjs, map[string]interface{}{
+		statusObjs = append(statusObjs, map[string]any{
 			"group":     objStatus.Group,
 			"kind":      objStatus.Kind,
 			"namespace": objStatus.Namespace,
@@ -168,7 +168,7 @@ func fromUnstructured(obj *unstructured.Unstructured) (*inventory.SingleObjectIn
 		return inv, nil
 	}
 	for _, item := range s {
-		m := item.(map[string]interface{})
+		m := item.(map[string]any)
 		namespace, _, _ := unstructured.NestedString(m, "namespace")
 		name, _, _ := unstructured.NestedString(m, "name")
 		group, _, _ := unstructured.NestedString(m, "group")

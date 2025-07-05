@@ -363,8 +363,8 @@ roleRef:
 `
 
 type nestedFieldValue struct {
-	Field []interface{}
-	Value interface{}
+	Field []any
+	Value any
 }
 
 func TestMutate(t *testing.T) {
@@ -382,7 +382,7 @@ func TestMutate(t *testing.T) {
 	clusterrole1 := ktestutil.YamlToUnstructured(t, clusterrole1y)
 	clusterrolebinding1 := ktestutil.YamlToUnstructured(t, clusterrolebinding1y)
 
-	joinedPaths := make([]interface{}, 0)
+	joinedPaths := make([]any, 0)
 	err := yaml.Unmarshal([]byte(joinedPathsYaml), &joinedPaths)
 	if err != nil {
 		t.Fatalf("error parsing yaml: %v", err)
@@ -436,7 +436,7 @@ func TestMutate(t *testing.T) {
 			reason:  expectedReason,
 			expected: []nestedFieldValue{
 				{
-					Field: []interface{}{"spec", "containers", 0, "env", 0, "value"},
+					Field: []any{"spec", "containers", 0, "env", 0, "value"},
 					Value: "80", // must be string, not int
 				},
 			},
@@ -448,11 +448,11 @@ func TestMutate(t *testing.T) {
 			reason:  expectedReason,
 			expected: []nestedFieldValue{
 				{
-					Field: []interface{}{"spec", "containers", 0, "env", 0, "value"},
+					Field: []any{"spec", "containers", 0, "env", 0, "value"},
 					Value: "80", // must be string, not int
 				},
 				{
-					Field: []interface{}{"spec", "containers", 0, "env", 1, "value"},
+					Field: []any{"spec", "containers", 0, "env", 1, "value"},
 					Value: "old",
 				},
 			},
@@ -465,11 +465,11 @@ func TestMutate(t *testing.T) {
 			reason:  expectedReason,
 			expected: []nestedFieldValue{
 				{
-					Field: []interface{}{"spec", "containers", 0, "env", 0, "value"},
+					Field: []any{"spec", "containers", 0, "env", 0, "value"},
 					Value: "80", // must be string, not int
 				},
 				{
-					Field: []interface{}{"spec", "containers", 0, "env", 1, "value"},
+					Field: []any{"spec", "containers", 0, "env", 1, "value"},
 					Value: "old",
 				},
 			},
@@ -481,11 +481,11 @@ func TestMutate(t *testing.T) {
 			reason:  expectedReason,
 			expected: []nestedFieldValue{
 				{
-					Field: []interface{}{"spec", "containers", 0, "env", 0, "value"},
+					Field: []any{"spec", "containers", 0, "env", 0, "value"},
 					Value: "80", // must be string, not int
 				},
 				{
-					Field: []interface{}{"spec", "containers", 0, "image"},
+					Field: []any{"spec", "containers", 0, "image"},
 					Value: "traefik/whoami:1.0", // make sure float string isn't trucated to "1"
 				},
 			},
@@ -498,11 +498,11 @@ func TestMutate(t *testing.T) {
 			reason:  expectedReason,
 			expected: []nestedFieldValue{
 				{
-					Field: []interface{}{"spec", "containers", 0, "env", 0, "value"},
+					Field: []any{"spec", "containers", 0, "env", 0, "value"},
 					Value: "80", // must be string, not int
 				},
 				{
-					Field: []interface{}{"spec", "containers", 0, "image"},
+					Field: []any{"spec", "containers", 0, "image"},
 					Value: "traefik/whoami:1.0", // make sure float string isn't trucated to "1"
 				},
 			},
@@ -514,7 +514,7 @@ func TestMutate(t *testing.T) {
 			reason:  expectedReason,
 			expected: []nestedFieldValue{
 				{
-					Field: []interface{}{"data", "json"},
+					Field: []any{"data", "json"},
 					Value: `[{"π":3.14},{"image":"traefik/whoami","version":"1.0"}]`, // string, not object
 				},
 			},
@@ -526,7 +526,7 @@ func TestMutate(t *testing.T) {
 			reason:  expectedReason,
 			expected: []nestedFieldValue{
 				{
-					Field: []interface{}{"spec", "rules", 0, "http", "paths"},
+					Field: []any{"spec", "rules", 0, "http", "paths"},
 					Value: joinedPaths, // object, not string
 				},
 			},
@@ -538,11 +538,11 @@ func TestMutate(t *testing.T) {
 			reason:  expectedReason,
 			expected: []nestedFieldValue{
 				{
-					Field: []interface{}{"spec", "ports", 0, "targetPort"},
+					Field: []any{"spec", "ports", 0, "targetPort"},
 					Value: 8080,
 				},
 				{
-					Field: []interface{}{"spec", "ports", 2, "targetPort"},
+					Field: []any{"spec", "ports", 2, "targetPort"},
 					Value: 8081,
 				},
 			},
@@ -554,7 +554,7 @@ func TestMutate(t *testing.T) {
 			reason:  expectedReason,
 			expected: []nestedFieldValue{
 				{
-					Field: []interface{}{"subjects", 0, "name"},
+					Field: []any{"subjects", 0, "name"},
 					Value: "bob@example.com",
 				},
 			},
@@ -606,7 +606,7 @@ func TestMutate(t *testing.T) {
 
 func TestValueToString(t *testing.T) {
 	tests := map[string]struct {
-		value    interface{}
+		value    any
 		expected string
 	}{
 		"int": {
@@ -626,10 +626,10 @@ func TestValueToString(t *testing.T) {
 			expected: "false",
 		},
 		"interface map": {
-			value: map[string]interface{}{
+			value: map[string]any{
 				"apiVersion": "v1",
 				"kind":       "Pod",
-				"metadata": map[string]interface{}{
+				"metadata": map[string]any{
 					"name":      "pod-name",
 					"namespace": "test-namespace",
 				},
@@ -637,9 +637,9 @@ func TestValueToString(t *testing.T) {
 			expected: `{"apiVersion":"v1","kind":"Pod","metadata":{"name":"pod-name","namespace":"test-namespace"}}`,
 		},
 		"interface list": {
-			value: []interface{}{
+			value: []any{
 				"x",
-				map[string]interface{}{
+				map[string]any{
 					"?": nil,
 				},
 				0,

@@ -23,13 +23,13 @@ var pod3Name = "pod-3"
 var testInventoryLabel = "test-app-label"
 
 var inventoryObj = &unstructured.Unstructured{
-	Object: map[string]interface{}{
+	Object: map[string]any{
 		"apiVersion": "v1",
 		"kind":       "ConfigMap",
-		"metadata": map[string]interface{}{
+		"metadata": map[string]any{
 			"name":      inventoryObjName,
 			"namespace": testNamespace,
-			"labels": map[string]interface{}{
+			"labels": map[string]any{
 				common.InventoryLabel: testInventoryLabel,
 			},
 		},
@@ -37,13 +37,13 @@ var inventoryObj = &unstructured.Unstructured{
 }
 
 var legacyInvObj = &unstructured.Unstructured{
-	Object: map[string]interface{}{
+	Object: map[string]any{
 		"apiVersion": "v1",
 		"kind":       "ConfigMap",
-		"metadata": map[string]interface{}{
+		"metadata": map[string]any{
 			"name":      legacyInvName,
 			"namespace": testNamespace,
-			"labels": map[string]interface{}{
+			"labels": map[string]any{
 				common.InventoryLabel: testInventoryLabel,
 			},
 		},
@@ -60,10 +60,10 @@ var invInfo = &resource.Info{
 }
 
 var pod1 = &unstructured.Unstructured{
-	Object: map[string]interface{}{
+	Object: map[string]any{
 		"apiVersion": "v1",
 		"kind":       "Pod",
-		"metadata": map[string]interface{}{
+		"metadata": map[string]any{
 			"name":      pod1Name,
 			"namespace": testNamespace,
 			"uid":       "uid1",
@@ -81,10 +81,10 @@ var pod1Info = &resource.Info{
 }
 
 var pod2 = &unstructured.Unstructured{
-	Object: map[string]interface{}{
+	Object: map[string]any{
 		"apiVersion": "v1",
 		"kind":       "Pod",
-		"metadata": map[string]interface{}{
+		"metadata": map[string]any{
 			"name":      pod2Name,
 			"namespace": testNamespace,
 			"uid":       "uid2",
@@ -102,10 +102,10 @@ var pod2Info = &resource.Info{
 }
 
 var pod3 = &unstructured.Unstructured{
-	Object: map[string]interface{}{
+	Object: map[string]any{
 		"apiVersion": "v1",
 		"kind":       "Pod",
-		"metadata": map[string]interface{}{
+		"metadata": map[string]any{
 			"name":      pod3Name,
 			"namespace": testNamespace,
 			"uid":       "uid3",

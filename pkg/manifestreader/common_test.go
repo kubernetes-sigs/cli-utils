@@ -346,10 +346,10 @@ metadata:
 
 func toUnstructured(gvk schema.GroupVersionKind, namespace string) *unstructured.Unstructured {
 	return &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": gvk.GroupVersion().String(),
 			"kind":       gvk.Kind,
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"namespace": namespace,
 			},
 		},
@@ -359,17 +359,17 @@ func toUnstructured(gvk schema.GroupVersionKind, namespace string) *unstructured
 func toCRDUnstructured(crdGvk schema.GroupVersionKind, crGvk schema.GroupVersionKind,
 	scope string) *unstructured.Unstructured {
 	return &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": crdGvk.GroupVersion().String(),
 			"kind":       crdGvk.Kind,
-			"spec": map[string]interface{}{
+			"spec": map[string]any{
 				"group": crGvk.Group,
-				"names": map[string]interface{}{
+				"names": map[string]any{
 					"kind": crGvk.Kind,
 				},
 				"scope": scope,
-				"versions": []interface{}{
-					map[string]interface{}{
+				"versions": []any{
+					map[string]any{
 						"name": crGvk.Version,
 					},
 				},
@@ -380,10 +380,10 @@ func toCRDUnstructured(crdGvk schema.GroupVersionKind, crGvk schema.GroupVersion
 
 func objMetaToUnstructured(id object.ObjMetadata) *unstructured.Unstructured {
 	return &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": fmt.Sprintf("%s/v1", id.GroupKind.Group),
 			"kind":       id.GroupKind.Kind,
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"namespace": id.Namespace,
 				"name":      id.Name,
 			},

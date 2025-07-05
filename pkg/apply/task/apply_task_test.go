@@ -218,10 +218,10 @@ func TestApplyTask_DryRun(t *testing.T) {
 	}{
 		"simple dry run": {
 			objs: []*unstructured.Unstructured{
-				toUnstructured(map[string]interface{}{
+				toUnstructured(map[string]any{
 					"apiVersion": "apps/v1",
 					"kind":       "Deployment",
-					"metadata": map[string]interface{}{
+					"metadata": map[string]any{
 						"name":      "foo",
 						"namespace": "default",
 					},
@@ -241,28 +241,28 @@ func TestApplyTask_DryRun(t *testing.T) {
 		},
 		"dry run with CRD and CR": {
 			objs: []*unstructured.Unstructured{
-				toUnstructured(map[string]interface{}{
+				toUnstructured(map[string]any{
 					"apiVersion": "apiextensions.k8s.io/v1",
 					"kind":       "CustomResourceDefinition",
-					"metadata": map[string]interface{}{
+					"metadata": map[string]any{
 						"name": "foo",
 					},
-					"spec": map[string]interface{}{
+					"spec": map[string]any{
 						"group": "custom.io",
-						"names": map[string]interface{}{
+						"names": map[string]any{
 							"kind": "Custom",
 						},
-						"versions": []interface{}{
-							map[string]interface{}{
+						"versions": []any{
+							map[string]any{
 								"name": "v1alpha1",
 							},
 						},
 					},
 				}),
-				toUnstructured(map[string]interface{}{
+				toUnstructured(map[string]any{
 					"apiVersion": "custom.io/v1alpha1",
 					"kind":       "Custom",
-					"metadata": map[string]interface{}{
+					"metadata": map[string]any{
 						"name": "bar",
 					},
 				}),
@@ -356,36 +356,36 @@ func TestApplyTaskWithError(t *testing.T) {
 	}{
 		"some resources have apply error": {
 			objs: []*unstructured.Unstructured{
-				toUnstructured(map[string]interface{}{
+				toUnstructured(map[string]any{
 					"apiVersion": "apiextensions.k8s.io/v1",
 					"kind":       "CustomResourceDefinition",
-					"metadata": map[string]interface{}{
+					"metadata": map[string]any{
 						"name": "foo",
 					},
-					"spec": map[string]interface{}{
+					"spec": map[string]any{
 						"group": "anothercustom.io",
-						"names": map[string]interface{}{
+						"names": map[string]any{
 							"kind": "AnotherCustom",
 						},
-						"versions": []interface{}{
-							map[string]interface{}{
+						"versions": []any{
+							map[string]any{
 								"name": "v2",
 							},
 						},
 					},
 				}),
-				toUnstructured(map[string]interface{}{
+				toUnstructured(map[string]any{
 					"apiVersion": "anothercustom.io/v2",
 					"kind":       "AnotherCustom",
-					"metadata": map[string]interface{}{
+					"metadata": map[string]any{
 						"name":      "bar",
 						"namespace": "barbar",
 					},
 				}),
-				toUnstructured(map[string]interface{}{
+				toUnstructured(map[string]any{
 					"apiVersion": "anothercustom.io/v2",
 					"kind":       "AnotherCustom",
-					"metadata": map[string]interface{}{
+					"metadata": map[string]any{
 						"name":      "bar-with-failure",
 						"namespace": "barbar",
 					},
@@ -514,7 +514,7 @@ func TestApplyTaskWithError(t *testing.T) {
 	}
 }
 
-func toUnstructured(obj map[string]interface{}) *unstructured.Unstructured {
+func toUnstructured(obj map[string]any) *unstructured.Unstructured {
 	return &unstructured.Unstructured{
 		Object: obj,
 	}
@@ -525,15 +525,15 @@ func toUnstructureds(rss []resourceInfo) []*unstructured.Unstructured {
 
 	for _, rs := range rss {
 		objs = append(objs, &unstructured.Unstructured{
-			Object: map[string]interface{}{
+			Object: map[string]any{
 				"apiVersion": rs.apiVersion,
 				"kind":       rs.kind,
-				"metadata": map[string]interface{}{
+				"metadata": map[string]any{
 					"name":       rs.name,
 					"namespace":  rs.namespace,
 					"uid":        string(rs.uid),
 					"generation": rs.generation,
-					"annotations": map[string]interface{}{
+					"annotations": map[string]any{
 						"config.k8s.io/owning-inventory": "id",
 					},
 				},

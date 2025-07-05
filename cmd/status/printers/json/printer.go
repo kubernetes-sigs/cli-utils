@@ -97,8 +97,8 @@ func (ep *Printer) printStatusEvent(se pollevent.Event) error {
 	return nil
 }
 
-func (ep *Printer) createJSONObj(id object.ObjMetadata) map[string]interface{} {
-	return map[string]interface{}{
+func (ep *Printer) createJSONObj(id object.ObjMetadata) map[string]any {
+	return map[string]any{
 		"group":     id.GroupKind.Group,
 		"kind":      id.GroupKind.Kind,
 		"namespace": id.Namespace,

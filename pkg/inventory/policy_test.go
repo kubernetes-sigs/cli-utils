@@ -14,10 +14,10 @@ import (
 
 func testObjectWithAnnotation(key, val string) *unstructured.Unstructured {
 	obj := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "v1",
 			"kind":       "Deployment",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name":      "foo",
 				"namespace": "ns",
 			},

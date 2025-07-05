@@ -27,9 +27,9 @@ func TestValidate(t *testing.T) {
 		"missing kind": {
 			resources: []*unstructured.Unstructured{
 				{
-					Object: map[string]interface{}{
+					Object: map[string]any{
 						"apiVersion": "apps/v1",
-						"metadata": map[string]interface{}{
+						"metadata": map[string]any{
 							"name":      "foo",
 							"namespace": "default",
 						},
@@ -56,7 +56,7 @@ func TestValidate(t *testing.T) {
 		"multiple errors in one object": {
 			resources: []*unstructured.Unstructured{
 				{
-					Object: map[string]interface{}{
+					Object: map[string]any{
 						"apiVersion": "apps/v1",
 						"kind":       "Deployment",
 					},
@@ -90,19 +90,19 @@ func TestValidate(t *testing.T) {
 		"one error in multiple object": {
 			resources: []*unstructured.Unstructured{
 				{
-					Object: map[string]interface{}{
+					Object: map[string]any{
 						"apiVersion": "apps/v1",
 						"kind":       "Deployment",
-						"metadata": map[string]interface{}{
+						"metadata": map[string]any{
 							"namespace": "default",
 						},
 					},
 				},
 				{
-					Object: map[string]interface{}{
+					Object: map[string]any{
 						"apiVersion": "apps/v1",
 						"kind":       "StatefulSet",
-						"metadata": map[string]interface{}{
+						"metadata": map[string]any{
 							"namespace": "default",
 						},
 					},
@@ -146,10 +146,10 @@ func TestValidate(t *testing.T) {
 		"namespace must be empty (cluster-scoped)": {
 			resources: []*unstructured.Unstructured{
 				{
-					Object: map[string]interface{}{
+					Object: map[string]any{
 						"apiVersion": "v1",
 						"kind":       "Namespace",
-						"metadata": map[string]interface{}{
+						"metadata": map[string]any{
 							"name":      "foo",
 							"namespace": "default",
 						},
@@ -176,10 +176,10 @@ func TestValidate(t *testing.T) {
 		"namespace is required (namespace-scoped)": {
 			resources: []*unstructured.Unstructured{
 				{
-					Object: map[string]interface{}{
+					Object: map[string]any{
 						"apiVersion": "apps/v1",
 						"kind":       "Deployment",
-						"metadata": map[string]interface{}{
+						"metadata": map[string]any{
 							"name": "foo",
 						},
 					},
