@@ -160,7 +160,7 @@ func TestSync(t *testing.T) {
 	barPodGKN := gkNamespace{GroupKind: podGVK.GroupKind(), Namespace: "Bar"}
 	// 1001 = 3 pages of 500
 	barObjs := make([]unstructured.Unstructured, 1001)
-	for i := 0; i < len(barObjs); i++ {
+	for i := range barObjs {
 		barObjs[i] = unstructured.Unstructured{
 			Object: map[string]any{
 				"apiVersion": podGVK.GroupVersion().String(),

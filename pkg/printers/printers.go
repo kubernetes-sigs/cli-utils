@@ -4,6 +4,8 @@
 package printers
 
 import (
+	"slices"
+
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	"sigs.k8s.io/cli-utils/pkg/print/list"
@@ -45,10 +47,5 @@ func DefaultPrinter() string {
 }
 
 func ValidatePrinterType(printerType string) bool {
-	for _, p := range SupportedPrinters() {
-		if printerType == p {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(SupportedPrinters(), printerType)
 }

@@ -4,6 +4,8 @@
 package watcher
 
 import (
+	"slices"
+
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
@@ -28,12 +30,7 @@ func isObjectUnschedulable(rs *event.ResourceStatus) bool {
 		return true
 	}
 	// recurse through generated resources
-	for _, subRS := range rs.GeneratedResources {
-		if isObjectUnschedulable(subRS) {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(rs.GeneratedResources, isObjectUnschedulable)
 }
 
 // isPodUnschedulable returns true if the object is a pod and is unschedulable

@@ -6,6 +6,7 @@ package status
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -48,14 +49,12 @@ func (s Status) String() string {
 	return string(s)
 }
 
-// StatusFromString turns a string into a Status. Will panic if the provided string is
+// FromStringOrDie turns a string into a Status. Will panic if the provided string is
 // not a valid status.
 func FromStringOrDie(text string) Status {
 	s := Status(text)
-	for _, r := range Statuses {
-		if s == r {
-			return s
-		}
+	if slices.Contains(Statuses, s) {
+		return s
 	}
 	panic(fmt.Errorf("string has invalid status: %s", s))
 }

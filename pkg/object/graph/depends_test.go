@@ -5,6 +5,7 @@ package graph
 
 import (
 	"errors"
+	"slices"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -1595,12 +1596,7 @@ func verifyObjSets(t *testing.T, expected []object.UnstructuredSet, actual []obj
 func containsObjs(objs []*unstructured.Unstructured, obj *unstructured.Unstructured) bool {
 	ids := object.UnstructuredSetToObjMetadataSet(objs)
 	id := object.UnstructuredToObjMetadata(obj)
-	for _, i := range ids {
-		if i == id {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(ids, id)
 }
 
 // verifyEdges ensures the slices of directed Edges contain the same elements.

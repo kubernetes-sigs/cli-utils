@@ -55,7 +55,7 @@ type BaseTablePrinter struct {
 // were printed.
 func (t *BaseTablePrinter) PrintTable(rs ResourceStates,
 	moveUpCount int) int {
-	for i := 0; i < moveUpCount; i++ {
+	for range moveUpCount {
 		t.moveUp()
 		t.eraseCurrentLine()
 	}

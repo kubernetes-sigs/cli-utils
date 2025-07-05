@@ -6,6 +6,7 @@ package json
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"time"
 
 	"k8s.io/cli-runtime/pkg/genericiooptions"
@@ -224,9 +225,7 @@ func (jf *formatter) printEvent(t string, content map[string]any) error {
 	m := make(map[string]any)
 	m["timestamp"] = jf.now().UTC().Format(time.RFC3339)
 	m["type"] = t
-	for key, val := range content {
-		m[key] = val
-	}
+	maps.Copy(m, content)
 	b, err := json.Marshal(m)
 	if err != nil {
 		return err
