@@ -14,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/metadata"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/cli-utils/pkg/apis/actuation"
 	"sigs.k8s.io/cli-utils/pkg/apply/cache"
@@ -42,13 +43,14 @@ import (
 // parameters and/or the set of resources that needs to be applied to the
 // cluster, different sets of tasks might be needed.
 type Applier struct {
-	pruner        *prune.Pruner
-	statusWatcher watcher.StatusWatcher
-	invClient     inventory.Client
-	client        dynamic.Interface
-	openAPIGetter discovery.OpenAPISchemaInterface
-	mapper        meta.RESTMapper
-	infoHelper    info.Helper
+	pruner         *prune.Pruner
+	statusWatcher  watcher.StatusWatcher
+	invClient      inventory.Client
+	client         dynamic.Interface
+	metadataClient metadata.Interface
+	openAPIGetter  discovery.OpenAPISchemaInterface
+	mapper         meta.RESTMapper
+	infoHelper     info.Helper
 }
 
 // prepareObjects returns the set of objects to apply and to prune or
@@ -128,7 +130,7 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.Info, objects objec
 		// Build list of apply validation filters.
 		applyFilters := []filter.ValidationFilter{
 			filter.InventoryPolicyApplyFilter{
-				Client:    a.client,
+				Client:    a.metadataClient,
 				Mapper:    a.mapper,
 				Inv:       invInfo,
 				InvPolicy: options.InventoryPolicy,
