@@ -305,9 +305,9 @@ func TestNewFilteredListWatchFromDynamicClientList(t *testing.T) {
 			listInput: listInput{},
 			listOuput: listOuput{
 				object: &unstructured.UnstructuredList{
-					Object: map[string]interface{}{
+					Object: map[string]any{
 						"kind": "PodList",
-						"metadata": map[string]interface{}{
+						"metadata": map[string]any{
 							"continue":        "",
 							"resourceVersion": "",
 						},
@@ -333,9 +333,9 @@ func TestNewFilteredListWatchFromDynamicClientList(t *testing.T) {
 			listInput: listInput{},
 			listOuput: listOuput{
 				object: &unstructured.UnstructuredList{
-					Object: map[string]interface{}{
+					Object: map[string]any{
 						"kind": "PodList",
-						"metadata": map[string]interface{}{
+						"metadata": map[string]any{
 							"continue":        "",
 							"resourceVersion": "",
 						},
@@ -365,9 +365,9 @@ func TestNewFilteredListWatchFromDynamicClientList(t *testing.T) {
 			listInput: listInput{},
 			listOuput: listOuput{
 				object: &unstructured.UnstructuredList{
-					Object: map[string]interface{}{
+					Object: map[string]any{
 						"kind": "PodList",
-						"metadata": map[string]interface{}{
+						"metadata": map[string]any{
 							"continue":        "",
 							"resourceVersion": "",
 						},
@@ -397,9 +397,9 @@ func TestNewFilteredListWatchFromDynamicClientList(t *testing.T) {
 			listInput: listInput{},
 			listOuput: listOuput{
 				object: &unstructured.UnstructuredList{
-					Object: map[string]interface{}{
+					Object: map[string]any{
 						"kind": "PodList",
-						"metadata": map[string]interface{}{
+						"metadata": map[string]any{
 							"continue":        "",
 							"resourceVersion": "",
 						},

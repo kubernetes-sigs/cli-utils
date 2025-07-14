@@ -40,13 +40,13 @@ var pdbName = "pdb"
 var testInventoryLabel = "test-app-label"
 
 var inventoryObj = &unstructured.Unstructured{
-	Object: map[string]interface{}{
+	Object: map[string]any{
 		"apiVersion": "v1",
 		"kind":       "ConfigMap",
-		"metadata": map[string]interface{}{
+		"metadata": map[string]any{
 			"name":      inventoryObjName,
 			"namespace": testNamespace,
-			"labels": map[string]interface{}{
+			"labels": map[string]any{
 				common.InventoryLabel: testInventoryLabel,
 			},
 		},
@@ -54,13 +54,13 @@ var inventoryObj = &unstructured.Unstructured{
 }
 
 var namespace = &unstructured.Unstructured{
-	Object: map[string]interface{}{
+	Object: map[string]any{
 		"apiVersion": "v1",
 		"kind":       "Namespace",
-		"metadata": map[string]interface{}{
+		"metadata": map[string]any{
 			"name": testNamespace,
 			"uid":  "uid-namespace",
-			"annotations": map[string]interface{}{
+			"annotations": map[string]any{
 				"config.k8s.io/owning-inventory": testInventoryLabel,
 			},
 		},
@@ -68,14 +68,14 @@ var namespace = &unstructured.Unstructured{
 }
 
 var pod = &unstructured.Unstructured{
-	Object: map[string]interface{}{
+	Object: map[string]any{
 		"apiVersion": "v1",
 		"kind":       "Pod",
-		"metadata": map[string]interface{}{
+		"metadata": map[string]any{
 			"name":      podName,
 			"namespace": testNamespace,
 			"uid":       "pod-uid",
-			"annotations": map[string]interface{}{
+			"annotations": map[string]any{
 				"config.k8s.io/owning-inventory": testInventoryLabel,
 			},
 		},
@@ -83,14 +83,14 @@ var pod = &unstructured.Unstructured{
 }
 
 var pdb = &unstructured.Unstructured{
-	Object: map[string]interface{}{
+	Object: map[string]any{
 		"apiVersion": "policy/v1beta1",
 		"kind":       "PodDisruptionBudget",
-		"metadata": map[string]interface{}{
+		"metadata": map[string]any{
 			"name":      pdbName,
 			"namespace": testNamespace,
 			"uid":       "uid2",
-			"annotations": map[string]interface{}{
+			"annotations": map[string]any{
 				"config.k8s.io/owning-inventory": testInventoryLabel,
 			},
 		},
@@ -98,14 +98,14 @@ var pdb = &unstructured.Unstructured{
 }
 
 var pdbDeleteFailure = &unstructured.Unstructured{
-	Object: map[string]interface{}{
+	Object: map[string]any{
 		"apiVersion": "policy/v1beta1",
 		"kind":       "PodDisruptionBudget",
-		"metadata": map[string]interface{}{
+		"metadata": map[string]any{
 			"name":      pdbName + "delete-failure",
 			"namespace": testNamespace,
 			"uid":       "uid2",
-			"annotations": map[string]interface{}{
+			"annotations": map[string]any{
 				"config.k8s.io/owning-inventory": testInventoryLabel,
 			},
 		},
@@ -134,13 +134,13 @@ func newInventory(children ...*unstructured.Unstructured) (inventory.Inventory, 
 
 // podDeletionPrevention object contains the "on-remove:keep" lifecycle directive.
 var podDeletionPrevention = &unstructured.Unstructured{
-	Object: map[string]interface{}{
+	Object: map[string]any{
 		"apiVersion": "v1",
 		"kind":       "Pod",
-		"metadata": map[string]interface{}{
+		"metadata": map[string]any{
 			"name":      "test-prevent-delete",
 			"namespace": testNamespace,
-			"annotations": map[string]interface{}{
+			"annotations": map[string]any{
 				common.OnRemoveAnnotation:    common.OnRemoveKeep,
 				inventory.OwningInventoryKey: testInventoryLabel,
 			},

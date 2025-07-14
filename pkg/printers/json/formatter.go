@@ -6,6 +6,7 @@ package json
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"time"
 
 	"k8s.io/cli-runtime/pkg/genericiooptions"
@@ -40,11 +41,11 @@ func (jf *formatter) FormatValidationEvent(ve event.ValidationEvent) error {
 		// no objects, invalid event
 		return fmt.Errorf("invalid validation event: no identifiers: %w", err)
 	}
-	objects := make([]interface{}, len(ve.Identifiers))
+	objects := make([]any, len(ve.Identifiers))
 	for i, id := range ve.Identifiers {
 		objects[i] = jf.baseResourceEvent(id)
 	}
-	return jf.printEvent("validation", map[string]interface{}{
+	return jf.printEvent("validation", map[string]any{
 		"objects": objects,
 		"error":   err.Error(),
 	})
@@ -95,7 +96,7 @@ func (jf *formatter) FormatWaitEvent(e event.WaitEvent) error {
 }
 
 func (jf *formatter) FormatErrorEvent(e event.ErrorEvent) error {
-	return jf.printEvent("error", map[string]interface{}{
+	return jf.printEvent("error", map[string]any{
 		"error": e.Err.Error(),
 	})
 }
@@ -106,7 +107,7 @@ func (jf *formatter) FormatActionGroupEvent(
 	s stats.Stats,
 	_ list.Collector,
 ) error {
-	content := map[string]interface{}{
+	content := map[string]any{
 		"action": age.Action.String(),
 		"status": age.Status.String(),
 	}
@@ -157,7 +158,7 @@ func (jf *formatter) FormatActionGroupEvent(
 func (jf *formatter) FormatSummary(s stats.Stats) error {
 	if s.ApplyStats != (stats.ApplyStats{}) {
 		as := s.ApplyStats
-		err := jf.printEvent("summary", map[string]interface{}{
+		err := jf.printEvent("summary", map[string]any{
 			"action":     event.ApplyAction.String(),
 			"count":      as.Sum(),
 			"successful": as.Successful,
@@ -170,7 +171,7 @@ func (jf *formatter) FormatSummary(s stats.Stats) error {
 	}
 	if s.PruneStats != (stats.PruneStats{}) {
 		ps := s.PruneStats
-		err := jf.printEvent("summary", map[string]interface{}{
+		err := jf.printEvent("summary", map[string]any{
 			"action":     event.PruneAction.String(),
 			"count":      ps.Sum(),
 			"successful": ps.Successful,
@@ -183,7 +184,7 @@ func (jf *formatter) FormatSummary(s stats.Stats) error {
 	}
 	if s.DeleteStats != (stats.DeleteStats{}) {
 		ds := s.DeleteStats
-		err := jf.printEvent("summary", map[string]interface{}{
+		err := jf.printEvent("summary", map[string]any{
 			"action":     event.DeleteAction.String(),
 			"count":      ds.Sum(),
 			"successful": ds.Successful,
@@ -196,7 +197,7 @@ func (jf *formatter) FormatSummary(s stats.Stats) error {
 	}
 	if s.WaitStats != (stats.WaitStats{}) {
 		ws := s.WaitStats
-		err := jf.printEvent("summary", map[string]interface{}{
+		err := jf.printEvent("summary", map[string]any{
 			"action":     event.WaitAction.String(),
 			"count":      ws.Sum(),
 			"successful": ws.Successful,
@@ -211,8 +212,8 @@ func (jf *formatter) FormatSummary(s stats.Stats) error {
 	return nil
 }
 
-func (jf *formatter) baseResourceEvent(identifier object.ObjMetadata) map[string]interface{} {
-	return map[string]interface{}{
+func (jf *formatter) baseResourceEvent(identifier object.ObjMetadata) map[string]any {
+	return map[string]any{
 		"group":     identifier.GroupKind.Group,
 		"kind":      identifier.GroupKind.Kind,
 		"namespace": identifier.Namespace,
@@ -220,13 +221,11 @@ func (jf *formatter) baseResourceEvent(identifier object.ObjMetadata) map[string
 	}
 }
 
-func (jf *formatter) printEvent(t string, content map[string]interface{}) error {
-	m := make(map[string]interface{})
+func (jf *formatter) printEvent(t string, content map[string]any) error {
+	m := make(map[string]any)
 	m["timestamp"] = jf.now().UTC().Format(time.RFC3339)
 	m["type"] = t
-	for key, val := range content {
-		m[key] = val
-	}
+	maps.Copy(m, content)
 	b, err := json.Marshal(m)
 	if err != nil {
 		return err

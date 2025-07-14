@@ -466,14 +466,14 @@ func podConditions(u *unstructured.Unstructured) (*Result, error) {
 	}
 }
 
-func getCrashLoopingContainers(obj map[string]interface{}) ([]string, bool, error) {
+func getCrashLoopingContainers(obj map[string]any) ([]string, bool, error) {
 	var containerNames []string
 	css, found, err := unstructured.NestedSlice(obj, "status", "containerStatuses")
 	if !found || err != nil {
 		return containerNames, found, err
 	}
 	for _, item := range css {
-		cs := item.(map[string]interface{})
+		cs := item.(map[string]any)
 		n, found := cs["name"]
 		if !found {
 			continue
@@ -483,13 +483,13 @@ func getCrashLoopingContainers(obj map[string]interface{}) ([]string, bool, erro
 		if !found {
 			continue
 		}
-		state := s.(map[string]interface{})
+		state := s.(map[string]any)
 
 		ws, found := state["waiting"]
 		if !found {
 			continue
 		}
-		waitingState := ws.(map[string]interface{})
+		waitingState := ws.(map[string]any)
 
 		r, found := waitingState["reason"]
 		if !found {

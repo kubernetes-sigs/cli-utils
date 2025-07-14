@@ -91,7 +91,7 @@ func textForError(baseErr error, cmdNameBase string) (string, bool) {
 		return "", false
 	}
 	var b bytes.Buffer
-	err = tmpl.Execute(&b, map[string]interface{}{
+	err = tmpl.Execute(&b, map[string]any{
 		"cmdNameBase": cmdNameBase,
 		"err":         baseErr,
 	})

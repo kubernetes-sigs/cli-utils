@@ -55,7 +55,7 @@ type BaseTablePrinter struct {
 // were printed.
 func (t *BaseTablePrinter) PrintTable(rs ResourceStates,
 	moveUpCount int) int {
-	for i := 0; i < moveUpCount; i++ {
+	for range moveUpCount {
 		t.moveUp()
 		t.eraseCurrentLine()
 	}
@@ -137,7 +137,7 @@ func (t *BaseTablePrinter) printSubTable(resources []Resource,
 	return linePrintCount
 }
 
-func (t *BaseTablePrinter) printOrDie(format string, a ...interface{}) {
+func (t *BaseTablePrinter) printOrDie(format string, a ...any) {
 	_, err := fmt.Fprintf(t.IOStreams.Out, format, a...)
 	if err != nil {
 		panic(err)

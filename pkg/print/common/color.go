@@ -22,7 +22,7 @@ var (
 // SprintfWithColor formats according to the provided pattern and returns
 // the result as a string with the necessary ansii escape codes for
 // color
-func SprintfWithColor(color Color, format string, a ...interface{}) string {
+func SprintfWithColor(color Color, format string, a ...any) string {
 	return fmt.Sprintf("%c[%dm", ESC, color) +
 		fmt.Sprintf(format, a...) +
 		fmt.Sprintf("%c[%dm", ESC, RESET)

@@ -106,18 +106,18 @@ metadata:
 
 func newInvObject(name, namespace, inventoryID string) *unstructured.Unstructured {
 	return &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "v1",
 			"kind":       "ConfigMap",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name":      name,
 				"namespace": namespace,
-				"labels": map[string]interface{}{
+				"labels": map[string]any{
 					common.InventoryLabel: inventoryID,
 				},
 			},
 			// data must be map[string]interface{} for generic Unstructured methods
-			"data": map[string]interface{}{},
+			"data": map[string]any{},
 		},
 	}
 }

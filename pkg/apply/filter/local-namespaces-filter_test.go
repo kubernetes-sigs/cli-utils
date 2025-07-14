@@ -12,10 +12,10 @@ import (
 )
 
 var testNamespace = &unstructured.Unstructured{
-	Object: map[string]interface{}{
+	Object: map[string]any{
 		"apiVersion": "v1",
 		"kind":       "Namespace",
-		"metadata": map[string]interface{}{
+		"metadata": map[string]any{
 			"name": "test-namespace",
 		},
 	},

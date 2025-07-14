@@ -76,13 +76,13 @@ func TestGet(t *testing.T) {
 	testCases := map[string]struct {
 		obj    *unstructured.Unstructured
 		path   string
-		values []interface{}
+		values []any
 		errMsg string
 	}{
 		"missing": {
 			obj:    o1,
 			path:   "$.nope",
-			values: []interface{}{},
+			values: []any{},
 		},
 		"invalid jsonpath": {
 			obj:    o1,
@@ -93,63 +93,63 @@ func TestGet(t *testing.T) {
 		"string": {
 			obj:    o1,
 			path:   "$.kind",
-			values: []interface{}{"Pod"},
+			values: []any{"Pod"},
 		},
 		"string in map": {
 			obj:    o1,
 			path:   "$.metadata.name",
-			values: []interface{}{"pod-name"},
+			values: []any{"pod-name"},
 		},
 		"int in array": {
 			obj:    o1,
 			path:   "$.list[0]",
-			values: []interface{}{1},
+			values: []any{1},
 		},
 		"string in array": {
 			obj:    o1,
 			path:   "$.list[1]",
-			values: []interface{}{"b"},
+			values: []any{"b"},
 		},
 		"bool in array": {
 			obj:    o1,
 			path:   "$.list[2]",
-			values: []interface{}{false},
+			values: []any{false},
 		},
 		"string in array in map": {
 			obj:    o1,
 			path:   "$.map.c[2]",
-			values: []interface{}{"z"},
+			values: []any{"z"},
 		},
 		"nil in map in array in map": {
 			obj:    o1,
 			path:   "$.map.c[1][\"?\"]",
-			values: []interface{}{nil},
+			values: []any{nil},
 		},
 		"array in map": {
 			obj:    o1,
 			path:   "$.map.a",
-			values: []interface{}{[]interface{}{"1", "2", "3"}},
+			values: []any{[]any{"1", "2", "3"}},
 		},
 		"array values": {
 			obj:    o1,
 			path:   "$.map.a.*",
-			values: []interface{}{"1", "2", "3"},
+			values: []any{"1", "2", "3"},
 		},
 		"field selector": {
 			obj:    o1,
 			path:   `$.entries[?(@.name=="b")].value`,
-			values: []interface{}{"y"},
+			values: []any{"y"},
 		},
 		"multi-field selector": {
 			obj:    o1,
 			path:   `$.entries[?(@.name=="a" || @.name=="c")].value`,
-			values: []interface{}{"x", "z"},
+			values: []any{"x", "z"},
 		},
 	}
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			testCtx := []interface{}{"path: %s\nobject:\n%s", tc.path, toYaml(t, tc.obj.Object)}
+			testCtx := []any{"path: %s\nobject:\n%s", tc.path, toYaml(t, tc.obj.Object)}
 			values, err := Get(tc.obj.Object, tc.path)
 			if tc.errMsg != "" {
 				require.EqualError(t, err, tc.errMsg, testCtx...)
@@ -165,7 +165,7 @@ func TestSet(t *testing.T) {
 	testCases := map[string]struct {
 		obj   *unstructured.Unstructured
 		path  string
-		value interface{}
+		value any
 		found int
 		err   error
 	}{
@@ -214,7 +214,7 @@ func TestSet(t *testing.T) {
 		"array in map": {
 			obj:   ktestutil.YamlToUnstructured(t, o2y),
 			path:  "$.map.a",
-			value: []interface{}{"1", "2", "3"},
+			value: []any{"1", "2", "3"},
 			found: 1,
 		},
 		"field selector": {
@@ -234,14 +234,14 @@ func TestSet(t *testing.T) {
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			found, err := Set(tc.obj.Object, tc.path, tc.value)
-			testCtx := []interface{}{"path: %s\nobject (mutated):\n%s", tc.path, toYaml(t, tc.obj.Object)}
+			testCtx := []any{"path: %s\nobject (mutated):\n%s", tc.path, toYaml(t, tc.obj.Object)}
 			require.Equal(t, tc.err, err, testCtx...)
 			require.Equal(t, tc.found, found, testCtx...)
 
 			values, err := Get(tc.obj.Object, tc.path)
 			require.NoError(t, err, testCtx...)
 			for i, value := range values {
-				testCtx := []interface{}{"path: %s\nindex: %d\nobject (mutated):\n%s", tc.path, i, toYaml(t, tc.obj.Object)}
+				testCtx := []any{"path: %s\nindex: %d\nobject (mutated):\n%s", tc.path, i, toYaml(t, tc.obj.Object)}
 				require.IsType(t, tc.value, value, testCtx...)
 				require.Equal(t, tc.value, value, testCtx...)
 			}
@@ -249,7 +249,7 @@ func TestSet(t *testing.T) {
 	}
 }
 
-func toYaml(t *testing.T, in interface{}) string {
+func toYaml(t *testing.T, in any) string {
 	yamlBytes, err := yaml.Marshal(in)
 	require.NoError(t, err)
 	return string(yamlBytes)

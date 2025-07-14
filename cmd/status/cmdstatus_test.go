@@ -247,7 +247,7 @@ inventory-name/deployment.apps/default/foo is InProgress: inProgress
 		inventory      object.ObjMetadataSet
 		events         []pollevent.Event
 		expectedErrMsg string
-		expectedOutput []map[string]interface{}
+		expectedOutput []map[string]any
 	}{
 		"wait for all known json": {
 			pollUntil: "known",
@@ -275,7 +275,7 @@ inventory-name/deployment.apps/default/foo is InProgress: inProgress
 					},
 				},
 			},
-			expectedOutput: []map[string]interface{}{
+			expectedOutput: []map[string]any{
 				{
 					"group":          "apps",
 					"kind":           "Deployment",
@@ -342,7 +342,7 @@ inventory-name/deployment.apps/default/foo is InProgress: inProgress
 					},
 				},
 			},
-			expectedOutput: []map[string]interface{}{
+			expectedOutput: []map[string]any{
 				{
 					"group":          "apps",
 					"kind":           "Deployment",
@@ -415,7 +415,7 @@ inventory-name/deployment.apps/default/foo is InProgress: inProgress
 					},
 				},
 			},
-			expectedOutput: []map[string]interface{}{
+			expectedOutput: []map[string]any{
 				{
 					"group":          "apps",
 					"kind":           "StatefulSet",
@@ -467,7 +467,7 @@ inventory-name/deployment.apps/default/foo is InProgress: inProgress
 					},
 				},
 			},
-			expectedOutput: []map[string]interface{}{
+			expectedOutput: []map[string]any{
 				{
 					"group":          "apps",
 					"kind":           "StatefulSet",
@@ -583,13 +583,13 @@ inventory-name/deployment.apps/default/foo is InProgress: inProgress
 }
 
 // nolint:unparam
-func assertOutput(t *testing.T, expectedOutput []map[string]interface{}, actual []string) bool {
+func assertOutput(t *testing.T, expectedOutput []map[string]any, actual []string) bool {
 	for i, expectedMap := range expectedOutput {
 		if len(expectedMap) == 0 {
 			return assert.Empty(t, actual[i])
 		}
 
-		var m map[string]interface{}
+		var m map[string]any
 		err := json.Unmarshal([]byte(actual[i]), &m)
 		if !assert.NoError(t, err) {
 			return false

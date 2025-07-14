@@ -9,18 +9,18 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var testObj = map[string]interface{}{
-	"f1": map[string]interface{}{
-		"f2": map[string]interface{}{
+var testObj = map[string]any{
+	"f1": map[string]any{
+		"f2": map[string]any{
 			"i32":   int32(32),
 			"i64":   int64(64),
 			"float": 64.02,
-			"ms": []interface{}{
-				map[string]interface{}{"f1f2ms0f1": 22},
-				map[string]interface{}{"f1f2ms1f1": "index1"},
+			"ms": []any{
+				map[string]any{"f1f2ms0f1": 22},
+				map[string]any{"f1f2ms1f1": "index1"},
 			},
-			"msbad": []interface{}{
-				map[string]interface{}{"f1f2ms0f1": 22},
+			"msbad": []any{
+				map[string]any{"f1f2ms0f1": 22},
 				32,
 			},
 		},
@@ -28,10 +28,10 @@ var testObj = map[string]interface{}{
 
 	"ride": "dragon",
 
-	"status": map[string]interface{}{
-		"conditions": []interface{}{
-			map[string]interface{}{"f1f2ms0f1": 22},
-			map[string]interface{}{"f1f2ms1f1": "index1"},
+	"status": map[string]any{
+		"conditions": []any{
+			map[string]any{"f1f2ms0f1": 22},
+			map[string]any{"f1f2ms1f1": "index1"},
 		},
 	},
 }

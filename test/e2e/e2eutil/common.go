@@ -54,7 +54,7 @@ func PodWithImage(obj *unstructured.Unstructured, containerName, image string) *
 
 	containerFound := false
 	for i := range containers {
-		container := containers[i].(map[string]interface{})
+		container := containers[i].(map[string]any)
 		name := container["name"].(string)
 		if name != containerName {
 			continue
@@ -73,7 +73,7 @@ func WithNodeSelector(obj *unstructured.Unstructured, key, value string) *unstru
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 	if !found {
-		selectors = make(map[string]interface{})
+		selectors = make(map[string]any)
 	}
 	selectors[key] = value
 	err = unstructured.SetNestedMap(obj.Object, selectors, "spec", "nodeSelector")
@@ -376,7 +376,7 @@ func ExpectNoReconcileTimeouts(events []event.Event, callerSkip ...int) {
 }
 
 func ManifestToUnstructured(manifest []byte) *unstructured.Unstructured {
-	u := make(map[string]interface{})
+	u := make(map[string]any)
 	err := yaml.Unmarshal(manifest, &u)
 	if err != nil {
 		panic(fmt.Errorf("failed to parse manifest yaml: %w", err))
@@ -386,7 +386,7 @@ func ManifestToUnstructured(manifest []byte) *unstructured.Unstructured {
 	}
 }
 
-func TemplateToUnstructured(tmpl string, data interface{}) *unstructured.Unstructured {
+func TemplateToUnstructured(tmpl string, data any) *unstructured.Unstructured {
 	t, err := template.New("manifest").Parse(tmpl)
 	if err != nil {
 		panic(fmt.Errorf("failed to parse manifest go-template: %w", err))

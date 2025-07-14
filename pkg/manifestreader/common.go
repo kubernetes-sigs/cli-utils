@@ -150,7 +150,7 @@ func KyamlNodeToUnstructured(n *yaml.RNode) (*unstructured.Unstructured, error) 
 		return nil, err
 	}
 
-	var m map[string]interface{}
+	var m map[string]any
 	err = json.Unmarshal(b, &m)
 	if err != nil {
 		return nil, err

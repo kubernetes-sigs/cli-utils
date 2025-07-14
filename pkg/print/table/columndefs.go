@@ -144,7 +144,7 @@ var (
 
 				realLength := 0
 				for i, cond := range conditions {
-					condition := cond.(map[string]interface{})
+					condition := cond.(map[string]any)
 					conditionType := condition["type"].(string)
 					conditionStatus := condition["status"].(string)
 					var color common.Color

@@ -31,7 +31,7 @@ func TestFormatter_FormatApplyEvent(t *testing.T) {
 	testCases := map[string]struct {
 		previewStrategy common.DryRunStrategy
 		event           event.ApplyEvent
-		expected        []map[string]interface{}
+		expected        []map[string]any
 	}{
 		"resource created without dryrun": {
 			previewStrategy: common.DryRunNone,
@@ -39,7 +39,7 @@ func TestFormatter_FormatApplyEvent(t *testing.T) {
 				Status:     event.ApplySuccessful,
 				Identifier: createIdentifier("apps", "Deployment", "default", "my-dep"),
 			},
-			expected: []map[string]interface{}{
+			expected: []map[string]any{
 				{
 					"group":     "apps",
 					"kind":      "Deployment",
@@ -57,7 +57,7 @@ func TestFormatter_FormatApplyEvent(t *testing.T) {
 				Status:     event.ApplySuccessful,
 				Identifier: createIdentifier("apps", "Deployment", "", "my-dep"),
 			},
-			expected: []map[string]interface{}{
+			expected: []map[string]any{
 				{
 					"group":     "apps",
 					"kind":      "Deployment",
@@ -75,7 +75,7 @@ func TestFormatter_FormatApplyEvent(t *testing.T) {
 				Status:     event.ApplySuccessful,
 				Identifier: createIdentifier("batch", "CronJob", "foo", "my-cron"),
 			},
-			expected: []map[string]interface{}{
+			expected: []map[string]any{
 				{
 					"group":     "batch",
 					"kind":      "CronJob",
@@ -94,7 +94,7 @@ func TestFormatter_FormatApplyEvent(t *testing.T) {
 				Identifier: createIdentifier("apps", "Deployment", "", "my-dep"),
 				Error:      errors.New("example error"),
 			},
-			expected: []map[string]interface{}{
+			expected: []map[string]any{
 				{
 					"group":     "apps",
 					"kind":      "Deployment",
@@ -114,7 +114,7 @@ func TestFormatter_FormatApplyEvent(t *testing.T) {
 				Identifier: createIdentifier("apps", "Deployment", "", "my-dep"),
 				Error:      errors.New("example error"),
 			},
-			expected: []map[string]interface{}{
+			expected: []map[string]any{
 				{
 					"group":     "apps",
 					"kind":      "Deployment",
@@ -152,7 +152,7 @@ func TestFormatter_FormatStatusEvent(t *testing.T) {
 	testCases := map[string]struct {
 		previewStrategy common.DryRunStrategy
 		event           event.StatusEvent
-		expected        map[string]interface{}
+		expected        map[string]any
 	}{
 		"resource update with Current status": {
 			previewStrategy: common.DryRunNone,
@@ -178,7 +178,7 @@ func TestFormatter_FormatStatusEvent(t *testing.T) {
 					Message: "Resource is Current",
 				},
 			},
-			expected: map[string]interface{}{
+			expected: map[string]any{
 				"group":     "apps",
 				"kind":      "Deployment",
 				"message":   "Resource is Current",
@@ -207,7 +207,7 @@ func TestFormatter_FormatPruneEvent(t *testing.T) {
 	testCases := map[string]struct {
 		previewStrategy common.DryRunStrategy
 		event           event.PruneEvent
-		expected        map[string]interface{}
+		expected        map[string]any
 	}{
 		"resource pruned without dryrun": {
 			previewStrategy: common.DryRunNone,
@@ -215,7 +215,7 @@ func TestFormatter_FormatPruneEvent(t *testing.T) {
 				Status:     event.PruneSuccessful,
 				Identifier: createIdentifier("apps", "Deployment", "default", "my-dep"),
 			},
-			expected: map[string]interface{}{
+			expected: map[string]any{
 				"group":     "apps",
 				"kind":      "Deployment",
 				"name":      "my-dep",
@@ -231,7 +231,7 @@ func TestFormatter_FormatPruneEvent(t *testing.T) {
 				Status:     event.PruneSkipped,
 				Identifier: createIdentifier("apps", "Deployment", "", "my-dep"),
 			},
-			expected: map[string]interface{}{
+			expected: map[string]any{
 				"group":     "apps",
 				"kind":      "Deployment",
 				"name":      "my-dep",
@@ -248,7 +248,7 @@ func TestFormatter_FormatPruneEvent(t *testing.T) {
 				Identifier: createIdentifier("apps", "Deployment", "", "my-dep"),
 				Error:      errors.New("example error"),
 			},
-			expected: map[string]interface{}{
+			expected: map[string]any{
 				"group":     "apps",
 				"kind":      "Deployment",
 				"name":      "my-dep",
@@ -266,7 +266,7 @@ func TestFormatter_FormatPruneEvent(t *testing.T) {
 				Identifier: createIdentifier("apps", "Deployment", "", "my-dep"),
 				Error:      errors.New("example error"),
 			},
-			expected: map[string]interface{}{
+			expected: map[string]any{
 				"group":     "apps",
 				"kind":      "Deployment",
 				"name":      "my-dep",
@@ -296,7 +296,7 @@ func TestFormatter_FormatDeleteEvent(t *testing.T) {
 		previewStrategy common.DryRunStrategy
 		event           event.DeleteEvent
 		statusCollector list.Collector
-		expected        map[string]interface{}
+		expected        map[string]any
 	}{
 		"resource deleted without no dryrun": {
 			previewStrategy: common.DryRunNone,
@@ -304,7 +304,7 @@ func TestFormatter_FormatDeleteEvent(t *testing.T) {
 				Status:     event.DeleteSuccessful,
 				Identifier: createIdentifier("apps", "Deployment", "default", "my-dep"),
 			},
-			expected: map[string]interface{}{
+			expected: map[string]any{
 				"group":     "apps",
 				"kind":      "Deployment",
 				"name":      "my-dep",
@@ -320,7 +320,7 @@ func TestFormatter_FormatDeleteEvent(t *testing.T) {
 				Status:     event.DeleteSkipped,
 				Identifier: createIdentifier("apps", "Deployment", "", "my-dep"),
 			},
-			expected: map[string]interface{}{
+			expected: map[string]any{
 				"group":     "apps",
 				"kind":      "Deployment",
 				"name":      "my-dep",
@@ -337,7 +337,7 @@ func TestFormatter_FormatDeleteEvent(t *testing.T) {
 				Identifier: createIdentifier("apps", "Deployment", "default", "my-dep"),
 				Error:      errors.New("example error"),
 			},
-			expected: map[string]interface{}{
+			expected: map[string]any{
 				"group":     "apps",
 				"kind":      "Deployment",
 				"name":      "my-dep",
@@ -355,7 +355,7 @@ func TestFormatter_FormatDeleteEvent(t *testing.T) {
 				Identifier: createIdentifier("apps", "Deployment", "default", "my-dep"),
 				Error:      errors.New("example error"),
 			},
-			expected: map[string]interface{}{
+			expected: map[string]any{
 				"group":     "apps",
 				"kind":      "Deployment",
 				"name":      "my-dep",
@@ -385,7 +385,7 @@ func TestFormatter_FormatWaitEvent(t *testing.T) {
 		previewStrategy common.DryRunStrategy
 		event           event.WaitEvent
 		statusCollector list.Collector
-		expected        map[string]interface{}
+		expected        map[string]any
 	}{
 		"resource reconciled": {
 			previewStrategy: common.DryRunNone,
@@ -394,7 +394,7 @@ func TestFormatter_FormatWaitEvent(t *testing.T) {
 				Status:     event.ReconcileSuccessful,
 				Identifier: createIdentifier("apps", "Deployment", "default", "my-dep"),
 			},
-			expected: map[string]interface{}{
+			expected: map[string]any{
 				"group":     "apps",
 				"kind":      "Deployment",
 				"name":      "my-dep",
@@ -411,7 +411,7 @@ func TestFormatter_FormatWaitEvent(t *testing.T) {
 				Status:     event.ReconcileSuccessful,
 				Identifier: createIdentifier("apps", "Deployment", "default", "my-dep"),
 			},
-			expected: map[string]interface{}{
+			expected: map[string]any{
 				"group":     "apps",
 				"kind":      "Deployment",
 				"name":      "my-dep",
@@ -428,7 +428,7 @@ func TestFormatter_FormatWaitEvent(t *testing.T) {
 				Status:     event.ReconcileSuccessful,
 				Identifier: createIdentifier("apps", "Deployment", "default", "my-dep"),
 			},
-			expected: map[string]interface{}{
+			expected: map[string]any{
 				"group":     "apps",
 				"kind":      "Deployment",
 				"name":      "my-dep",
@@ -445,7 +445,7 @@ func TestFormatter_FormatWaitEvent(t *testing.T) {
 				Status:     event.ReconcilePending,
 				Identifier: createIdentifier("apps", "Deployment", "default", "my-dep"),
 			},
-			expected: map[string]interface{}{
+			expected: map[string]any{
 				"group":     "apps",
 				"kind":      "Deployment",
 				"name":      "my-dep",
@@ -462,7 +462,7 @@ func TestFormatter_FormatWaitEvent(t *testing.T) {
 				Status:     event.ReconcileSkipped,
 				Identifier: createIdentifier("apps", "Deployment", "default", "my-dep"),
 			},
-			expected: map[string]interface{}{
+			expected: map[string]any{
 				"group":     "apps",
 				"kind":      "Deployment",
 				"name":      "my-dep",
@@ -479,7 +479,7 @@ func TestFormatter_FormatWaitEvent(t *testing.T) {
 				Status:     event.ReconcileTimeout,
 				Identifier: createIdentifier("apps", "Deployment", "default", "my-dep"),
 			},
-			expected: map[string]interface{}{
+			expected: map[string]any{
 				"group":     "apps",
 				"kind":      "Deployment",
 				"name":      "my-dep",
@@ -496,7 +496,7 @@ func TestFormatter_FormatWaitEvent(t *testing.T) {
 				Status:     event.ReconcileFailed,
 				Identifier: createIdentifier("apps", "Deployment", "default", "my-dep"),
 			},
-			expected: map[string]interface{}{
+			expected: map[string]any{
 				"group":     "apps",
 				"kind":      "Deployment",
 				"name":      "my-dep",
@@ -527,7 +527,7 @@ func TestFormatter_FormatActionGroupEvent(t *testing.T) {
 		actionGroups    []event.ActionGroup
 		statsCollector  stats.Stats
 		statusCollector list.Collector
-		expected        map[string]interface{}
+		expected        map[string]any
 	}{
 		"not the last apply action group finished": {
 			previewStrategy: common.DryRunNone,
@@ -549,7 +549,7 @@ func TestFormatter_FormatActionGroupEvent(t *testing.T) {
 			statsCollector: stats.Stats{
 				ApplyStats: stats.ApplyStats{},
 			},
-			expected: map[string]interface{}{
+			expected: map[string]any{
 				"action":     "Apply",
 				"count":      0,
 				"failed":     0,
@@ -582,7 +582,7 @@ func TestFormatter_FormatActionGroupEvent(t *testing.T) {
 					Successful: 42,
 				},
 			},
-			expected: map[string]interface{}{
+			expected: map[string]any{
 				"action":     "Apply",
 				"count":      42,
 				"failed":     0,
@@ -610,7 +610,7 @@ func TestFormatter_FormatActionGroupEvent(t *testing.T) {
 					Action: event.PruneAction,
 				},
 			},
-			expected: map[string]interface{}{
+			expected: map[string]any{
 				"action":    "Prune",
 				"status":    "Started",
 				"timestamp": "2022-03-24T01:51:36Z",
@@ -635,7 +635,7 @@ func TestFormatter_FormatValidationEvent(t *testing.T) {
 	testCases := map[string]struct {
 		previewStrategy common.DryRunStrategy
 		event           event.ValidationEvent
-		expected        map[string]interface{}
+		expected        map[string]any
 		expectedError   error
 	}{
 		"zero objects, return error": {
@@ -671,11 +671,11 @@ func TestFormatter_FormatValidationEvent(t *testing.T) {
 					},
 				),
 			},
-			expected: map[string]interface{}{
+			expected: map[string]any{
 				"type":      "validation",
 				"timestamp": "",
-				"objects": []interface{}{
-					map[string]interface{}{
+				"objects": []any{
+					map[string]any{
 						"group":     "apps",
 						"kind":      "Deployment",
 						"name":      "bar",
@@ -765,17 +765,17 @@ func TestFormatter_FormatValidationEvent(t *testing.T) {
 					},
 				),
 			},
-			expected: map[string]interface{}{
+			expected: map[string]any{
 				"type":      "validation",
 				"timestamp": "",
-				"objects": []interface{}{
-					map[string]interface{}{
+				"objects": []any{
+					map[string]any{
 						"group":     "apps",
 						"kind":      "Deployment",
 						"name":      "bar",
 						"namespace": "default",
 					},
-					map[string]interface{}{
+					map[string]any{
 						"group":     "apps",
 						"kind":      "Deployment",
 						"name":      "foo",
@@ -810,7 +810,7 @@ func TestFormatter_FormatSummary(t *testing.T) {
 
 	testCases := map[string]struct {
 		statsCollector stats.Stats
-		expected       []map[string]interface{}
+		expected       []map[string]any
 	}{
 		"apply prune wait": {
 			statsCollector: stats.Stats{
@@ -831,7 +831,7 @@ func TestFormatter_FormatSummary(t *testing.T) {
 					Timeout:    1,
 				},
 			},
-			expected: []map[string]interface{}{
+			expected: []map[string]any{
 				{
 					"action":     "Apply",
 					"count":      float64(6),
@@ -880,10 +880,10 @@ func TestFormatter_FormatSummary(t *testing.T) {
 	}
 }
 
-func assertOutputLines(t *testing.T, expectedMaps []map[string]interface{}, actual string) {
+func assertOutputLines(t *testing.T, expectedMaps []map[string]any, actual string) {
 	actual = strings.TrimRight(actual, "\n")
 	lines := strings.Split(actual, "\n")
-	actualMaps := make([]map[string]interface{}, len(lines))
+	actualMaps := make([]map[string]any, len(lines))
 	for i, line := range lines {
 		err := json.Unmarshal([]byte(line), &actualMaps[i])
 		require.NoError(t, err)
@@ -892,12 +892,12 @@ func assertOutputLines(t *testing.T, expectedMaps []map[string]interface{}, actu
 }
 
 // nolint:unparam
-func assertOutput(t *testing.T, expectedMap map[string]interface{}, actual string) bool {
+func assertOutput(t *testing.T, expectedMap map[string]any, actual string) bool {
 	if len(expectedMap) == 0 {
 		return assert.Empty(t, actual)
 	}
 
-	var m map[string]interface{}
+	var m map[string]any
 	err := json.Unmarshal([]byte(actual), &m)
 	if !assert.NoError(t, err) {
 		return false

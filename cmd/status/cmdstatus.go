@@ -125,21 +125,21 @@ func (r *Runner) preRunE(*cobra.Command, []string) error {
 
 	if r.inventoryNames != "" {
 		r.inventoryNameSet = make(map[string]bool)
-		for _, name := range strings.Split(r.inventoryNames, ",") {
+		for name := range strings.SplitSeq(r.inventoryNames, ",") {
 			r.inventoryNameSet[name] = true
 		}
 	}
 
 	if r.namespaces != "" {
 		r.namespaceSet = make(map[string]bool)
-		for _, ns := range strings.Split(r.namespaces, ",") {
+		for ns := range strings.SplitSeq(r.namespaces, ",") {
 			r.namespaceSet[ns] = true
 		}
 	}
 
 	if r.statuses != "" {
 		r.statusSet = make(map[string]bool)
-		for _, st := range strings.Split(r.statuses, ",") {
+		for st := range strings.SplitSeq(r.statuses, ",") {
 			parsedST := strings.ToLower(st)
 			r.statusSet[parsedST] = true
 		}

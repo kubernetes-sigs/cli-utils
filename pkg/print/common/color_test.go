@@ -14,19 +14,19 @@ func TestSprintfWithColor(t *testing.T) {
 	testCases := map[string]struct {
 		color          Color
 		format         string
-		args           []interface{}
+		args           []any
 		expectedResult string
 	}{
 		"no args with color": {
 			color:          GREEN,
 			format:         "This is a test",
-			args:           []interface{}{},
+			args:           []any{},
 			expectedResult: "\x1b[32mThis is a test\x1b[0m",
 		},
 		"with args and color": {
 			color:          YELLOW,
 			format:         "%s %s",
-			args:           []interface{}{"sonic", "youth"},
+			args:           []any{"sonic", "youth"},
 			expectedResult: "\x1b[33msonic youth\x1b[0m",
 		},
 	}

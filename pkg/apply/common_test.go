@@ -36,19 +36,19 @@ import (
 )
 
 func newInventoryObj(info *inventory.SingleObjectInfo, set object.ObjMetadataSet) *unstructured.Unstructured {
-	invMap := make(map[string]interface{})
+	invMap := make(map[string]any)
 	for _, objMeta := range set {
 		invMap[objMeta.String()] = ""
 	}
 
 	return &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "v1",
 			"kind":       "ConfigMap",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name":      info.GetName(),
 				"namespace": info.GetNamespace(),
-				"labels": map[string]interface{}{
+				"labels": map[string]any{
 					common.InventoryLabel: info.GetID().String(),
 				},
 			},
@@ -457,7 +457,7 @@ func toJSONBytes(t *testing.T, obj runtime.Object) []byte {
 
 type JSONPathSetter struct {
 	Path  string
-	Value interface{}
+	Value any
 }
 
 func (jps JSONPathSetter) Mutate(u *unstructured.Unstructured) {

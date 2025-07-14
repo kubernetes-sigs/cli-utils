@@ -629,7 +629,7 @@ func TestWaitTask_SingleTaskResult(t *testing.T) {
 		})
 
 		// send multiple status updates
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			task.StatusUpdate(taskContext, testDeploymentID)
 		}
 	}()

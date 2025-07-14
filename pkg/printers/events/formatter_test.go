@@ -509,10 +509,10 @@ func TestFormatter_FormatValidationEvent(t *testing.T) {
 
 func createObject(group, kind, namespace, name string) *unstructured.Unstructured {
 	return &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": fmt.Sprintf("%s/v1", group),
 			"kind":       kind,
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name":      name,
 				"namespace": namespace,
 			},

@@ -16,7 +16,7 @@ import (
 )
 
 var objInvalid = &unstructured.Unstructured{
-	Object: map[string]interface{}{
+	Object: map[string]any{
 		"apiVersion": "apps/v1",
 		"kind":       "Deployment",
 	},

@@ -15,10 +15,10 @@ import (
 )
 
 var inventoryObj = &unstructured.Unstructured{
-	Object: map[string]interface{}{
+	Object: map[string]any{
 		"apiVersion": "v1",
 		"kind":       "ConfigMap",
-		"metadata": map[string]interface{}{
+		"metadata": map[string]any{
 			"name":      "inventory-name",
 			"namespace": "inventory-namespace",
 		},

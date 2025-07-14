@@ -20,12 +20,12 @@ func TestUnstructuredToInfo(t *testing.T) {
 	}{
 		"with path annotation": {
 			obj: &unstructured.Unstructured{
-				Object: map[string]interface{}{
+				Object: map[string]any{
 					"apiVersion": "apps/v1",
 					"kind":       "Deployment",
-					"metadata": map[string]interface{}{
+					"metadata": map[string]any{
 						"name": "foo",
-						"annotations": map[string]interface{}{
+						"annotations": map[string]any{
 							kioutil.PathAnnotation: "deployment.yaml",
 						},
 					},
@@ -37,12 +37,12 @@ func TestUnstructuredToInfo(t *testing.T) {
 		},
 		"with both new and legacy annotations": {
 			obj: &unstructured.Unstructured{
-				Object: map[string]interface{}{
+				Object: map[string]any{
 					"apiVersion": "apps/v1",
 					"kind":       "Deployment",
-					"metadata": map[string]interface{}{
+					"metadata": map[string]any{
 						"name": "foo",
-						"annotations": map[string]interface{}{
+						"annotations": map[string]any{
 							kioutil.PathAnnotation:       "deployment.yaml",
 							kioutil.LegacyPathAnnotation: "deployment.yaml", //nolint:staticcheck
 						},
@@ -55,10 +55,10 @@ func TestUnstructuredToInfo(t *testing.T) {
 		},
 		"without path annotation": {
 			obj: &unstructured.Unstructured{
-				Object: map[string]interface{}{
+				Object: map[string]any{
 					"apiVersion": "apps/v1",
 					"kind":       "Deployment",
-					"metadata": map[string]interface{}{
+					"metadata": map[string]any{
 						"name":      "foo",
 						"namespace": "bar",
 					},
