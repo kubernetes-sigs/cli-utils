@@ -22,6 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/resource"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
+	metadatafake "k8s.io/client-go/metadata/fake"
 	"k8s.io/client-go/rest/fake"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/klog/v2"
@@ -64,7 +65,8 @@ func newTestApplier(
 	clusterObjs object.UnstructuredSet,
 	statusWatcher watcher.StatusWatcher,
 ) *Applier {
-	tf := newTestFactory(t, invObj, resources, clusterObjs)
+	objs := newResourceInfo(resources, clusterObjs)
+	tf := newTestFactory(t, invObj, objs)
 	defer tf.Cleanup()
 
 	infoHelper := &fakeInfoHelper{
@@ -72,10 +74,13 @@ func newTestApplier(
 	}
 
 	invClient := newTestInventory(t, tf)
+	mapper, err := tf.ToRESTMapper()
+	require.NoError(t, err)
 
 	applier, err := NewApplierBuilder().
 		WithFactory(tf).
 		WithInventoryClient(invClient).
+		WithMetadataClient(fakeMetadataClient(t, mapper, objs)).
 		WithStatusWatcher(statusWatcher).
 		Build()
 	require.NoError(t, err)
@@ -93,7 +98,8 @@ func newTestDestroyer(
 	clusterObjs object.UnstructuredSet,
 	statusWatcher watcher.StatusWatcher,
 ) *Destroyer {
-	tf := newTestFactory(t, invObj, object.UnstructuredSet{}, clusterObjs)
+	objs := newResourceInfo(object.UnstructuredSet{}, clusterObjs)
+	tf := newTestFactory(t, invObj, objs)
 	defer tf.Cleanup()
 
 	invClient := newTestInventory(t, tf)
@@ -119,17 +125,10 @@ func newTestInventory(
 	return invClient
 }
 
-func newTestFactory(
-	t *testing.T,
-	invObj *unstructured.Unstructured,
+func newResourceInfo(
 	resourceSet object.UnstructuredSet,
 	clusterObjs object.UnstructuredSet,
-) *cmdtesting.TestFactory {
-	tf := cmdtesting.NewTestFactory().WithNamespace(invObj.GetNamespace())
-
-	mapper, err := tf.ToRESTMapper()
-	require.NoError(t, err)
-
+) []resourceInfo {
 	objMap := make(map[object.ObjMetadata]resourceInfo)
 	for _, r := range resourceSet {
 		objMeta := object.UnstructuredToObjMetadata(r)
@@ -149,6 +148,18 @@ func newTestFactory(
 	for _, obj := range objMap {
 		objs = append(objs, obj)
 	}
+	return objs
+}
+
+func newTestFactory(
+	t *testing.T,
+	invObj *unstructured.Unstructured,
+	objs []resourceInfo,
+) *cmdtesting.TestFactory {
+	tf := cmdtesting.NewTestFactory().WithNamespace(invObj.GetNamespace())
+
+	mapper, err := tf.ToRESTMapper()
+	require.NoError(t, err)
 
 	handlers := []handler{
 		&nsHandler{},
@@ -416,6 +427,34 @@ func (f *fakeInfoHelper) getClient(gv schema.GroupVersion) (resource.RESTClient,
 		return f.factory.UnstructuredClient, nil
 	}
 	return f.factory.Client, nil
+}
+
+// fakeMetadataClient returns a fake metadata client.
+func fakeMetadataClient(t *testing.T, mapper meta.RESTMapper, objs []resourceInfo) *metadatafake.FakeMetadataClient {
+	fakeClient := metadatafake.NewSimpleMetadataClient(scheme.Scheme)
+
+	for i := range objs {
+		obj := objs[i]
+		gvk := obj.resource.GroupVersionKind()
+		mapping, err := mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+		require.NoError(t, err)
+		r := mapping.Resource.Resource
+		objMeta := &metav1.PartialObjectMetadata{}
+		objMeta.APIVersion = obj.resource.GetAPIVersion()
+		objMeta.Kind = obj.resource.GetKind()
+		objMeta.Name = obj.resource.GetName()
+		objMeta.Namespace = obj.resource.GetNamespace()
+		objMeta.Annotations = obj.resource.GetAnnotations()
+		objMeta.Labels = obj.resource.GetLabels()
+		fakeClient.PrependReactor("get", r, func(clienttesting.Action) (bool, runtime.Object, error) {
+			if obj.exists {
+				return true, objMeta, nil
+			}
+			return false, nil, nil
+		})
+	}
+
+	return fakeClient
 }
 
 // fakeDynamicClient returns a fake dynamic client.

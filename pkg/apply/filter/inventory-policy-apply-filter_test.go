@@ -8,8 +8,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	dynamicfake "k8s.io/client-go/dynamic/fake"
+	metadatafake "k8s.io/client-go/metadata/fake"
 	"k8s.io/kubectl/pkg/scheme"
 	"sigs.k8s.io/cli-utils/pkg/apis/actuation"
 	"sigs.k8s.io/cli-utils/pkg/common"
@@ -25,6 +26,17 @@ var invObjTemplate = &unstructured.Unstructured{
 			"name":      "inventory-name",
 			"namespace": "inventory-namespace",
 		},
+	},
+}
+
+var defaultMetadataObj = &metav1.PartialObjectMetadata{
+	ObjectMeta: metav1.ObjectMeta{
+		Name:      defaultObj.GetName(),
+		Namespace: defaultObj.GetNamespace(),
+	},
+	TypeMeta: metav1.TypeMeta{
+		Kind:       defaultObj.GetKind(),
+		APIVersion: defaultObj.GetAPIVersion(),
 	},
 }
 
@@ -89,11 +101,14 @@ func TestInventoryPolicyApplyFilter(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			obj := defaultObj.DeepCopy()
 			objIDAnnotation := map[string]string{
 				"config.k8s.io/owning-inventory": tc.objInventoryID,
 			}
+
+			obj := defaultObj.DeepCopy()
 			obj.SetAnnotations(objIDAnnotation)
+			metadataObj := defaultMetadataObj.DeepCopy()
+			metadataObj.SetAnnotations(objIDAnnotation)
 			invIDLabel := map[string]string{
 				common.InventoryLabel: tc.inventoryID,
 			}
@@ -102,7 +117,7 @@ func TestInventoryPolicyApplyFilter(t *testing.T) {
 			invInfoObj, err := inventory.ConfigMapToInventoryInfo(invObj)
 			require.NoError(t, err)
 			filter := InventoryPolicyApplyFilter{
-				Client: dynamicfake.NewSimpleDynamicClient(scheme.Scheme, obj),
+				Client: metadatafake.NewSimpleMetadataClient(scheme.Scheme, metadataObj),
 				Mapper: testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme,
 					scheme.Scheme.PrioritizedVersionsAllGroups()...),
 				Inv:       invInfoObj,
