@@ -327,7 +327,7 @@ func (w *ObjectStatusReporter) startInformerNow(
 		return err
 	}
 
-	informer := w.InformerFactory.NewInformer(ctx, mapping, gkn.Namespace)
+	informer := w.InformerFactory.NewInformer(mapping, gkn.Namespace)
 
 	w.informerRefs[gkn].SetInformer(informer)
 
