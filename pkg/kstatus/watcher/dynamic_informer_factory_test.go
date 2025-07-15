@@ -181,7 +181,7 @@ func TestResourceNotFoundError(t *testing.T) {
 			mapping, err := fakeMapper.RESTMapping(carpGVK.GroupKind())
 			require.NoError(t, err)
 
-			informer := informerFactory.NewInformer(ctx, mapping, namespace)
+			informer := informerFactory.NewInformer(mapping, namespace)
 
 			err = informer.SetWatchErrorHandler(func(_ *cache.Reflector, err error) {
 				tc.errorHandler(t, err)
@@ -191,7 +191,7 @@ func TestResourceNotFoundError(t *testing.T) {
 			require.NoError(t, err)
 
 			// Block until context cancel or timeout.
-			informer.Run(ctx.Done())
+			informer.RunWithContext(ctx)
 		})
 	}
 }
@@ -442,7 +442,7 @@ func TestNewFilteredListWatchFromDynamicClientList(t *testing.T) {
 			tc.setup(fakeClient)
 
 			ctx := context.Background()
-			lw := NewFilteredListWatchFromDynamicClient(ctx, fakeClient, tc.args.resource, tc.args.namespace, tc.args.filters)
+			lw := NewFilteredListWatchFromDynamicClient(fakeClient, tc.args.resource, tc.args.namespace, tc.args.filters)
 
 			obj, err := lw.ListWithContext(ctx, tc.listInput.options)
 			testutil.AssertEqual(t, tc.listOuput.object, obj)
@@ -690,7 +690,7 @@ func TestNewFilteredListWatchFromDynamicClientWatch(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
 			defer cancel()
 
-			lw := NewFilteredListWatchFromDynamicClient(ctx, fakeClient, tc.args.resource, tc.args.namespace, tc.args.filters)
+			lw := NewFilteredListWatchFromDynamicClient(fakeClient, tc.args.resource, tc.args.namespace, tc.args.filters)
 
 			watcher, err := lw.WatchWithContext(ctx, tc.watchInput.options)
 
