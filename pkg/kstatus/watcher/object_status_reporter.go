@@ -361,7 +361,7 @@ func (w *ObjectStatusReporter) startInformerNow(
 	// Informer will be stopped when the context is cancelled.
 	go func() {
 		klog.V(3).Infof("Watch starting: %v", gkn)
-		informer.Run(ctx.Done())
+		informer.RunWithContext(ctx)
 		klog.V(3).Infof("Watch stopped: %v", gkn)
 		// Signal to the caller there will be no more events for this GroupKind.
 		close(eventCh)

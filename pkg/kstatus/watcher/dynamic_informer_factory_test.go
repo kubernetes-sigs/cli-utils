@@ -191,7 +191,7 @@ func TestResourceNotFoundError(t *testing.T) {
 			require.NoError(t, err)
 
 			// Block until context cancel or timeout.
-			informer.Run(ctx.Done())
+			informer.RunWithContext(ctx)
 		})
 	}
 }
