@@ -28,7 +28,7 @@ all: generate license fix vet fmt test lint tidy
 	go install github.com/monopole/mdrip@v1.0.2
 
 "$(MYGOBIN)/kind":
-	go install sigs.k8s.io/kind@v0.16.0
+	go install sigs.k8s.io/kind@v0.30.0
 
 # The following target intended for reference by a file in
 # https://github.com/kubernetes/test-infra/tree/master/config/jobs/kubernetes-sigs/cli-utils
