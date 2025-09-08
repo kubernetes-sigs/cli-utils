@@ -79,7 +79,7 @@ metadata:
 spec:
   containers:
   - name: kubernetes-pause
-    image: registry.k8s.io/pause:2.0
+    image: registry.k8s.io/pause:3.10.1
 `)
 
 var podB = []byte(`
@@ -93,7 +93,7 @@ metadata:
 spec:
   containers:
   - name: kubernetes-pause
-    image: registry.k8s.io/pause:2.0
+    image: registry.k8s.io/pause:3.10.1
 `)
 
 func buildMultiResourceConfig(configs ...[]byte) []byte {
