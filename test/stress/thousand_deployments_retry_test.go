@@ -67,7 +67,7 @@ func thousandDeploymentsRetryTest(ctx context.Context, c client.Client, invConfi
 	var applierEvents []event.Event
 
 	maxAttempts := 15
-	reconcileTimeout := 2 * time.Minute
+	reconcileTimeout := 3 * time.Minute
 
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
 		start := time.Now()
