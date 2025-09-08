@@ -35,7 +35,7 @@ var legacyTypes = map[string]GetConditionsFn{
 	"batch/CronJob":              alwaysReady,
 	"ConfigMap":                  alwaysReady,
 	"batch/Job":                  jobConditions,
-	"apiextensions.k8s.io/CustomResourceDefinition": crdConditions,
+	"apiextensions.k8s.io/CustomResourceDefinition": CRDConditions,
 }
 
 const (
@@ -608,7 +608,7 @@ func serviceConditions(u *unstructured.Unstructured) (*Result, error) {
 	}, nil
 }
 
-func crdConditions(u *unstructured.Unstructured) (*Result, error) {
+func CRDConditions(u *unstructured.Unstructured) (*Result, error) {
 	obj := u.UnstructuredContent()
 
 	objc, err := GetObjectWithConditions(obj)
