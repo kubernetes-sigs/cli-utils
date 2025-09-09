@@ -410,6 +410,18 @@ func CreateInventoryCRD(ctx context.Context, c client.Client) {
 		err = c.Create(ctx, invCRD)
 	}
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+	gomega.Eventually(func() bool { // wait for CRD to be processed by the API server.
+		err = c.Get(ctx, types.NamespacedName{
+			Name: invCRD.GetName(),
+		}, &u)
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		res, err := status.CRDConditions(&u)
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		return res.Status == status.CurrentStatus
+	}).WithContext(ctx).WithTimeout(time.Minute).Should(gomega.BeTrue())
 }
 
 func CreateRandomNamespace(ctx context.Context, c client.Client) *v1.Namespace {

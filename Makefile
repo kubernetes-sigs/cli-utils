@@ -10,7 +10,7 @@ export PATH := $(MYGOBIN):$(PATH)
 all: generate license fix vet fmt test lint tidy
 
 "$(MYGOBIN)/stringer":
-	go install golang.org/x/tools/cmd/stringer@v0.29.0
+	go install golang.org/x/tools/cmd/stringer@v0.36.0
 
 "$(MYGOBIN)/addlicense":
 	go install github.com/google/addlicense@v1.0.0
@@ -22,13 +22,13 @@ all: generate license fix vet fmt test lint tidy
 	go install k8s.io/code-generator/cmd/deepcopy-gen@v0.25.2
 
 "$(MYGOBIN)/ginkgo":
-	go install github.com/onsi/ginkgo/v2/ginkgo@v2.2.0
+	go install github.com/onsi/ginkgo/v2/ginkgo@v2.25.2
 
 "$(MYGOBIN)/mdrip":
 	go install github.com/monopole/mdrip@v1.0.2
 
 "$(MYGOBIN)/kind":
-	go install sigs.k8s.io/kind@v0.16.0
+	go install sigs.k8s.io/kind@v0.30.0
 
 # The following target intended for reference by a file in
 # https://github.com/kubernetes/test-infra/tree/master/config/jobs/kubernetes-sigs/cli-utils
