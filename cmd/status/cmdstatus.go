@@ -107,7 +107,7 @@ type Runner struct {
 }
 
 func (r *Runner) preRunE(*cobra.Command, []string) error {
-	if !slice.ContainsString(PollUntilOptions, r.pollUntil, nil) {
+	if !slice.Contains(PollUntilOptions, r.pollUntil, nil) {
 		return fmt.Errorf("pollUntil must be one of %s", strings.Join(PollUntilOptions, ","))
 	}
 

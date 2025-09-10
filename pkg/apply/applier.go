@@ -313,8 +313,8 @@ func handleError(eventChannel chan event.Event, err error) {
 // for the passed non cluster-scoped localObjs, plus the namespace
 // of the passed inventory object. This is used to skip deleting
 // namespaces which have currently applied objects in them.
-func localNamespaces(localInv inventory.Info, localObjs []object.ObjMetadata) sets.String { // nolint:staticcheck
-	namespaces := sets.NewString()
+func localNamespaces(localInv inventory.Info, localObjs []object.ObjMetadata) sets.Set[string] { // nolint:staticcheck
+	namespaces := sets.New[string]()
 	for _, obj := range localObjs {
 		if obj.Namespace != "" {
 			namespaces.Insert(obj.Namespace)

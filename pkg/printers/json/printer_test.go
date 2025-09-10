@@ -6,14 +6,14 @@ package json
 import (
 	"testing"
 
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"sigs.k8s.io/cli-utils/pkg/printers/printer"
 	printertesting "sigs.k8s.io/cli-utils/pkg/printers/testutil"
 )
 
 func TestPrint(t *testing.T) {
 	printertesting.PrintResultErrorTest(t, func() printer.Printer {
-		ioStreams, _, _, _ := genericclioptions.NewTestIOStreams()
+		ioStreams, _, _, _ := genericiooptions.NewTestIOStreams()
 		return NewPrinter(ioStreams)
 	})
 }

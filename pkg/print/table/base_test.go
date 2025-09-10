@@ -11,7 +11,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	pe "sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
@@ -133,7 +133,7 @@ Deployment/VeryLongNameThatShouldBeTrimm  end
 
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
-			ioStreams, _, outBuffer, _ := genericclioptions.NewTestIOStreams()
+			ioStreams, _, outBuffer, _ := genericiooptions.NewTestIOStreams()
 
 			printer := &BaseTablePrinter{
 				IOStreams: ioStreams,
