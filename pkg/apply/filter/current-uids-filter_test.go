@@ -13,29 +13,29 @@ import (
 
 func TestCurrentUIDFilter(t *testing.T) {
 	tests := map[string]struct {
-		filterUIDs    sets.String // nolint:staticcheck
-		objUID        string
+		filterUIDs    sets.Set[types.UID] // nolint:staticcheck
+		objUID        types.UID
 		expectedError error
 	}{
 		"Empty filter UIDs, object is not filtered": {
-			filterUIDs: sets.NewString(),
+			filterUIDs: sets.New[types.UID](),
 			objUID:     "bar",
 		},
 		"Empty object UID, object is not filtered": {
-			filterUIDs: sets.NewString("foo"),
+			filterUIDs: sets.New[types.UID]("foo"),
 			objUID:     "",
 		},
 		"Object UID not in filter UID set, object is not filtered": {
-			filterUIDs: sets.NewString("foo", "baz"),
+			filterUIDs: sets.New[types.UID]("foo", "baz"),
 			objUID:     "bar",
 		},
 		"Object UID is in filter UID set, object is filtered": {
-			filterUIDs:    sets.NewString("foo"),
+			filterUIDs:    sets.New[types.UID]("foo"),
 			objUID:        "foo",
 			expectedError: &ApplyPreventedDeletionError{UID: "foo"},
 		},
 		"Object UID is among several filter UIDs, object is filtered": {
-			filterUIDs:    sets.NewString("foo", "bar", "baz"),
+			filterUIDs:    sets.New[types.UID]("foo", "bar", "baz"),
 			objUID:        "foo",
 			expectedError: &ApplyPreventedDeletionError{UID: "foo"},
 		},
@@ -47,7 +47,7 @@ func TestCurrentUIDFilter(t *testing.T) {
 				CurrentUIDs: tc.filterUIDs,
 			}
 			obj := defaultObj.DeepCopy()
-			obj.SetUID(types.UID(tc.objUID))
+			obj.SetUID(tc.objUID)
 			err := filter.Filter(t.Context(), obj)
 			testutil.AssertEqual(t, tc.expectedError, err)
 		})

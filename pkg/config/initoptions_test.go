@@ -12,7 +12,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 )
 
@@ -167,7 +167,7 @@ func TestComplete(t *testing.T) {
 
 			tf := cmdtesting.NewTestFactory().WithNamespace("foo")
 			defer tf.Cleanup()
-			ioStreams, _, out, _ := genericclioptions.NewTestIOStreams()
+			ioStreams, _, out, _ := genericiooptions.NewTestIOStreams()
 			io := NewInitOptions(tf, ioStreams)
 			err = io.Complete(tc.args)
 
@@ -255,7 +255,7 @@ func (f *fakeNamespaceLoader) Namespace() (string, bool, error) {
 func TestDefaultInventoryID(t *testing.T) {
 	tf := cmdtesting.NewTestFactory().WithNamespace("foo")
 	defer tf.Cleanup()
-	ioStreams, _, _, _ := genericclioptions.NewTestIOStreams() //nolint:dogsled
+	ioStreams, _, _, _ := genericiooptions.NewTestIOStreams() // nolint:dogsled
 	io := NewInitOptions(tf, ioStreams)
 	actual, err := io.defaultInventoryID()
 	if err != nil {
@@ -345,7 +345,7 @@ func TestFillInValues(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			tf := cmdtesting.NewTestFactory().WithNamespace("foo")
 			defer tf.Cleanup()
-			ioStreams, _, _, _ := genericclioptions.NewTestIOStreams() //nolint:dogsled
+			ioStreams, _, _, _ := genericiooptions.NewTestIOStreams()
 			io := NewInitOptions(tf, ioStreams)
 			io.Namespace = tc.namespace
 			io.InventoryID = tc.inventoryID
