@@ -18,6 +18,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/dynamic/fake"
@@ -327,7 +328,7 @@ func TestPrune(t *testing.T) {
 			pruneFilters: []filter.ValidationFilter{
 				filter.CurrentUIDFilter{
 					// Add pod UID to set of current UIDs
-					CurrentUIDs: sets.NewString("pod-uid"),
+					CurrentUIDs: sets.New(types.UID("pod-uid")),
 				},
 			},
 			options: defaultOptions,
@@ -357,7 +358,7 @@ func TestPrune(t *testing.T) {
 			pruneFilters: []filter.ValidationFilter{
 				filter.CurrentUIDFilter{
 					// Add pod UID to set of current UIDs
-					CurrentUIDs: sets.NewString("pod-uid"),
+					CurrentUIDs: sets.New(types.UID("pod-uid")),
 				},
 			},
 			options: defaultOptions,
@@ -525,7 +526,7 @@ func TestPrune(t *testing.T) {
 			pruneObjs:   []*unstructured.Unstructured{namespace},
 			pruneFilters: []filter.ValidationFilter{
 				filter.LocalNamespacesFilter{
-					LocalNamespaces: sets.NewString(namespace.GetName()),
+					LocalNamespaces: sets.New(namespace.GetName()),
 				},
 			},
 			options: defaultOptions,

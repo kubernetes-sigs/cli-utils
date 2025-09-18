@@ -13,7 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"sigs.k8s.io/cli-utils/pkg/apply/event"
 	"sigs.k8s.io/cli-utils/pkg/common"
 	pollevent "sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
@@ -77,7 +77,7 @@ func TestFormatter_FormatApplyEvent(t *testing.T) {
 
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
-			ioStreams, _, out, _ := genericclioptions.NewTestIOStreams() //nolint:dogsled
+			ioStreams, _, out, _ := genericiooptions.NewTestIOStreams()
 			formatter := NewFormatter(ioStreams, tc.previewStrategy)
 			err := formatter.FormatApplyEvent(tc.event)
 			assert.NoError(t, err)
@@ -124,7 +124,7 @@ func TestFormatter_FormatStatusEvent(t *testing.T) {
 
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
-			ioStreams, _, out, _ := genericclioptions.NewTestIOStreams() //nolint:dogsled
+			ioStreams, _, out, _ := genericiooptions.NewTestIOStreams()
 			formatter := NewFormatter(ioStreams, tc.previewStrategy)
 			err := formatter.FormatStatusEvent(tc.event)
 			assert.NoError(t, err)
@@ -183,7 +183,7 @@ func TestFormatter_FormatPruneEvent(t *testing.T) {
 
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
-			ioStreams, _, out, _ := genericclioptions.NewTestIOStreams() //nolint:dogsled
+			ioStreams, _, out, _ := genericiooptions.NewTestIOStreams()
 			formatter := NewFormatter(ioStreams, tc.previewStrategy)
 			err := formatter.FormatPruneEvent(tc.event)
 			assert.NoError(t, err)
@@ -242,7 +242,7 @@ func TestFormatter_FormatDeleteEvent(t *testing.T) {
 
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
-			ioStreams, _, out, _ := genericclioptions.NewTestIOStreams() //nolint:dogsled
+			ioStreams, _, out, _ := genericiooptions.NewTestIOStreams()
 			formatter := NewFormatter(ioStreams, tc.previewStrategy)
 			err := formatter.FormatDeleteEvent(tc.event)
 			assert.NoError(t, err)
@@ -353,7 +353,7 @@ func TestFormatter_FormatWaitEvent(t *testing.T) {
 
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
-			ioStreams, _, out, _ := genericclioptions.NewTestIOStreams() //nolint:dogsled
+			ioStreams, _, out, _ := genericiooptions.NewTestIOStreams()
 			formatter := NewFormatter(ioStreams, tc.previewStrategy)
 			err := formatter.FormatWaitEvent(tc.event)
 			assert.NoError(t, err)
@@ -494,7 +494,7 @@ func TestFormatter_FormatValidationEvent(t *testing.T) {
 
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
-			ioStreams, _, out, _ := genericclioptions.NewTestIOStreams() //nolint:dogsled
+			ioStreams, _, out, _ := genericiooptions.NewTestIOStreams()
 			formatter := NewFormatter(ioStreams, tc.previewStrategy)
 			err := formatter.FormatValidationEvent(tc.event)
 			if tc.expectedError != nil {

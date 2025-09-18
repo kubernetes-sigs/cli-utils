@@ -11,32 +11,31 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/testutil"
 )
 
-var testNamespace = &unstructured.Unstructured{
-	Object: map[string]any{
-		"apiVersion": "v1",
-		"kind":       "Namespace",
-		"metadata": map[string]any{
-			"name": "test-namespace",
-		},
-	},
-}
-
 func TestLocalNamespacesFilter(t *testing.T) {
+	testNamespace := &unstructured.Unstructured{
+		Object: map[string]any{
+			"apiVersion": "v1",
+			"kind":       "Namespace",
+			"metadata": map[string]any{
+				"name": "test-namespace",
+			},
+		},
+	}
 	tests := map[string]struct {
-		localNamespaces sets.String // nolint:staticcheck
+		localNamespaces sets.Set[string] // nolint:staticcheck
 		namespace       string
 		expectedError   error
 	}{
 		"No local namespaces, namespace is not filtered": {
-			localNamespaces: sets.NewString(),
+			localNamespaces: sets.New[string](),
 			namespace:       "test-namespace",
 		},
 		"Namespace not in local namespaces, namespace is not filtered": {
-			localNamespaces: sets.NewString("foo", "bar"),
+			localNamespaces: sets.New("foo", "bar"),
 			namespace:       "test-namespace",
 		},
 		"Namespace is in local namespaces, namespace is filtered": {
-			localNamespaces: sets.NewString("foo", "test-namespace", "bar"),
+			localNamespaces: sets.New("foo", "test-namespace", "bar"),
 			namespace:       "test-namespace",
 			expectedError: &NamespaceInUseError{
 				Namespace: "test-namespace",

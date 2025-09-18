@@ -6,10 +6,10 @@ package table
 import (
 	"fmt"
 	"io"
+	"math"
 	"time"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/utils/integer"
 	"sigs.k8s.io/cli-utils/pkg/print/common"
 )
 
@@ -205,13 +205,13 @@ var (
 				switch {
 				case age.Seconds() <= 90:
 					return fmt.Fprintf(w, "%ds",
-						integer.RoundToInt32(age.Round(time.Second).Seconds()))
+						int32(math.Round(age.Round(time.Second).Seconds())))
 				case age.Minutes() <= 90:
 					return fmt.Fprintf(w, "%dm",
-						integer.RoundToInt32(age.Round(time.Minute).Minutes()))
+						int32(math.Round(age.Round(time.Minute).Minutes())))
 				default:
 					return fmt.Fprintf(w, "%dh",
-						integer.RoundToInt32(age.Round(time.Hour).Hours()))
+						int32(math.Round(age.Round(time.Hour).Hours())))
 				}
 			},
 		},
