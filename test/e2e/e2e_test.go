@@ -158,6 +158,10 @@ var _ = Describe("E2E", func() {
 					deletionPreventionTest(ctx, c, invConfig, inventoryName, namespace.GetName())
 				})
 
+				It("MutationPrevention", func() {
+					mutationPreventionTest(ctx, c, invConfig, inventoryName, namespace.GetName())
+				})
+
 				It("CustomResource", func() {
 					crdTest(ctx, c, invConfig, inventoryName, namespace.GetName())
 				})

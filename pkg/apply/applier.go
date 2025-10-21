@@ -135,6 +135,11 @@ func (a *Applier) Run(ctx context.Context, invInfo inventory.Info, objects objec
 				Inv:       invInfo,
 				InvPolicy: options.InventoryPolicy,
 			},
+			// consider consolidating these two filters to minimize repeated Get calls
+			filter.PreventUpdateFilter{
+				Client: a.metadataClient,
+				Mapper: a.mapper,
+			},
 			filter.DependencyFilter{
 				TaskContext:       taskContext,
 				ActuationStrategy: actuation.ActuationStrategyApply,
