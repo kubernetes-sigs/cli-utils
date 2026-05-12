@@ -75,6 +75,18 @@ func TestParseObjMetadata(t *testing.T) {
 			},
 			isError: false,
 		},
+		"RBAC resources can have a literal underscore in their name": {
+			invStr: "test-namespace_roles_ops_rbac.authorization.k8s.io_ClusterRole",
+			inventory: &ObjMetadata{
+				Namespace: "test-namespace",
+				Name:      "roles_ops",
+				GroupKind: schema.GroupKind{
+					Group: rbacv1.GroupName,
+					Kind:  "ClusterRole",
+				},
+			},
+			isError: false,
+		},
 		"Test double underscore (colon) at end of name": {
 			invStr: "test-namespace_leader-locking-kube-scheduler___rbac.authorization.k8s.io_RoleBinding",
 			inventory: &ObjMetadata{
