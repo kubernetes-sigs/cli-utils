@@ -91,18 +91,20 @@ func ParseObjMetadata(s string) (ObjMetadata, error) {
 	// Finally, second field name. Name may contain colon transcoded as double underscore.
 	name := s[:index]
 	name = strings.ReplaceAll(name, colonTranscoded, ":")
-	// Check that there are no extra fields by search for fieldSeparator.
-	if strings.Contains(name, fieldSeparator) {
-		return NilObjMetadata, fmt.Errorf("too many fields within: %s", s)
+	gk := schema.GroupKind{Group: group, Kind: kind}
+	// RBAC resources may contain a literal underscore in their name, so the
+	// extra-fields check below would reject otherwise valid identifiers.
+	if _, isRBAC := RBACGroupKind[gk]; !isRBAC {
+		// Check that there are no extra fields by search for fieldSeparator.
+		if strings.Contains(name, fieldSeparator) {
+			return NilObjMetadata, fmt.Errorf("too many fields within: %s", s)
+		}
 	}
 	// Create the ObjMetadata object from the four parsed fields.
 	id := ObjMetadata{
 		Namespace: namespace,
 		Name:      name,
-		GroupKind: schema.GroupKind{
-			Group: group,
-			Kind:  kind,
-		},
+		GroupKind: gk,
 	}
 	return id, nil
 }
