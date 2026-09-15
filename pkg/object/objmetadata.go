@@ -91,8 +91,8 @@ func ParseObjMetadata(s string) (ObjMetadata, error) {
 	// Finally, second field name. Name may contain colon transcoded as double underscore.
 	name := s[:index]
 	name = strings.ReplaceAll(name, colonTranscoded, ":")
-	// Check that there are no extra fields by search for fieldSeparator.
-	if strings.Contains(name, fieldSeparator) {
+	isRBAC := RBACGroupKind[schema.GroupKind{Group: group, Kind: kind}]
+	if !isRBAC && strings.Contains(name, fieldSeparator) {
 		return NilObjMetadata, fmt.Errorf("too many fields within: %s", s)
 	}
 	// Create the ObjMetadata object from the four parsed fields.

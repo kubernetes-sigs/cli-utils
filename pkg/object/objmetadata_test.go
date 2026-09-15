@@ -87,6 +87,35 @@ func TestParseObjMetadata(t *testing.T) {
 			},
 			isError: false,
 		},
+		"RBAC resources can have underscore in their name": {
+			invStr: "test-namespace_roles_ops_rbac.authorization.k8s.io_ClusterRole",
+			inventory: &ObjMetadata{
+				Namespace: "test-namespace",
+				Name:      "roles_ops",
+				GroupKind: schema.GroupKind{
+					Group: rbacv1.GroupName,
+					Kind:  "ClusterRole",
+				},
+			},
+			isError: false,
+		},
+		"RBAC resources can have underscore and colon in their name": {
+			invStr: "test-namespace_system_leader__locking_rbac.authorization.k8s.io_RoleBinding",
+			inventory: &ObjMetadata{
+				Namespace: "test-namespace",
+				Name:      "system_leader:locking",
+				GroupKind: schema.GroupKind{
+					Group: rbacv1.GroupName,
+					Kind:  "RoleBinding",
+				},
+			},
+			isError: false,
+		},
+		"Non-RBAC resources with underscore in name still error": {
+			invStr:    "test-namespace_test_name_apps_Deployment",
+			inventory: &ObjMetadata{},
+			isError:   true,
+		},
 		"Not enough fields -- error": {
 			invStr:    "_test-name_apps",
 			inventory: &ObjMetadata{},
@@ -116,6 +145,43 @@ func TestParseObjMetadata(t *testing.T) {
 			}
 			if tc.isError && err == nil {
 				t.Errorf("Should have returned an error in ParseObjMetadata()")
+			}
+		})
+	}
+}
+
+func TestObjMetadataStringRoundTrip(t *testing.T) {
+	tests := map[string]ObjMetadata{
+		"Basic resource": {
+			Namespace: "test-namespace",
+			Name:      "test-name",
+			GroupKind: schema.GroupKind{Group: "apps", Kind: "Deployment"},
+		},
+		"RBAC resource with colon": {
+			Namespace: "test-namespace",
+			Name:      "system:leader-locking-kube-scheduler",
+			GroupKind: schema.GroupKind{Group: rbacv1.GroupName, Kind: "Role"},
+		},
+		"RBAC resource with underscore": {
+			Namespace: "test-namespace",
+			Name:      "roles_ops",
+			GroupKind: schema.GroupKind{Group: rbacv1.GroupName, Kind: "ClusterRole"},
+		},
+		"RBAC resource with underscore and colon": {
+			Namespace: "test-namespace",
+			Name:      "system_leader:locking",
+			GroupKind: schema.GroupKind{Group: rbacv1.GroupName, Kind: "RoleBinding"},
+		},
+	}
+
+	for tn, tc := range tests {
+		t.Run(tn, func(t *testing.T) {
+			actual, err := ParseObjMetadata(tc.String())
+			if err != nil {
+				t.Fatalf("Error parsing round-tripped inventory string %q: %s", tc.String(), err)
+			}
+			if !tc.Equals(&actual) {
+				t.Errorf("Expected inventory (%s) != round-tripped inventory (%s)\n", tc, actual)
 			}
 		})
 	}
