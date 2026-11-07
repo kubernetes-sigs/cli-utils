@@ -309,7 +309,7 @@ func TestNewFilteredListWatchFromDynamicClientList(t *testing.T) {
 						"kind": "PodList",
 						"metadata": map[string]any{
 							"continue":        "",
-							"resourceVersion": "",
+							"resourceVersion": "3",
 						},
 						"apiVersion": "v1",
 					},
@@ -337,7 +337,7 @@ func TestNewFilteredListWatchFromDynamicClientList(t *testing.T) {
 						"kind": "PodList",
 						"metadata": map[string]any{
 							"continue":        "",
-							"resourceVersion": "",
+							"resourceVersion": "3",
 						},
 						"apiVersion": "v1",
 					},
@@ -369,7 +369,7 @@ func TestNewFilteredListWatchFromDynamicClientList(t *testing.T) {
 						"kind": "PodList",
 						"metadata": map[string]any{
 							"continue":        "",
-							"resourceVersion": "",
+							"resourceVersion": "3",
 						},
 						"apiVersion": "v1",
 					},
@@ -401,7 +401,7 @@ func TestNewFilteredListWatchFromDynamicClientList(t *testing.T) {
 						"kind": "PodList",
 						"metadata": map[string]any{
 							"continue":        "",
-							"resourceVersion": "",
+							"resourceVersion": "3",
 						},
 						"apiVersion": "v1",
 					},
