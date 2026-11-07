@@ -40,11 +40,17 @@ func (f *DynamicInformerFactory) NewInformer(mapping *meta.RESTMapping, namespac
 	example := &unstructured.Unstructured{}
 	example.SetGroupVersionKind(mapping.GroupVersionKind)
 	return cache.NewSharedIndexInformer(
-		NewFilteredListWatchFromDynamicClient(
+		// Propagate whether the client supports WatchList semantics, so the
+		// reflector can fall back to List+Watch for clients that don't (e.g.
+		// the fake dynamic client). Mirrors client-go's dynamicinformer.
+		cache.ToListWatcherWithWatchListSemantics(
+			NewFilteredListWatchFromDynamicClient(
+				f.Client,
+				mapping.Resource,
+				namespace,
+				f.Filters,
+			),
 			f.Client,
-			mapping.Resource,
-			namespace,
-			f.Filters,
 		),
 		example,
 		f.ResyncPeriod,
