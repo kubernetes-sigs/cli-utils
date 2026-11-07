@@ -10,7 +10,6 @@ import (
 	. "github.com/onsi/ginkgo/v2" //nolint:revive
 	. "github.com/onsi/gomega"    //nolint:revive
 
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -92,9 +91,10 @@ func continueOnErrorTest(ctx context.Context, c client.Client, invConfig invconf
 								invalidCrdObj.GetName(),
 								field.ErrorList{
 									&field.Error{
-										Type:     field.ErrorTypeInvalid,
-										Field:    "spec.versions",
-										BadValue: []apiextensions.CustomResourceDefinitionVersion(nil),
+										Type:  field.ErrorTypeInvalid,
+										Field: "spec.versions",
+										// Only the rendered message is compared; a nil slice renders as "null".
+										BadValue: []any(nil),
 										Detail:   "must have exactly one version marked as storage version",
 									},
 									&field.Error{

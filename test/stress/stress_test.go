@@ -16,9 +16,9 @@ import (
 	"k8s.io/kubectl/pkg/scheme"
 	"sigs.k8s.io/cli-utils/test/e2e/e2eutil"
 	"sigs.k8s.io/cli-utils/test/e2e/invconfig"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
+	"sigs.k8s.io/controller-runtime/pkg/client/config"
 )
 
 // Parse optional logging flags
@@ -41,7 +41,7 @@ var _ = BeforeSuite(func() {
 	// increase from 4000 to handle long event lists
 	format.MaxLength = 10000
 
-	cfg, err := ctrl.GetConfig()
+	cfg, err := config.GetConfig()
 	Expect(err).NotTo(HaveOccurred())
 
 	cfg.UserAgent = e2eutil.UserAgent("test/stress")
