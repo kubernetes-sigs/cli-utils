@@ -15,9 +15,6 @@ GINKGO := go run github.com/onsi/ginkgo/v2/ginkgo
 .PHONY: all
 all: generate license fix vet fmt test lint tidy
 
-"$(MYGOBIN)/deepcopy-gen":
-	go install k8s.io/code-generator/cmd/deepcopy-gen@v0.25.2
-
 # The following target intended for reference by a file in
 # https://github.com/kubernetes/test-infra/tree/master/config/jobs/kubernetes-sigs/cli-utils
 .PHONY: prow-presubmit-check
@@ -50,8 +47,8 @@ install-column-apt:
 	apt-get install -y bsdmainutils
 
 .PHONY: generate-deepcopy
-generate-deepcopy: "$(MYGOBIN)/deepcopy-gen"
-	hack/run-in-gopath.sh deepcopy-gen --input-dirs ./pkg/apis/... -O zz_generated.deepcopy --go-header-file ./LICENSE_TEMPLATE_GO
+generate-deepcopy:
+	$(GO_TOOL) deepcopy-gen --output-file zz_generated.deepcopy.go --go-header-file ./LICENSE_TEMPLATE_GO ./pkg/apis/...
 
 .PHONY: generate
 generate: generate-deepcopy
