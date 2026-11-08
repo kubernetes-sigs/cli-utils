@@ -14,7 +14,7 @@ import (
 
 // Type determines the type of events that are available.
 //
-//go:generate stringer -type=Type
+//go:generate go tool -modfile=$TOOLS_MODFILE stringer -type=Type
 type Type int
 
 const (
@@ -107,7 +107,7 @@ func (ie InitEvent) String() string {
 	return fmt.Sprintf("InitEvent{ ActionGroups: %s }", ie.ActionGroups)
 }
 
-//go:generate stringer -type=ResourceAction -linecomment
+//go:generate go tool -modfile=$TOOLS_MODFILE stringer -type=ResourceAction -linecomment
 type ResourceAction int
 
 const (
@@ -157,7 +157,7 @@ func (ee ErrorEvent) String() string {
 	return fmt.Sprintf("ErrorEvent{ Err: %q }", ee.Err.Error())
 }
 
-//go:generate stringer -type=WaitEventStatus -linecomment
+//go:generate go tool -modfile=$TOOLS_MODFILE stringer -type=WaitEventStatus -linecomment
 type WaitEventStatus int
 
 const (
@@ -180,7 +180,7 @@ func (we WaitEvent) String() string {
 		we.GroupName, we.Status, we.Identifier)
 }
 
-//go:generate stringer -type=ActionGroupEventStatus
+//go:generate go tool -modfile=$TOOLS_MODFILE stringer -type=ActionGroupEventStatus
 type ActionGroupEventStatus int
 
 const (
@@ -200,7 +200,7 @@ func (age ActionGroupEvent) String() string {
 		age.GroupName, age.Action, age.Status)
 }
 
-//go:generate stringer -type=ApplyEventStatus -linecomment
+//go:generate go tool -modfile=$TOOLS_MODFILE stringer -type=ApplyEventStatus -linecomment
 type ApplyEventStatus int
 
 const (
@@ -253,7 +253,7 @@ func (se StatusEvent) String() string {
 		status, gen, se.Identifier)
 }
 
-//go:generate stringer -type=PruneEventStatus -linecomment
+//go:generate go tool -modfile=$TOOLS_MODFILE stringer -type=PruneEventStatus -linecomment
 type PruneEventStatus int
 
 const (
@@ -281,7 +281,7 @@ func (pe PruneEvent) String() string {
 		pe.GroupName, pe.Status, pe.Identifier)
 }
 
-//go:generate stringer -type=DeleteEventStatus -linecomment
+//go:generate go tool -modfile=$TOOLS_MODFILE stringer -type=DeleteEventStatus -linecomment
 type DeleteEventStatus int
 
 const (

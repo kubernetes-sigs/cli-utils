@@ -18,7 +18,7 @@ import (
 // the inventory-id value in the package and the owning-inventory
 // annotation in the live object.
 //
-//go:generate stringer -type=Policy -linecomment
+//go:generate go tool -modfile=$TOOLS_MODFILE stringer -type=Policy -linecomment
 type Policy int
 
 const (
@@ -74,7 +74,7 @@ const OwningInventoryKey = "config.k8s.io/owning-inventory"
 // IDMatchStatus represents the result of comparing the
 // id from current inventory info and the inventory-id from a live object.
 //
-//go:generate stringer -type=IDMatchStatus
+//go:generate go tool -modfile=$TOOLS_MODFILE stringer -type=IDMatchStatus
 type IDMatchStatus int
 
 const (

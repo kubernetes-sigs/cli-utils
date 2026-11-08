@@ -3,7 +3,7 @@
 
 package validation
 
-//go:generate stringer -type=Policy
+//go:generate go tool -modfile=$TOOLS_MODFILE stringer -type=Policy
 type Policy int
 
 const (

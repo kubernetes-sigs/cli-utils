@@ -17,8 +17,9 @@ const _Relationship_name = "DependentDependency"
 var _Relationship_index = [...]uint8{0, 9, 19}
 
 func (i Relationship) String() string {
-	if i < 0 || i >= Relationship(len(_Relationship_index)-1) {
+	idx := int(i) - 0
+	if i < 0 || idx >= len(_Relationship_index)-1 {
 		return "Relationship(" + strconv.FormatInt(int64(i), 10) + ")"
 	}
-	return _Relationship_name[_Relationship_index[i]:_Relationship_index[i+1]]
+	return _Relationship_name[_Relationship_index[idx]:_Relationship_index[idx+1]]
 }

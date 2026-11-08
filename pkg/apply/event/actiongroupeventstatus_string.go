@@ -17,8 +17,9 @@ const _ActionGroupEventStatus_name = "StartedFinished"
 var _ActionGroupEventStatus_index = [...]uint8{0, 7, 15}
 
 func (i ActionGroupEventStatus) String() string {
-	if i < 0 || i >= ActionGroupEventStatus(len(_ActionGroupEventStatus_index)-1) {
+	idx := int(i) - 0
+	if i < 0 || idx >= len(_ActionGroupEventStatus_index)-1 {
 		return "ActionGroupEventStatus(" + strconv.FormatInt(int64(i), 10) + ")"
 	}
-	return _ActionGroupEventStatus_name[_ActionGroupEventStatus_index[i]:_ActionGroupEventStatus_index[i+1]]
+	return _ActionGroupEventStatus_name[_ActionGroupEventStatus_index[idx]:_ActionGroupEventStatus_index[idx+1]]
 }

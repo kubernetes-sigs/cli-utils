@@ -18,8 +18,9 @@ const _RESTScopeStrategy_name = "automaticrootnamespace"
 var _RESTScopeStrategy_index = [...]uint8{0, 9, 13, 22}
 
 func (i RESTScopeStrategy) String() string {
-	if i < 0 || i >= RESTScopeStrategy(len(_RESTScopeStrategy_index)-1) {
+	idx := int(i) - 0
+	if i < 0 || idx >= len(_RESTScopeStrategy_index)-1 {
 		return "RESTScopeStrategy(" + strconv.FormatInt(int64(i), 10) + ")"
 	}
-	return _RESTScopeStrategy_name[_RESTScopeStrategy_index[i]:_RESTScopeStrategy_index[i+1]]
+	return _RESTScopeStrategy_name[_RESTScopeStrategy_index[idx]:_RESTScopeStrategy_index[idx+1]]
 }

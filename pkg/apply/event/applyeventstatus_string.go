@@ -19,8 +19,9 @@ const _ApplyEventStatus_name = "PendingSuccessfulSkippedFailed"
 var _ApplyEventStatus_index = [...]uint8{0, 7, 17, 24, 30}
 
 func (i ApplyEventStatus) String() string {
-	if i < 0 || i >= ApplyEventStatus(len(_ApplyEventStatus_index)-1) {
+	idx := int(i) - 0
+	if i < 0 || idx >= len(_ApplyEventStatus_index)-1 {
 		return "ApplyEventStatus(" + strconv.FormatInt(int64(i), 10) + ")"
 	}
-	return _ApplyEventStatus_name[_ApplyEventStatus_index[i]:_ApplyEventStatus_index[i+1]]
+	return _ApplyEventStatus_name[_ApplyEventStatus_index[idx]:_ApplyEventStatus_index[idx+1]]
 }

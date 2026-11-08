@@ -19,8 +19,9 @@ const _PruneEventStatus_name = "PendingSuccessfulSkippedFailed"
 var _PruneEventStatus_index = [...]uint8{0, 7, 17, 24, 30}
 
 func (i PruneEventStatus) String() string {
-	if i < 0 || i >= PruneEventStatus(len(_PruneEventStatus_index)-1) {
+	idx := int(i) - 0
+	if i < 0 || idx >= len(_PruneEventStatus_index)-1 {
 		return "PruneEventStatus(" + strconv.FormatInt(int64(i), 10) + ")"
 	}
-	return _PruneEventStatus_name[_PruneEventStatus_index[i]:_PruneEventStatus_index[i+1]]
+	return _PruneEventStatus_name[_PruneEventStatus_index[idx]:_PruneEventStatus_index[idx+1]]
 }
