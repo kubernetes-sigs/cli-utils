@@ -25,7 +25,10 @@ Alternatively, use
 
 ## Establish the base
 
-Download the example configs for services `mysql` and `wordpress`
+Download the example configs for services `mysql` and `wordpress`.
+The `mysql` Deployment is written out instead, to lower the open files limit:
+`mysql:5.6` allocates memory in proportion to it, and in `kind` the limit is so high
+that `mysqld` tries to use about 16GB.
 <!-- @createBase @testE2EAgainstLatestRelease -->
 ```
 BASE=$DEMO_HOME/base
@@ -47,7 +50,46 @@ curl -s -o "$BASE/wordpress/#1.yaml" "https://raw.githubusercontent.com\
 curl -s -o "$BASE/mysql/#1.yaml" "https://raw.githubusercontent.com\
 /kubernetes-sigs/kustomize\
 /master/examples/wordpress/mysql\
-/{secret,deployment,service}.yaml"
+/{secret,service}.yaml"
+
+cat > "$BASE/mysql/deployment.yaml" <<'EOF'
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql
+  labels:
+    app: mysql
+spec:
+  selector:
+    matchLabels:
+      app: mysql
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      containers:
+      - image: mysql:5.6
+        name: mysql
+        command: ["sh", "-c", "ulimit -n 1048576 && exec docker-entrypoint.sh mysqld"]
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: mysql-pass
+              key: password
+        ports:
+        - containerPort: 3306
+          name: mysql
+        volumeMounts:
+        - name: mysql-persistent-storage
+          mountPath: /var/lib/mysql
+      volumes:
+      - name: mysql-persistent-storage
+        emptyDir: {}
+EOF
 
 function expectedOutputLine() {
   if ! grep -q "$@" "$OUTPUT/status"; then
