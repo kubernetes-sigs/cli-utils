@@ -60,6 +60,13 @@ function expectedOutputLine() {
 }
 ```
 
+Delete any existing kind cluster and create a new one. By default the name of the cluster is "kind"
+<!-- @deleteAndCreateKindCluster @testE2EAgainstLatestRelease -->
+```
+kind delete cluster
+kind create cluster
+```
+
 Use the kapply init command to generate the inventory template. This contains
 the namespace and inventory id used by apply to create inventory objects.
 <!-- @createInventoryTemplate @testE2EAgainstLatestRelease-->
@@ -69,13 +76,6 @@ expectedOutputLine "namespace: default is used for inventory object"
 
 kapply init $BASE/wordpress | tee $OUTPUT/status
 expectedOutputLine "namespace: default is used for inventory object"
-```
-
-Delete any existing kind cluster and create a new one. By default the name of the cluster is "kind"
-<!-- @deleteAndCreateKindCluster @testE2EAgainstLatestRelease -->
-```
-kind delete cluster
-kind create cluster
 ```
 
 Let's apply the mysql service

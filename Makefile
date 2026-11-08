@@ -75,10 +75,14 @@ lint:
 test:
 	go test -race -cover ./cmd/... ./pkg/...
 
+# The cluster is deleted after a successful run to free memory for verify-kapply-e2e,
+# which runs next in the same CI pod and creates its own cluster.
+# On failure it is kept for debugging.
 .PHONY: test-e2e
 test-e2e:
 	$(GO_TOOL) kind delete cluster --name=cli-utils-e2e && $(GO_TOOL) kind create cluster --name=cli-utils-e2e --wait 5m
 	$(GINKGO) -v ./test/e2e/... -- -v 3
+	$(GO_TOOL) kind delete cluster --name=cli-utils-e2e
 
 .PHONY: test-e2e-focus
 test-e2e-focus:
