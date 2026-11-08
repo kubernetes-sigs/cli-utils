@@ -5,6 +5,8 @@ GOPATH := $(shell go env GOPATH)
 MYGOBIN := $(shell go env GOPATH)/bin
 SHELL := /bin/bash
 export PATH := $(MYGOBIN):$(PATH)
+# Use the Ginkgo CLI version from go.mod, so it always matches the library.
+GINKGO := go run github.com/onsi/ginkgo/v2/ginkgo
 
 .PHONY: all
 all: generate license fix vet fmt test lint tidy
@@ -20,9 +22,6 @@ all: generate license fix vet fmt test lint tidy
 
 "$(MYGOBIN)/deepcopy-gen":
 	go install k8s.io/code-generator/cmd/deepcopy-gen@v0.25.2
-
-"$(MYGOBIN)/ginkgo":
-	go install github.com/onsi/ginkgo/v2/ginkgo@v2.25.2
 
 "$(MYGOBIN)/mdrip":
 	go install github.com/monopole/mdrip@v1.0.2
@@ -90,21 +89,21 @@ test:
 	go test -race -cover ./cmd/... ./pkg/...
 
 .PHONY: test-e2e
-test-e2e: "$(MYGOBIN)/ginkgo" "$(MYGOBIN)/kind"
+test-e2e: "$(MYGOBIN)/kind"
 	kind delete cluster --name=cli-utils-e2e && kind create cluster --name=cli-utils-e2e --wait 5m
-	"$(MYGOBIN)/ginkgo" -v ./test/e2e/... -- -v 3
+	$(GINKGO) -v ./test/e2e/... -- -v 3
 
 .PHONY: test-e2e-focus
-test-e2e-focus: "$(MYGOBIN)/ginkgo" "$(MYGOBIN)/kind"
+test-e2e-focus: "$(MYGOBIN)/kind"
 	kind delete cluster --name=cli-utils-e2e && kind create cluster --name=cli-utils-e2e --wait 5m
-	"$(MYGOBIN)"/ginkgo -v -focus ".*$(FOCUS).*" ./test/e2e/... -- -v 5
+	$(GINKGO) -v -focus ".*$(FOCUS).*" ./test/e2e/... -- -v 5
 
 .PHONY: test-stress
-test-stress: "$(MYGOBIN)/ginkgo" "$(MYGOBIN)/kind"
+test-stress: "$(MYGOBIN)/kind"
 	kind delete cluster --name=cli-utils-e2e && kind create cluster --name=cli-utils-e2e --wait 5m \
 		--config=./test/stress/kind-cluster.yaml
 	kubectl wait nodes --for=condition=ready --all --timeout=5m
-	"$(MYGOBIN)/ginkgo" -v ./test/stress/... -- -v 3
+	$(GINKGO) -v ./test/stress/... -- -v 3
 
 .PHONY: vet
 vet:
