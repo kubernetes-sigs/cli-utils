@@ -20,8 +20,9 @@ const _ResourceAction_name = "ApplyPruneDeleteWaitInventory"
 var _ResourceAction_index = [...]uint8{0, 5, 10, 16, 20, 29}
 
 func (i ResourceAction) String() string {
-	if i < 0 || i >= ResourceAction(len(_ResourceAction_index)-1) {
+	idx := int(i) - 0
+	if i < 0 || idx >= len(_ResourceAction_index)-1 {
 		return "ResourceAction(" + strconv.FormatInt(int64(i), 10) + ")"
 	}
-	return _ResourceAction_name[_ResourceAction_index[i]:_ResourceAction_index[i+1]]
+	return _ResourceAction_name[_ResourceAction_index[idx]:_ResourceAction_index[idx+1]]
 }

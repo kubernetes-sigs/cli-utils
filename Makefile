@@ -3,32 +3,17 @@
 
 GOPATH := $(shell go env GOPATH)
 MYGOBIN := $(shell go env GOPATH)/bin
+# Tools are versioned in hack/tools/go.mod and run with $(GO_TOOL) <tool>.
+# The path is absolute and exported, so go:generate directives and scripts can use it too.
+export TOOLS_MODFILE := $(CURDIR)/hack/tools/go.mod
+GO_TOOL := go tool -modfile=$(TOOLS_MODFILE)
 SHELL := /bin/bash
 export PATH := $(MYGOBIN):$(PATH)
+# Use the Ginkgo CLI version from go.mod, so it always matches the library.
+GINKGO := go run github.com/onsi/ginkgo/v2/ginkgo
 
 .PHONY: all
 all: generate license fix vet fmt test lint tidy
-
-"$(MYGOBIN)/stringer":
-	go install golang.org/x/tools/cmd/stringer@v0.36.0
-
-"$(MYGOBIN)/addlicense":
-	go install github.com/google/addlicense@v1.0.0
-
-"$(MYGOBIN)/golangci-lint":
-	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.62.2
-
-"$(MYGOBIN)/deepcopy-gen":
-	go install k8s.io/code-generator/cmd/deepcopy-gen@v0.25.2
-
-"$(MYGOBIN)/ginkgo":
-	go install github.com/onsi/ginkgo/v2/ginkgo@v2.25.2
-
-"$(MYGOBIN)/mdrip":
-	go install github.com/monopole/mdrip@v1.0.2
-
-"$(MYGOBIN)/kind":
-	go install sigs.k8s.io/kind@v0.30.0
 
 # The following target intended for reference by a file in
 # https://github.com/kubernetes/test-infra/tree/master/config/jobs/kubernetes-sigs/cli-utils
@@ -62,49 +47,54 @@ install-column-apt:
 	apt-get install -y bsdmainutils
 
 .PHONY: generate-deepcopy
-generate-deepcopy: "$(MYGOBIN)/deepcopy-gen"
-	hack/run-in-gopath.sh deepcopy-gen --input-dirs ./pkg/apis/... -O zz_generated.deepcopy --go-header-file ./LICENSE_TEMPLATE_GO
+generate-deepcopy:
+	$(GO_TOOL) deepcopy-gen --output-file zz_generated.deepcopy.go --go-header-file ./LICENSE_TEMPLATE_GO ./pkg/apis/...
 
 .PHONY: generate
-generate: "$(MYGOBIN)/stringer" generate-deepcopy
+generate: generate-deepcopy
 	go generate ./...
 
 .PHONY: license
-license: "$(MYGOBIN)/addlicense"
-	"$(MYGOBIN)/addlicense" -v -y 2021 -c "The Kubernetes Authors." -f LICENSE_TEMPLATE .
+license:
+	$(GO_TOOL) addlicense -v -y 2021 -c "The Kubernetes Authors." -f LICENSE_TEMPLATE .
 
 .PHONY: verify-license
-verify-license: "$(MYGOBIN)/addlicense"
-	"$(MYGOBIN)/addlicense" -check .
+verify-license:
+	$(GO_TOOL) addlicense -check .
 
 .PHONY: tidy
 tidy:
 	go mod tidy
+	go -C hack/tools mod tidy
 
 .PHONY: lint
-lint: "$(MYGOBIN)/golangci-lint"
-	"$(MYGOBIN)/golangci-lint" run ./...
+lint:
+	$(GO_TOOL) golangci-lint run ./...
 
 .PHONY: test
 test:
 	go test -race -cover ./cmd/... ./pkg/...
 
+# The cluster is deleted after a successful run to free memory for verify-kapply-e2e,
+# which runs next in the same CI pod and creates its own cluster.
+# On failure it is kept for debugging.
 .PHONY: test-e2e
-test-e2e: "$(MYGOBIN)/ginkgo" "$(MYGOBIN)/kind"
-	kind delete cluster --name=cli-utils-e2e && kind create cluster --name=cli-utils-e2e --wait 5m
-	"$(MYGOBIN)/ginkgo" -v ./test/e2e/... -- -v 3
+test-e2e:
+	$(GO_TOOL) kind delete cluster --name=cli-utils-e2e && $(GO_TOOL) kind create cluster --name=cli-utils-e2e --wait 5m
+	$(GINKGO) -v ./test/e2e/... -- -v 3
+	$(GO_TOOL) kind delete cluster --name=cli-utils-e2e
 
 .PHONY: test-e2e-focus
-test-e2e-focus: "$(MYGOBIN)/ginkgo" "$(MYGOBIN)/kind"
-	kind delete cluster --name=cli-utils-e2e && kind create cluster --name=cli-utils-e2e --wait 5m
-	"$(MYGOBIN)"/ginkgo -v -focus ".*$(FOCUS).*" ./test/e2e/... -- -v 5
+test-e2e-focus:
+	$(GO_TOOL) kind delete cluster --name=cli-utils-e2e && $(GO_TOOL) kind create cluster --name=cli-utils-e2e --wait 5m
+	$(GINKGO) -v -focus ".*$(FOCUS).*" ./test/e2e/... -- -v 5
 
 .PHONY: test-stress
-test-stress: "$(MYGOBIN)/ginkgo" "$(MYGOBIN)/kind"
-	kind delete cluster --name=cli-utils-e2e && kind create cluster --name=cli-utils-e2e --wait 5m \
+test-stress:
+	$(GO_TOOL) kind delete cluster --name=cli-utils-e2e && $(GO_TOOL) kind create cluster --name=cli-utils-e2e --wait 5m \
 		--config=./test/stress/kind-cluster.yaml
 	kubectl wait nodes --for=condition=ready --all --timeout=5m
-	"$(MYGOBIN)/ginkgo" -v ./test/stress/... -- -v 3
+	$(GINKGO) -v ./test/stress/... -- -v 3
 
 .PHONY: vet
 vet:
@@ -124,7 +114,7 @@ build-with-race-detector:
 verify-kapply-e2e: test-examples-e2e-kapply
 
 .PHONY: test-examples-e2e-kapply
-test-examples-e2e-kapply: "$(MYGOBIN)/mdrip" "$(MYGOBIN)/kind"
+test-examples-e2e-kapply:
 	( \
 		set -e; \
 		/bin/rm -f bin/kapply; \

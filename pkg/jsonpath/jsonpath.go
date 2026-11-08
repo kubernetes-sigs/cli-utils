@@ -8,11 +8,10 @@ import (
 	"fmt"
 
 	"github.com/spyzhov/ajson"
-	// Using gopkg.in/yaml.v3 instead of sigs.k8s.io/yaml on purpose.
+	// Using go.yaml.in/yaml/v3 instead of sigs.k8s.io/yaml on purpose.
 	// yaml.v3 correctly parses ints:
 	// https://github.com/kubernetes-sigs/yaml/issues/45
-	// yaml.v3 Node is also used as input to yqlib.
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v3"
 	"k8s.io/klog/v2"
 )
 
