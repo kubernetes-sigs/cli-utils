@@ -17,8 +17,9 @@ const _Policy_name = "ExitEarlySkipInvalid"
 var _Policy_index = [...]uint8{0, 9, 20}
 
 func (i Policy) String() string {
-	if i < 0 || i >= Policy(len(_Policy_index)-1) {
+	idx := int(i) - 0
+	if i < 0 || idx >= len(_Policy_index)-1 {
 		return "Policy(" + strconv.FormatInt(int64(i), 10) + ")"
 	}
-	return _Policy_name[_Policy_index[i]:_Policy_index[i+1]]
+	return _Policy_name[_Policy_index[idx]:_Policy_index[idx+1]]
 }

@@ -18,8 +18,9 @@ const _IDMatchStatus_name = "EmptyMatchNoMatch"
 var _IDMatchStatus_index = [...]uint8{0, 5, 10, 17}
 
 func (i IDMatchStatus) String() string {
-	if i < 0 || i >= IDMatchStatus(len(_IDMatchStatus_index)-1) {
+	idx := int(i) - 0
+	if i < 0 || idx >= len(_IDMatchStatus_index)-1 {
 		return "IDMatchStatus(" + strconv.FormatInt(int64(i), 10) + ")"
 	}
-	return _IDMatchStatus_name[_IDMatchStatus_index[i]:_IDMatchStatus_index[i+1]]
+	return _IDMatchStatus_name[_IDMatchStatus_index[idx]:_IDMatchStatus_index[idx+1]]
 }

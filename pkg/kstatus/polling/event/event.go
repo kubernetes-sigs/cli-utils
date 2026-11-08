@@ -14,7 +14,7 @@ import (
 // Type is the type that describes the type of an Event that is passed back to the caller
 // as resources in the cluster are being polled.
 //
-//go:generate stringer -type=Type -linecomment
+//go:generate go tool -modfile=$TOOLS_MODFILE stringer -type=Type -linecomment
 type Type int
 
 const (

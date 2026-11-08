@@ -28,7 +28,7 @@ type Options struct {
 	RESTScopeStrategy RESTScopeStrategy
 }
 
-//go:generate stringer -type=RESTScopeStrategy -linecomment
+//go:generate go tool -modfile=$TOOLS_MODFILE stringer -type=RESTScopeStrategy -linecomment
 type RESTScopeStrategy int
 
 const (

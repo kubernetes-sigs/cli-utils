@@ -15,7 +15,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/object"
 )
 
-//go:generate stringer -type=Relationship -linecomment
+//go:generate go tool -modfile=$TOOLS_MODFILE stringer -type=Relationship -linecomment
 type Relationship int
 
 const (
@@ -23,7 +23,7 @@ const (
 	RelationshipDependency                     // Dependency
 )
 
-//go:generate stringer -type=Phase -linecomment
+//go:generate go tool -modfile=$TOOLS_MODFILE stringer -type=Phase -linecomment
 type Phase int
 
 const (

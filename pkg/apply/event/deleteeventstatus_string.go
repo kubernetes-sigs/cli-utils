@@ -19,8 +19,9 @@ const _DeleteEventStatus_name = "PendingSuccessfulSkippedFailed"
 var _DeleteEventStatus_index = [...]uint8{0, 7, 17, 24, 30}
 
 func (i DeleteEventStatus) String() string {
-	if i < 0 || i >= DeleteEventStatus(len(_DeleteEventStatus_index)-1) {
+	idx := int(i) - 0
+	if i < 0 || idx >= len(_DeleteEventStatus_index)-1 {
 		return "DeleteEventStatus(" + strconv.FormatInt(int64(i), 10) + ")"
 	}
-	return _DeleteEventStatus_name[_DeleteEventStatus_index[i]:_DeleteEventStatus_index[i+1]]
+	return _DeleteEventStatus_name[_DeleteEventStatus_index[idx]:_DeleteEventStatus_index[idx+1]]
 }

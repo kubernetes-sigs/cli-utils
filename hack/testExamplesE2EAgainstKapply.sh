@@ -11,11 +11,17 @@ GREEN='\033[0;32m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
+TOOLS_MODFILE="${TOOLS_MODFILE:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/tools/go.mod}"
+
+# The examples call kind by name. go tool -n builds it if needed and prints its path.
+kind_path="$(go tool -modfile="${TOOLS_MODFILE}" -n kind)"
+PATH="$(dirname "${kind_path}"):${PATH}"
+
 results=()
 failed=0
 
 function run_test() {
-    mdrip -alsologtostderr -v 10 --blockTimeOut 6m0s --mode test \
+    go tool -modfile="${TOOLS_MODFILE}" mdrip -alsologtostderr -v 10 --blockTimeOut 6m0s --mode test \
         --label testE2EAgainstLatestRelease "${1}"
 }
 

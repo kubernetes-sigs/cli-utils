@@ -73,7 +73,7 @@ func NoDeletion(key, value string) bool {
 
 var Strategies = []DryRunStrategy{DryRunNone, DryRunClient, DryRunServer}
 
-//go:generate stringer -type=DryRunStrategy
+//go:generate go tool -modfile=$TOOLS_MODFILE stringer -type=DryRunStrategy
 type DryRunStrategy int
 
 const (

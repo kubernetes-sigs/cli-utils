@@ -18,8 +18,9 @@ const _DryRunStrategy_name = "DryRunNoneDryRunClientDryRunServer"
 var _DryRunStrategy_index = [...]uint8{0, 10, 22, 34}
 
 func (i DryRunStrategy) String() string {
-	if i < 0 || i >= DryRunStrategy(len(_DryRunStrategy_index)-1) {
+	idx := int(i) - 0
+	if i < 0 || idx >= len(_DryRunStrategy_index)-1 {
 		return "DryRunStrategy(" + strconv.FormatInt(int64(i), 10) + ")"
 	}
-	return _DryRunStrategy_name[_DryRunStrategy_index[i]:_DryRunStrategy_index[i+1]]
+	return _DryRunStrategy_name[_DryRunStrategy_index[idx]:_DryRunStrategy_index[idx+1]]
 }
