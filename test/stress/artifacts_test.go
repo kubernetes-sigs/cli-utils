@@ -73,7 +73,7 @@ metadata:
   name: ""
   namespace: ""
 spec:
-  replicas: 1
+  replicas: 0 # Running 1000 pods needs more memory than the CI job has.
   selector:
     matchLabels:
       app: pause
