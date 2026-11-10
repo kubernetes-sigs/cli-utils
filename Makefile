@@ -16,7 +16,7 @@ all: generate license fix vet fmt test lint tidy
 	go install github.com/google/addlicense@v1.0.0
 
 "$(MYGOBIN)/golangci-lint":
-	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.62.2
+	go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0
 
 "$(MYGOBIN)/deepcopy-gen":
 	go install k8s.io/code-generator/cmd/deepcopy-gen@v0.25.2
@@ -89,10 +89,14 @@ lint: "$(MYGOBIN)/golangci-lint"
 test:
 	go test -race -cover ./cmd/... ./pkg/...
 
+# The cluster is deleted after a successful run to free memory for verify-kapply-e2e,
+# which runs next in the same CI pod and creates its own cluster.
+# On failure it is kept for debugging.
 .PHONY: test-e2e
 test-e2e: "$(MYGOBIN)/ginkgo" "$(MYGOBIN)/kind"
 	kind delete cluster --name=cli-utils-e2e && kind create cluster --name=cli-utils-e2e --wait 5m
 	"$(MYGOBIN)/ginkgo" -v ./test/e2e/... -- -v 3
+	kind delete cluster --name=cli-utils-e2e
 
 .PHONY: test-e2e-focus
 test-e2e-focus: "$(MYGOBIN)/ginkgo" "$(MYGOBIN)/kind"
