@@ -152,9 +152,26 @@ var (
 		reconciledColumnDef,
 		table.MustColumn("conditions"),
 		table.MustColumn("age"),
-		table.MustColumn("message"),
+		withActuationError(table.MustColumn("message")),
 	}
 )
+
+// withActuationError gives operation errors priority over polled status messages.
+func withActuationError(column table.ColumnDef) table.ColumnDef {
+	printResource := column.PrintResourceFunc
+	column.PrintResourceFunc = func(w io.Writer, width int, resource table.Resource) (int, error) {
+		info, ok := resource.(*resourceInfo)
+		if !ok || info.Error == nil {
+			return printResource(w, width, resource)
+		}
+		message := info.Error.Error()
+		if len(message) > width {
+			message = message[:width]
+		}
+		return fmt.Fprint(w, message)
+	}
+	return column
+}
 
 // runPrintLoop starts a new goroutine that will regularly fetch the
 // latest state from the collector and update the table.

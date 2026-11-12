@@ -237,6 +237,8 @@ included to translate from the primary event stream into STDOUT text:
     line, intended for automated interpretation by machine.
 1. **Table Printer**: The table  printer writes and updates in-place a table
     with one object per line, intended for human consumption.
+    The message column gives apply, prune, and delete errors priority over
+    resource status messages, so later status updates preserve the failure reason.
 
 ## Packages
 
