@@ -340,6 +340,7 @@ func (r *resourceStateCollector) LatestState() *ResourceState {
 			identifier:     ri.identifier,
 			resourceStatus: ri.resourceStatus,
 			ResourceAction: ri.ResourceAction,
+			Error:          ri.Error,
 			ApplyStatus:    ri.ApplyStatus,
 			PruneStatus:    ri.PruneStatus,
 			DeleteStatus:   ri.DeleteStatus,
