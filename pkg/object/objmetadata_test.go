@@ -75,17 +75,26 @@ func TestParseObjMetadata(t *testing.T) {
 			},
 			isError: false,
 		},
-		"RBAC resources can have a literal underscore in their name": {
-			invStr: "test-namespace_roles_ops_rbac.authorization.k8s.io_ClusterRole",
+		"Cluster-scoped RBAC resource with a literal underscore in its name": {
+			invStr: "_roles_ops_rbac.authorization.k8s.io_ClusterRole",
 			inventory: &ObjMetadata{
-				Namespace: "test-namespace",
-				Name:      "roles_ops",
+				Name: "roles_ops",
 				GroupKind: schema.GroupKind{
 					Group: rbacv1.GroupName,
 					Kind:  "ClusterRole",
 				},
 			},
 			isError: false,
+		},
+		"RBAC resource with an ambiguous run of underscores -- error": {
+			invStr:    "_a___b_rbac.authorization.k8s.io_ClusterRole",
+			inventory: &ObjMetadata{},
+			isError:   true,
+		},
+		"Non-RBAC resource with an underscore in its name -- error": {
+			invStr:    "test-namespace_test_name_apps_Deployment",
+			inventory: &ObjMetadata{},
+			isError:   true,
 		},
 		"Test double underscore (colon) at end of name": {
 			invStr: "test-namespace_leader-locking-kube-scheduler___rbac.authorization.k8s.io_RoleBinding",
@@ -128,6 +137,46 @@ func TestParseObjMetadata(t *testing.T) {
 			}
 			if tc.isError && err == nil {
 				t.Errorf("Should have returned an error in ParseObjMetadata()")
+			}
+		})
+	}
+}
+
+func TestObjMetadataRBACNameRoundTrip(t *testing.T) {
+	clusterRole := schema.GroupKind{Group: rbacv1.GroupName, Kind: "ClusterRole"}
+	role := schema.GroupKind{Group: rbacv1.GroupName, Kind: "Role"}
+	tests := map[string]struct {
+		id      ObjMetadata
+		isError bool
+	}{
+		"underscore in the middle":          {id: ObjMetadata{Name: "roles_ops", GroupKind: clusterRole}},
+		"leading underscore":                {id: ObjMetadata{Name: "_ops", GroupKind: clusterRole}},
+		"trailing underscore":               {id: ObjMetadata{Name: "ops_", GroupKind: clusterRole}},
+		"namespaced Role with underscore":   {id: ObjMetadata{Namespace: "test-namespace", Name: "roles_ops", GroupKind: role}},
+		"underscore and colon not adjacent": {id: ObjMetadata{Name: "system:roles_ops", GroupKind: clusterRole}},
+		"several separate underscores":      {id: ObjMetadata{Name: "a_b_c", GroupKind: clusterRole}},
+		"double colon":                      {id: ObjMetadata{Name: "a::b", GroupKind: clusterRole}},
+		// "a:_b", "a_:b" and "a___b" all encode to "a___b", so parsing must
+		// fail instead of guessing which object is meant.
+		"colon followed by underscore -- error": {id: ObjMetadata{Name: "a:_b", GroupKind: clusterRole}, isError: true},
+		"underscore followed by colon -- error": {id: ObjMetadata{Name: "a_:b", GroupKind: clusterRole}, isError: true},
+		"three underscores -- error":            {id: ObjMetadata{Name: "a___b", GroupKind: clusterRole}, isError: true},
+	}
+	for tn, tc := range tests {
+		t.Run(tn, func(t *testing.T) {
+			s := tc.id.String()
+			actual, err := ParseObjMetadata(s)
+			if tc.isError {
+				if err == nil {
+					t.Errorf("expected an error parsing %q, got %v", s, actual)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error parsing %q: %v", s, err)
+			}
+			if actual != tc.id {
+				t.Errorf("round trip of %q: expected %v, got %v", s, tc.id, actual)
 			}
 		})
 	}
