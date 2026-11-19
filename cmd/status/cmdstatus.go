@@ -6,13 +6,13 @@ package status
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-	"k8s.io/kubectl/pkg/util/slice"
 	"sigs.k8s.io/cli-utils/cmd/flagutils"
 	"sigs.k8s.io/cli-utils/cmd/status/printers"
 	"sigs.k8s.io/cli-utils/cmd/status/printers/printer"
@@ -107,7 +107,7 @@ type Runner struct {
 }
 
 func (r *Runner) preRunE(*cobra.Command, []string) error {
-	if !slice.Contains(PollUntilOptions, r.pollUntil, nil) {
+	if !slices.Contains(PollUntilOptions, r.pollUntil) {
 		return fmt.Errorf("pollUntil must be one of %s", strings.Join(PollUntilOptions, ","))
 	}
 

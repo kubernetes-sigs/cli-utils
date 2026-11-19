@@ -33,9 +33,9 @@ func (cde CyclicDependencyError) Error() string {
 	var errorBuf bytes.Buffer
 	errorBuf.WriteString("cyclic dependency:")
 	for _, edge := range cde.Edges {
-		errorBuf.WriteString(fmt.Sprintf("\n%s%s -> %s", multierror.Prefix,
+		fmt.Fprintf(&errorBuf, "\n%s%s -> %s", multierror.Prefix,
 			mutation.ResourceReferenceFromObjMetadata(edge.From),
-			mutation.ResourceReferenceFromObjMetadata(edge.To)))
+			mutation.ResourceReferenceFromObjMetadata(edge.To))
 	}
 	return errorBuf.String()
 }

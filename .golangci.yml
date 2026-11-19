@@ -1,59 +1,86 @@
 # Copyright 2019 The Kubernetes Authors.
 # SPDX-License-Identifier: Apache-2.0
 
-run:
-  timeout: 30m
-
+version: "2"
 linters:
-  # please, do not use `enable-all`: it's deprecated and will be removed soon.
-  # inverted configuration with `enable-all` and `disable` is not scalable during updates of golangci-lint
-  disable-all: true
+  default: none
   enable:
     - bodyclose
-    # - depguard
+    - copyloopvar
     - dogsled
     - dupl
     - errcheck
-    - copyloopvar
     - gochecknoinits
     - goconst
     - gocritic
     - gocyclo
-    - gofmt
-    - goimports
     - gosec
-    - gosimple
     - govet
     - ineffassign
-    # - interfacer
     - lll
     - misspell
     - nakedret
-    - staticcheck
-    - stylecheck
     - revive
-    - typecheck
+    - staticcheck
     - unconvert
     - unparam
     - unused
     - whitespace
-
-
-linters-settings:
-  dupl:
-    threshold: 400
-  lll:
-    line-length: 170
-  gocyclo:
-    min-complexity: 30
-  copyloopvar:
-    check-alias: true
-
-issues:
-  # List of regexps of issue texts to exclude, empty list by default.
-  # But independently from this option we use default exclude patterns,
-  # it can be disabled by `exclude-use-default: false`. To list all
-  # excluded by default patterns execute `golangci-lint run --help`
-  exclude:
-    - "Using the variable on range scope `tc` in function literal"
-    - "unused-parameter: parameter"
+  settings:
+    copyloopvar:
+      check-alias: true
+    dupl:
+      threshold: 400
+    goconst:
+      # goconst v1.8+ also checks strings in composite literals (test fixtures,
+      # unstructured field paths, ...). Keep the previous behavior.
+      exclude-types:
+        - Call
+        - CompositeLit
+    gocyclo:
+      min-complexity: 30
+    lll:
+      line-length: 170
+    staticcheck:
+      checks:
+        # golangci-lint defaults.
+        - all
+        - -ST1000
+        - -ST1003
+        - -ST1016
+        - -ST1020
+        - -ST1021
+        - -ST1022
+        # Explicit embedded field selectors are often clearer.
+        - -QF1008
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      - path: (.+)\.go$
+        text: Using the variable on range scope `tc` in function literal
+      - path: (.+)\.go$
+        text: 'unused-parameter: parameter'
+      # Test fixtures contain Secret manifests.
+      - path: _test\.go$
+        linters:
+          - gosec
+        text: G101
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

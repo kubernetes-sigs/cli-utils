@@ -105,7 +105,7 @@ func textForError(baseErr error, cmdNameBase string) (string, bool) {
 // event the error is actually a pointer to a type.
 func findErrType(err error) (reflect.Type, bool) {
 	switch reflect.ValueOf(err).Kind() {
-	case reflect.Ptr:
+	case reflect.Pointer:
 		// If the value of the interface is a pointer, we use the type
 		// of the real value.
 		return reflect.ValueOf(err).Elem().Type(), true
