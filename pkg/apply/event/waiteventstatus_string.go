@@ -20,8 +20,9 @@ const _WaitEventStatus_name = "PendingSuccessfulSkippedTimeoutFailed"
 var _WaitEventStatus_index = [...]uint8{0, 7, 17, 24, 31, 37}
 
 func (i WaitEventStatus) String() string {
-	if i < 0 || i >= WaitEventStatus(len(_WaitEventStatus_index)-1) {
+	idx := int(i) - 0
+	if i < 0 || idx >= len(_WaitEventStatus_index)-1 {
 		return "WaitEventStatus(" + strconv.FormatInt(int64(i), 10) + ")"
 	}
-	return _WaitEventStatus_name[_WaitEventStatus_index[i]:_WaitEventStatus_index[i+1]]
+	return _WaitEventStatus_name[_WaitEventStatus_index[idx]:_WaitEventStatus_index[idx+1]]
 }
